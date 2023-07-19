@@ -20,7 +20,6 @@ set.seed(12932)
 
 library(tidyverse)
 library(marginaleffects)
-library(fwildclusterboot) # I hope you have Julia installed Ed
 library(broom)
 library(knitr)
 library(kableExtra)
@@ -379,9 +378,9 @@ indiv_balance_fit = feols(
 
 school_balance_fit = feols(
     data = analysis_school_data %>%
-      select(any_of(balance_variables), treat_dist, county), 
+      select(any_of(balance_variables), treat_dist, county, cluster.id), 
     .[balance_variables] ~ 0 + treat_dist + i(county, ref = "Busia"),
-    vcov = "HC"
+    cluster = ~cluster.id
   )
 
 # put all the baseline balance fits into a list we can map over
