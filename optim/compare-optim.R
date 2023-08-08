@@ -138,8 +138,8 @@ if (!script_options$posterior_median) { # if all draws
         mutate(
             overshoot = 100*(util/target_optim - 1)
         )
-treat_v = "bracelet"
-
+    # The fixing mu/delta df
+    treat_v = "bracelet"
     fix_oa_df = subset_oa_df %>%
         filter(private_benefit_z == treat_v  & visibility_z == treat_v) %>%
         filter(allocation_type != "experimental") %>%
@@ -160,100 +160,6 @@ treat_v = "bracelet"
             j
         )  %>%
         mutate(any_fix = fix_type != "no-fix")
-
-    fix_demand_df = 
-    demand_df %>%
-        filter(private_benefit_z == treat_v  & visibility_z == treat_v) %>%
-        filter(allocation_type != "experimental") %>%
-        filter(static_vstar == FALSE) %>%
-        filter(rep_type == "rep")
-
-    draw_n = 200
-
-    fix_oa_df %>%
-        filter(!is.na(fix_distance)) %>%
-        # filter(fix_distance == 0) %>%
-        ggplot(aes(
-            x = dist,
-            y = demand,
-            colour = fix_type,
-            group =  interaction(fix_type, draw)
-        )) +
-        geom_line(alpha = 0.5)  +
-        geom_line(
-            inherit.aes = FALSE,
-            aes(x = dist, y = demand, group = draw),
-            data = fix_oa_df %>%
-                filter(fix_type == "no-fix") %>%
-                ungroup() %>%
-                select(-fix_distance, -fix_type),               
-                alpha = 0.3,
-                colour = "black"
-        ) +
-        facet_grid(fix_distance~fix_type) +
-        theme_bw() +
-        theme(legend.position = "bottom") 
-
-    draw_n = 20
-
-    fix_oa_df %>%
-        filter(!is.na(fix_distance)) %>%
-        filter(draw == draw_n) %>%
-        ggplot(aes(
-            x = dist,
-            y = demand,
-            colour = fix_type,
-            group =  interaction(fix_type, draw)
-        )) +
-        geom_line(alpha = 1)  +
-        geom_line(
-            data = fix_oa_df %>%
-                filter(fix_type == "no-fix") %>%
-                filter(draw == draw_n) %>%
-                ungroup() %>%
-                select(-fix_distance),               
-                alpha = 1
-        ) +
-        facet_wrap(~fix_distance, ncol = 1) +
-        theme_bw() +
-        theme(legend.position = "bottom") +
-        geom_vline(
-            data = tibble(
-                xint = c(0, 1250, 2500),
-                fix_distance = c(0, 1250, 2500)
-            ),
-            aes(xintercept = xint),
-            linetype = "longdash"
-        )
-    ggsave(
-        "temp-plots/fixing-plot.pdf",
-        width = 10,
-        height = 10
-    )
-stop()
-
-
-
-    demand_df %>%
-        filter(!is.na(fix_distance)) %>%
-        ggplot(aes(
-            x = mean_dist,
-            y = median_demand,
-            colour = fix_type,
-            group =  interaction(fix_type)
-        )) +
-        geom_line(alpha = 0.5)  +
-        geom_line(
-            data = demand_df %>%
-                filter(fix_type == "no-fix") %>%
-                ungroup() %>%
-                select(-fix_distance),               
-                alpha = 1
-        ) +
-        facet_wrap(~fix_distance, ncol = 1) +
-        theme_bw() +
-        theme(legend.position = "bottom") 
-
 
     summ_optim_df = subset_oa_df %>%
         group_by(
@@ -349,33 +255,6 @@ clean_summ_optim_df = summ_optim_df %>%
 
 
 
-clean_summ_optim_df %>%
-    filter(rep_type == "rep") %>%
-    filter(!is.na(distance_constraint), distance_constraint != 2500) %>%
-    ggplot(aes(
-        x = n_pot, 
-        fill = interaction(private_benefit_z, visibility_z, static_vstar, rep_type, allocation_type, fix_type, fix_distance)
-    )) +
-    geom_density(alpha = 0.6) +
-    theme_minimal() +
-    theme(legend.position = "bottom") +
-    facet_wrap(~distance_constraint)
-
-
-
-clean_summ_optim_df %>%
-    filter(rep_type == "rep") %>%
-    ggplot(aes(
-        x = n_pot, 
-        fill = interaction(private_benefit_z, visibility_z, static_vstar, rep_type, allocation_type)
-    )) +
-    geom_histogram(
-        colour = "black"
-    ) +
-    theme_minimal() +
-    theme(legend.position = "bottom")
-
-
 
 
 clean_summ_optim_df %>% 
@@ -407,6 +286,11 @@ summ_optim_df = model_df %>%
     group_by(
         private_benefit_z,
         visibility_z, 
+        static_vstar,
+        allocation_type,
+        distance_constraint,
+        fix_type,
+        fix_distance,
         model, 
         rep_type,
         cutoff_type

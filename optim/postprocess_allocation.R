@@ -1,4 +1,5 @@
 #!/usr/bin/Rscript
+print(commandArgs(trailingOnly = TRUE))
 script_options <- docopt::docopt(
     stringr::str_glue("Usage:
         postprocess_allocation.R  [options] [--min-cost | --max-takeup]
@@ -22,18 +23,49 @@ script_options <- docopt::docopt(
           --pdf-output-path=<pdf-output-path>  Output path for PDF plots 
 "),
   args = if (interactive()) "
-                            --constraint-type=agg \
-                            --welfare-function=log \
-                            --min-cost \
-                            --optim-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-log-full-many-pots \
-                            --optim-input-a-filename=target-rep-suppress-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws-optimal-allocation.rds \
-                            --output-path=optim/plots/agg-log-full-many-pots \
-                            --output-basename=target-rep-agg-log-suppress-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median \
-                            --cutoff-type=cutoff
-                            --data-input-name=full-many-pots-experiment.rds \
-                            --pdf-output-path=presentations/takeup-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fig/
+ --min-cost                                                                                                                                                                        
+ --constraint-type=agg                                                                                                                                                              
+ --welfare-function=identity                                                                                                                                                        
+ --optim-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots                                                                                            
+ --optim-input-a-filename=target-rep-distconstraint-3500-util-identity-mu1250-cutoff-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws-optimal-allocation.rds
+ --data-input-name=full-many-pots-experiment.rds                                                                                                                                    
+ --output-path=optim/plots/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots                                                                                               
+ --output-basename=agg-target-rep-distconstraint-3500-util-identity-mu1250-cutoff-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws                          
+ --cutoff-type=cutoff                                                                                                                                                               
+ --pdf-output-path=presentations/optim-takeup-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fig                                                                                           
+
                              " else commandArgs(trailingOnly = TRUE)
 ) 
+
+
+
+                            # --constraint-type=agg \
+                            # --welfare-function=identity \
+                            # --min-cost \
+                            # --optim-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
+                            # --optim-input-a-filename=target-rep-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws-optimal-allocation.rds \
+                            # --output-path=optim/plots/agg-log-full-many-pots \
+                            # --output-basename=target-rep-agg-log-suppress-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median \
+                            # --cutoff-type=cutoff
+                            # --data-input-name=full-many-pots-experiment.rds \
+                            # --pdf-output-path=presentations/takeup-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fig/
+
+
+
+        # Rscript ./optim/postprocess_allocation.R  \
+        #                             --min-cost \
+        #                             ${POSTERIOR_MEDIAN} \
+        #                             --constraint-type=${CONSTRAINT_TYPE} \
+        #                             --welfare-function=${WELFARE_FUNCTION} \
+        #                             --optim-input-path=${OUTPUT_PATH} \
+        #                             --optim-input-a-filename=target-${CONSTRAINT_TARGET}-${DEMAND_NAME}${TMP_REP_VAR_A}${CUTOFF}cutoff-b-$1-mu-$2-${MODEL}-${POSTVAR}-optimal-allocation.rds \
+        #                             --optim-input-b-filename=target-${CONSTRAINT_TARGET}-${DEMAND_NAME}${TMP_REP_VAR_B}${CUTOFF}cutoff-b-$3-mu-$4-${MODEL}-${POSTVAR}-optimal-allocation.rds \
+        #                             --comp-output-basename=target-${CONSTRAINT_TARGET}-${WELFARE_FUNCTION}-${SUPPRESS_REP}${CUTOFF}cutoff-b1-$1-mu1-$2-b2-$3-mu2-$4-${MODEL}-${POSTVAR} \
+        #                             --data-input-name=$DATA_INPUT_NAME \
+        #                             --output-path=${PLOT_OUTPUT_PATH} \
+        #                             --output-basename=target-${CONSTRAINT_TARGET}-${WELFARE_FUNCTION}-${DEMAND_NAME}${SUPPRESS_REP}${CUTOFF}cutoff-b-$1-mu-$2-${MODEL}-${POSTVAR} \
+        #                             --cutoff-type=${CUTOFF}cutoff \
+        #                             --pdf-output-path=presentations/takeup-${MODEL}-fig/
 
 
 library(tidyverse)
@@ -494,16 +526,7 @@ if (!is.null(script_options$optim_input_b_filename)) {
 
 
 if (stat_type == "post-draws") {
-
-    long_optimal_df = optimal_df %>%
-        select(
-            draw,
-            model,
-            private_benefit_z,
-            visibility_z, 
-            model_output
-            )  %>%
-        unnest(model_output)
+    library(sf)
 
     cols_we_want = c(
         "draw", 
@@ -520,6 +543,22 @@ if (stat_type == "post-draws") {
         "pot_lat", 
         "target_optim"
     )
+
+    long_optimal_df = optimal_df %>%
+        select(
+            draw,
+            model,
+            private_benefit_z,
+            visibility_z, 
+            model_output
+            )  %>%
+        mutate(model_output = map(
+            model_output,
+            select,
+            any_of(cols_we_want)
+        )) %>%
+        unnest(model_output)
+
 
 
     long_optimal_df = long_optimal_df %>%
