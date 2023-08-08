@@ -309,22 +309,26 @@ print(
 ```{r}
 #| create-te-df
 
-
-
-ate_rvar_df = bind_rows(
-  read_rds(
+ate_rvar_struct = read_rds(
       file.path(
         "temp-data",
         str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{params$struct_models}_1-4.rds")
       ) 
-  ),
-  read_rds(
+  )
+ate_rvar_rf = read_rds(
       file.path(
         "temp-data",
         str_glue("rvar_processed_dist_fit{params$rf_fit_version}_ates_{params$rf_models}_1-4.rds")
       ) 
   )
+# weird bind_rows() bug with rvar cols
+ate_rvar_df = bind_rows(
+    ate_rvar_struct %>% 
+      select(-value),
+    ate_rvar_rf %>%
+      select(-value)
 )
+ate_rvar_df$value = c(ate_rvar_struct$value, ate_rvar_rf$value)
 
 create_cis = function(.data) {
   med_fun = function(x) {
