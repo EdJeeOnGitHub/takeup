@@ -782,6 +782,7 @@ wide_belief_tbl = wide_belief_df %>%
     booktabs = TRUE, 
     escape = FALSE, 
     align = "lcccccc", 
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
     caption = "Beliefs Results"
   ) %>%
   kable_styling(
@@ -1011,6 +1012,7 @@ all_wide_disagg_belief_tbl = wide_disagg_belief_input_df %>%
     booktabs = TRUE, 
     escape = FALSE, 
     align = "lcccccc", 
+    linesep = "",
     caption = "Beliefs Results"
   ) %>%
   kable_styling(
@@ -1074,6 +1076,7 @@ wide_disagg_belief_sob_tbl = wide_disagg_belief_input_df %>%
     booktabs = TRUE, 
     escape = FALSE, 
     align = "lcccccc", 
+    linesep = "",
     caption = "Beliefs Results"
   ) %>%
   kable_styling(
@@ -1134,6 +1137,7 @@ wide_disagg_belief_tbl = wide_disagg_belief_input_df %>%
     booktabs = TRUE, 
     escape = FALSE, 
     align = "lcccccc", 
+    linesep = "",
     caption = "Beliefs Results"
   ) %>%
   kable_styling(
@@ -1180,7 +1184,7 @@ wide_disagg_belief_tbl %>%
 
 
 ```{r}
-#| eval=FALSE
+#| eval=TRUE
 1+1
 
 wtp_input_df = tidy_param_df %>%
@@ -1198,7 +1202,7 @@ wtp_input_df = tidy_param_df %>%
       paste0(
         value, "\n",
         "(", conf.low, ", ", conf.high, ")"
-      )
+      ), align = "c"
     )
   ) %>%
   select(variable, val_diff, estim_std) %>%
@@ -1438,6 +1442,7 @@ optim_summ_tbl = optim_summ_input_df %>%
     align = "llccc",
     booktabs = TRUE,
     # format = "latex",
+    linesep = "",
     escape = FALSE
     ) %>%
   kableExtra::kable_styling(
@@ -1495,7 +1500,7 @@ optim_summ_tbl %>%
     index = c(
       "Panel A: No Fixing" = 1, 
       "Panel B: Fix $\\mu$" = 3, 
-      "Panel C: Fix $\\delta$" = 3
+      "Panel C: Fix $\\Delta(w^*)$" = 3
     ), 
     italic = TRUE,
     escape = FALSE,
@@ -2396,52 +2401,56 @@ create_balance_input = function(tidy_df,
         )
       )  
 
-    bal_input_df %>%
+  if (comp_df == TRUE) {
+    wide_bal_input_df = bal_input_df %>%
       select(lhs, lhs_treat, rhs_treat, lhs_dist, estim_std) %>%
       unique()  %>%
       mutate(
         treat_diff = paste0(str_sub(lhs_treat, 1, 3), " - ", str_sub(rhs_treat, 1,3)),
         treat_diff = if_else(is.na(rhs_treat),  str_sub(lhs_treat, 1, 3), treat_diff)
         )  %>%
-    mutate(
-      treat_diff = factor(treat_diff, levels = c(
-        "con",
-        "ink - con",
-        "cal - con",
-        "bra - con",
-        "bra - cal"
-      )),
-      lhs_treat = factor(lhs_treat, treat_levels_c) %>% fct_rev(), 
-      lhs_dist = factor(lhs_dist, dist_levels) %>% fct_rev()
-    ) %>%
-    select(lhs, treat_diff, lhs_dist, estim_std) 
+      mutate(
+        treat_diff = factor(treat_diff, levels = c(
+          "con",
+          "ink - con",
+          "cal - con",
+          "bra - con",
+          "bra - cal"
+        )),
+        lhs_treat = factor(lhs_treat, treat_levels_c) %>% fct_rev(), 
+        lhs_dist = factor(lhs_dist, dist_levels) %>% fct_rev()
+      ) %>%
+      select(lhs, treat_diff, lhs_dist, estim_std) %>%
+      pivot_wider(
+      names_from = c(treat_diff, lhs_dist),
+      values_from = estim_std, 
+      )    %>%
+      select(
+      any_of(col_order_we_want)
+      )  
+  } else {
 
-  wide_bal_input_df = bal_input_df %>%
-    select(lhs, lhs_treat, rhs_treat, lhs_dist, estim_std) %>%
-    unique()  %>%
-    mutate(
-      treat_diff = paste0(str_sub(lhs_treat, 1, 3), " - ", str_sub(rhs_treat, 1,3)),
-      treat_diff = if_else(is.na(rhs_treat),  str_sub(lhs_treat, 1, 3), treat_diff)
-      )  %>%
-    mutate(
-      treat_diff = factor(treat_diff, levels = c(
-        "con",
-        "ink - con",
-        "cal - con",
-        "bra - con",
-        "bra - cal"
-      )),
-      lhs_treat = factor(lhs_treat, treat_levels_c) %>% fct_rev(), 
-      lhs_dist = factor(lhs_dist, dist_levels) %>% fct_rev()
-    ) %>%
-    select(lhs, treat_diff, lhs_dist, estim_std) %>%
-    pivot_wider(
-    names_from = c(treat_diff, lhs_dist),
-    values_from = estim_std, 
-    )    %>%
-    select(
-    any_of(col_order_we_want)
-    )  
+    wide_bal_input_df = bal_input_df %>%
+      select(lhs, lhs_treat, estim_std, lhs_dist) %>%
+      mutate(
+        col_name = paste0(lhs_treat, "_", lhs_dist)
+      ) %>%
+      select(lhs, estim_std, col_name) %>%
+      spread(col_name, estim_std) %>%
+      select(
+        lhs,
+
+        control_close,
+        ink_close,
+        calendar_close,
+        bracelet_close,
+
+        control_far,
+        ink_far,
+        calendar_far,
+        bracelet_far
+      )
+  }
   return(wide_bal_input_df)
 }
 
@@ -2514,10 +2523,10 @@ N_baseline_obs = baseline_balance_data %>%
 # across a range of alternative mechanisms.
 comp_endline_vars = endline_vars %>%
   str_remove(., "endline_")
-comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
+# comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
 baseline_endline_externality_fit = feols(
       data = endline_and_baseline_data, 
-      .[comp_endline_vars] ~ 0 + treat_dist:type, 
+      .[comp_endline_vars] ~ 0 + treat_dist:type + i(county, ref = "Busia"), 
       ~cluster.id
       ) 
 
@@ -2705,6 +2714,7 @@ dist_comp_df %>%
       escape = FALSE, 
       booktabs = TRUE,
       align = "lcccccccc", 
+      linesep = "\\addlinespace \\addlinespace \\addlinespace",
       caption = "Distance Comparison Balance table"
   ) %>%
   kable_styling(
@@ -2715,7 +2725,7 @@ dist_comp_df %>%
 ```
 
 ```{r}
-#| endline-table, eval=FALSE
+#| endline-table, eval=TRUE
 
 
 endline_balance_df = create_balance_input(
@@ -2730,19 +2740,16 @@ endline_balance_df = create_balance_input(
       mutate_all(as.character) %>%
       mutate(type = "pval")
   ) %>%
-  arrange(lhs, type) %>%
   mutate(lhs = str_remove(lhs, "lhs: ")) %>%
   left_join(lhs_translation_df %>% select(lhs = lhs_no_prefix, clean_name)) %>%
   mutate(lhs = clean_name) %>%
   select(-clean_name) %>%
+  arrange(lhs, type) %>%
   mutate(lhs = if_else(type == "pval", paste0("$\\Delta$", lhs, ", $p$-value"), lhs)) %>%
   select(-type) %>%
   mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
   mutate(across(where(is.character), replace_na, "-")) %>%
-  select(all_of(col_order)) %>%
-  filter(lhs != "Knowledge of deworming medication")
-
-
+  select(all_of(col_order)) 
 
 treat_colnames = str_to_title(treat_levels_c)
 endline_bal_table = endline_balance_df %>% 
@@ -2752,7 +2759,8 @@ knitr::kable(
     col.names = c("", treat_colnames, "F-test $p$-value", treat_colnames, "F-test $p$-value", "Joint F-test $p$-value"), 
     booktabs = TRUE, 
     caption = "Endline Table", 
-    align = "lccccccccccc"
+    align = "lccccccccccc",
+    linesep = "",
 ) %>%
 kable_styling(
   latex_options = c("scale_down")
@@ -2762,7 +2770,6 @@ add_header_above(c("", "Close" = 5, "Far" = 5, ""))
 endline_bal_table %>%
   custom_save_latex_table("endline-table")
 
-endline_bal_table
 
 ```
 
@@ -2861,6 +2868,7 @@ cts_dist_fits %>%
       escape = FALSE, 
       booktabs = TRUE,
       align = "lccc", 
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
       caption = "Continuous Distance: Balance Checks"
   ) %>%
   kable_styling(

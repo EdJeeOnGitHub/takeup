@@ -651,7 +651,7 @@ balance_joint_tests %>%
 # across a range of alternative mechanisms.
 comp_endline_vars = endline_vars %>%
   str_remove(., "endline_")
-comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
+# comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
 baseline_endline_externality_fit = feols(
       data = endline_and_baseline_data, 
       .[comp_endline_vars] ~ 0 + treat_dist:type, 
