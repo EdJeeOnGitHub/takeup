@@ -31,7 +31,7 @@ params:
     struct_models: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
     rf_models: REDUCED_FORM_NO_RESTRICT
     show_probs: FALSE
-    cache: TRUE
+    cache: FALSE
 ---
 
 
@@ -1475,15 +1475,15 @@ optim_summ_tbl %>%
     select(fix_type, fix_distance, n_pot, mean_demand, mean_dist) %>%
     mutate(fix_type = factor(fix_type, levels = c("no-fix", "fix-mu", "fix-delta"))) %>%
     arrange(fix_type) %>%
+    select(-fix_type) %>%
   knitr::kable(
     col.names = c(
-      "Fix type", 
       "Fix distance",
       "Assigned PoTs", 
       "Mean take-up", 
       "Mean distance (km)"
     ),
-    align = "llccc",
+    align = "cccc",
     booktabs = TRUE,
     # format = "latex",
     escape = FALSE
@@ -1494,8 +1494,8 @@ optim_summ_tbl %>%
   pack_rows(
     index = c(
       "Panel A: No Fixing" = 1, 
-      "Panel B: Fix Mu" = 3, 
-      "Panel C: Fix Delta" = 3
+      "Panel B: Fix $\\mu$" = 3, 
+      "Panel C: Fix $\\delta$" = 3
     ), 
     italic = TRUE,
     escape = FALSE,
@@ -1512,7 +1512,7 @@ fix_optim_tbl %>%
 
 ```
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 #|optim-summ-table-robust,
 #| dependson = c("optim-summ-table"), eval=FALSE
 optim_summ_robust_tbl = optim_summ_input_df %>%
@@ -1554,7 +1554,6 @@ optim_summ_robust_tbl = optim_summ_input_df %>%
   ) 
 
 
-optim_summ_robust_tbl
 
 optim_summ_robust_tbl %>%
   custom_save_latex_table("optim-summ-robust-table")
