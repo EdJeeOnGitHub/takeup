@@ -517,26 +517,14 @@ comp_balance_tidy_df = balance_fits %>%
   map_dfr(
     create_balance_comparisons, 
     .id = "lhs"
-  )  %>%
-  mutate(
-      lhs = str_remove(lhs, "lhs: ")
-  ) %>%
-  mutate(
-    lhs = str_replace_all(lhs, "\\.", " ") %>% str_to_title()
-  )
+  ) 
 
 
 balance_tidy_df = balance_fits %>%
     map_dfr(tidy, .id = "lhs") %>%
-    mutate(
-        lhs = str_remove(lhs, "lhs: ")
-    ) %>%
     select(
         lhs, term, estimate, std.error, p.value
-    )   %>%
-    mutate(
-      lhs = str_replace_all(lhs, "\\.", " ") %>% str_to_title()
-    )
+    )  
 
 comp_balance_tidy_df %>%
     write_csv(
@@ -823,15 +811,9 @@ endline_p_val_df = endline_p_val_df %>%
 
 endline_tidy_df = endline_balance_fit %>%
     map_dfr(tidy, .id = "lhs") %>%
-    mutate(
-        lhs = str_remove(lhs, "lhs: ")
-    ) %>%
     select(
         lhs, term, estimate, std.error, p.value
-    )   %>%
-    mutate(
-      lhs = str_replace_all(lhs, "\\.", " ") %>% str_to_title()
-    ) 
+    )  
 
 
 endline_tidy_df %>%
