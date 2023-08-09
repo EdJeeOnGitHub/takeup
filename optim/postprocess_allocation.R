@@ -37,37 +37,6 @@ script_options <- docopt::docopt(
                              " else commandArgs(trailingOnly = TRUE)
 ) 
 
-
-
-                            # --constraint-type=agg \
-                            # --welfare-function=identity \
-                            # --min-cost \
-                            # --optim-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
-                            # --optim-input-a-filename=target-rep-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws-optimal-allocation.rds \
-                            # --output-path=optim/plots/agg-log-full-many-pots \
-                            # --output-basename=target-rep-agg-log-suppress-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median \
-                            # --cutoff-type=cutoff
-                            # --data-input-name=full-many-pots-experiment.rds \
-                            # --pdf-output-path=presentations/takeup-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fig/
-
-
-
-        # Rscript ./optim/postprocess_allocation.R  \
-        #                             --min-cost \
-        #                             ${POSTERIOR_MEDIAN} \
-        #                             --constraint-type=${CONSTRAINT_TYPE} \
-        #                             --welfare-function=${WELFARE_FUNCTION} \
-        #                             --optim-input-path=${OUTPUT_PATH} \
-        #                             --optim-input-a-filename=target-${CONSTRAINT_TARGET}-${DEMAND_NAME}${TMP_REP_VAR_A}${CUTOFF}cutoff-b-$1-mu-$2-${MODEL}-${POSTVAR}-optimal-allocation.rds \
-        #                             --optim-input-b-filename=target-${CONSTRAINT_TARGET}-${DEMAND_NAME}${TMP_REP_VAR_B}${CUTOFF}cutoff-b-$3-mu-$4-${MODEL}-${POSTVAR}-optimal-allocation.rds \
-        #                             --comp-output-basename=target-${CONSTRAINT_TARGET}-${WELFARE_FUNCTION}-${SUPPRESS_REP}${CUTOFF}cutoff-b1-$1-mu1-$2-b2-$3-mu2-$4-${MODEL}-${POSTVAR} \
-        #                             --data-input-name=$DATA_INPUT_NAME \
-        #                             --output-path=${PLOT_OUTPUT_PATH} \
-        #                             --output-basename=target-${CONSTRAINT_TARGET}-${WELFARE_FUNCTION}-${DEMAND_NAME}${SUPPRESS_REP}${CUTOFF}cutoff-b-$1-mu-$2-${MODEL}-${POSTVAR} \
-        #                             --cutoff-type=${CUTOFF}cutoff \
-        #                             --pdf-output-path=presentations/takeup-${MODEL}-fig/
-
-
 library(tidyverse)
 library(sf)
 library(data.table)

@@ -1,7 +1,9 @@
-
 #!/usr/bin/env bash
+#' This file creates various policymaker allocation counterfactuals using the  
+#' posterior draws from the structural model. There's a million different arguments 
+#' as the script has slowly grown a life of its own over time.
 
-LATEST_VERSION=86
+LATEST_VERSION=86 # Version of the model fit to use.
 # VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 VERSION=86
 
@@ -11,28 +13,38 @@ NUM_CORES=16
 PRED_DISTANCE="" # --pred-distance
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 NUM_POST_DRAWS=200
+
+## What to skip/run
 POSTERIOR_MEDIAN="" # --posterior-median or ""
 SKIP_PREDICTION=0 # 1
 SKIP_OA=0 # 1 or 0
 SKIP_PP=0 # 1 or 0
 RUN_TARGET_CREATION=0
 RUN_ESTIMATION="--run-estimation"
+
+## Welfare function, constraint type, geographic setting
 WELFARE_FUNCTION="identity"
 CONSTRAINT_TYPE="agg"
 COUNTY="full"
-OUTPUT_PATH="optim/data/${MODEL}/${CONSTRAINT_TYPE}-${COUNTY}-many-pots" # /many-pots
-PLOT_OUTPUT_PATH="optim/plots/${MODEL}/${CONSTRAINT_TYPE}-${COUNTY}-many-pots" #/many-pots
-DATA_INPUT_NAME="${COUNTY}-many-pots-experiment.rds"
-CUTOFF="" # either no- or empty string
-SOLVER="gurobi"
-MANY_POTS="--many-pots" #"--many-pots"
-SUPPRESS_REP="" # "suppress-rep-" #suppress-rep-
-CONSTRAINT_TARGET="rep"
-STATIC_SIGNAL_PM="" # "--static-signal-pm"
-STATIC_SIGNAL_DIST=500
-DEMAND_NAME="" # "static-"
-DEFAULT_CONSTRAINT_DISTANCE=3500
+
+## More options...
+CUTOFF="" # either no- or empty string - Whether to introduce a hard cutoff to avoid extrapolation
+SOLVER="gurobi" # Which solver to use
+MANY_POTS="--many-pots" #"--many-pots" - Use all available PoTs or just those in experiment.
+SUPPRESS_REP="" # "suppress-rep-" - Remove reputational returns (for some counterfactuals)
+CONSTRAINT_TARGET="rep" # Whether to try and hit a target takeup that uses rep returns
+STATIC_SIGNAL_PM="" # "--static-signal-pm" - Does the policymaker think the signal is static or dynamic (B&T)
+STATIC_SIGNAL_DIST=500 # If static, where to estimate the effect of signals
+DEMAND_NAME="" # "static-" - prefix demand filename for whatever reason
+DEFAULT_CONSTRAINT_DISTANCE=3500 # Distance cutoff constraint for extrapolation
 CONSTRAINT_DISTANCE=${1:-$DEFAULT_CONSTRAINT_DISTANCE} # Get version from command line if provided
+
+## Output Paths
+OUTPUT_PATH="optim/data/${MODEL}/${CONSTRAINT_TYPE}-${COUNTY}-many-pots/dist-constraint-${CONSTRAINT_DISTANCE}/" 
+PLOT_OUTPUT_PATH="optim/plots/${MODEL}/${CONSTRAINT_TYPE}-${COUNTY}-many-pots" 
+DATA_INPUT_NAME="${COUNTY}-many-pots-experiment.rds"
+
+## Fixing \mu or \delta at certain distances
 DEFAULT_FIX_PARAM=""
 DEFAULT_FIX_PARAM_DISTANCE=""
 FIX_PARAM=${2:-${DEFAULT_FIX_PARAM}}
@@ -41,6 +53,7 @@ FIX_PARAM_NAME="${FIX_PARAM}${FIX_PARAM_DISTANCE}"
 echo "Constraint distance: ${CONSTRAINT_DISTANCE}"
 echo "Fix param: ${FIX_PARAM}"
 echo "Fix param distance: ${FIX_PARAM_DISTANCE}"
+
 mkdir -p ${OUTPUT_PATH}
 mkdir -p ${PLOT_OUTPUT_PATH}
 
