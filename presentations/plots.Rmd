@@ -32,7 +32,7 @@ params:
   struct_model: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
   rf_model: REDUCED_FORM_NO_RESTRICT
   plot_caption: TRUE
-  component_checks: TRUE
+  component_checks: FALSE
   cache: TRUE
 ---
 
@@ -82,8 +82,10 @@ knitr::opts_chunk$set(
   warnings = FALSE, 
   warning = FALSE, 
   cache = params$cache, 
-  cache.path = here(str_glue("takeup-{params$struct_model}{params$fit_version}-figure-cache/")), 
-  fig.path = here(str_glue("takeup-{params$struct_model}{params$fit_version}-fig/")), 
+  cache.path = here(
+    str_glue("presentations/takeup-{params$struct_model}{params$fit_version}-figure-cache/")
+    ), 
+  fig.path = here(str_glue("presentations/takeup-{params$struct_model}{params$fit_version}-fig/")), 
   fig.align = "center"
   )
 
@@ -187,10 +189,9 @@ sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 
 
 ```{r}
-
 #| component-checks,
 #| fig.cap = "Model subcomponents - MODEL 86",
-#| fig.width = 10, fig.height = 10
+#| fig.width = 10, fig.height = 10, eval=params$component_checks
 
   component_files = map(
       c("control", "ink", "calendar", "bracelet"),
@@ -382,12 +383,12 @@ theme_set(theme_minimal() +
 #### Delta Expectation ####
 
 ```{r}
-# delta-with-u-example,
-# fig.cap="Net reputational return, $\\mu\\Delta[w^*]$, as a function of cutoff type, $w^*$",
-# fig.note="This plot shows how expected reputational return, $\\mu\\Delta[w^*]$ 
-#  varies as cutoff type, $w^*$, changes. As $\\sigma_u$ increases, the 
-#  reputational return falls as it becomes harder to infer someone's type based 
-#  off actions." 
+#| delta-with-u-example,
+#| fig.cap="Net reputational return, $\\mu\\Delta[w^*]$, as a function of cutoff type, $w^*$",
+#| fig.note="This plot shows how expected reputational return, $\\mu\\Delta[w^*]$ 
+#|  varies as cutoff type, $w^*$, changes. As $\\sigma_u$ increases, the 
+#|  reputational return falls as it becomes harder to infer someone's type based 
+#|  off actions." 
 
 sim_int <- expand.grid(
   w = seq(-2, 2, 0.1),
@@ -470,10 +471,10 @@ sim_int %>%
 
 #### Reported Social Perception ####
 ```{r}
-# reported-social-perception,
-#  fig.cap="Reported social perception of some observable activities.",
-#  fig.note="This plot shows the praise and stigma associated with various activities 
-#  including deworming."
+#| reported-social-perception,
+#|  fig.cap="Reported social perception of some observable activities.",
+#|  fig.note="This plot shows the praise and stigma associated with various activities 
+#|  including deworming."
 
 
 
@@ -532,13 +533,13 @@ baseline_praise_stigma_plot_data %>%
 
 #### Distance Randomisation ####
 ```{r}
-# dist-plot,
-# fig.cap="Distance to Treatment Location (meters)",
-# fig.note="This graph shows a density plot of distance to the assigned point of
-#  treatment from each cluster centroid and household location. Clusters assigned to 
-#  the close condition have greater density <1.25km whilst those assigned to the 
-#  far condition place greater density >1.25km. 
-#  Density estimates use all 9,805 surveyed individuals in the takeup sample."
+#| dist-plot,
+#| fig.cap="Distance to Treatment Location (meters)",
+#| fig.note="This graph shows a density plot of distance to the assigned point of
+#|  treatment from each cluster centroid and household location. Clusters assigned to 
+#|  the close condition have greater density <1.25km whilst those assigned to the 
+#|  far condition place greater density >1.25km. 
+#|  Density estimates use all 9,805 surveyed individuals in the takeup sample."
 
 
 
