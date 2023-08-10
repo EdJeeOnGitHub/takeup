@@ -1192,7 +1192,8 @@ gpt_endline_know_notknow_table_data = bind_rows(
 
 
 
-know_notknow_fit = function(data, dep_var) {
+know_notknow_fit = function(data, dep_var, by_dist = FALSE) {
+    fml = if(!by_dist) as.formula("lhs ~ assigned.treatment") else as.formula("lhs ~ 0 +assigned.treatment:dist.pot.group")
     data %>%
         filter(!is.na(second.order)) %>%
         filter(!is.na(second.order.reason))  %>%
@@ -1201,7 +1202,8 @@ know_notknow_fit = function(data, dep_var) {
         ) %>%
         feols(
             data = ., 
-            fml = lhs ~ assigned.treatment,
+            fml = fml,
+            ~cluster.id,
             split = ~knowledge
         ) 
 }
@@ -1212,6 +1214,7 @@ sob_gpt_know_notknow_reason_fits = map(
         ~know_notknow_fit(data = gpt_endline_know_notknow_table_data, dep_var = .x)
     )
 
+
 sob_gpt_know_notknow_fit_df = imap_dfr(
     sob_gpt_know_notknow_reason_fits, 
     ~map_dfr(., ~tidy(.x, conf.int = TRUE) %>% mutate(N = nobs(.x)), .id = "sample") %>% mutate(var = dep_vars[[.y]]))
@@ -1219,4 +1222,64 @@ sob_gpt_know_notknow_fit_df = imap_dfr(
 sob_gpt_know_notknow_fit_df %>%
     write_csv(
         "temp-data/second-order-know-notknow-gpt-reason-distribution.csv"
+    )
+
+
+sob_gpt_know_notknow_dist_reason_fits = map(
+        dep_vars, 
+        ~know_notknow_fit(data = gpt_endline_know_notknow_table_data, dep_var = .x, by_dist = TRUE)
+    )
+
+
+know_dist_hyp_fun = function(i) {
+    zero_vec = matrix(0, nrow = 1, ncol = 4)
+    pos_vec = zero_vec
+    neg_vec = zero_vec
+    pos_vec[i] = 1
+    neg_vec[i] = -1
+    cbind(pos_vec, neg_vec)
+}
+
+
+
+get_dist_know_pvals = function(fit) {
+    treats = c("control", "ink", "calendar", "bracelet")
+    know_dist_pvals = map(
+        1:4,
+        ~ { 
+            
+            stat = fit %>%
+            car::lht(
+                .,
+                know_dist_hyp_fun(.x),
+                test = "F",
+                error.df = fixest::degrees_freedom(
+                    .,
+                    type = "resid")
+            )
+            val = stat$`Pr(>F)`[2]
+            names(val) = treats[.x]
+            return(val)
+        }
+        ) %>% unlist() %>% enframe()
+    return(know_dist_pvals)
+}
+
+dist_gpt_df = tibble(
+    fits = map(
+        1:7,
+        ~sob_gpt_know_notknow_dist_reason_fits[[.x]][[2]]
+    ),
+    vars = dep_vars[1:7],
+    know = "Know"
+    )
+
+dist_gpt_df %>%
+    mutate(
+        dist_pvals = map(fits, get_dist_know_pvals)
+    )  %>%
+    unnest(dist_pvals) %>%
+    select(-fits) %>%
+    write_csv(
+        "temp-data/second-order-know-notknow-gpt-reason-dist-pval.csv"
     )

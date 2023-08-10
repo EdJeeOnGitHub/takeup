@@ -1744,6 +1744,9 @@ gpt_know_notknow_df = read_csv(
         "temp-data/second-order-know-notknow-gpt-reason-distribution.csv"
 )
 
+gpt_pval_dist_df = read_csv(
+        "temp-data/second-order-know-notknow-gpt-reason-dist-pval.csv"
+)
 
 
 gpt_know_N_df = gpt_know_notknow_df %>%
