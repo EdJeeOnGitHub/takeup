@@ -1,4 +1,3 @@
-
 script_options = docopt::docopt(
     stringr::str_glue("Usage:
     rf-robustness.R  [options]
@@ -76,7 +75,35 @@ nosms_data <- analysis.data %>%
 
 analysis_data <- monitored_nosms_data %>% 
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group)
-stop()
+
+
+balance_data = read_rds(
+  file.path(
+    "temp-data",
+    "saved_balance_data.rds"
+  )
+)
+
+baseline_data = balance_data$baseline_balance_data
+
+# - primary schooling
+# - floor tile/cement
+# - know everyone can be infected
+# - maybe know biyearly
+
+cluster_cov_df = baseline_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+        mean_primary = mean(completed_primary, na.rm = TRUE),
+        mean_floor = mean(floor_tile_cement, na.rm = TRUE),
+        mean_all_can_get_worms = mean(all_can_get_worms, na.rm = TRUE)
+    )
+
+analysis_data = analysis_data %>%
+    left_join(
+        cluster_cov_df,
+        by = "cluster.id"
+    )
 
 
 default_priors = get_prior(
@@ -857,8 +884,3 @@ analysis_data %>%
         ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
     )
     ))
-
-# - primary schooling
-# - floor tile/cement
-# - know everyone can be infected
-# - maybe know biyearly
