@@ -103,26 +103,18 @@ analysis_data = analysis_data %>%
     left_join(
         cluster_cov_df,
         by = "cluster.id"
-    )
+    ) %>%
+    filter(!is.na(mean_primary))
 
 
 default_priors = get_prior(
     data = analysis_data,
-    dewormed ~ (assigned_treatment*assigned_dist_group | sms_treatment), 
+    dewormed ~ (assigned_treatment*assigned_dist_group | county + cluster.id) + 
+        mean_primary + mean_floor + mean_all_can_get_worms, 
     family = bernoulli(link = "probit")
 )
 
 manual_priors = default_priors
-
-#TODO: gen this list of variable names
-# coefs = c(prior_summary(rf_fit) %>%
-#     as_tibble() %>%
-#     filter(coef != "" & coef != "Intercept") %>%
-#     select(coef) %>%
-#     pull(coef))
-
-# manual_priors[which(default_priors$coef %in% coefs), "prior"] = "normal(0, 0.25)"
-# manual_priors[which(default_priors$coef == "Intercept"), "prior"] = "normal(0, 1)"
 
 
 if (script_options$load_fit) {
@@ -133,13 +125,22 @@ if (script_options$load_fit) {
         )
     )
 } else {
+
     rf_fit = brm(
         data = analysis_data,
-        dewormed ~ (assigned_treatment*assigned_dist_group | sms_treatment), 
+        dewormed ~ (assigned_treatment*assigned_dist_group | county + cluster.id) + 
+            mean_primary + mean_floor + mean_all_can_get_worms, 
         family = bernoulli(link = "probit"),
         prior = manual_priors,
-	control = list(adapt_delta = 0.99)
+        backend = "cmdstanr",
+        silent = 0,
+        refresh = 50,
+        chains = 4,
+        cores = 4,
+        threads = threading(3),
+    	control = list(adapt_delta = 0.99)
     )
+
 }
 
 if (script_options$save_fit) {
