@@ -2828,24 +2828,26 @@ dist_comp_df = inner_join(
   by = "lhs"
 )
 
-dist_comp_df %>%
+dist_comp_bal_tbl = dist_comp_df %>%
   left_join(lhs_translation_df %>% select(lhs, clean_name)) %>%
   mutate(lhs = clean_name) %>%
   select(-clean_name) %>%
   arrange(lhs == "Distance to PoT") %>%
   knitr::kable(
-      # format = "latex",
+      format = "latex",
       col.names = c("", colnames(.)[2:ncol(.)]),
       escape = FALSE, 
       booktabs = TRUE,
       align = "lcccccccc", 
-      linesep = "\\addlinespace \\addlinespace \\addlinespace",
+      linesep = "",
       caption = "Distance Comparison Balance table"
   ) %>%
   kable_styling(
     latex_options = c("scale_down")
   )  
 
+dist_comp_bal_tbl %>%
+  custom_save_latex_table("dist-comp-balance-table")
 
 ```
 
@@ -2993,7 +2995,7 @@ cts_dist_fits %>%
       escape = FALSE, 
       booktabs = TRUE,
       align = "lccc", 
-    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    linesep = "",
       caption = "Continuous Distance: Balance Checks"
   ) %>%
   kable_styling(

@@ -1283,3 +1283,23 @@ dist_gpt_df %>%
     write_csv(
         "temp-data/second-order-know-notknow-gpt-reason-dist-pval.csv"
     )
+
+
+stop()
+
+dist_gpt_df
+
+
+# General Visibility
+#  Communication 
+#  Social Proximity 
+# Incentive Type 
+# Circumstances Othe
+
+
+# Graph:
+
+#     just for knows. (don’t knows will show up as percentage <100)
+#     x axis control, ink calendar, bracelet
+#     y axis is percentage that say each thing. stacked  for each treatment
+#     close/far on a facet or smth.

@@ -2762,3 +2762,77 @@ plot_perm_fit_df %>%
 
 
 ```
+
+
+```{r}
+#| gpt-reason-plot,
+#| fig.cap="Reasons Why Participants Believed Others Knew Treatment Status",
+#| fig.width = 8, fig.height = 6
+
+gpt_endline_know_notknow_table_data = read_csv(
+    "temp-data/second-order-know-notknow-gpt-reason-full-data.csv"
+)
+
+gpt_translation_df = tribble(
+    ~gpt_name, ~clean_name,
+    "campaign", "General Visibility",
+    "communication", "Communication",
+    "relationship", "Social Proximity", 
+    "signal", "Incentive",
+    "type", "Type",
+    "circumstances", "Circumstances",
+    "other", "Other",
+    "Don't Know", "Don't Know"
+) 
+
+gpt_translation_df = gpt_translation_df %>%
+    mutate(
+        clean_name = factor(clean_name, levels = clean_name)
+    )
+
+gpt_endline_know_notknow_table_data %>%
+    filter(!is.na(second.order)) %>%
+    filter(!is.na(second.order.reason)) %>%
+    select(
+        knowledge,
+        dist.pot.group,
+        assigned.treatment,
+        category_sob_reason_short
+    ) %>%
+    mutate(
+        category_sob_reason_short = if_else(
+            knowledge == FALSE,
+            "Don't Know",
+            category_sob_reason_short
+        )
+    ) %>%
+    left_join(
+        gpt_translation_df,
+        by = c("category_sob_reason_short" = "gpt_name")
+    )  %>%
+    mutate(
+        assigned.treatment = str_to_title(assigned.treatment),
+        dist.pot.group = str_to_title(dist.pot.group)
+    ) %>%
+    mutate(assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet"))) %>%
+    ggplot(aes(
+        x = assigned.treatment,
+        fill = clean_name,
+    )) +
+    geom_bar(
+        position = "fill",
+        colour = "black"
+    ) +
+    facet_grid(~dist.pot.group) +
+    scale_fill_brewer("", palette = "Accent") +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    labs(
+        x = "Treatment",
+        y = "Proportion"
+    ) +
+    theme(
+      panel.grid.major.x = element_blank() 
+    )
+
+```
