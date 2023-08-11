@@ -155,6 +155,17 @@ baseline.data = baseline.data %>%
     ), 
   )
 
+# Use functions to clean: 
+#  - all_can_get_worms 
+#  - know_deworming_stops_worms
+#  - correct_when treat
+# in baseline & endline
+baseline.data %>%
+  group_by(cluster.id) %>%
+  summarise(
+    n = n()
+  )
+
 baseline.data = baseline.data %>%
   # these are nested lists of responses so we map_lgl and use any()
   mutate(
@@ -168,7 +179,9 @@ baseline.data = baseline.data %>%
         ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
     )
     ), 
-    correct_when_treat = map_lgl(when_treat, ~any(.x == "every 6 months")), 
+    correct_when_treat = map_lgl(when_treat, ~any(.x %in% c("every 3 months",
+                                                            "every 6 months"
+                                                            ))), 
     know_deworming_stops_worms = map2_lgl(
       stop_worms, 
       stop_worms_other,
@@ -313,10 +326,26 @@ endline_balance_data = endline.data %>%
   ) %>%
   mutate(
     all_can_get_worms = map_lgl(who_worms, ~any(str_detect(.x, "everyone") | (str_detect(.x, "adult") & str_detect(.x, "child")))), 
-    correct_when_treat = map_lgl(when_treat, ~any(.x == "every 6 months")), 
+    correct_when_treat = map_lgl(when_treat, ~any(.x %in% c("every 6 months", "every 3 months"))), 
     know_deworming_stops_worms = map_lgl(stop_worms, ~any(.x == "medicine"))
   ) 
-  
+
+full_join(
+baseline_balance_data %>%
+  select(when_treat) %>%
+  unnest(when_treat) %>%
+  count(when_treat) %>%
+  arrange(-n) %>%
+  rename(n_baseline = n),
+
+endline_balance_data %>%
+  select(when_treat) %>%
+  unnest(when_treat) %>%
+  count(when_treat) %>%
+  arrange(-n) %>%
+  rename(n_endline = n)) %>%
+  mutate(across(where(is.numeric), ~100*.x/sum(.x, na.rm = TRUE)))
+
 
 
 endline_and_baseline_data = bind_rows(
