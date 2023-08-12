@@ -420,7 +420,7 @@ endline_balance_fit = feols(
     ) 
 
 baseline_balance_fit = feols(
-    data = ed_baseline_balance_data, 
+    data = baseline_balance_data, 
     .[baseline_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
@@ -911,7 +911,6 @@ ri_fun = function(draw) {
       perm_dist = sample(cluster.dist.to.pot, size = n())
     )
   perm_indiv_data = analysis_school_data %>%
-    group_by(dist.pot.group) %>%
     mutate(perm_dist = sample(cluster.dist.to.pot, size = n()))
   
   perm_baseline_dist_fit = feols(
@@ -1013,6 +1012,35 @@ balance_data = lst(
   plot_perm_fit_df,
   ri_p_val_df
 )
+
+
+comp_balance_tidy_df %>%
+  filter(term == "treat_dist") %>%
+  select(
+    lhs, 
+    lhs_treatment, 
+    rhs_treatment, 
+    lhs_dist, 
+    rhs_dist, 
+    comp_type,
+    estimate,
+    p.value
+    )  %>%
+    write_csv(
+      file.path(
+        script_options$output_path,
+        "comm-pvals.csv"
+      )
+    )
+
+
+tibble(
+  lhs = names(balance_joint_tests),
+  joint = map_dbl(balance_joint_tests, "joint_pval"),
+  close = map_dbl(balance_joint_tests, "close_pval"),
+  far = map_dbl(balance_joint_tests, "far_pval")
+) %>%
+  mutate(across(where(is.numeric), round, 5))
 
 
 saveRDS(
