@@ -4,14 +4,12 @@ script_options = docopt::docopt(
   balance.R [options]
   
 Options:
-  --num-boot-draws=<num-boot-draws>  Number of bootstrap draws to use in wild sub-cluster bootstrap [default: 1000]
   --output-path=<path>  Where to save output files [default: {file.path('temp-data')}]
-  --cts-interval=<cts-interval>  Interval for continuous distance binning [default: 200]
+  --community-level
 "),
   args = if (interactive()) "
-    --num-boot-draws=200 \
-    --output-path=temp-data \
-    --cts-interval=200
+    --output-path=temp-data/community-level-bal \
+    --community-level
     " else commandArgs(trailingOnly = TRUE)
 ) 
 
@@ -29,8 +27,6 @@ library(magrittr)
 library(furrr)
 
 
-script_options$num_boot_draws = as.numeric(script_options$num_boot_draws)
-script_options$cts_interval = as.numeric(script_options$cts_interval)
 
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
@@ -387,30 +383,62 @@ endline_vars = c(
   "correct_when_treat", 
   "know_deworming_stops_worms"
   )
+
+
+## If at cluster level, aggregate
+
+baseline_balance_data = baseline_balance_data %>%
+  group_by(cluster.id) %>%
+  summarise(
+    across(c(baseline_vars, cluster.dist.to.pot), mean, na.rm = TRUE),
+    treat_dist = unique(treat_dist),
+    county = unique(county)
+    )
+
+endline_balance_data = endline_balance_data %>%
+  group_by(cluster.id) %>%
+  summarise(
+    across(endline_vars, mean, na.rm = TRUE),
+    treat_dist = unique(treat_dist),
+    county = unique(county)
+    )
+
+analysis_school_data = analysis_school_data %>%
+  group_by(cluster.id) %>%
+  summarise(
+    across(any_of(unique(c(indiv_balance_vars, balance_variables))), mean, na.rm = TRUE),
+    treat_dist = unique(treat_dist),
+    county = unique(county)
+    )
+
 ## Fits
 endline_balance_fit = feols(
     data = endline_balance_data, 
     .[endline_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
-    cluster = ~cluster.id
+    cluster = if(script_options$community_level) NULL else ~cluster.id,
+    vcov = if(script_options$community_level) "hetero"
     ) 
 
 baseline_balance_fit = feols(
-    data = baseline_balance_data, 
+    data = ed_baseline_balance_data, 
     .[baseline_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
-    ~cluster.id
+    cluster = if(script_options$community_level) NULL else ~cluster.id,
+    vcov = if(script_options$community_level) "hetero"
     ) 
 
 indiv_balance_fit = feols(
     data = analysis_school_data, 
     .[indiv_balance_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
-    cluster = ~cluster.id
+    cluster = if(script_options$community_level) NULL else ~cluster.id,
+    vcov = if(script_options$community_level) "hetero"
     ) 
 
 school_balance_fit = feols(
     data = analysis_school_data %>%
       select(any_of(balance_variables), treat_dist, county, cluster.id), 
     .[balance_variables] ~ 0 + treat_dist + i(county, ref = "Busia"),
-    cluster = ~cluster.id
+    cluster = if(script_options$community_level) NULL else ~cluster.id,
+    vcov = if(script_options$community_level) "hetero"
   )
 
 # put all the baseline balance fits into a list we can map over
@@ -1067,7 +1095,10 @@ fully_cts_dist_balance = dist_balance_cts_fun(cluster.dist.to.pot)
 
 fully_cts_dist_balance %>%
   saveRDS(
-    "temp-data/fully_cts_dist_balance.rds"
+    file.path(
+      script_options$output_path,
+      "fully_cts_dist_balance.rds"
+    )
   )
 
 
@@ -1094,5 +1125,8 @@ pval_cts_binned_dist = map_dbl(
 
 pval_cts_binned_dist %>%
   saveRDS(
-    "temp-data/discrete_cts_dist_balance.rds"
+    file.path(
+      script_options$output_path,
+      "discrete_cts_dist_balance.rds"
+    )
   )
