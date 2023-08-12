@@ -11,7 +11,7 @@ script_options = docopt::docopt(
         --output-path=<output-path>  Output path [default: temp-data]
     "),
     args = if (interactive()) "
-        --load-fit
+    --save-fit
         --fit-path=data/stan_analysis_data
         --fit-file=REDUCED_FORM_ROBUSTNESS.rds
         --output-path=temp-data
