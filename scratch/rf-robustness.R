@@ -104,22 +104,27 @@ analysis_data = analysis_data %>%
         cluster_cov_df,
         by = "cluster.id"
     ) %>%
-    filter(!is.na(mean_primary))
+    filter(!is.na(mean_primary)) %>%
+    group_by(cluster.id) %>%
+    mutate(
+        std_cluster_dist_to_pot = mean(standard_cluster.dist.to.pot, na.rm = TRUE)
+    )
 
 
 default_priors = get_prior(
     data = analysis_data,
     dewormed ~ (assigned_treatment*assigned_dist_group | county + cluster.id) + 
-        mean_primary + mean_floor + mean_all_can_get_worms, 
+        mean_primary + mean_floor + mean_all_can_get_worms + std_cluster_dist_to_pot, 
     family = bernoulli(link = "probit")
 )
 
+
 manual_priors = default_priors
 
-manual_priors$prior[9] = "normal(0, 0.1)"
-manual_priors$prior[10] = "normal(0, 1)"
-manual_priors$prior[18] = "normal(0, 0.1)"
-manual_priors$prior[19] = "normal(0, 1)"
+# manual_priors$prior[9] = "normal(0, 0.1)"
+# manual_priors$prior[10] = "normal(0, 1)"
+# manual_priors$prior[18] = "normal(0, 0.1)"
+# manual_priors$prior[19] = "normal(0, 1)"
 manual_priors
 
 if (script_options$load_fit) {
@@ -134,7 +139,7 @@ if (script_options$load_fit) {
     rf_fit = brm(
         data = analysis_data,
         dewormed ~ (assigned_treatment*assigned_dist_group | county + cluster.id) + 
-            mean_primary + mean_floor + mean_all_can_get_worms, 
+            mean_primary + mean_floor + mean_all_can_get_worms + std_cluster_dist_to_pot, 
         family = bernoulli(link = "probit"),
         prior = manual_priors,
         backend = "cmdstanr",
@@ -159,13 +164,13 @@ if (script_options$save_fit) {
 }
 
 
-rf_priors = brm(
-    data = analysis_data,
-        dewormed ~ (assigned_treatment*assigned_dist_group | sms_treatment), 
-        family = bernoulli(link = "probit"),
-        sample_prior = "only", 
-        prior = manual_priors
-)
+# rf_priors = brm(
+#     data = analysis_data,
+#         dewormed ~ (assigned_treatment*assigned_dist_group | sms_treatment), 
+#         family = bernoulli(link = "probit"),
+#         sample_prior = "only", 
+#         prior = manual_priors
+# )
 
 library(tidybayes)
 
@@ -181,7 +186,9 @@ pred_hat_dfs = map_dfr(
             assigned_dist_group, 
             mean_primary, 
             mean_floor, 
-            mean_all_can_get_worms) %>%
+            mean_all_can_get_worms,
+            cluster_dist_to_pot
+            ) %>%
         mutate(assigned_treatment = .x) %>%
         add_epred_rvars(rf_fit) %>%
         mutate(row_id = 1:n())
@@ -270,7 +277,10 @@ te_plot = level_df %>%
     ) +
     geom_vline(xintercept = 0, linetype = "longdash")
 
+te_plot
+
 ggsave(
+    plot = te_plot,
     "temp-plots/rf-robust-te.pdf",
     width = 8,
     height = 6
