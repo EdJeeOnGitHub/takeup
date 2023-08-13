@@ -8,8 +8,7 @@ Options:
   --community-level
 "),
   args = if (interactive()) "
-    --output-path=temp-data/community-level-bal \
-    --community-level
+    --output-path=temp-data \
     " else commandArgs(trailingOnly = TRUE)
 ) 
 
@@ -68,138 +67,113 @@ monitored_nosms_data <- analysis.data %>%
 
 analysis_data <- monitored_nosms_data
 
-#| balance-setup
-baseline.data = baseline.data %>%
-  mutate(
-    fully_aware_externalities = case_when(
-      neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-      is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-      TRUE ~ FALSE
-    ),
-    partially_aware_externalities = case_when(
-      neighbours_worms_affect == "yes" | worms_affect == "yes" ~ TRUE,
-      is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-      TRUE ~ FALSE
-    )
-  )
 
-# Create floor quality variable
-baseline.data = baseline.data %>%
-  mutate(
-    floor_tile_cement = floor == "Cement" | floor == "Tiles"
-  ) %>%
-  group_by(
-    cluster.id
-  ) %>%
-  mutate(
-    frac_floor_tile_cement = mean(floor_tile_cement, na.rm = TRUE)
-  ) %>%
-  ungroup()
 
-# Create years of schooling and completley primary variables
-baseline.data = baseline.data %>%
-  mutate(
-    completed_primary = (school == "Primary 8" | str_detect(school, "Secondary|College|University"))
-  ) %>%
-  mutate(
-    schooling_years_plus = case_when(
-      str_detect(school, "Primary") ~ 0, 
-      str_detect(school, "Secondary") ~ 8, 
-      str_detect(school, "College") ~ 16, 
-      str_detect(school, "University") ~ 16
-    ), 
-    digits_schooling = str_extract(school, "\\d+") %>% as.numeric(), 
-    years_schooling = digits_schooling + schooling_years_plus, 
-    years_schooling = if_else(school == "Never gone to school", 0, years_schooling), 
-    years_schooling = if_else(str_detect(school, "College|University"), 16, years_schooling)
-  ) %>%
-  select(-digits_schooling, -schooling_years_plus)
-# Months since an individual took deworming treatment at baseline (i.e. independent of the campaign)
-baseline.data = baseline.data %>%
-  mutate(
-    treated_digit = str_extract(treated_when, "\\d+") %>% as.numeric, 
-    treated_months = case_when(
-      str_detect(treated_when, "year") ~ 12, 
-      str_detect(treated_when, "mon") ~ 1, 
-      TRUE ~ NA_real_
+## Load Census Data
+census_data_env = new.env()
+with_env = function(f, e = parent.frame()) {
+    stopifnot(is.function(f))
+    environment(f) = e
+    f
+}
+load_census_function = function(){
+  load(file.path("data", "takeup_census.RData"))
+  return(census.data)
+}
+census_data = with_env(load_census_function, census_data_env)() %>%
+  rename(census.consent = consent) # Rename this to reduce chance of error
+
+n_indiv_df = census_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+        n_per_cluster = sum(num.individuals)
     )
+
+
+
+clean_census_data %>%
+  select(hh.has.phone, hh.has.non.phone) %>%
+  count(hh.has.phone, hh.has.non.phone)
+
+
+
+clean_covariates = function(data) {
+  cov_data = data %>%
+    mutate(
+      # these are nested lists of responses so we map_lgl and use any()
+      all_can_get_worms = map2_lgl(
+        who_worms, 
+        who_worms_other,
+        ~any(
+          "everyone" %in% .x | 
+          str_detect(str_to_lower(.y), "any") | 
+          (("adult" %in% .x) & ("child" %in% .x)) |
+          ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
+      )
+      ), 
+      correct_when_treat = map_lgl(when_treat, ~any(.x %in% c("every 3 months",
+                                                              "every 6 months"
+                                                              ))), 
+      know_deworming_stops_worms = map2_lgl(
+        stop_worms, 
+        stop_worms_other,
+        ~any(.x %in% c(
+          "medicine", 
+          "wearing shoes", 
+          "using toilets", 
+          "wash hands") | str_detect(.y, "cooked|prepar|cook")))
+    ) %>%
+    group_by(cluster.id) %>%
+    mutate(community_size = n()) %>%
+    ungroup()
+
+  cov_data = cov_data %>%
+    mutate(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      )
     ) %>%
     mutate(
-      months_since_treatment = treated_digit*treated_months
+      floor_tile_cement = floor == "Cement" | floor == "Tiles"
     ) %>%
-    select(-treated_digit, -treated_months) %>%
-    # has someone been dewormed in the last 12 months
+    group_by(
+      cluster.id
+    ) %>%
     mutate(
-        dewormed_last_12 = case_when(
-            str_detect(treated_when, "mon|(1 year)") ~ TRUE,
-            is.na(treated_when) ~ NA,
-            TRUE ~ FALSE
+      frac_floor_tile_cement = mean(floor_tile_cement, na.rm = TRUE)
+    ) %>%
+    ungroup()
+  
+  cov_data = cov_data %>%
+    mutate(
+      completed_primary = (school == "Primary 8" | str_detect(school, "Secondary|College|University"))
+    ) %>%
+    mutate(
+      have_phone_lgl = case_when(
+        have_phone == "Yes" ~ TRUE, 
+        have_phone == "No" ~ FALSE, 
+        TRUE ~ NA
+      ), 
+    )
+
+    treated_past_present = "treated" %in% colnames(data) 
+    if (treated_past_present) {
+      cov_data = cov_data %>%
+        mutate(
+          treated_lgl = case_when(
+            treated == "yes" ~ TRUE, 
+            treated == "no" ~ FALSE, 
+            TRUE ~ NA
+          )
         )
-    )
+    }
+  return(cov_data)
+}
 
 baseline.data = baseline.data %>%
-  mutate(
-    have_phone_lgl = case_when(
-      have_phone == "Yes" ~ TRUE, 
-      have_phone == "No" ~ FALSE, 
-      TRUE ~ NA
-    ), 
-    treated_lgl = case_when(
-      treated == "yes" ~ TRUE, 
-      treated == "no" ~ FALSE, 
-      TRUE ~ NA
-    ), 
-  )
-
-# Use functions to clean: 
-#  - all_can_get_worms 
-#  - know_deworming_stops_worms
-#  - correct_when treat
-# in baseline & endline
-baseline.data %>%
-  group_by(cluster.id) %>%
-  summarise(
-    n = n()
-  )
-
-baseline.data = baseline.data %>%
-  # these are nested lists of responses so we map_lgl and use any()
-  mutate(
-    all_can_get_worms = map2_lgl(
-      who_worms, 
-      who_worms_other,
-      ~any(
-        "everyone" %in% .x | 
-        str_detect(str_to_lower(.y), "any") | 
-        (("adult" %in% .x) & ("child" %in% .x)) |
-        ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
-    )
-    ), 
-    correct_when_treat = map_lgl(when_treat, ~any(.x %in% c("every 3 months",
-                                                            "every 6 months"
-                                                            ))), 
-    know_deworming_stops_worms = map2_lgl(
-      stop_worms, 
-      stop_worms_other,
-      ~any(.x %in% c(
-        "medicine", 
-        "wearing shoes", 
-        "using toilets", 
-        "wash hands") | str_detect(.y, "cooked|prepar|cook")))
-  ) 
-
-baseline.data %>%
-  select(who_worms) %>%
-  mutate(
-    ad_and_child = map_lgl(who_worms, ~any(("adult" %in% .x) & ("child" %in% .x)))
-  ) %>%
-  filter(ad_and_child == TRUE)
-
-baseline.data %>%
-  select(who_worms_other) %>%
-  count(who_worms_other) %>%
-  arrange(-n) %>%
-  print(n = 100)
+  clean_covariates()
 
 # creating a single treat x distance variable for balance testing
 cluster_treat_df = analysis_data %>%
@@ -252,53 +226,71 @@ baseline_vars = c(
   "all_can_get_worms",
   "correct_when_treat",
   "fully_aware_externalities",
-  "partially_aware_externalities"
+  "have_phone_lgl"
 )
 
 
-
-# PoT level balance variables
+# Distance/cluster size balance vars
 balance_variables = c(
-  "cluster.dist.to.pot"
+  "cluster.dist.to.pot",
+  "n_per_cluster"
 )
 
 # Indiv level balance variables
 indiv_balance_vars = c(
   "female", 
-  "phone_owner", 
   "age"
 )
 
 rct_school_df = rct.schools.data %>% 
     as_tibble()
+
+clean_census_data = census_data %>%
+  filter(!is.na(assigned.treatment)) %>%
+  right_join(
+    analysis_data %>%
+      select(cluster.id, dist.pot.group, cluster.dist.to.pot) %>%
+      unique()
+  ) %>%
+  mutate(
+    female = gender == 2,
+    age = age.census,
+    phone_owner = hh.has.phone
+    )
+
 # Adding school (PoT) data to analysis df
 analysis_school_data = left_join(
     analysis_data,
     rct_school_df %>% mutate(cluster.id = as.numeric(cluster.id)) ,
-    by = "cluster.id"
-)
+    by = "cluster.id") %>%
+    group_by(cluster.id) %>%
+    mutate(row_id = 1:n()) %>%
+    left_join(
+      n_indiv_df %>% mutate(row_id = 1),
+      by = c("cluster.id", "row_id")
+    ) %>%
+    ungroup() %>%
+    select(-row_id)
 
 
 analysis_school_data = analysis_school_data %>%
-mutate(
-    treat_dist = paste0(
-    "treat: ", 
-    assigned.treatment,
-    ", dist: ", dist.pot.group
-    ) %>% factor()
-)  %>%
-mutate(
-  female = fct_match(gender, "female")
-) %>%
-  rename(dist_to_pot = dist.to.pot)
+  mutate(
+      treat_dist = paste0(
+      "treat: ", 
+      assigned.treatment,
+      ", dist: ", dist.pot.group
+      ) %>% factor()
+    )  
 
+clean_census_data = clean_census_data %>%
+  mutate(
+      treat_dist = paste0(
+      "treat: ", 
+      assigned.treatment,
+      ", dist: ", dist.pot.group
+      ) %>% factor()
+  )  
   
-
-# Probably a better way to get the schools in the sample
-school_treat_df = analysis_school_data %>%
-  filter(!is.na(assigned.treatment)) %>%
-  select(treat_dist, cluster.dist.to.pot = standard_cluster.dist.to.pot,  cluster.id, county) %>%
-  unique()
 
 
 
@@ -308,40 +300,7 @@ endline_balance_data = endline.data %>%
     cluster_treat_df, 
     by = "cluster.id"
   ) %>%
-  mutate(
-    fully_aware_externalities = case_when(
-      neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-      is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-      TRUE ~ FALSE
-    ),
-    partially_aware_externalities = case_when(
-      neighbours_worms_affect == "yes" | worms_affect == "yes" ~ TRUE,
-      is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-      TRUE ~ FALSE
-    )
-  ) %>%
-  mutate(
-    all_can_get_worms = map_lgl(who_worms, ~any(str_detect(.x, "everyone") | (str_detect(.x, "adult") & str_detect(.x, "child")))), 
-    correct_when_treat = map_lgl(when_treat, ~any(.x %in% c("every 6 months", "every 3 months"))), 
-    know_deworming_stops_worms = map_lgl(stop_worms, ~any(.x == "medicine"))
-  ) 
-
-full_join(
-baseline_balance_data %>%
-  select(when_treat) %>%
-  unnest(when_treat) %>%
-  count(when_treat) %>%
-  arrange(-n) %>%
-  rename(n_baseline = n),
-
-endline_balance_data %>%
-  select(when_treat) %>%
-  unnest(when_treat) %>%
-  count(when_treat) %>%
-  arrange(-n) %>%
-  rename(n_endline = n)) %>%
-  mutate(across(where(is.numeric), ~100*.x/sum(.x, na.rm = TRUE)))
-
+  clean_covariates()
 
 
 endline_and_baseline_data = bind_rows(
@@ -354,7 +313,6 @@ endline_and_baseline_data = bind_rows(
       constituency, cluster.id, 
       county,
       fully_aware_externalities,
-      partially_aware_externalities
       ) %>%
     mutate(
       type = "endline"
@@ -367,8 +325,7 @@ endline_and_baseline_data = bind_rows(
       know_deworming_stops_worms,
       constituency, cluster.id,
       county,
-      fully_aware_externalities,
-      partially_aware_externalities
+      fully_aware_externalities
       ) %>%
     mutate(
       type = "baseline"
@@ -378,7 +335,6 @@ endline_and_baseline_data = bind_rows(
 
 endline_vars = c(
   "fully_aware_externalities",
-  "partially_aware_externalities",
   "all_can_get_worms", 
   "correct_when_treat", 
   "know_deworming_stops_worms"
@@ -386,31 +342,37 @@ endline_vars = c(
 
 
 ## If at cluster level, aggregate
+if (script_options$community_level) {
+  baseline_balance_data = baseline_balance_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+      across(c(baseline_vars, cluster.dist.to.pot), mean, na.rm = TRUE),
+      treat_dist = unique(treat_dist),
+      county = unique(county)
+      )
 
-baseline_balance_data = baseline_balance_data %>%
-  group_by(cluster.id) %>%
-  summarise(
-    across(c(baseline_vars, cluster.dist.to.pot), mean, na.rm = TRUE),
-    treat_dist = unique(treat_dist),
-    county = unique(county)
-    )
-
-endline_balance_data = endline_balance_data %>%
-  group_by(cluster.id) %>%
-  summarise(
-    across(endline_vars, mean, na.rm = TRUE),
-    treat_dist = unique(treat_dist),
-    county = unique(county)
-    )
-
-analysis_school_data = analysis_school_data %>%
-  group_by(cluster.id) %>%
-  summarise(
-    across(any_of(unique(c(indiv_balance_vars, balance_variables))), mean, na.rm = TRUE),
-    treat_dist = unique(treat_dist),
-    county = unique(county)
-    )
-
+  endline_balance_data = endline_balance_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+      across(endline_vars, mean, na.rm = TRUE),
+      treat_dist = unique(treat_dist),
+      county = unique(county)
+      )
+  clean_census_data = clean_census_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+      across(any_of(unique(indiv_balance_vars)), mean, na.rm = TRUE),
+      treat_dist = unique(treat_dist),
+      county = unique(county)
+    ) 
+  analysis_school_data = analysis_school_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+      across(any_of(unique(balance_variables)), mean, na.rm = TRUE),
+      treat_dist = unique(treat_dist),
+      county = unique(county)
+      )
+}
 ## Fits
 endline_balance_fit = feols(
     data = endline_balance_data, 
@@ -427,7 +389,7 @@ baseline_balance_fit = feols(
     ) 
 
 indiv_balance_fit = feols(
-    data = analysis_school_data, 
+    data = clean_census_data, 
     .[indiv_balance_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
@@ -444,7 +406,7 @@ school_balance_fit = feols(
 # put all the baseline balance fits into a list we can map over
 balance_fits = c(
   indiv_balance_fit,
-  list("lhs: cluster.dist.to.pot" = school_balance_fit),
+  school_balance_fit,
   baseline_balance_fit
 )
 
@@ -711,7 +673,7 @@ comp_endline_vars = endline_vars %>%
 # comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
 baseline_endline_externality_fit = feols(
       data = endline_and_baseline_data, 
-      .[comp_endline_vars] ~ 0 + treat_dist:type, 
+      .[comp_endline_vars] ~ 0 + treat_dist:type + i(county, ref = "Busia"), 
       ~cluster.id
       ) 
 
@@ -727,20 +689,19 @@ perform_externality_test = function(data, var, R) {
     fml = fml,
     ~cluster.id
   )
-
-  n_county = sum(str_detect(names(coef(fit)), "county"))
+  # n_county = sum(str_detect(names(coef(fit)), "county"))
   nrow_mat = ifelse(is.matrix(R), nrow(R), 1)
-  county_0_mat = matrix(
-    0,
-    nrow = nrow_mat,
-    ncol = n_county
-    )
+  # county_0_mat = matrix(
+  #   0,
+  #   nrow = nrow_mat,
+  #   ncol = n_county
+  #   )
 
   R = matrix(R, nrow = nrow_mat)
   resid_df = fixest::degrees_freedom(fit, type = "resid")
   test = car::lht(
     fit,
-    cbind(matrix(county_0_mat[1:nrow_mat, ], nrow = nrow_mat), R),
+    R,
     error.df = resid_df,
     test = "F"
   )
@@ -794,7 +755,8 @@ generate_joint_externality_hyp_m = function(fit, treat_term, dist_term) {
         type == "endline", 
         1, 
         val
-        )
+        ),
+      val = if_else(str_detect(term, "county::"), 0, val)
     )
   return(hyp_df$val)
 }
@@ -899,7 +861,7 @@ baseline_dist_fit = feols(
 )
 
 indiv_dist_fit = feols(
-    data = analysis_school_data, 
+    data = clean_census_data, 
     .[indiv_balance_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
     cluster = ~cluster.id
     ) 
@@ -910,7 +872,7 @@ ri_fun = function(draw) {
     mutate(
       perm_dist = sample(cluster.dist.to.pot, size = n())
     )
-  perm_indiv_data = analysis_school_data %>%
+  perm_indiv_data = clean_census_data %>%
     mutate(perm_dist = sample(cluster.dist.to.pot, size = n()))
   
   perm_baseline_dist_fit = feols(
@@ -960,7 +922,6 @@ lhs_translation_df = tribble(
   "lhs: completed_primary", "Completed primary schooling",
   "lhs: correct_when_treat", "Know bi-yearly treatment recommended",
   "lhs: fully_aware_externalities", "Understands externalities",
-  "lhs: partially_aware_externalities", "Partially understands externalities",
   "lhs: female", "Female",
   "lhs: phone_owner", "Phone owner",
   "lhs: know_deworming_stops_worms", "Knows deworming stops worms"
@@ -1059,7 +1020,7 @@ saveRDS(
 dist_balance_cts_fun = function(rhs_var) {
   ## Indiv
   indiv_balance_cts_fit = feols(
-      data = analysis_school_data %>%
+      data = clean_census_data %>%
         mutate(dist_measure = {{ rhs_var }}/1000), 
       .[indiv_balance_vars] ~  dist_measure + dist_measure^2,
       cluster = ~cluster.id
@@ -1084,7 +1045,7 @@ dist_balance_cts_fun = function(rhs_var) {
 }
 
 dist_balance_disc_fun = function(rhs_var, interval_length) {
-  analysis_school_data = analysis_school_data %>%
+  clean_census_data = clean_census_data %>%
     mutate(
       dist_measure = cut_interval({{ rhs_var }}, length = interval_length )
     )
@@ -1096,7 +1057,7 @@ dist_balance_disc_fun = function(rhs_var, interval_length) {
 
   ## Indiv
   indiv_balance_disc_fit = feols(
-      data = analysis_school_data,
+      data = clean_census_data,
       .[indiv_balance_vars] ~  0 + dist_measure + i(county, ref = "Busia"),
       cluster = ~cluster.id
       ) 

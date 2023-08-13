@@ -1284,6 +1284,8 @@ dist_gpt_df %>%
         "temp-data/second-order-know-notknow-gpt-reason-dist-pval.csv"
     )
 
+gpt_endline_know_notknow_table_data %>%
+    write_csv("temp-data/second-order-know-notknow-gpt-reason-full-data.csv")
 
 stop()
 

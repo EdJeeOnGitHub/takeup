@@ -2687,9 +2687,10 @@ lhs_translation_df = tribble(
   "lhs: fully_aware_externalities", "Understands externalities",
   "lhs: partially_aware_externalities", "Partially understands externalities",
   "lhs: female", "Female",
-  "lhs: phone_owner", "Phone owner",
+  "lhs: have_phone_lgl", "Phone owner",
   "lhs: know_deworming_stops_worms", "Knows deworming stops worms",
-  "lhs: cluster.dist.to.pot", "Distance to PoT"
+  "lhs: cluster.dist.to.pot", "Distance to PoT",
+  "lhs: n_per_cluster", "Census count per cluster"
 ) %>%
   mutate(
     lhs_no_prefix = str_remove(lhs, "lhs: ")
