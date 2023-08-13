@@ -169,7 +169,15 @@ custom_save_latex_table = function(table, table_name){
       params$table_output_path, paste0(table_name, ".tex")
     )
   )
-  table %>%
+  # Create space in latex due to rmd bug with \\ immediately followed by [
+  # table = table  %>%
+  #   str_replace_all(., "removeme12345", "  ")
+
+  attr(table, "kable_meta")$contents = str_replace_all(attr(table, "kable_meta")$contents, "removeme12345", " ")
+  table[1] = str_replace_all(table[1], "removeme12345", " ")
+
+
+  clean_table = table %>%
     str_remove(
       ., 
       fixed("\\begin{table}")
@@ -181,11 +189,15 @@ custom_save_latex_table = function(table, table_name){
     str_remove(
       ., 
       "\\\\end\\{table\\}"
-    )  %>%
-    writeLines(
-      table_conn
-    )
+    ) 
+    
+    
+    clean_table %>%
+      writeLines(
+        table_conn
+      )
     close(table_conn)
+
     return(table)
 }
 ```
@@ -2522,7 +2534,7 @@ create_balance_input = function(tidy_df,
         estim_std = if_else(
           lhs_treat == "control",
           linebreak(paste0(estimate, "\n", str_glue("({std.error})")), align = "c"),
-          linebreak(paste0(estimate, "\n", str_glue("({below_val})")), align = "c")
+          linebreak(paste0(estimate, "\n", "{[", below_val, "]}"), align = "c")
         )
       )  
 
@@ -2737,6 +2749,7 @@ colnames(comp_wide_indiv_bal_df) = colnames(comp_wide_indiv_bal_df) %>%
   str_replace(., "_far", "") %>%
   str_to_title()
 
+
 bal_table_names = colnames(comp_wide_indiv_bal_df)
 bal_table_names[1] = ""
 bal_table_names[bal_table_names == "Joint_p"] = "Joint Test"
@@ -2757,6 +2770,11 @@ kable_styling(
   latex_options = c("scale_down")
 ) %>%
 add_header_above(c("", "Close" = 6, "Far" = 6, "")) 
+
+
+# attr(comp_bal_table, "kable_meta")$contents = str_replace_all(attr(comp_bal_table, "kable_meta")$contents, "removeme12345", " ")
+# comp_bal_table[1] = str_replace_all(comp_bal_table[1], "removeme12345", " ")
+
 
 comp_bal_table %>%
   custom_save_latex_table("comp-balance-table")
@@ -2793,6 +2811,7 @@ dist_comp_df = inner_join(
     names_from = lhs_treatment, values_from = estim_std
   ) %>%
     select(1,4, 5, 3, 2 ),
+
  comp_balance_tidy_df %>%
   filter(comp_type == "distance")  %>%
   select(
@@ -2818,7 +2837,7 @@ dist_comp_df = inner_join(
     "$"
      ),
     estim_std = linebreak(
-      paste0(estimate,"\n", str_glue("({p.value})")), align = "c") 
+      paste0(estimate,"\n", str_glue("{{[{p.value}]}}")), align = "c") 
      
      ) %>%
      select(-estimate, -p.value) %>%
