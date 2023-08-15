@@ -2671,3 +2671,10 @@ get_dyn_ate <- function() {
   
   return(dyn_all_ate)
 }
+
+convert.to.sp <- function(.data, .coord.formula, .proj4string) {
+  sp::coordinates(.data) <- .coord.formula
+  sp::proj4string(.data) <- .proj4string
+
+  return(.data)
+}

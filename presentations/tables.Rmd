@@ -2627,6 +2627,7 @@ N_pretreat = nrow(pretreat_data)
 N_census = nrow(clean_census_data)
 N_takeup = nrow(analysis_data)
 N_baseline_worm = nrow(baseline_worm_data)
+N_endline = nrow(balance_data$endline_worm_data)
 
 N_wtp_obs_df = balance_analysis_data %>%
   filter(KEY.individ %in% incentive_choice_data$KEY.individ) %>%
@@ -2639,8 +2640,6 @@ N_wtp_obs_df = balance_analysis_data %>%
     N_pot = n_distinct(cluster.id)
   )  %>%
   mutate(type = "WTP")
-
-
 
 N_baseline_worm_obs  = baseline_worm_data  %>%
   group_by(treat_dist) %>%
@@ -2701,9 +2700,9 @@ lhs_translation_df = tribble(
   "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
   "lhs: completed_primary", "Completed primary schooling", "pretreat",
   "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
-  "lhs: fully_aware_externalities", "Understands externalities", "baseline_worm",
+  "lhs: fully_aware_externalities", "Know worms impose externality", "baseline_worm",
   "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
-  "lhs: female", "Female", "census",
+  "lhs: female", "Female", "pretreat",
   "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
   "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
   "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
@@ -2713,12 +2712,21 @@ lhs_translation_df = tribble(
   "lhs: religion_christianity", "Christian", "pretreat",
   "lhs: family_treated_lgl", "$\\geq 1$ Family member dewormed", "baseline_worm",
   "lhs: adult_in_family_treated", "Adults in family dewormed", "baseline_worm",
-  "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm"
+  "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm",
+  "lhs: know_deworm", "Know about community-based MDA?", "implementation",
+  "lhs: treat_begin", "Know when MDA starts?", "implementation",
+  "lhs: treat_end", "Know about MDA ends?", "implementation",
+  "lhs: days_available", "Know length of MDA?", "implementation",
+  "lhs: chv_visit", "Did a CHV visit you to discuss MDA?", "implementation"
 ) %>%
   mutate(
     lhs_no_prefix = str_remove(lhs, "lhs: ")
   ) %>%
-    mutate(sample = factor(sample, levels = c("pretreat", "census", "baseline_worm", "takeup_sample")))
+    mutate(sample = factor(sample, levels = c("pretreat", "baseline_worm", "census", "takeup_sample", "implementation")))
+
+
+
+
 
 ```
 
@@ -2740,7 +2748,7 @@ comp_wide_indiv_bal_df = create_balance_input(
  select(all_of(col_diff_order)) %>%
   mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
   mutate(across(where(is.character), replace_na, "-")) %>%
-  left_join(lhs_translation_df %>% select(lhs, clean_name, sample)) %>%
+  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample)) %>%
   mutate(lhs = clean_name) %>%
   select(-clean_name) %>%
   arrange(sample) %>%
@@ -2779,9 +2787,10 @@ n_per_comp_panel_df = lhs_translation_df %>%
 
 panel_names = c(
       str_glue("Panel A: Pretreat covariates, $N={format(N_pretreat, big.mark = ',')}$"), 
-      str_glue("Panel B: Census covariates, $N={format(N_census,  big.mark = ',')}$"), 
-      str_glue("Panel C: Baseline worm covariates, $N={format(N_baseline_worm, big.mark = ',')}$"),
-      str_glue("Panel D: Takeup sample covariates, $N={format(N_takeup, big.mark = ',')}$")
+      str_glue("Panel B: Baseline worm covariates, $N={format(N_baseline_worm, big.mark = ',')}$"),
+      str_glue("Panel C: Census covariates, $N={format(N_census,  big.mark = ',')}$"), 
+      str_glue("Panel D: Takeup sample covariates, $N={format(N_takeup, big.mark = ',')}$"),
+      str_glue("Panel E: Implementation covariates, $N={format(N_endline, big.mark = ',')}$")
 ) 
 
 panel_list = n_per_comp_panel_df$n
@@ -2846,8 +2855,8 @@ dist_comp_df = inner_join(
     select(-estimate, -std.error) %>%
   pivot_wider(
     names_from = lhs_treatment, values_from = estim_std
-  ) %>%
-    select(1,4, 5, 3, 2 ),
+  ) ,
+    # select(1,4, 5, 3, 2 ),
 
  comp_balance_tidy_df %>%
   filter(comp_type == "distance")  %>%
@@ -2880,16 +2889,18 @@ dist_comp_df = inner_join(
      select(-estimate, -p.value) %>%
   pivot_wider(
     names_from = lhs_treatment, values_from = estim_std
-  ) %>%
-    select(1,4, 5, 3, 2 ),
+  ) ,
+    # select(1,4, 5, 3, 2 ),
   by = "lhs"
-)
+) %>%
+  select(lhs, contains("Con"), contains("Ink"), contains("Cal"), contains("Bra"))
+
 
 dist_comp_bal_tbl = dist_comp_df %>%
-  left_join(lhs_translation_df %>% select(lhs, clean_name)) %>%
+  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample)) %>%
   mutate(lhs = clean_name) %>%
-  select(-clean_name) %>%
-  arrange(lhs == "Distance to PoT") %>%
+  arrange(sample) %>%
+  select(-clean_name, -sample) %>%
   knitr::kable(
       format = "latex",
       col.names = c("", colnames(.)[2:ncol(.)]),
@@ -2901,7 +2912,16 @@ dist_comp_bal_tbl = dist_comp_df %>%
   ) %>%
   kable_styling(
     latex_options = c("scale_down")
-  )  
+  )   %>%
+pack_rows(
+    index = panel_list,
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+)
 
 dist_comp_bal_tbl %>%
   custom_save_latex_table("dist-comp-balance-table")

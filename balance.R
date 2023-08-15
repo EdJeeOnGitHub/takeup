@@ -28,18 +28,6 @@ library(furrr)
 
 
 
-baseline_worm_data %>%
-  filter(assigned.treatment == "control") %>%
-  group_by(dist.pot.group) %>%
-  count(when_treat) %>%
-  spread(dist.pot.group, n) %>%
-  mutate(across(where(is.numeric), ~100*.x/sum(.x)))
-
-
-
-
-
-
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
@@ -55,6 +43,7 @@ cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat
 load(file.path("data", "takeup_village_pot_dist.RData"))
 load(file.path("data", "analysis.RData"))
 
+baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
@@ -79,17 +68,6 @@ monitored_nosms_data <- analysis.data %>%
 
 
 analysis_data <- monitored_nosms_data
-
-
-# Remove surveys that took less than 10 minutes or more than 3 hours
-# (long right tail of survey times past 500 mins, not sure where we should cut here
-# if at all)
-# baseline.data = baseline.data %>%
-#   mutate(time = lubridate::mdy_hms(endtime) - lubridate::mdy_hms(starttime)) %>%
-#   filter(time > 10,  time < 3*60) 
-# endline.data = endline.data %>%
-#   mutate(time = lubridate::ymd_hms(endtime) - lubridate::ymd_hms(starttime)) %>%
-#   filter(time > 10,  time < 3*60) 
 
 ## Load Census Data
 census_data_env = new.env()
@@ -182,8 +160,8 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
     "isValidated"
     )
   cov_data = bind_rows(
-    # baseline_data %>% select(-any_of(drop_vars)),
-    endline_data %>% select(-any_of(drop_vars))
+    baseline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "baseline"),
+    endline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "endline")
   ) 
   cov_data = cov_data %>%
     mutate(
@@ -232,9 +210,17 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
 
 baseline_worm = baseline.data %>%
   clean_worm_covariates()
+clean_takeup_variables = function(data) {
+  data %>%
+    mutate(
+      female = gender == "female",
+      have_phone_lgl = phone_owner
+    )
+}
+analysis_data = analysis_data %>%
+  clean_takeup_variables()
 
-# creating a single treat x distance variable for balance testing
-cluster_treat_df = analysis_data %>%
+cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))  %>%
   mutate(
       treat_dist = paste0(
       "treat: ", 
@@ -242,33 +228,49 @@ cluster_treat_df = analysis_data %>%
       ", dist: ", dist.pot.group
       ) %>% factor()
   ) %>%
-  select(cluster.id, treat_dist, cluster.dist.to.pot) %>%
+  select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
   unique()
+# # creating a single treat x distance variable for balance testing
+# cluster_treat_df = analysis_data %>%
+#   mutate(
+#       treat_dist = paste0(
+#       "treat: ", 
+#       assigned.treatment,
+#       ", dist: ", dist.pot.group
+#       ) %>% factor()
+#   ) %>%
+#   select(cluster.id, treat_dist, cluster.dist.to.pot) %>%
+#   unique()
 
 
 pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
-  left_join(cluster_treat_df, by = "cluster.id")
+  left_join(cluster_treat_df, by = "cluster.id") %>%
+  filter(!is.na(treat_dist))
 
 ## Baseline Balance
 baseline_worm_data = baseline_worm %>%
   inner_join(
     cluster_treat_df, 
     by = "cluster.id"
-  )
+  ) %>%
+  filter(!is.na(treat_dist))
 
 
-baseline_pretreat_data = pretreat_data %>%
-  left_join(
-    cluster_treat_df,
-    by = "cluster.id"
-  ) 
-
-
+clean_implementation_vars = function(data)  {
+  data %>%
+    mutate(
+      know_deworm = know_deworm == "yes",
+      treat_begin = treat_begin == "knows",
+      treat_end = treat_end == "knows",
+      days_available = days_available == "knows",
+      chv_visit =  chv_visit == "yes"
+    )
+}
 
 
 worm_vars = c(
-  "know_how_stop_worms",
   "treated_lgl", 
+  "know_how_stop_worms",
   "all_can_get_worms",
   "correct_when_treat",
   "fully_aware_externalities",
@@ -278,25 +280,33 @@ worm_vars = c(
 
 pretreat_vars = c(
   "completed_primary", 
-  "years_schooling",
   "floor_tile_cement",
   "ethnicity_luhya",
   "religion_christianity"
 )
 
-# Distance/cluster size balance vars
-misc_vars = c(
-  "cluster.dist.to.pot",
-  "n_per_cluster",
-  "have_phone_lgl"
+implementation_vars = c(
+  "chv_visit",
+  "know_deworm",
+  "treat_begin",
+  "treat_end",
+  "days_available"
 )
-analysis_data %>%
-  select(gender, age)
+
+# Distance/cluster size balance vars
+takeup_vars = c(
+  "n_per_cluster",
+  "female",
+  "have_phone_lgl",
+  "cluster.dist.to.pot"
+)
+
 
 # Indiv level balance variables
 census_vars = c(
-  "female", 
-  "age"
+  "dewormed",
+  "age",
+  "know_age" # just include this so fixest creates a list of fits...
 )
 
 
@@ -347,7 +357,6 @@ clean_census_data = clean_census_data %>%
   
 
 
-
 #### Endline
 endline_worm_data = endline.data %>%
   inner_join(
@@ -356,6 +365,12 @@ endline_worm_data = endline.data %>%
   ) %>%
   clean_worm_covariates()
 
+endline_implementation_data = endline.data %>%
+  inner_join(
+    cluster_treat_df, 
+    by = "cluster.id"
+  ) %>%
+  clean_implementation_vars()
 
 endline_and_baseline_worm_data = bind_rows(
   endline_worm_data %>%
@@ -389,8 +404,6 @@ endline_vars = c(
   "know_worms_infectious"
   )
 
-
-
 ## If at cluster level, aggregate
 if (script_options$community_level) {
   baseline_worm_data = baseline_worm_data %>%
@@ -401,18 +414,19 @@ if (script_options$community_level) {
       county = unique(county)
       )
 
-    baseline_pretreat_data = baseline_pretreat_data %>%
-      group_by(cluster.id) %>%
-      summarise(
-        across(c(pretreat_vars, cluster.dist.to.pot), mean, na.rm = TRUE),
-        treat_dist = unique(treat_dist),
-        county = unique(county)
-      )
 
   endline_worm_data = endline_worm_data %>%
     group_by(cluster.id) %>%
     summarise(
       across(endline_vars, mean, na.rm = TRUE),
+      treat_dist = unique(treat_dist),
+      county = unique(county)
+      )
+
+  endline_implementation_data = endline_implementation_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+      across(implementation_vars, mean, na.rm = TRUE),
       treat_dist = unique(treat_dist),
       county = unique(county)
       )
@@ -428,7 +442,7 @@ if (script_options$community_level) {
   analysis_data = analysis_data %>%
     group_by(cluster.id) %>%
     summarise(
-      across(any_of(unique(misc_vars)), mean, na.rm = TRUE),
+      across(any_of(unique(takeup_vars)), mean, na.rm = TRUE),
       treat_dist = unique(treat_dist),
       county = unique(county)
       )
@@ -437,6 +451,13 @@ if (script_options$community_level) {
 endline_worm_fit = feols(
     data = endline_worm_data, 
     .[endline_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
+    cluster = if(script_options$community_level) NULL else ~cluster.id,
+    vcov = if(script_options$community_level) "hetero"
+    ) 
+
+endline_implementation_fit = feols(
+    data = endline_implementation_data, 
+    .[implementation_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
     ) 
@@ -450,7 +471,16 @@ baseline_worm_fit = feols(
 
 pretreat_fit = feols(
   data = pretreat_data,
-  .[pretreat_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+  .[pretreat_vars[pretreat_vars != 'religion_christianity']] ~ 0 + treat_dist + i(county, ref = "Busia") + i(sample_type, ref = "baseline"),
+  cluster = if(script_options$community_level) NULL else ~cluster.id,
+  vcov = if(script_options$community_level) "hetero"
+)
+
+# control mean >1 if we have county FE due to LPM, so just don't use county FE.
+# This is stupid but the world we live in.
+pretreat_christ_fit = feols(
+  data = pretreat_data,
+  religion_christianity ~ 0 + treat_dist,
   cluster = if(script_options$community_level) NULL else ~cluster.id,
   vcov = if(script_options$community_level) "hetero"
 )
@@ -464,8 +494,8 @@ census_fit = feols(
 
 misc_fit = feols(
     data = analysis_data %>%
-      select(any_of(misc_vars), treat_dist, county, cluster.id), 
-    .[misc_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+      select(any_of(takeup_vars), treat_dist, county, cluster.id), 
+    .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
   )
@@ -474,7 +504,9 @@ misc_fit = feols(
 balance_fits = c(
   baseline_worm_fit,
   pretreat_fit,
+  list("lhs: religion_christianity" = pretreat_christ_fit),
   census_fit,
+  endline_implementation_fit,
   misc_fit
 )
 
@@ -483,8 +515,8 @@ create_balance_comparisons = function(fit) {
   comp_df = avg_comparisons(
     fit,
     variables = list("treat_dist" = "all")
-    ) %>%
-    as_tibble()
+  ) %>%
+  as_tibble()
 
 
   comp_df = comp_df %>%
@@ -595,7 +627,6 @@ create_balance_comparisons = function(fit) {
       dist_comp_df
     )
     return(final_clean_comp_df)
-
 }
 
 
@@ -646,7 +677,6 @@ construct_joint_test_m = function(object) {
 ## We want to test for balance across all conditions and balance within distance condition
 ## I don't know how to do such a joint test in R easily so we setup the test matrix 
 ## manually for the wald test
-
 # Number of dist groups x treatment
 n_variables = 8
 # matrix R for test 
@@ -671,7 +701,6 @@ hyp_matrix_far = cbind(
   matrix(-1, nrow = 3, ncol = 1), 
   part_hyp_matrix[, 1:(ncol(part_hyp_matrix) - 1)]
 )
-
 
 perform_balance_joint_test = function(fit, var, joint_R, close_R, far_R) {
   county_0_mat = matrix(
@@ -929,7 +958,6 @@ endline_p_val_df %>%
     )
 
 
-
 #### Continuous Distance Tests ####
 baseline_worm_dist_fit = feols(
   data = baseline_worm_data,
@@ -939,9 +967,10 @@ baseline_worm_dist_fit = feols(
 
 pretreat_dist_fit = feols(
   data = pretreat_data,
-  .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
-  ~cluster.id
+  .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia") + i(sample_type, ref = "baseline"), 
+  ~cluster.id 
 )
+
 census_dist_fit = feols(
     data = clean_census_data, 
     .[census_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
@@ -1028,6 +1057,9 @@ realised_fit_df = realised_fit_df %>%
     lhs_translation_df,
     by = "lhs"
   )
+
+realised_fit_df %>%
+  select(lhs, statistic)
 
 plot_perm_fit_df = perm_fit_df %>%
   left_join(
@@ -1210,3 +1242,4 @@ saveRDS(
 #       "discrete_cts_dist_balance.rds"
 #     )
 #   )
+
