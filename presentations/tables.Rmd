@@ -42,6 +42,7 @@ library(posterior)
 library(tidybayes)
 library(marginaleffects)
 library(broom)
+library(data.table)
 library(knitr)
 library(kableExtra)
 library(ggthemes)
@@ -2429,11 +2430,12 @@ balance_data = read_rds(
   )
 )
 
-analysis_school_data = balance_data$analysis_school_data
-baseline_balance_data = balance_data$baseline_balance_data
+balance_analysis_data = balance_data$analysis_data
+baseline_worm_data = balance_data$baseline_worm_data
 endline_vars = balance_data$endline_vars
-endline_and_baseline_data = balance_data$endline_and_baseline_data
-
+endline_and_baseline_worm_data = balance_data$endline_and_baseline_worm_data
+pretreat_data = balance_data$pretreat_data
+clean_census_data = balance_data$clean_census_data
 
 ```
 
@@ -2621,8 +2623,12 @@ incentive_choice_data <- wtp.data %>%
           response = 2 * (response == "switch") - 1) 
 
 
+N_pretreat = nrow(pretreat_data)
+N_census = nrow(clean_census_data)
+N_takeup = nrow(analysis_data)
+N_baseline_worm = nrow(baseline_worm_data)
 
-N_wtp_obs_df = analysis_school_data %>%
+N_wtp_obs_df = balance_analysis_data %>%
   filter(KEY.individ %in% incentive_choice_data$KEY.individ) %>%
   filter(!is.na(KEY.individ)) %>%
   group_by(
@@ -2636,7 +2642,7 @@ N_wtp_obs_df = analysis_school_data %>%
 
 
 
-N_baseline_obs = baseline_balance_data %>%
+N_baseline_worm_obs  = baseline_worm_data  %>%
   group_by(treat_dist) %>%
   summarise(
     N_indiv = n_distinct(KEY), 
@@ -2661,8 +2667,8 @@ N_baseline_obs = baseline_balance_data %>%
 comp_endline_vars = endline_vars %>%
   str_remove(., "endline_")
 # comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
-baseline_endline_externality_fit = feols(
-      data = endline_and_baseline_data, 
+baseline_endline_worm_fit = feols(
+      data = endline_and_baseline_worm_data, 
       .[comp_endline_vars] ~ 0 + treat_dist:type + i(county, ref = "Busia"), 
       ~cluster.id
       ) 
@@ -2687,26 +2693,32 @@ endline_tidy_df = read_csv(
 ```{r}
 #| baseline-covariate-naming
 
-
 lhs_translation_df = tribble(
-  ~lhs, ~clean_name,
-  "lhs: age", "Age",
-  "lhs: all_can_get_worms", "Know everyone can be infected",
-  "lhs: treated_lgl", "Dewormed in the past",
-  "lhs: floor_tile_cement", "Floor made of tile/cement",
-  "lhs: completed_primary", "Completed primary schooling",
-  "lhs: correct_when_treat", "Know bi-yearly treatment recommended",
-  "lhs: fully_aware_externalities", "Understands externalities",
-  "lhs: partially_aware_externalities", "Partially understands externalities",
-  "lhs: female", "Female",
-  "lhs: have_phone_lgl", "Phone owner",
-  "lhs: know_deworming_stops_worms", "Knows deworming stops worms",
-  "lhs: cluster.dist.to.pot", "Distance to PoT",
-  "lhs: n_per_cluster", "Census count per cluster"
+  ~lhs, ~clean_name, ~sample,
+  "lhs: age", "Age", "census",
+  "lhs: all_can_get_worms", "Know everyone can be infected", "baseline_worm",
+  "lhs: treated_lgl", "Dewormed in the past", "baseline_worm",
+  "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
+  "lhs: completed_primary", "Completed primary schooling", "pretreat",
+  "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
+  "lhs: fully_aware_externalities", "Understands externalities", "baseline_worm",
+  "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
+  "lhs: female", "Female", "census",
+  "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
+  "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
+  "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
+  "lhs: n_per_cluster", "Number of individuals per community", "census",
+  "lhs: years_schooling", "Years schooling", "pretreat",
+  "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
+  "lhs: religion_christianity", "Christian", "pretreat",
+  "lhs: family_treated_lgl", "$\\geq 1$ Family member dewormed", "baseline_worm",
+  "lhs: adult_in_family_treated", "Adults in family dewormed", "baseline_worm",
+  "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm"
 ) %>%
   mutate(
     lhs_no_prefix = str_remove(lhs, "lhs: ")
-  )
+  ) %>%
+    mutate(sample = factor(sample, levels = c("pretreat", "census", "baseline_worm", "takeup_sample")))
 
 ```
 
@@ -2728,10 +2740,13 @@ comp_wide_indiv_bal_df = create_balance_input(
  select(all_of(col_diff_order)) %>%
   mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
   mutate(across(where(is.character), replace_na, "-")) %>%
-  left_join(lhs_translation_df %>% select(lhs, clean_name)) %>%
+  left_join(lhs_translation_df %>% select(lhs, clean_name, sample)) %>%
   mutate(lhs = clean_name) %>%
-  select(-clean_name)
-  
+  select(-clean_name) %>%
+  arrange(sample) %>%
+  select(-sample)
+
+
 1+1
 
 ```
@@ -2742,8 +2757,6 @@ comp_wide_indiv_bal_df = create_balance_input(
 #| comp-balance-table,
 #| dependson=c("balance-setup", "balance-creation")
 
-comp_wide_indiv_bal_df = comp_wide_indiv_bal_df %>%
-  arrange(lhs == "Distance to PoT")
 colnames(comp_wide_indiv_bal_df) = colnames(comp_wide_indiv_bal_df) %>%
   str_replace(., "_close", "") %>%
   str_replace(., "_far", "") %>%
@@ -2757,6 +2770,23 @@ bal_table_names[bal_table_names == "Far_joint_p"] = "Joint Test"
 bal_table_names[bal_table_names == "Close_joint_p"] = "Joint Test"
 1+1
 
+n_per_comp_panel_df = lhs_translation_df %>%
+  filter(clean_name %in% comp_wide_indiv_bal_df$Lhs) %>%
+  count(sample) %>%
+  mutate(sample = factor(sample, levels = c("pretreat", "census", "baseline_worm", "takeup_sample"))) %>%
+  data.table::data.table(.) 
+
+
+panel_names = c(
+      str_glue("Panel A: Pretreat covariates, $N={format(N_pretreat, big.mark = ',')}$"), 
+      str_glue("Panel B: Census covariates, $N={format(N_census,  big.mark = ',')}$"), 
+      str_glue("Panel C: Baseline worm covariates, $N={format(N_baseline_worm, big.mark = ',')}$"),
+      str_glue("Panel D: Takeup sample covariates, $N={format(N_takeup, big.mark = ',')}$")
+) 
+
+panel_list = n_per_comp_panel_df$n
+names(panel_list) = panel_names
+
 comp_bal_table = comp_wide_indiv_bal_df %>% 
 knitr::kable(
     format = "latex",
@@ -2769,11 +2799,18 @@ knitr::kable(
 kable_styling(
   latex_options = c("scale_down")
 ) %>%
-add_header_above(c("", "Close" = 6, "Far" = 6, "")) 
+add_header_above(c("", "Close" = 6, "Far" = 6, ""))  %>%
+pack_rows(
+    index = panel_list,
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+)
 
 
-# attr(comp_bal_table, "kable_meta")$contents = str_replace_all(attr(comp_bal_table, "kable_meta")$contents, "removeme12345", " ")
-# comp_bal_table[1] = str_replace_all(comp_bal_table[1], "removeme12345", " ")
 
 
 comp_bal_table %>%
@@ -2923,7 +2960,7 @@ endline_bal_table %>%
 
 
 ```{r}
-#| cts-distance-pval-table
+#| cts-distance-pval-table, eval=FALSE
 1+1
 
 
@@ -2967,6 +3004,7 @@ cts_distance_pval_df = read_rds(
 ```
 
 ```{r}
+#| eval = FALSE
 
 cts_dist_fits = 
   read_rds(
