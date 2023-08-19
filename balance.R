@@ -298,6 +298,7 @@ takeup_vars = c(
   "n_per_cluster",
   "female",
   "have_phone_lgl",
+  "age.census",
   "cluster.dist.to.pot"
 )
 
@@ -305,7 +306,6 @@ takeup_vars = c(
 # Indiv level balance variables
 census_vars = c(
   "dewormed",
-  "age",
   "know_age" # just include this so fixest creates a list of fits...
 )
 
@@ -475,6 +475,8 @@ pretreat_fit = feols(
   cluster = if(script_options$community_level) NULL else ~cluster.id,
   vcov = if(script_options$community_level) "hetero"
 )
+
+
 
 # control mean >1 if we have county FE due to LPM, so just don't use county FE.
 # This is stupid but the world we live in.
@@ -1023,7 +1025,7 @@ ri_fun = function(draw) {
 
 plan(multisession, workers = 12)
 perm_fit_df = future_map_dfr(
-  1:10, 
+  1:500, 
   ri_fun, 
   .progress = TRUE, 
   .options = furrr_options(
