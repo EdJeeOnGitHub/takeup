@@ -3023,6 +3023,170 @@ cts_distance_pval_df = read_rds(
 
 ```
 
+
+```{r}
+#| baseline-perception-balance
+
+baseline_perception_data = read_rds(
+  "temp-data/praise_stigma_baseline.rds"
+)
+
+baseline_perception_fits = baseline_perception_data[[1]]
+baseline_perception_pvals = baseline_perception_data[[2]]
+
+
+tidy_b_p_fits = map_dfr(
+  baseline_perception_fits,
+  tidy,
+  .id = "sample"
+)  %>%
+  mutate(
+    topic = str_extract(sample, "(?<=sample: )\\w+$")
+  ) %>%
+  filter(str_detect(term, "treat_dist")) %>%
+  mutate(
+    sample = rep(c("praise", "stigma"), each = n()/2)
+  ) %>%
+  mutate(
+    treatment = str_extract(term, "(?<=disttreat: )\\w+"),
+    distance = str_extract(term, "(?<=, dist: )\\w+$")
+  ) %>%
+  select(
+    sample, topic, treatment, distance, estimate, std.error
+  ) %>%
+  mutate(
+    across(where(is.numeric), round, 3),
+    estim_std = linebreak(
+      paste0(
+        estimate, "\n",
+        str_glue(
+          "({std.error})"
+        )
+      ),
+      align = "c"
+    )
+  )  %>%
+  select(-estimate, -std.error) 
+
+wide_tidy_b_p_fits = tidy_b_p_fits %>%
+  pivot_wider(
+    names_from = c(treatment, distance),
+    values_from = estim_std
+  ) %>%
+  select(
+    sample,
+    topic,
+
+
+    control_close,
+    ink_close,
+    calendar_close,
+    bracelet_close,
+
+
+    control_far,
+    ink_far,
+    calendar_far,
+    bracelet_far
+  ) 
+
+
+joint_baseline_perception_pvals = map_dbl(baseline_perception_pvals, "joint_pval") %>%
+  enframe() %>%
+  mutate(
+    sample = rep(c("praise", "stigma"), each = n()/2)
+  ) %>%
+  mutate(
+    topic = str_extract(name, "(?<=sample: )\\w+$")
+  ) %>%
+  select(
+    sample,
+    topic,
+    p_val = value
+  ) %>%
+  mutate(
+    p_val = round(p_val, 3)
+  )
+
+wide_tidy_b_p_fits = wide_tidy_b_p_fits %>%
+  left_join(
+    joint_baseline_perception_pvals,
+    by = c("sample", "topic")
+  ) %>%
+  mutate(
+    topic = case_when(
+      topic == "clothe" & sample == "praise" ~ "Wearing nice clothes to church",
+      topic == "defecat" & sample == "praise" ~ "Use latrine",
+      topic == "dewor" & sample == "praise" ~ "Deworming during MDA",
+      topic == "immuniz" & sample == "praise" ~ "Immunizing children",
+
+      topic == "clothe" & sample == "stigma" ~ "Not wearing nice clothes to church",
+      topic == "defecat" & sample == "stigma" ~ "Open defecation",
+      topic == "dewor" & sample == "stigma" ~ "Not deworming during MDA",
+      topic == "immuniz" & sample == "stigma" ~ "Not immunizing children",
+    )
+  ) %>%
+  mutate(
+    sample = str_to_title(sample)
+  )
+
+baseline_perception_tbl = wide_tidy_b_p_fits %>%
+  select(-sample) %>%
+  kbl(
+    col.names = c(
+      "Topic",
+
+      "Control",
+      "Ink",
+      "Calendar",
+      "Bracelet",
+
+      "Control",
+      "Ink",
+      "Calendar",
+      "Bracelet",
+
+      "Joint Test"
+    ), 
+    format = "latex", 
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lccccccccc", 
+    caption = "Baseline Perception Balance"
+  )  %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Close" = 4, 
+      "Far" = 4,
+      " " = 1
+      )
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Praise" = 4, 
+      "Panel A: Stigma" = 4
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  
+
+baseline_perception_tbl %>%
+  custom_save_latex_table(
+    "baseline-perception-table"
+  )
+
+
+```
+
+
 ```{r}
 #| eval = FALSE
 

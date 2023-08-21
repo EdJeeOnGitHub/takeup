@@ -357,6 +357,19 @@ clean_census_data = clean_census_data %>%
   
 
 
+
+social_perception_baseline = baseline.data %>% 
+  select(assigned.treatment, dist.pot.group, cluster.id, county, matches("^(praise|stigma)_[^_]+$")) %>% 
+  gather(key = key, value = response, -assigned.treatment, -dist.pot.group, -cluster.id, -county)  %>%
+  separate(key, c("praise.stigma", "topic"), "_") %>% 
+  separate(topic, c("topic", "question.group"), -2) %>% 
+  filter(!is.na(response))  %>%
+  inner_join(
+    cluster_treat_df, 
+    by = "cluster.id"
+  ) %>%
+  mutate(response_yes = response == "yes") 
+
 #### Endline
 endline_worm_data = endline.data %>%
   inner_join(
@@ -958,6 +971,52 @@ endline_p_val_df %>%
             "endline_balance_p_val_df.csv"
         )
     )
+
+
+#### Social Perception Balanced ####
+praise_baseline_fit = social_perception_baseline %>%
+  filter(praise.stigma == "praise") %>%
+  feols(
+    response_yes ~ 0 + treat_dist + i(county, ref = "Busia"),
+    ~cluster.id,
+    split = ~topic
+  )
+
+stigma_baseline_fit = social_perception_baseline %>%
+  filter(praise.stigma == "stigma") %>%
+  feols(
+    response_yes ~ 0 + treat_dist + i(county, ref = "Busia"),
+    ~cluster.id,
+    split = ~topic
+  )
+
+praise_stigma_fits = c(
+  praise_baseline_fit,
+  stigma_baseline_fit
+)
+
+praise_stigma_joint_tests  = map(
+  praise_stigma_fits,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+saveRDS(
+  list(
+    praise_stigma_fits,
+    praise_stigma_joint_tests
+  ),
+  file.path(
+      script_options$output_path,
+      "praise_stigma_baseline.rds"
+  )
+)
+
+
 
 
 #### Continuous Distance Tests ####

@@ -476,8 +476,6 @@ sim_int %>%
 #|  fig.note="This plot shows the praise and stigma associated with various activities 
 #|  including deworming."
 
-
-
 social_perception_data = baseline.data %>% 
   select(matches("^(praise|stigma)_[^_]+$")) %>% 
   gather(key = key, value = response) %>% 
