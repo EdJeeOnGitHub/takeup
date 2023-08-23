@@ -2706,7 +2706,7 @@ lhs_translation_df = tribble(
   "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
   "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
   "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
-  "lhs: n_per_cluster", "Number of individuals per community", "pretreat",
+  "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
   "lhs: years_schooling", "Years schooling", "pretreat",
   "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
   "lhs: religion_christianity", "Christian", "pretreat",
@@ -2717,12 +2717,13 @@ lhs_translation_df = tribble(
   "lhs: treat_begin", "Know when MDA starts?", "implementation",
   "lhs: treat_end", "Know about MDA ends?", "implementation",
   "lhs: days_available", "Know length of MDA?", "implementation",
-  "lhs: chv_visit", "Did a CHV visit you to discuss MDA?", "implementation"
+  "lhs: chv_visit", "Did a CHV visit you?", "implementation",
+  "lhs: announcement", "Was there an announcement about MDA in your community?", "implementation"
 ) %>%
   mutate(
     lhs_no_prefix = str_remove(lhs, "lhs: ")
   ) %>%
-    mutate(sample = factor(sample, levels = c("pretreat", "baseline_worm", "census", "takeup_sample", "implementation")))
+    mutate(sample = factor(sample, levels = c("takeup_sample", "pretreat", "baseline_worm", "census", "implementation")))
 
 
 
@@ -2786,10 +2787,10 @@ n_per_comp_panel_df = lhs_translation_df %>%
 
 
 panel_names = c(
-      str_glue("Panel A: Pretreat covariates, $N={format(N_pretreat, big.mark = ',')}$"), 
-      str_glue("Panel B: Baseline worm covariates, $N={format(N_baseline_worm, big.mark = ',')}$"),
+      str_glue("Panel A: Takeup sample covariates, $N={format(N_takeup, big.mark = ',')}$"),
+      str_glue("Panel B: Pretreat covariates, $N={format(N_pretreat, big.mark = ',')}$"), 
+      str_glue("Panel C: Baseline worm covariates, $N={format(N_baseline_worm, big.mark = ',')}$"),
       # str_glue("Panel C: Census covariates, $N={format(N_census,  big.mark = ',')}$"), 
-      str_glue("Panel C: Takeup sample covariates, $N={format(N_takeup, big.mark = ',')}$"),
       str_glue("Panel D: Implementation covariates, $N={format(N_endline, big.mark = ',')}$")
 ) 
 
