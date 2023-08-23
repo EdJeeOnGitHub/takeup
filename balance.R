@@ -28,7 +28,6 @@ library(furrr)
 
 
 
-
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
 source(file.path( "dist_structural_util.R"))
@@ -160,7 +159,7 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
     "isValidated"
     )
   cov_data = bind_rows(
-    baseline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "baseline"),
+    # baseline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "baseline"),
     endline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "endline")
   ) 
   cov_data = cov_data %>%
@@ -207,6 +206,7 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
 
     return(cov_data)
 }
+
 
 baseline_worm = baseline.data %>%
   clean_worm_covariates()
@@ -255,6 +255,26 @@ baseline_worm_data = baseline_worm %>%
   ) %>%
   filter(!is.na(treat_dist))
 
+# monitoring checks
+sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv")
+
+
+clean_sens_imp_df = sens_imp_df %>%
+  filter(!is.na(enumerator)) %>%
+  filter(!is.na(announcement)) %>%
+  mutate(announce_church = str_detect(where, "1")) %>%
+  select(
+    cluster.id = cluster_id,
+    announcement,
+    announce_church
+  ) %>%
+  inner_join(cluster_treat_df, by = "cluster.id") %>%
+  filter(!is.na(treat_dist)) %>%
+  left_join(
+    cluster.strat.data %>%
+      select(cluster.id, county)
+  )
+
 
 clean_implementation_vars = function(data)  {
   data %>%
@@ -262,7 +282,6 @@ clean_implementation_vars = function(data)  {
       know_deworm = know_deworm == "yes",
       treat_begin = treat_begin == "knows",
       treat_end = treat_end == "knows",
-      days_available = days_available == "knows",
       chv_visit =  chv_visit == "yes"
     )
 }
@@ -287,11 +306,14 @@ pretreat_vars = c(
 
 implementation_vars = c(
   "chv_visit",
-  "know_deworm",
-  "treat_begin",
-  "treat_end",
-  "days_available"
+  "flyer"
 )
+
+
+sens_vars = c(
+  "announcement",
+  "announce_church"
+  )
 
 # Distance/cluster size balance vars
 takeup_vars = c(
@@ -484,10 +506,18 @@ baseline_worm_fit = feols(
 
 pretreat_fit = feols(
   data = pretreat_data,
-  .[pretreat_vars[pretreat_vars != 'religion_christianity']] ~ 0 + treat_dist + i(county, ref = "Busia") + i(sample_type, ref = "baseline"),
+  .[pretreat_vars[pretreat_vars != 'religion_christianity']] ~ 0 + treat_dist + i(county, ref = "Busia"),
   cluster = if(script_options$community_level) NULL else ~cluster.id,
   vcov = if(script_options$community_level) "hetero"
 )
+
+sens_fit = feols(
+  data = clean_sens_imp_df,
+  .[sens_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+  cluster = if(script_options$community_level) NULL else ~cluster.id,
+  vcov = if(script_options$community_level) "hetero"
+)
+
 
 
 
@@ -514,7 +544,6 @@ misc_fit = feols(
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
   )
-
 # put all the baseline balance fits into a list we can map over
 balance_fits = c(
   baseline_worm_fit,
@@ -522,7 +551,8 @@ balance_fits = c(
   list("lhs: religion_christianity" = pretreat_christ_fit),
   census_fit,
   endline_implementation_fit,
-  misc_fit
+  misc_fit,
+  sens_fit
 )
 
 
@@ -1028,7 +1058,7 @@ baseline_worm_dist_fit = feols(
 
 pretreat_dist_fit = feols(
   data = pretreat_data,
-  .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia") + i(sample_type, ref = "baseline"), 
+  .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
   ~cluster.id 
 )
 
@@ -1084,7 +1114,7 @@ ri_fun = function(draw) {
 
 plan(multisession, workers = 12)
 perm_fit_df = future_map_dfr(
-  1:500, 
+  1:5, 
   ri_fun, 
   .progress = TRUE, 
   .options = furrr_options(
