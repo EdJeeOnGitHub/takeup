@@ -282,7 +282,8 @@ clean_implementation_vars = function(data)  {
       know_deworm = know_deworm == "yes",
       treat_begin = treat_begin == "knows",
       treat_end = treat_end == "knows",
-      chv_visit =  chv_visit == "yes"
+      chv_visit =  chv_visit == "yes",
+      flyer = flyer == "yes"
     )
 }
 
