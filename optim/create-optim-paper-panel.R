@@ -55,6 +55,8 @@ optim_files = c(
     str_glue("target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-static-cutoff-b-control-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds"),
     str_glue("target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-suppress-rep-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds")
 )
+optim_files = str_c(str_glue("dist-constraint-{script_options$distance_constraint}/"), optim_files)
+
 # experimental_file = str_glue("target-rep-util-{script_options$welfare_function}-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-experimental-control-allocation-data.rds")
 experimental_file = str_glue(
     "target-rep-agg-{script_options$welfare_function}-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-experimental-control-allocation-data.rds"
@@ -160,7 +162,6 @@ hex <- ggthemes::canva_pal("Primary colors with a vibrant twist")(2)
 
 plot_comp_function = function(meta_df, long_df){
     # long_df = subset_long_opt_df
-
     # meta_df = subset_optimisation_df
 
     summ_df = long_df %>%
@@ -175,6 +176,8 @@ plot_comp_function = function(meta_df, long_df){
             mean_dist = mean(dist),
             n_pot = n_distinct(j)
         ) 
+
+    summ_df
 
     optimal_comp_df = long_df
 
@@ -206,7 +209,6 @@ plot_comp_function = function(meta_df, long_df){
             mutate(
                 type = paste0("pot_", assigned_pot)
             )
-
 
 
     village_comp_df = bind_rows(
@@ -362,7 +364,6 @@ plot_comp_function = function(meta_df, long_df){
         )
     )
 
-
     library(cowplot)
 
     legend <- get_legend(
@@ -389,12 +390,13 @@ plot_comp_function = function(meta_df, long_df){
     return(p_grid)
 }
 
+stop()
 
 subset_optimisation_df = optimisation_df %>%
     filter(
         file %in% c(
-    str_glue("target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds"),
-    str_glue("target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds")
+    str_glue("dist-constraint-{script_options$distance_constraint}/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds"),
+    str_glue("dist-constraint-{script_options$distance_constraint}/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds")
         ) | allocation_type == "experimental"
     ) %>%
     arrange(allocation_type)
@@ -402,14 +404,18 @@ subset_optimisation_df = optimisation_df %>%
 subset_long_opt_df = long_opt_df %>%
     filter(
         file %in% c(
-    str_glue("target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds"),
-    str_glue("target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds")
+    str_glue("dist-constraint-{script_options$distance_constraint}/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds"),
+    str_glue("dist-constraint-{script_options$distance_constraint}/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-median-optimal-allocation.rds")
         ) | allocation_type == "experimental"
     ) %>%
     arrange(allocation_type)
 
+
+
+
 comp_plot = plot_comp_function(subset_optimisation_df, subset_long_opt_df)
 
+comp_plot
 
 save_plot(
     plot = comp_plot,
@@ -420,5 +426,5 @@ save_plot(
         )
     ), 
     base_width = 20, 
-    base_height = 20
+    base_height = 10
 )
