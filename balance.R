@@ -6,9 +6,11 @@ script_options = docopt::docopt(
 Options:
   --output-path=<path>  Where to save output files [default: {file.path('temp-data')}]
   --community-level
+  --fit-ri
 "),
   args = if (interactive()) "
     --output-path=temp-data \
+    --fit-ri
     " else commandArgs(trailingOnly = TRUE)
 ) 
 
@@ -1113,16 +1115,21 @@ ri_fun = function(draw) {
   )
 }
 
-plan(multisession, workers = 12)
-perm_fit_df = future_map_dfr(
-  1:5, 
-  ri_fun, 
-  .progress = TRUE, 
-  .options = furrr_options(
-    seed = TRUE,
-    packages = c("broom", "fixest")
+if (script_options$fit_ri) {
+  plan(multisession, workers = 12)
+  perm_fit_df = future_map_dfr(
+    1:100, 
+    ri_fun, 
+    .progress = TRUE, 
+    .options = furrr_options(
+      seed = TRUE,
+      packages = c("broom", "fixest")
+      )
     )
-  )
+  saveRDS(perm_fit_df, "temp-data/balance-cts-dist-ri.rds")
+} else {
+  perm_fit_df = read_rds("temp-data/balance-cts-dist-ri.rds")
+}
 
 lhs_translation_df = tribble(
   ~lhs, ~clean_name,
