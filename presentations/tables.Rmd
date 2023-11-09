@@ -404,6 +404,8 @@ incentive_ate_df =  ate_rvar_df %>%
 
 
 
+
+
 signal_ate_df = ate_rvar_df %>%
   filter(model == params$struct_models) %>%
   mutate(mu_treatment = str_to_title(mu_treatment)) %>%
@@ -577,12 +579,6 @@ x = 1 + 5
 #### Split Table ####
 ```{r}
 #| overall-table-only
-
-
-
-
-
-
 overall_te_kbl_df = all_ate_tbl %>% 
   arrange(estimand, treatment) %>%
   filter(estimand == "overall") %>%
@@ -635,8 +631,6 @@ overall_te_kbl_df = all_ate_tbl %>%
   row_spec(c(3), hline_after = TRUE) 
 
 
-
-
 overall_te_kbl_df %>%
   custom_save_latex_table(
     "overall-te-table"
@@ -644,6 +638,122 @@ overall_te_kbl_df %>%
 
 ```
 
+
+```{r}
+#|
+struct_overall_tbl = all_ate_tbl %>% 
+  arrange(estimand, treatment) %>%
+  filter(estimand == "overall") %>%
+  select(-estimand) %>%
+  select(-contains("rf_")) %>%
+  kbl(
+    col.names = c(
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Overall Results") %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Structural" = 4
+      )
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Overall" = 5
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3), hline_after = TRUE) 
+
+
+struct_overall_tbl %>%
+  custom_save_latex_table(
+    "struct-overall-te-table"
+  )
+
+
+```
+
+```{r}
+#| rf-table-only
+rf_overall_tbl = all_ate_tbl %>% 
+  arrange(estimand, treatment) %>%
+  filter(estimand == "overall") %>%
+  select(-estimand) %>%
+  select(-contains("struct_")) %>%
+  kbl(
+    col.names = c(
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Overall Results") %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Reduced Form" = 4
+      )
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Overall" = 5
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3), hline_after = TRUE) 
+
+
+rf_overall_tbl %>%
+  custom_save_latex_table(
+    "rf-overall-te-table"
+  )
+
+
+```
 
 ```{r}
 #| private-signal-tbl, results="asis"
@@ -3380,5 +3490,81 @@ pref_fit_table_no_pp = fixest::etable(
 
 
 pref_fit_table_no_pp
+
+```
+
+
+```{r}
+
+pref_gift_fit_not_dewormed = analysis_data %>%
+    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    filter(assigned.treatment %in% c("bracelet", "calendar")) %>%
+    filter(
+      dewormed == FALSE
+    )  %>%
+    ungroup() %>%
+    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    group_by(assigned.treatment, dist.pot.group) %>%
+    fixest::feols(
+      data = .,
+      want_bracelet ~ dist.pot.group,
+      fsplit = ~assigned.treatment,
+      cluster = ~cluster.id
+    ) 
+
+
+
+pref_gift_fit_dewormed = analysis_data %>%
+    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    filter(assigned.treatment %in% c("bracelet", "calendar")) %>%
+    filter(
+      dewormed == TRUE
+    )  %>%
+    ungroup() %>%
+    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    group_by(assigned.treatment, dist.pot.group) %>%
+    fixest::feols(
+      data = .,
+      want_bracelet ~ dist.pot.group,
+      fsplit = ~assigned.treatment,
+      cluster = ~cluster.id
+    ) 
+
+pref_gift_fit_not_dewormed
+
+
+
+pref_gift_fit = pref_gift_fit_dewormed 
+    
+    
+pref_gift_fit_tbl = fixest::etable(
+  list(
+    "(1) Sample: Calendar" = pref_gift_fit[[2]],
+    "(2) Sample: Bracelet" = pref_gift_fit[[3]],
+    "(3) Sample: Both" = pref_gift_fit[[1]]
+  ),
+  dict = c(
+    "dist.pot.groupfar" = "Distance group: Far",
+    "want_bracelet" = "Prefer bracelet",
+    "assigned.treatment" = "Treatment Arm"
+  ),
+  tex = TRUE,
+  depvar = FALSE,
+  title = "Preference for Bracelet Gift Across Distance",
+  style.tex = fixest::style.tex("aer"))
+
+pref_gift_fit_tbl
 
 ```
