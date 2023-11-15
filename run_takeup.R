@@ -1,5 +1,4 @@
 #!/usr/bin/Rscript
-
 script_options <- docopt::docopt(
   stringr::str_glue("Usage:
   run_takeup.R takeup prior [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds]
@@ -29,10 +28,10 @@ Options:
 "),
 
   args = if (interactive()) "
-    takeup prior \
+    takeup fit \
     --cmdstanr \
-    --outputname=dist_prior95 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB \
+    --outputname=dist_fit96 \
+    --models=REDUCED_FORM_NO_RESTRICT_DIST_CTS \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 800 \
@@ -52,7 +51,6 @@ Options:
 library(magrittr)
 library(tidyverse)
 library(furrr)
-library(HRW)
 library(sf)
 library(loo)
 
@@ -525,7 +523,6 @@ treatment_map_design_matrix <- cluster_treatment_map %>%
   modelr::model_matrix(treatment_formula)
 
 # Beliefs Data ------------------------------------------------------------
-
 beliefs_treatment_formula <- ~ assigned_treatment 
 
 beliefs_treatment_map_design_matrix <- cluster_treatment_map %>%
@@ -770,6 +767,7 @@ if (script_options$takeup) {
       save(rank_stats, file = output_file_name)
 
     } else {
+      
       dist_fit <- models %>% 
         stan_list(
           stan_data, 
@@ -941,3 +939,4 @@ if (script_options$takeup) {
 }
   
 cat(str_glue("All done. Saved results to output ID '{output_name}'\n\n"))
+
