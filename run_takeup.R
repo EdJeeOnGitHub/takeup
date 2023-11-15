@@ -28,7 +28,7 @@ Options:
 "),
 
   args = if (interactive()) "
-    takeup fit \
+    takeup prior \
     --cmdstanr \
     --outputname=dist_fit96 \
     --models=REDUCED_FORM_NO_RESTRICT_DIST_CTS \
@@ -36,8 +36,7 @@ Options:
     --threads=3 \
     --iter 800 \
     --chains=4 \
-    --sequential  \
-    --update
+    --sequential  
     " else commandArgs(trailingOnly = TRUE)
   # args = if (interactive()) "takeup cv --models=REDUCED_FORM_NO_RESTRICT --cmdstanr --include-paths=stan_models --update --output-path=data/stan_analysis_data --outputname=test --folds=2 --sequential" else commandArgs(trailingOnly = TRUE)
 
@@ -777,7 +776,9 @@ if (script_options$takeup) {
       
       if (script_options$cmdstanr) {
         dist_fit_obj <- dist_fit
-        
+        print(str_glue("Output Path: {script_options$output_path}")) 
+        print(str_glue("Output Name: output_name")) 
+
         dist_fit %<>%
           imap(~ file.path(script_options$output_path, str_c(output_name, "_", .y, ".rds")))
       
