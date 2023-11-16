@@ -3568,3 +3568,80 @@ pref_gift_fit_tbl = fixest::etable(
 pref_gift_fit_tbl
 
 ```
+
+
+
+```{r}
+robustness_ate_rvar_df = read_rds(
+      file.path(
+        "temp-data",
+        str_glue("rvar_processed_dist_fit96_ates_REDUCED_FORM_NO_RESTRICT_DIST_CTS_1-4.rds")
+      ) 
+  )
+
+robustness_ate_rvar_df
+
+robustness_ate_df =  robustness_ate_rvar_df %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
+  ) 
+
+robustness_ate_tbl = robustness_ate_df %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  rename_with(
+    ~paste0("rf_", .),
+    .cols = c(combined, close, far, far_minus_close)
+  ) %>%
+  arrange(treatment)   %>%
+  create_cis() %>%
+  recode_control_mean()  %>%
+  mutate(estimand = "overall") %>%
+  select(-model)
+
+
+robustness_kbl_df = robustness_ate_tbl %>% 
+  arrange(treatment) %>%
+  select(-estimand) %>%
+  kbl(
+    col.names = c(
+      # "Estimand", 
+      # "Treatment", 
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Results"
+  )  %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Reduced Form" = 4
+      )
+  ) %>%
+  row_spec(c(3), hline_after = TRUE) 
+robustness_kbl_df %>%
+  custom_save_latex_table(
+    "robustness-rf-cts-dist-te-table"
+  )
+
+```
