@@ -12,11 +12,10 @@ Options:
   
   "), 
   args = if (interactive()) "
-  95
-  --prior
+  96
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
-  1 
+  --model=REDUCED_FORM_NO_RESTRICT_DIST_CTS
+  1 2 3 4
   " else commandArgs(trailingOnly = TRUE)
 )
 library(tidyverse)

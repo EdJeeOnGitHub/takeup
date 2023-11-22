@@ -14,7 +14,7 @@
 #SBATCH --error=temp/log/takeup-%j.log
 #SBATCH --export=IN_SLURM=1
 
-LATEST_VERSION=91
+LATEST_VERSION=96
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
 SLURM_INOUT_DIR=~/scratch-midway2
@@ -45,14 +45,14 @@ STAN_THREADS=$((${CORES} / 4))
 
 fit_models () {
 	models=(
-		"STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP" 
+		# "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP" 
 		"STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL"
 		"STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL"
 		"STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL"
 		"STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL"
 		"STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS"
-		"REDUCED_FORM_NO_RESTRICT_DIST_CTS"
-		"REDUCED_FORM_NO_RESTRICT"
+		# "REDUCED_FORM_NO_RESTRICT_DIST_CTS"
+		# "REDUCED_FORM_NO_RESTRICT"
 		)
 
 	for model in "${models[@]}"
@@ -68,50 +68,36 @@ fit_models () {
 			--threads=${STAN_THREADS} \
 			--outputname=dist_fit${VERSION} \
 			--num-mix-groups=1 \
-			--chains=2 \
+			--chains=4 \
 			--iter=${ITER} \
 			--sequential > temp/log/output-${model}-fit${VERSION}.txt 2>&1
 
-		Rscript --no-save \
-			--no-restore \
-			--verbose \
-			run_takeup.R takeup prior \
-			--models=${model} \
-			${CMDSTAN_ARGS} \
-			${OUTPUT_ARGS} \
-			--update-output \
-			--threads=${STAN_THREADS} \
-			--outputname=dist_prior${VERSION} \
-			--chains=2 \
-			--num-mix-groups=1 \
-			--iter=${ITER} \
-			--sequential > temp/log/output-${model}-prior${VERSION}.txt 2>&1
+		# Rscript --no-save \
+		# 	--no-restore \
+		# 	--verbose \
+		# 	run_takeup.R takeup prior \
+		# 	--models=${model} \
+		# 	${CMDSTAN_ARGS} \
+		# 	${OUTPUT_ARGS} \
+		# 	--update-output \
+		# 	--threads=${STAN_THREADS} \
+		# 	--outputname=dist_prior${VERSION} \
+		# 	--chains=4 \
+		# 	--num-mix-groups=1 \
+		# 	--iter=${ITER} \
+		# 	--sequential > temp/log/output-${model}-prior${VERSION}.txt 2>&1
 	done
 
-		Rscript --no-save \
-			--no-restore \
-			--verbose \
-			postprocess_dist_fit.R \
-			${VERSION} \
-			--load-from-csv \
-			--cores=1  \
-			${POSTPROCESS_INOUT_ARGS} > temp/log/postprocess-output${VERSION}.txt 2>&1 
+		# Rscript --no-save \
+		# 	--no-restore \
+		# 	--verbose \
+		# 	postprocess_dist_fit.R \
+		# 	${VERSION} \
+		# 	--load-from-csv \
+		# 	--cores=1  \
+		# 	${POSTPROCESS_INOUT_ARGS} > temp/log/postprocess-output${VERSION}.txt 2>&1 
 
 }
 
 
 fit_models
-# WTP 
-# Rscript ./run_takeup.R wtp prior --chains=4 --iter 2000 --outputname=wtp_model_prior --output-path=data/stan_analysis_data --multilevel &
-# Rscript ./run_takeup.R wtp fit   --chains=4 --iter 2000 --outputname=wtp_model_fit   --output-path=data/stan_analysis_data --multilevel
-# wait
-
-# Distance
-#Rscript ./run_takeup.R dist prior --chains=4 --iter 800 --outputname=dist_model_prior --output-path=data/stan_analysis_data --num-mix-groups=1 --multilevel &
-#Rscript ./run_takeup.R dist fit   --chains=4 --iter 800 --outputname=dist_model_fit   --output-path=data/stan_analysis_data --num-mix-groups=1 --multilevel
-#wait
-
-# Beliefs
-#Rscript ./run_takeup.R beliefs prior --chains=4 --iter 1000 --outputname=beliefs_prior --output-path=data/stan_analysis_data &
-#Rscript ./run_takeup.R beliefs fit   --chains=4 --iter 1000 --outputname=beliefs       --output-path=data/stan_analysis_data --num-mix-groups=1
-#wait

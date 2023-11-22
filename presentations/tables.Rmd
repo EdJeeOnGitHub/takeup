@@ -120,19 +120,11 @@ theme_set(theme_minimal() +
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
-if (interactive()) {
-    rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
-    rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
-    cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
-    load(file.path("data", "takeup_village_pot_dist.RData"))
-    load(file.path("data", "analysis.RData"))
-} else {
-    rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
-    rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
-    cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
-    load(file.path("data", "takeup_village_pot_dist.RData"))
-    load(file.path("data", "analysis.RData"))
-}
+rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
+rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
+cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
+load(file.path("data", "takeup_village_pot_dist.RData"))
+load(file.path("data", "analysis.RData"))
 
 
 standardize <- as_mapper(~ (.) / sd(.))
