@@ -28,10 +28,10 @@ Options:
 "),
 
   args = if (interactive()) "
-    takeup prior \
+    takeup fit \
     --cmdstanr \
-    --outputname=dist_fit96 \
-    --models=REDUCED_FORM_NO_RESTRICT_DIST_CTS \
+    --outputname=test \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 800 \
@@ -720,9 +720,34 @@ stan_data <- lst(
   analysis_data,
   # SBC
   sbc = script_options$sbc
-) %>% 
-  list_modify(!!!map(models, pluck, "model_type") %>% set_names(~ str_c("MODEL_TYPE_", .))) %>% 
+)  %>%
+  # list_modify(!!!map(models, pluck, "model_type") %>% set_names(~ str_c("MODEL_TYPE_", .))) %>% 
   list_modify(!!!wtp_stan_data) 
+
+str_c("MODEL_TYPE", map(models, pluck, "model_type"))
+
+map(
+  models, 
+  pluck, 
+  "model_type")
+
+
+map(
+  models, 
+  pluck, 
+  "model_type") %>% 
+discard(is.null) %>%
+str_c("MODEL_TYPE_", .) %>%
+unique()
+
+stan_data %>%
+  list_modify(!!!
+  map(models, pluck, "model_type") %>% set_names(~str_c("MODEL_TYPE_", .))
+  )
+
+set_names(
+  ~str_c("MODEL_TYPE_", .)
+)
 
 
 
@@ -939,6 +964,7 @@ if (script_options$takeup) {
   
   write_rds(wtp_results, file.path(script_options$output_path, str_c(output_name, "_results.rds")))
 }
-  
+
+
 cat(str_glue("All done. Saved results to output ID '{output_name}'\n\n"))
 

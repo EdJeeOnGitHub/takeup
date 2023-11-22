@@ -525,8 +525,9 @@ fit_model <- function(curr_stan_data, chains, threads, iter, use_cmdstanr, inclu
     # Here we drop data.frames etc. that stan won't like
     pruned_curr_stan_data = curr_stan_data %>%
       discard(
-        ~ is_function(.x) | is.character(.) | is.data.frame(.) | is.null(.)
+        ~ is_function(.x) | is.character(.) | is.null(.)
       )  
+    pruned_curr_stan_data$analysis_data = NULL
 
     dist_model$sample(
       data = pruned_curr_stan_data,
