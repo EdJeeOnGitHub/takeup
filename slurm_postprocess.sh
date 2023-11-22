@@ -3,7 +3,7 @@
 #SBATCH --partition=bigmem2
 #SBATCH --job-name=quick-takeup        # create a short name for your job
 #SBATCH --nodes=1                # node count
-#SBATCH --ntasks=6              # total number of tasks across all nodes
+#SBATCH --ntasks=1              # total number of tasks across all nodes
 #SBATCH --cpus-per-task=1      # cpu-cores per task (>1 if multi-threaded tasks)
 #SBATCH --mem-per-cpu=50G         # memory per cpu-core (4G is default)
 #SBATCH --time=0-10:00:00        # maximum time needed (HH:MM:SS)
@@ -12,21 +12,25 @@
 #SBATCH --mail-user=edjee96@gmail.com
 #SBATCH --output=temp/log/takeup-%j.log
 #SBATCH --error=temp/log/takeup-%j.log
+#SBATCH --array=0-4 # Adjust this to the number of models - 1
 #SBATCH --export=IN_SLURM=1
 
-LATEST_VERSION=95
+LATEST_VERSION=96
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
-SLURM_INOUT_DIR=~/scratch-midway2
+SLURM_INOUT_DIR="data/stan_analysis_data"
+
 models=(
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB"
-  )
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS"
+)
 
 prior_args=(
   "--prior"
   ""
 )
-
-#  "REDUCED_FORM_NO_RESTRICT"
 
 
 echo "Version: $VERSION"
@@ -49,32 +53,15 @@ else
 fi
 
 
+model=${models[$SLURM_ARRAY_TASK_ID]} # get the model for this task
 
-    echo "RUNNING MODEL: $1"
-    echo "RUNNING VERSION: $2"
-    echo "Postprocess args: $3"
-
-
-	module load R/4.2.0
-
-
-
-# Source the functions script
-source quick_postprocess.sh
-
-
-for model in "${models[@]}"
-do
-    Rscript --no-save \
-            --no-restore \
-            --verbose \
-            quick_ate_postprocess.R \
-	    ${VERSION} \
-            --model=${model} \
-            1 2 3 4 > temp/log/struct-postprocess_${model}_${VERSION}.txt 2>&1 &
-
-	done
-wait
+Rscript --no-save \
+        --no-restore \
+        --verbose \
+        quick_ate_postprocess.R \
+        ${VERSION} \
+        --model=${model} \
+        1 2 3 4 > temp/log/struct-postprocess_${model}_${VERSION}.txt 2>&1 
 
 	  # Within SLURM tasks
 #	  srun --export=all --exclusive --ntasks=1 bash -c \
