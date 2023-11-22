@@ -48,42 +48,60 @@ else
   CORES=8
 fi
 
+
+
+    echo "RUNNING MODEL: $1"
+    echo "RUNNING VERSION: $2"
+    echo "Postprocess args: $3"
+
+
+	module load R/4.2.0
+
+
+
 # Source the functions script
 source quick_postprocess.sh
 
 
-for prior_arg in "${prior_args[@]}"
+for model in "${models[@]}"
 do
-	for model in "${models[@]}"
-	do
-	  # Within SLURM tasks
-	  srun --export=all --exclusive --ntasks=1 bash -c \
-	    "source quick_postprocess.sh && postprocess_model \
-	      quick_ate_postprocess.R \
-	      ${VERSION} \
-	      ${model} \
-	      ${IN_ARG} \
-	      ${OUT_ARG} \
-	      ${prior_arg}" &
-	  srun --export=all --exclusive --ntasks=1 bash -c \
-	    "source quick_postprocess.sh && postprocess_model \
-	      quick_submodel_postprocess.R \
-	      ${VERSION} \
-	      ${model} \
-	      ${IN_ARG} \
-	      ${OUT_ARG} \
-	      ${prior_arg}" &
-	  srun --export=all --exclusive --ntasks=1 bash -c \
-	    "source quick_postprocess.sh && postprocess_model \
-	      quick_roc_postprocess.R \
-	      ${VERSION} \
-	      ${model} \
-	      ${IN_ARG} \
-	      ${OUT_ARG} \
-	      ${prior_arg} \
-	      --cluster-roc \
-	      --cluster-takeup-prop \
-	      --cluster-rep-return-dist" &
+    Rscript --no-save \
+            --no-restore \
+            --verbose \
+            quick_ate_postprocess.R \
+	    ${VERSION} \
+            --model=${model} \
+            1 2 3 4 > temp/log/struct-postprocess_${model}_${VERSION}.txt 2>&1 &
+
 	done
-done
 wait
+
+	  # Within SLURM tasks
+#	  srun --export=all --exclusive --ntasks=1 bash -c \
+#	    "source quick_postprocess.sh && postprocess_model \
+#	      quick_ate_postprocess.R \
+#	      ${VERSION} \
+#	      ${model} \
+#	      ${IN_ARG} \
+#	      ${OUT_ARG} \
+#	      ${prior_arg}" &
+#	  srun --export=all --exclusive --ntasks=1 bash -c \
+#	    "source quick_postprocess.sh && postprocess_model \
+#	      quick_submodel_postprocess.R \
+#	      ${VERSION} \
+#	      ${model} \
+#	      ${IN_ARG} \
+#	      ${OUT_ARG} \
+#	      ${prior_arg}" &
+#	  srun --export=all --exclusive --ntasks=1 bash -c \
+#	    "source quick_postprocess.sh && postprocess_model \
+#	      quick_roc_postprocess.R \
+#	      ${VERSION} \
+#	      ${model} \
+#	      ${IN_ARG} \
+#	      ${OUT_ARG} \
+#	      ${prior_arg} \
+#	      --cluster-roc \
+#	      --cluster-takeup-prop \
+#	      --cluster-rep-return-dist \
+#	      --sm" &

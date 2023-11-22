@@ -18,7 +18,7 @@
 LATEST_VERSION=96
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
-SLURM_INOUT_DIR=~/scratch-midway2
+SLURM_INOUT_DIR="data/stan_analysis_data"
 ITER=400
 
 if [[ -v IN_SLURM ]]; then
