@@ -724,32 +724,6 @@ stan_data <- lst(
   # list_modify(!!!map(models, pluck, "model_type") %>% set_names(~ str_c("MODEL_TYPE_", .))) %>% 
   list_modify(!!!wtp_stan_data) 
 
-str_c("MODEL_TYPE", map(models, pluck, "model_type"))
-
-map(
-  models, 
-  pluck, 
-  "model_type")
-
-
-map(
-  models, 
-  pluck, 
-  "model_type") %>% 
-discard(is.null) %>%
-str_c("MODEL_TYPE_", .) %>%
-unique()
-
-stan_data %>%
-  list_modify(!!!
-  map(models, pluck, "model_type") %>% set_names(~str_c("MODEL_TYPE_", .))
-  )
-
-set_names(
-  ~str_c("MODEL_TYPE_", .)
-)
-
-
 
 if (script_options$sbc & !script_options$takeup) {
   stop("Not yet implemented")
