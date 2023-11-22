@@ -15,6 +15,22 @@
 #SBATCH --export=IN_SLURM=1
 #SBATCH --array=0-4              # create a job array with 5 tasks
 
+if [[ -v IN_SLURM ]]; then
+  echo "Running in SLURM..."
+  module load -f midway2 gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
+
+  OUTPUT_ARGS="--output-path=${SLURM_INOUT_DIR}"
+  POSTPROCESS_INOUT_ARGS="--input-path=${SLURM_INOUT_DIR} --output-path=${SLURM_INOUT_DIR}"
+  CORES=$SLURM_CPUS_PER_TASK
+
+  echo "Running with ${CORES} cores."
+  echo "INOUT ARGS: ${POSTPROCESS_INOUT_ARGS}."
+else
+  OUTPUT_ARGS="--output-path=data/stan_analysis_data"
+  POSTPROCESS_INOUT_ARGS=
+  CORES=8
+fi
+
 models=(
   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL"
   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL"
