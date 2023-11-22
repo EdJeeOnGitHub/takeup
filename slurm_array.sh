@@ -15,6 +15,12 @@
 #SBATCH --export=IN_SLURM=1
 #SBATCH --array=0-4              # create a job array with 5 tasks
 
+LATEST_VERSION=96
+VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
+CMDSTAN_ARGS="--cmdstanr"
+SLURM_INOUT_DIR=~/scratch-midway2
+ITER=400
+
 if [[ -v IN_SLURM ]]; then
   echo "Running in SLURM..."
   module load -f midway2 gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
