@@ -28,10 +28,10 @@ Options:
 "),
 
   args = if (interactive()) "
-    takeup fit \
+    takeup prior \
     --cmdstanr \
     --outputname=test \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL \
+    --models=REDUCED_FORM_NO_RESTRICT \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 800 \
@@ -778,12 +778,12 @@ if (script_options$takeup) {
         print(str_glue("Output Path: {script_options$output_path}")) 
         print(str_glue("Output Name: {output_name}")) 
 
-
-
         # BUG spaces in paths causing problems. Wait till it is fixed.
+        print(str_glue("Names dist_fit_obj: {names(dist_fit_obj)}"))
+
         try(iwalk(dist_fit_obj, ~.x$save_output_files(
           dir = script_options$output_path, 
-          basename = str_c(output_name, "_", dist_fit[.y]), 
+          basename = str_c(output_name, "_", .y), 
           timestamp = FALSE, random = FALSE)))
 
         dist_fit %<>%
