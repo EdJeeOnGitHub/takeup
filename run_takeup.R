@@ -778,16 +778,18 @@ if (script_options$takeup) {
         print(str_glue("Output Path: {script_options$output_path}")) 
         print(str_glue("Output Name: {output_name}")) 
 
-        dist_fit %<>%
-          imap(~ file.path(script_options$output_path, str_c(output_name, "_", .y, ".rds")))
-        print(str_glue("Dist Fit Path: {dist_fit}"))
 
 
         # BUG spaces in paths causing problems. Wait till it is fixed.
         try(iwalk(dist_fit_obj, ~.x$save_output_files(
           dir = script_options$output_path, 
-          basename = output_name, 
+          basename = str_c(output_name, "_", dist_fit[.y]), 
           timestamp = FALSE, random = FALSE)))
+
+        dist_fit %<>%
+          imap(~ file.path(script_options$output_path, str_c(output_name, "_", .y, ".rds")))
+
+        print(str_glue("Dist Fit Path: {dist_fit}"))
         dist_fit_obj %>% 
           iwalk(~ {
             cat(.y, "Diagnosis ---------------------------------\n")
