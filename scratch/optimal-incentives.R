@@ -81,30 +81,72 @@ mu_rep_type = switch(
 )
 
 
-first_param_draw = extract_params(
-    param_draws = struct_param_draws,
-    private_benefit_treatment = script_options$private_benefit_z,
-    visibility_treatment = script_options$visibility_z,
-    draw_id = 2,
-    dist_sd = sd_of_dist,
-    j_id = 1,
-    rep_cutoff = Inf,
-    dist_cutoff = Inf, 
-    bounds = c(-Inf, Inf),
-    mu_rep_type = mu_rep_type,
-    suppress_reputation = FALSE, 
-    static_signal = NA,
-    fix_mu_at_1 = FALSE,
-    fix_mu_distance = NULL,
-    static_delta_v_star = NA
-)
 
+max_draw = max(struct_param_draws$.draw)
+draw_treat_grid = expand.grid(
+    draw = 1:min(max_draw, script_options$num_post_draws),
+    lambda = seq(from = 0, to = 0.5, length.out = 10)
+    # treatment = script_options$treatment
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = lambda)
+
+draw_treat_grid = draw_treat_grid %>%
+    mutate(
+        params_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = script_options$private_benefit_z,
+                visibility_treatment = script_options$visibility_z,
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            ),
+        params_control_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = script_options$private_benefit_z,
+                visibility_treatment = "control",
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            )
+        ) 
+draw_treat_grid = draw_treat_grid %>%
+    unnest(data)
 
 #' distance in meters
 find_optimal_incentive = function(distance, lambda, params) {
     takeup_fun = find_pred_takeup(params)
     takeup_list = takeup_fun(distance)
-
+    if (params$suppress_reputation) {
+        takeup_list$mu_rep = 0
+        takeup_list$mu_rep_deriv = 0
+        takeup_list$delta_v_star = 0
+        takeup_list$delta_v_star_deriv = 0
+    }
     delta = takeup_list$delta
     mu_rep_deriv = takeup_list$mu_rep_deriv
     delta_v_star = takeup_list$delta_v_star
@@ -118,7 +160,7 @@ find_optimal_incentive = function(distance, lambda, params) {
 
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
-    lhs = (delta - mu_rep_deriv * delta_v_star) * (v_star + b + lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
 
     rhs = lambda * delta / hazard
 
@@ -126,16 +168,67 @@ find_optimal_incentive = function(distance, lambda, params) {
     return(diff)
 }
 
-find_optimal_incentive(100, 0.1, first_param_draw)
-anon_f = function(x, lambda) {
-    find_optimal_incentive(x, lambda, first_param_draw)
+
+anon_f = function(x, lambda, params) {
+    find_optimal_incentive(x, lambda, params)
 }
 
-lambda = seq(from = 0, to = 2, length.out = 20)
+draw_treat_grid = draw_treat_grid %>%
+    mutate(
+        funs_vis = map2(
+            params_vis,
+            lambda,
+            ~function(x) find_optimal_incentive(x, .y, .x)
+        ),
+        funs_control_vis = map2(
+            params_control_vis,
+            lambda,
+            ~function(x) find_optimal_incentive(x, .y, .x)
+        )
+    )
+library(furrr)
+plan(multisession, workers = 12)
+plan(sequential)
 
-lambda_df = tibble(
-    lambda = lambda
-)
+test = draw_treat_grid %>%
+    head(n = 40) %>%
+    mutate(
+        fit_vis = map(
+            funs_vis,
+            ~optim(1, .x, method = "Brent", lower = 0, upper = 10000)
+        ),
+        fit_control_vis = map(
+            funs_control_vis,
+            ~optim(1, .x, method = "Brent", lower = 0, upper = 10000)
+        )
+    )
+
+test_p = test %>%
+    slice(2) %>%
+    pull(params_no_vis) %>%
+    first()
+
+
+find_pred_takeup(test_p)(10)
+
+test = test %>%
+    mutate(
+        res_vis = map_dbl(fit_vis, "par"),
+        res_control_vis = map_dbl(fit_control_vis, "par")
+        )
+
+test %>%
+    select(draw, lambda, contains("res")) %>%
+    pivot_longer(
+        contains("res")
+    ) %>%
+    ggplot(aes(
+        x = lambda,
+        y = value,
+        group = interaction(draw, name),
+        colour = name
+    )) +
+    geom_line()
 
 lambda_df = lambda_df %>%
     mutate(
