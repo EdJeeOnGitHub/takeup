@@ -394,7 +394,7 @@ layout(
     showlegend = FALSE,
     scene = list(
       camera=list(
-        eye = list(x=1.9/2.5, y=-4/2.5, z=2.5/2.5)
+        eye = list(x=1.9/2, y=-4/2, z=2.5/2)
         ),
         yaxis = list(title = "Private Incentive"),
         xaxis = list(title = "Visibility"),
