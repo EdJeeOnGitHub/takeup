@@ -29,7 +29,7 @@ script_options = docopt::docopt(
                             bracelet
                             --output-name=optimal-incentives-TEST-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --from-csv
-                            --num-post-draws=200
+                            --num-post-draws=1
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                               " 
@@ -67,6 +67,13 @@ struct_param_draws = read_csv(
 )
 
 
+struct_param_draws = struct_param_draws %>%
+    group_by(.variable, k, j) %>%
+    summarise(.value = mean(.value)) %>% 
+    mutate(.draw = 1)
+
+
+script_options$num_post_draws = as.numeric(script_options$num_post_draws)
 struct_param_draws
 
 sd_of_dist = read_rds("temp-data/sd_of_dist.rds")
@@ -84,12 +91,14 @@ mu_rep_type = switch(
 
 max_draw = max(struct_param_draws$.draw)
 draw_treat_grid = expand.grid(
-    draw = 1:min(max_draw, script_options$num_post_draws),
-    lambda = seq(from = 0, to = 0.5, length.out = 10)
+    draw = 1,
+    # lambda = seq(from = 0, to = 0.3, length.out = 3),
+    lambda = 0,
+    b_add = seq(from = -3, to = 3, length.out = 20)
     # treatment = script_options$treatment
 ) %>% as_tibble() %>%
     group_by(draw) %>%
-    nest(data = lambda)
+    nest(data = c(lambda, b_add))
 
 draw_treat_grid = draw_treat_grid %>%
     mutate(
@@ -138,8 +147,13 @@ draw_treat_grid = draw_treat_grid %>%
     unnest(data)
 
 #' distance in meters
-find_optimal_incentive = function(distance, lambda, params) {
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+    # additional net benefit to get dewormed
+    params$beta = params$beta  +  b_add
+    params$base_mu_rep = params$base_mu_rep + mu_add
+
     takeup_fun = find_pred_takeup(params)
+
     takeup_list = takeup_fun(distance)
     if (params$suppress_reputation) {
         takeup_list$mu_rep = 0
@@ -169,47 +183,39 @@ find_optimal_incentive = function(distance, lambda, params) {
 }
 
 
-anon_f = function(x, lambda, params) {
-    find_optimal_incentive(x, lambda, params)
-}
-
 draw_treat_grid = draw_treat_grid %>%
     mutate(
-        funs_vis = map2(
-            params_vis,
-            lambda,
-            ~function(x) find_optimal_incentive(x, .y, .x)
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add
+            ),
+            ~function(x) find_optimal_incentive(distance = x, lambda = ..1, params = ..2, b_add = ..3)
         ),
-        funs_control_vis = map2(
-            params_control_vis,
-            lambda,
-            ~function(x) find_optimal_incentive(x, .y, .x)
+        funs_control_vis = pmap(
+            list(
+                lambda,
+                params_control_vis,
+                b_add
+            ),
+            ~function(x) find_optimal_incentive(distance = x, lambda = ..1, params = ..2, b_add = ..3)
         )
-    )
-library(furrr)
-plan(multisession, workers = 12)
-plan(sequential)
+    ) %>%
+    ungroup()
 
 test = draw_treat_grid %>%
-    head(n = 40) %>%
+    ungroup() %>%
     mutate(
         fit_vis = map(
             funs_vis,
-            ~optim(1, .x, method = "Brent", lower = 0, upper = 10000)
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000)
         ),
         fit_control_vis = map(
             funs_control_vis,
-            ~optim(1, .x, method = "Brent", lower = 0, upper = 10000)
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000)
         )
     )
-
-test_p = test %>%
-    slice(2) %>%
-    pull(params_no_vis) %>%
-    first()
-
-
-find_pred_takeup(test_p)(10)
 
 test = test %>%
     mutate(
@@ -217,18 +223,244 @@ test = test %>%
         res_control_vis = map_dbl(fit_control_vis, "par")
         )
 
-test %>%
-    select(draw, lambda, contains("res")) %>%
+long_test = test %>%
+    select(draw, lambda, b_add, contains("res")) %>%
     pivot_longer(
-        contains("res")
+        contains('res')
     ) %>%
+    mutate(name = case_when(
+        name == "res_control_vis" ~ "B: Bracelet, Mu: Control",
+        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
+        )) 
+
+p_private_incentive_only = long_test %>%
+    ggplot(aes(
+        x = b_add,
+        y = value,
+        colour = name,
+        group = interaction(draw, name)
+    )) +
+    geom_line(size = 2) +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    labs(
+        x = "Additional Private Incentive to Get Dewormed",
+        y = "Optimal PoT Distance (meters)"
+    ) +
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist") 
+
+ggsave(
+    "temp-data/optimal-distance-vs-b-add.pdf",
+    width = 8,
+    height = 6
+)
+
+
+
+#### B and Mu
+
+seq_size = 12
+b_mu_draw_treat_grid = expand.grid(
+    draw = 1:min(max_draw, script_options$num_post_draws),
+    # lambda = seq(from = 0, to = 0.3, length.out = 3),
+    lambda = 0,
+    b_add = seq(from = -3, to = 3, length.out = seq_size),
+    # b_add = 0,
+    mu_add = seq(from = 0, to = 2, length.out = seq_size)
+    # treatment = script_options$treatment
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(lambda, b_add, mu_add))
+
+b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+    mutate(
+        params_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = script_options$private_benefit_z,
+                visibility_treatment = script_options$visibility_z,
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            )
+        ) 
+
+b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+    unnest(data)
+
+b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+    mutate(
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add,
+                mu_add
+            ),
+            ~function(x) { find_optimal_incentive(distance = x*1000, lambda = ..1, params = ..2, b_add = ..3, mu_add = ..4) }
+        )
+        )
+
+b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+    ungroup() %>%
+    mutate(
+        fit_vis = map(
+            funs_vis,
+            ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent")
+        )
+    )
+
+b_mu_draw_treat_grid
+
+
+b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+    mutate(
+        res_vis = map_dbl(fit_vis, "par")
+        )
+
+p_contour = b_mu_draw_treat_grid %>%
+    select(
+        draw,
+        lambda,
+        b_add,
+        mu_add,
+        res_vis
+    ) %>%
+    ggplot(aes(
+        x = b_add,
+        y = mu_add,
+        z = res_vis
+    )) +
+    geom_contour_filled() +
+    theme_minimal() +
+    scale_fill_viridis_d(
+         option = "inferno"
+    )  +
+    labs(
+        x = "Private Incentive",
+        y = "Visibility",
+        fill = "Optimal Distance (km)"
+    ) +
+    theme(
+        legend.position = "bottom"
+    )
+ggsave(
+    p_contour,
+    filename = "temp-data/ramsey-contour-plot.pdf",
+    width = 10,
+    height = 10
+)
+
+
+library(plotly)
+b_mat = b_mu_draw_treat_grid %>%
+    select(b_add, mu_add, res_vis) %>%
+    pivot_wider(
+        names_from = b_add,
+        values_from = res_vis
+    ) 
+
+b_mat_mu = b_mat$mu_add
+b_mat_b = b_mat %>%
+    select(-mu_add) %>%
+    colnames() %>%
+    as.numeric()
+b_mat_z = b_mat %>%
+    select(-mu_add) %>%
+    as.matrix()
+b_mat_z = b_mat_z * 1000
+
+fig = plot_ly(
+    x = b_mat_mu, 
+    y = b_mat_b, 
+    z = b_mat_z,
+    contours = list(
+    z = list(show = TRUE, start = min(b_mat_z), end = max(b_mat_z), size = 500))
+    ) %>% add_surface()
+fig_3d = fig %>%
+    hide_colorbar() %>%
+layout(
+    showlegend = FALSE,
+    scene = list(
+      camera=list(
+        eye = list(x=1.9/2.5, y=-4/2.5, z=2.5/2.5)
+        ),
+        yaxis = list(title = "Private Incentive"),
+        xaxis = list(title = "Visibility"),
+        zaxis = list(title = "Optimal Distance")
+      )
+  )
+fig_3d
+orca(
+    fig_3d, 
+    scale = 3,
+    file = "temp-data/3d-plot.pdf")
+
+
+long_test %>%
+    group_by(lambda, b_add, name) %>%
+    mutate(name = case_when(
+        name == "res_control_vis" ~ "B: Bracelet, Mu: Control",
+        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
+        )) %>%
+    filter(lambda < 0.3) %>%
     ggplot(aes(
         x = lambda,
         y = value,
-        group = interaction(draw, name),
+        group = interaction(draw, name, b_add),
         colour = name
     )) +
-    geom_line()
+    geom_line(alpha = 0.1) +
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist") +
+    theme_minimal() +
+    theme(legend.position = "bottom") + 
+    labs(
+        x = "Shadow Cost of Public Funds",
+        y = "Optimal PoT Distance (meters)"
+    )  +
+    geom_line(
+        data =  . %>%
+            group_by(lambda, b_add, name)  %>%
+            summarise(value = mean(value)),
+        inherit.aes = FALSE,
+        aes(
+            x = lambda,
+            y = value,
+            colour = name
+        ),
+        linewidth = 3
+    ) + 
+    facet_wrap(~b_add)
+
+ggsave(
+    "temp-data/ramsey-plot.pdf",
+    width = 8,
+    height = 6
+)
+
+
+long_test %>%
+    group_by(lambda, name)  %>%
+    summarise(value = median(value))
+
+long_test %>%
+    group_by(lambda, name) %>%
+    mutate(name = case_when(
+        name == "res_control_vis" ~ "B: Bracelet, Mu: Control",
+        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
+        )) %>%
+    filter(lambda < 0.3) %>%
 
 lambda_df = lambda_df %>%
     mutate(

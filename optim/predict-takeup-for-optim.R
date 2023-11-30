@@ -80,7 +80,7 @@ library(furrr)
 source(file.path("optim", "optim-functions.R"))
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
-source(file.path( "dist_structural_util.R"))
+source(file.path("dist_structural_util.R"))
 
 mu_rep_type = switch(
     script_options$model,
