@@ -74,7 +74,6 @@ struct_param_draws = struct_param_draws %>%
 
 
 script_options$num_post_draws = as.numeric(script_options$num_post_draws)
-struct_param_draws
 
 sd_of_dist = read_rds("temp-data/sd_of_dist.rds")
 
@@ -150,7 +149,7 @@ draw_treat_grid = draw_treat_grid %>%
 find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
     # additional net benefit to get dewormed
     params$beta = params$beta  +  b_add
-    params$base_mu_rep = params$base_mu_rep + mu_add
+    params$base_mu_rep = params$base_mu_rep * mu_add
 
     takeup_fun = find_pred_takeup(params)
 
@@ -204,7 +203,7 @@ draw_treat_grid = draw_treat_grid %>%
     ) %>%
     ungroup()
 
-test = draw_treat_grid %>%
+draw_treat_grid = draw_treat_grid %>%
     ungroup() %>%
     mutate(
         fit_vis = map(
@@ -217,13 +216,13 @@ test = draw_treat_grid %>%
         )
     )
 
-test = test %>%
+draw_treat_grid = draw_treat_grid %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par"),
         res_control_vis = map_dbl(fit_control_vis, "par")
         )
 
-long_test = test %>%
+long_draw_treat = draw_treat_grid %>%
     select(draw, lambda, b_add, contains("res")) %>%
     pivot_longer(
         contains('res')
@@ -233,7 +232,7 @@ long_test = test %>%
         name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
         )) 
 
-p_private_incentive_only = long_test %>%
+p_private_incentive_only = long_draw_treat %>%
     ggplot(aes(
         x = b_add,
         y = value,
@@ -259,10 +258,9 @@ ggsave(
 
 #### B and Mu
 
-seq_size = 12
+seq_size = 50
 b_mu_draw_treat_grid = expand.grid(
     draw = 1:min(max_draw, script_options$num_post_draws),
-    # lambda = seq(from = 0, to = 0.3, length.out = 3),
     lambda = 0,
     b_add = seq(from = -3, to = 3, length.out = seq_size),
     # b_add = 0,
@@ -278,8 +276,8 @@ b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
             draw,
             ~extract_params(
                 param_draws = struct_param_draws,
-                private_benefit_treatment = script_options$private_benefit_z,
-                visibility_treatment = script_options$visibility_z,
+                private_benefit_treatment = "control",
+                visibility_treatment = "control",
                 draw_id = .x,
                 dist_sd = sd_of_dist,
                 j_id = 1,
@@ -342,16 +340,17 @@ p_contour = b_mu_draw_treat_grid %>%
         y = mu_add,
         z = res_vis
     )) +
-    geom_contour_filled() +
+    metR::geom_contour_fill() +
     theme_minimal() +
-    scale_fill_viridis_d(
+    scale_fill_viridis_c(
          option = "inferno"
     )  +
     labs(
-        x = "Private Incentive",
-        y = "Visibility",
+        x = "Shift in Norms/Additional Private Incentive",
+        y = "Fraction Control Visibility (%)",
         fill = "Optimal Distance (km)"
     ) +
+    scale_y_continuous(labels = scales::percent) +
     theme(
         legend.position = "bottom"
     )
