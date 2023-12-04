@@ -146,10 +146,12 @@ draw_treat_grid = draw_treat_grid %>%
     unnest(data)
 
 #' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, p_vis = NULL) {
     # additional net benefit to get dewormed
     params$beta = params$beta  +  b_add
-    params$base_mu_rep = params$base_mu_rep * mu_add
+    if (!is.null(p_vis)) {
+        params$mu_rep = params$base_mu_rep * p_vis
+    }
 
     takeup_fun = find_pred_takeup(params)
 
