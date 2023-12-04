@@ -32,6 +32,7 @@ params:
     rf_models: REDUCED_FORM_NO_RESTRICT
     show_probs: FALSE
     cache: FALSE
+    width: 0.95
 ---
 
 
@@ -60,6 +61,7 @@ if (interactive()) {
         struct_models = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB",
         rf_models = "REDUCED_FORM_NO_RESTRICT",
         show_probs = FALSE,
+        width = 0.95,
         cache = TRUE
     )
     source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
@@ -91,6 +93,8 @@ knitr::opts_chunk$set(
 
 dir.create("presentations/tables", showWarnings = FALSE)
 
+
+ci_width = as.numeric(params$width)
 ```
 
 
@@ -335,11 +339,11 @@ ate_rvar_df = bind_rows(
 )
 ate_rvar_df$value = c(ate_rvar_struct$value, ate_rvar_rf$value)
 
-create_cis = function(.data) {
+create_cis = function(.data, .width = 0.95) {
   med_fun = function(x) {
     mean_x = mean(x) %>% round(3)
-    conf.low = quantile(x, 0.05) %>% round(3)
-    conf.high = quantile(x, 0.95) %>% round(3)
+    conf.low = quantile(x, (1 - .width)/2) %>% round(3)
+    conf.high = quantile(x, 1 - (1 - .width)/2) %>% round(3)
   
     return_val = linebreak(
       paste0(
@@ -451,7 +455,7 @@ incentive_ate_tbl = incentive_ate_df %>%
   )) %>%
   mutate(far_minus_close = far - close) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean()  %>%
   spread_rf() %>%
   mutate(estimand = "overall")
@@ -461,7 +465,7 @@ private_ate_tbl = private_ate_df %>%
     ate_tbl_levels
   )) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean() %>%
   spread_rf() %>%
   mutate(estimand = "private")
@@ -473,7 +477,7 @@ signal_ate_tbl = signal_ate_df %>%
   )) %>%
   mutate(far_minus_close = far - close) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean() %>%
   spread_rf() %>%
   mutate(estimand = "signal")
@@ -499,8 +503,6 @@ latex_group_gap_space = "2em"
 
 
 ```{r, results="asis"}
-
-
 1+3
 
 te_kbl_df = all_ate_tbl %>% 
@@ -822,7 +824,7 @@ tidy_param_df %>%
   ) %>%
   select(model, tidy_draws) %>%
   unnest(tidy_draws) %>%
-  filter(.width == 0.9) %>%
+  filter(.width == params$width) %>%
   filter(treatment == "Control") %>%
   mutate(
     across(where(is.numeric), round, 3),
@@ -846,7 +848,7 @@ tidy_param_df %>%
   ) %>%
   select(model, tidy_draws) %>%
   unnest(tidy_draws) %>%
-  filter(.width == 0.9) %>%
+  filter(.width == params$width) %>%
   mutate(
     across(where(is.numeric), round, 3),
     estim_std = linebreak(
@@ -1009,6 +1011,8 @@ close_far_disagg_belief = disagg_base_belief_data  %>%
         per_0.5 = mean(prop), 
         per_0.05 = per_0.5 - cv(0.05)*std.error, 
         per_0.95 = per_0.5 + cv(0.05)*std.error,
+        per_0.975 = per_0.5 + cv(0.025)*std.error,
+        per_0.025 = per_0.5 - cv(0.025)*std.error,
         per_0.1 =  per_0.5 - cv(0.1)*std.error,
         per_0.9 =  per_0.5 + cv(0.1)*std.error,
         per_0.25 =  per_0.5 - cv(0.5)*std.error,
@@ -1039,6 +1043,8 @@ combined_disagg_belief = disagg_base_belief_data  %>%
         mean_est = mean(prop), 
         std.error = sd(prop)/sqrt(n()),
         per_0.5 = mean(prop), 
+        per_0.025 = per_0.5 - cv(0.025)*std.error,
+        per_0.0975 = per_0.5 + cv(0.025)*std.error,
         per_0.05 = per_0.5 - cv(0.05)*std.error, 
         per_0.95 = per_0.5 + cv(0.05)*std.error,
         per_0.1 =  per_0.5 - cv(0.1)*std.error,
@@ -1078,14 +1084,14 @@ wide_disagg_belief_input_df = comp_belief_data %>%
     distance = assigned_dist_group, 
     knowledge_type,
     mean_est, 
-    per_0.05, 
-    per_0.95, 
+    per_0.025, 
+    per_0.975, 
     ord = belief_type
   )  %>%
   mutate(across(where(is.numeric), round, 3)) %>%
   mutate(
     estim_value = linebreak(
-      paste0(mean_est, "\n", "(", per_0.05, ", ", per_0.95, ")"), 
+      paste0(mean_est, "\n", "(", per_0.025, ", ", per_0.975, ")"), 
       align = "c"
       )
   ) %>%
@@ -1308,7 +1314,7 @@ wtp_input_df = tidy_param_df %>%
   ) %>%
   filter(fit_type == "fit") %>%
   unnest(tidy_draws) %>%
-  filter(.width ==  .90) %>%
+  filter(.width ==  params$width) %>%
   left_join(tibble(pref_value_diff_idx = 1:21, val_diff = -seq(-100, 100, 10)), by = "pref_value_diff_idx")   %>%
   filter(val_diff %in% c(-50, 0, 50))  %>%
   mutate(
@@ -3563,23 +3569,44 @@ pref_gift_fit_tbl
 
 
 
+## Robustness ATE Stuff
+
 ```{r}
-robustness_ate_rvar_df = read_rds(
-      file.path(
-        "temp-data",
-        str_glue("rvar_processed_dist_fit96_ates_REDUCED_FORM_NO_RESTRICT_DIST_CTS_1-4.rds")
-      ) 
-  )
 
-robustness_ate_rvar_df
 
-robustness_ate_df =  robustness_ate_rvar_df %>%
+ate_files = fs::dir_ls(
+  file.path(
+    here::here(),
+    "temp-data"
+  ),
+  regexp = "rvar_processed_dist_fit96_ates.*1-4\\.rds$"
+)
+
+robustness_ate_rvar_df = 
+  map_dfr(
+    ate_files,
+    read_rds,
+    .id = "filepath"
+  ) %>%
+  mutate(
+    filepath = basename(filepath),
+    model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
+    fit_type = factor(fit_type),
+    model = factor(model)
+    ) 
+
+
+
+
+rf_robustness_ate_df =  robustness_ate_rvar_df %>%
+  filter(fct_match(model, "REDUCED_FORM_NO_RESTRICT_DIST_CTS")) %>%
   create_ate_table(
     .estimand = "overall",
     group_var = treatment
   ) 
 
-robustness_ate_tbl = robustness_ate_df %>%
+
+rf_robustness_ate_tbl = rf_robustness_ate_df %>%
   mutate(treatment = factor(treatment, levels = 
     ate_tbl_levels
   )) %>%
@@ -3589,13 +3616,13 @@ robustness_ate_tbl = robustness_ate_df %>%
     .cols = c(combined, close, far, far_minus_close)
   ) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean()  %>%
   mutate(estimand = "overall") %>%
   select(-model)
 
 
-robustness_kbl_df = robustness_ate_tbl %>% 
+rf_robustness_kbl_df = rf_robustness_ate_tbl %>% 
   arrange(treatment) %>%
   select(-estimand) %>%
   kbl(
@@ -3631,9 +3658,112 @@ robustness_kbl_df = robustness_ate_tbl %>%
       )
   ) %>%
   row_spec(c(3), hline_after = TRUE) 
-robustness_kbl_df %>%
+rf_robustness_kbl_df %>%
   custom_save_latex_table(
     "robustness-rf-cts-dist-te-table"
   )
+
+```
+
+
+
+```{r}
+
+struct_robustness_ate_df = robustness_ate_rvar_df %>%
+  filter(fct_match(model_type, "structural")) %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
+  ) 
+
+
+new_model_levels = c(
+  "High WTP Prior Mean",
+  "High WTP Prior Variance",
+  "No WTP Submodel",
+  "No Beliefs Submodel",
+  "No Submodels"
+)
+
+rename_models = function(data, variable) {
+  data %>%
+    mutate(
+      {{variable}} := case_when(
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL" ~ "High WTP Prior Mean",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL" ~ "High WTP Prior Variance",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL" ~ "No Beliefs Submodel",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL" ~ "No WTP Submodel",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS" ~ "No Submodels"
+      )
+    )
+}
+
+struct_robustness_ate_tbl = struct_robustness_ate_df %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  rename_with(
+    ~paste0("struct_", .),
+    .cols = c(combined, close, far, far_minus_close)
+  ) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean()  %>%
+  mutate(estimand = "overall")  %>%
+  rename_models(model) %>%
+  mutate(
+    model = factor(model, levels = new_model_levels)
+  )
+
+
+
+
+struct_robustness_kbl_df = struct_robustness_ate_tbl %>%
+  arrange(treatment, model) %>%
+  select(-estimand) %>%
+  kbl(
+    col.names = c(
+      # "Estimand", 
+      # "Treatment", 
+      "Model",
+      "Treatment",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "llcccc", 
+    caption = "Results"
+  )  %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ",
+      " ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 2,
+      "Structural" = 4
+      )
+  ) %>%
+  row_spec(c(5, 10, 15, 20), hline_after = TRUE) 
+
+struct_robustness_kbl_df
+
+struct_robustness_kbl_df %>%
+  custom_save_latex_table(
+    "robustness-struct-te-table"
+  )
+
 
 ```

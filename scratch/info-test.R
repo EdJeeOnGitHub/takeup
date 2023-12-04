@@ -143,7 +143,7 @@ takeup_df %>%
     geom_line()
 
 
-pct_ink = 0.95
+pct_ink = 0.144 + 0.666
 pct_bra = pct_ink + 0.022
 pct_s_df = tibble(
     incentive = c("ink", "bracelet"),
@@ -221,7 +221,7 @@ ggsave(
     width = 8,
     height = 6
 )
-
+stop()
 
 p_grid = expand.grid(
     p_d = seq(0.01, 0.99, 0.01),
