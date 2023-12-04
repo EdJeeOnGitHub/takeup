@@ -145,17 +145,22 @@ draw_treat_grid = draw_treat_grid %>%
 draw_treat_grid = draw_treat_grid %>%
     unnest(data)
 
-#' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, p_vis = NULL) {
+draw_treat_grid  %>%
+    pull(params_vis) %>%
+    first() 
+
+recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
     # additional net benefit to get dewormed
     params$beta = params$beta  +  b_add
-    if (!is.null(p_vis)) {
-        params$mu_rep = params$base_mu_rep * p_vis
-    }
-
+    params$centered_cluster_beta_1ord = params$centered_cluster_beta_1ord + mu_add
     takeup_fun = find_pred_takeup(params)
-
     takeup_list = takeup_fun(distance)
+    return(takeup_list)
+}
+
+#' distance in meters
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     if (params$suppress_reputation) {
         takeup_list$mu_rep = 0
         takeup_list$mu_rep_deriv = 0
@@ -182,6 +187,9 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, p_vis = N
     diff = abs(lhs - rhs)
     return(diff)
 }
+
+
+
 
 
 draw_treat_grid = draw_treat_grid %>%
@@ -260,13 +268,13 @@ ggsave(
 
 #### B and Mu
 
-seq_size = 50
+seq_size = 10
 b_mu_draw_treat_grid = expand.grid(
     draw = 1:min(max_draw, script_options$num_post_draws),
     lambda = 0,
     b_add = seq(from = -3, to = 3, length.out = seq_size),
     # b_add = 0,
-    mu_add = seq(from = 0, to = 2, length.out = seq_size)
+    mu_add = seq(from = -3, to = 3, length.out = seq_size)
     # treatment = script_options$treatment
 ) %>% as_tibble() %>%
     group_by(draw) %>%
@@ -321,25 +329,43 @@ b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
         )
     )
 
-b_mu_draw_treat_grid
-
-
 b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par")
         )
+
+b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+    mutate(
+        takeup_list = pmap(
+            list(
+                res_vis,
+                params_vis,
+                b_add,
+                mu_add
+            ),
+            ~recalc_takeup(distance = ..1*1000, params = ..2, b_add = ..3, mu_add = ..4)
+        )
+    ) %>%
+    mutate(
+        pr_obs = map_dbl(takeup_list, "pr_obs")
+    )
+
+
+b_mu_draw_treat_grid  %>%
+    select(b_add, pr_obs, res_vis) %>%
+    tail()
 
 p_contour = b_mu_draw_treat_grid %>%
     select(
         draw,
         lambda,
         b_add,
-        mu_add,
+        pr_obs,
         res_vis
     ) %>%
     ggplot(aes(
         x = b_add,
-        y = mu_add,
+        y = pr_obs,
         z = res_vis
     )) +
     metR::geom_contour_fill() +
@@ -349,7 +375,7 @@ p_contour = b_mu_draw_treat_grid %>%
     )  +
     labs(
         x = "Shift in Norms/Additional Private Incentive",
-        y = "Fraction Control Visibility (%)",
+        y = "Visibility (%)",
         fill = "Optimal Distance (km)"
     ) +
     scale_y_continuous(labels = scales::percent) +
@@ -366,19 +392,19 @@ ggsave(
 
 library(plotly)
 b_mat = b_mu_draw_treat_grid %>%
-    select(b_add, mu_add, res_vis) %>%
+    select(b_add, pr_obs, res_vis) %>%
     pivot_wider(
         names_from = b_add,
         values_from = res_vis
     ) 
 
-b_mat_mu = b_mat$mu_add
+b_mat_mu = b_mat$pr_obs
 b_mat_b = b_mat %>%
-    select(-mu_add) %>%
+    select(-pr_obs) %>%
     colnames() %>%
     as.numeric()
 b_mat_z = b_mat %>%
-    select(-mu_add) %>%
+    select(-pr_obs) %>%
     as.matrix()
 b_mat_z = b_mat_z * 1000
 
