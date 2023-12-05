@@ -1,0 +1,120 @@
+\documentclass{article}
+
+% Packages for mathematics
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+
+% Define theorem environments
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\begin{document}
+
+\title{Title of the Document}
+\author{Author's Name}
+\date{\today}
+
+\maketitle
+
+\begin{abstract}
+This is the abstract of the document.
+\end{abstract}
+
+\section{Welfare}
+We have utility function:
+\begin{align*}
+    U_i &= (w_i + b - \delta d) a_i + \mu(d) E_{-i}\left[v_i | a_i\right] \\
+    &= \begin{cases}
+        (w_i + b- \delta d) + \mu E \left[v_i | 1\right] & \text{if } a_i = 1 \\
+        \mu E \left[v | 0\right] & \text{if } a_i = 0
+    \end{cases} \\
+    &= \max \left\{w_i + b - \delta d + \mu E\left[v | 1\right],
+    \mu E\left[v | 0\right]
+      \right\} 
+\end{align*}
+
+Therefore welfare, ignoring $\lambda$ for now:
+\begin{align*}
+    W(d) &= \bar{U}(d) + (1 - \lambda) \delta d \overline{a} \\
+    &= \int_{-\infty}^{\infty} \max \left\{w_i + b - \lambda \delta d + \mu E\left[v | 1\right], \mu E\left[v | 0\right] \right\} f(w) dw \\ 
+    &= \int^{\infty}_{w^*(d)} (w_i + b - \lambda \delta d + \mu E\left[v | w > w^*(d)\right]) f(w) dw + \int^{w^*(d)}_{-\infty} \mu E\left[v | w < w^*(d)\right] f(w) dw \\
+\end{align*}
+Where the last line follows from the fact we know individuals will only take action if $w_i > w^*(d)$ i.e. above cut-off type.
+We use the fact: $(1 - F(w^*)) \mathcal{M}^+(w^*) + F(w^*)\mathcal{M}^-(w^*) = \overline{w}$ and take the 
+reputational returns out of the first integral to get:
+\begin{align*}
+    W(d) &= \int^{\infty}_{w^*(d)} (w_i + b - \lambda \delta d) f(w) dw +  \mu \overline{w} \\
+\end{align*}
+So to maximise welfare the social planner differentiates the above and finds $d^*$ to 
+solve the FOC:
+\begin{align*}
+    - \frac{\delta - \mu' \Delta(w^*(d))}{1 + \mu \Delta'(w^*(d))} (w^*(d) + b - \lambda \delta d) - 
+    \lambda \delta \frac{\left[1 - F(w^*(d))\right]}{f(w^*(d))} &= 0
+\end{align*}
+
+
+\section{Takeup}
+The decision to deworm is given by:
+\begin{align*}
+    Y_i &= \mathbb{I}\left\{w_i + b - \delta d + \mu \Delta(w^*(d)) > 0 \right\} \\
+\end{align*}
+So:
+\begin{align*}
+    \overline{Y}(d) &= \int \mathbb{I}\left\{w + b - \delta d + \mu \Delta(w^*(d)) \right\} f(w) dw \\
+    &=  \int^{w^*(d)}_{-\infty} 0 \times f(w) dw + \int^{\infty}_{w^*(d)} 1 \times f(w) dw \\
+    &= 1 - F(w^*(d)) 
+\end{align*}
+To maximise takeup:
+\begin{align*}
+    \tilde{d} &= \max_d \left\{1 - F(w^*(d)) \right\} \\
+  0 &=    -f_w(w^*(d)) \underbrace{\frac{\partial w^*(d)}{\partial d}}_{\textrm{Social Multiplier}}  \\
+\end{align*}
+Whatever sets the social multiplier to zero maximises the deworming level. For 
+B\'enabou and Tirole this would just set $\tilde{d} = 0$ as this would obviously max 
+takeup. However, in our model:
+\begin{align*}
+    SM &= \frac{\delta - \mu'(\tilde{d}) \Delta(w^*(\tilde{d}))}{1 + \mu(\tilde{d}) \Delta'(w^*(\tilde{d}))}  \\
+    \implies & \delta = \mu'(\tilde{d}) \Delta(w^*(\tilde{d})) 
+\end{align*}
+Gives the optimal distance.
+
+TODO look at when two cooincide.
+
+The intuition on this is quite nice. 
+
+
+Look at the welfare FOC, this is the net social marginal benefit of reducing distance, $d$, by one unit: 
+\begin{align*}
+- \frac{\delta - \mu' \Delta(w^*(d))}{1 + \mu \Delta'(w^*(d))} \underbrace{(w^*(d) + b - \lambda \delta d)}_{\gamma}f(w^*(d))
+\end{align*}
+
+This almost coincides with the takeup maximising FOC:
+\begin{align*}
+ -f_w(w^*(d)) \underbrace{\frac{\partial w^*(d)}{\partial d}}_{\frac{\delta - \mu' \Delta(w^*(d))}{1 + \mu \Delta'(w^*(d))}} 
+\end{align*}
+Except it ignores the utility of individuals: $(w^*(d) + b - \lambda \delta d)$. 
+
+When we maximise welfare we have to equate net social marginal benefit to the \emph{deadweight loss} of paying the 
+extra subsidy (reducing distance) to all the inframarginal people - those who would have got dewormed 
+anyway before we reduced distance.
+
+When do the two coincide? When $\lambda = 0$ - there's no deadweight loss from the inframarginal 
+agents and $\gamma = 1 \implies w^*(d) = -b$. In general this isn't going to happen.
+
+\section{Main Results}
+
+\begin{theorem}
+This is a theorem.
+\end{theorem}
+
+\begin{proof}
+This is the proof of the theorem.
+\end{proof}
+
+\section{Conclusion}
+This is the conclusion section.
+
+\end{document}
