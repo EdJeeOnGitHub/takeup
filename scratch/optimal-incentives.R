@@ -25,8 +25,8 @@ script_options = docopt::docopt(
     "),
     args = if (interactive()) "
                             86
-                            bracelet
-                            bracelet
+                            control
+                            control
                             --output-name=optimal-incentives-TEST-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --from-csv
                             --num-post-draws=1
