@@ -145,18 +145,32 @@ draw_treat_grid = draw_treat_grid %>%
 draw_treat_grid = draw_treat_grid %>%
     unnest(data)
 
-draw_treat_grid  %>%
+ed = draw_treat_grid  %>%
     pull(params_vis) %>%
     first() 
-
+ed$centered_cluster_dist_beta_1ord
+ed$visibility_treatment
 recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
     # additional net benefit to get dewormed
     params$beta = params$beta  +  b_add
     params$centered_cluster_beta_1ord = params$centered_cluster_beta_1ord + mu_add
     takeup_fun = find_pred_takeup(params)
     takeup_list = takeup_fun(distance)
+    mu_rep_0 = calculate_mu_rep(
+                dist = 0,
+                base_mu_rep = params$base_mu_rep,
+                mu_beliefs_effect = 1,
+                beta = params$centered_cluster_beta_1ord,
+                dist_beta = params$centered_cluster_dist_beta_1ord,
+                beta_control = params$mu_beta_z_control,
+                dist_beta_control = params$mu_beta_d_control,
+                mu_rep_type = params$mu_rep_type, 
+                control = params$visibility_treatment == "control")
+    pr_vis_0 = mu_rep_0 / params$base_mu_rep
+    takeup_list$pr_vis_0 = pr_vis_0
     return(takeup_list)
 }
+
 
 #' distance in meters
 find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
@@ -268,26 +282,25 @@ ggsave(
 
 #### B and Mu
 
-seq_size = 10
+seq_size = 30
 b_mu_draw_treat_grid = expand.grid(
     draw = 1:min(max_draw, script_options$num_post_draws),
     lambda = 0,
-    b_add = seq(from = -3, to = 3, length.out = seq_size),
+    b_add = seq(from = -2, to = 2, length.out = seq_size),
     # b_add = 0,
-    mu_add = seq(from = -3, to = 3, length.out = seq_size)
+    mu_add = seq(from = -4, to = 4, length.out = seq_size)
     # treatment = script_options$treatment
 ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add, mu_add))
-
 b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
     mutate(
         params_vis = map(
             draw,
             ~extract_params(
                 param_draws = struct_param_draws,
-                private_benefit_treatment = "control",
-                visibility_treatment = "control",
+                private_benefit_treatment = "bracelet",
+                visibility_treatment = "bracelet",
                 draw_id = .x,
                 dist_sd = sd_of_dist,
                 j_id = 1,
@@ -345,11 +358,10 @@ b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
             ),
             ~recalc_takeup(distance = ..1*1000, params = ..2, b_add = ..3, mu_add = ..4)
         )
-    ) %>%
+    )  %>%
     mutate(
-        pr_obs = map_dbl(takeup_list, "pr_obs")
+        pr_obs = map_dbl(takeup_list, "pr_vis_0")
     )
-
 
 b_mu_draw_treat_grid  %>%
     select(b_add, pr_obs, res_vis) %>%
@@ -363,6 +375,7 @@ p_contour = b_mu_draw_treat_grid %>%
         pr_obs,
         res_vis
     ) %>%
+    # filter(abs(b_add) < 2) %>%
     ggplot(aes(
         x = b_add,
         y = pr_obs,
