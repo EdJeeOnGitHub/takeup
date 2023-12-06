@@ -22,7 +22,6 @@ script_options = docopt::docopt(
         --single-chain  Only use first chain for draws (useful for debugging) 
         --fit-type=<fit-type>  Which fit type to use - prior predictive or posterior draws [default: fit] 
         --lambda=<lambda>  Lambda to use for optimal incentives [default: 0]
-
     "),
     args = if (interactive()) "
                             86
@@ -176,7 +175,7 @@ recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
 
 
 #' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0) {
     takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     if (params$suppress_reputation) {
         takeup_list$mu_rep = 0
@@ -197,14 +196,13 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
 
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
 
     rhs = lambda * delta / hazard
 
     diff = abs(lhs - rhs)
     return(diff)
 }
-
 
 
 
@@ -572,3 +570,125 @@ ggsave(
     height = 6
 )
 
+
+## Externalities ... and repeated code
+externality_treat_grid = expand.grid(
+    draw = 1:min(max_draw, script_options$num_post_draws),
+    externality = seq(from = 0, to = abs(param_check$beta_b_control), length.out = seq_size),
+    b_add = seq(from = -2, to = 2, length.out = seq_size),
+    mu_add = 0,
+    lambda = 0
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(externality, lambda, b_add, mu_add))
+
+externality_treat_grid = externality_treat_grid %>%
+    mutate(
+        params_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = "control",
+                visibility_treatment = "control",
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            )
+        ) 
+
+externality_treat_grid = externality_treat_grid %>%
+    unnest(data)
+
+externality_treat_grid = externality_treat_grid %>%
+    mutate(
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add,
+                mu_add,
+                externality
+            ),
+            ~function(x) { 
+                find_optimal_incentive(
+                    distance = x*1000, 
+                    lambda = ..1, 
+                    params = ..2, 
+                    b_add = ..3, 
+                    mu_add = ..4,
+                    externality = ..5
+                    ) 
+                }
+        )
+        )
+
+externality_treat_grid = externality_treat_grid %>%
+    ungroup() %>%
+    mutate(
+        fit_vis = map(
+            funs_vis,
+            ~optim(
+                2.5, 
+                .x, 
+                lower = 0, 
+                upper = 18, 
+                method = "Brent",
+                control = list(
+                    abstol = 1e-12,
+                    reltol = 1e-12
+                    )
+                )
+        )
+    )
+
+externality_treat_grid = externality_treat_grid %>%
+    mutate(
+        res_vis = map_dbl(fit_vis, "par")
+        )
+
+abs(param_check$beta_b_control)
+
+p_externality = externality_treat_grid %>%
+    select(draw, externality, lambda, b_add, contains("res")) %>%
+    pivot_longer(
+        contains('res')
+    ) %>%
+    mutate(externality_pct = 100*externality/abs(param_check$beta_b_control)) %>%
+    # this seems to be doing v weird stuff:
+    # maybe the multiple equilibria thing?
+    # filter(value > 1) %>%
+    ggplot(aes(
+        x = b_add,
+        y = value,
+        colour = externality_pct,
+        group = externality_pct
+    )) +
+    geom_line() +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    labs(
+        x = "Shift in Norms/Additional Private Incentive",
+        y = "Optimal Distance (km)",
+        colour = "Value of Externality (Relative to Control, %)"
+    )
+
+
+ggsave(
+    plot = p_externality,
+    file = file.path(
+        script_options$output_path,
+        str_glue("{script_options$output_name}-externality-control.pdf")
+    ),
+    width = 8,
+    height = 6
+)
