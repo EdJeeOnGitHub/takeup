@@ -145,11 +145,12 @@ draw_treat_grid = draw_treat_grid %>%
 draw_treat_grid = draw_treat_grid %>%
     unnest(data)
 
-ed = draw_treat_grid  %>%
+params_check = draw_treat_grid  %>%
     pull(params_vis) %>%
     first() 
-ed$centered_cluster_dist_beta_1ord
-ed$visibility_treatment
+params_check$centered_cluster_dist_beta_1ord
+params_check$visibility_treatment
+
 recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
     # additional net benefit to get dewormed
     params$beta = params$beta  +  b_add
