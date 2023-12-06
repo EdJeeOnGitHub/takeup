@@ -11,7 +11,7 @@ script_options = docopt::docopt(
         --from-csv  Load parameter draws from a csv file
         --to-csv   Load stanfit object and write draws to csv
         --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
-        --output-path=<path>  Path to find results [default: {file.path('optim', 'data')}]
+        --output-path=<path>  Path to find results [default: {file.path('temp-data')}]
         --output-name=<output-name>  Prepended to output file
         --num-post-draws=<num-post-draws>  Number of posterior draws to use [default: 200]
         --num-cores=<num-cores>  Number of cores to use [default: 8]
@@ -21,13 +21,14 @@ script_options = docopt::docopt(
         --suppress-reputation  Suppress reputational returns
         --single-chain  Only use first chain for draws (useful for debugging) 
         --fit-type=<fit-type>  Which fit type to use - prior predictive or posterior draws [default: fit] 
+        --lambda=<lambda>  Lambda to use for optimal incentives [default: 0]
 
     "),
     args = if (interactive()) "
                             86
                             control
                             control
-                            --output-name=optimal-incentives-TEST-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            --output-name=ramsey-control-lambda-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --from-csv
                             --num-post-draws=1
                             --num-cores=12
@@ -56,6 +57,7 @@ source(file.path("dist_structural_util.R"))
 
 fit_version = script_options$fit_version
 
+script_options$lambda = as.numeric(script_options$lambda)
 
 struct_param_draws = read_csv(
     file.path(
@@ -92,7 +94,7 @@ max_draw = max(struct_param_draws$.draw)
 draw_treat_grid = expand.grid(
     draw = 1,
     # lambda = seq(from = 0, to = 0.3, length.out = 3),
-    lambda = 0,
+    lambda = script_options$lambda,
     b_add = seq(from = -3, to = 3, length.out = 20)
     # treatment = script_options$treatment
 ) %>% as_tibble() %>%
@@ -274,7 +276,11 @@ p_private_incentive_only = long_draw_treat %>%
     ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist") 
 
 ggsave(
-    "temp-data/optimal-distance-vs-b-add.pdf",
+    plot = p_private_incentive_only,
+    file = file.path(
+        script_options$output_path,
+        str_glue("{script_options$output_name}-private-incentive-only.pdf")
+    ),
     width = 8,
     height = 6
 )
@@ -286,7 +292,7 @@ ggsave(
 seq_size = 30
 b_mu_draw_treat_grid = expand.grid(
     draw = 1:min(max_draw, script_options$num_post_draws),
-    lambda = 0,
+    lambda = script_options$lambda,
     b_add = seq(from = -2, to = 2, length.out = seq_size),
     # b_add = 0,
     mu_add = seq(from = -4, to = 4, length.out = seq_size)
@@ -398,7 +404,10 @@ p_contour = b_mu_draw_treat_grid %>%
     )
 ggsave(
     p_contour,
-    filename = "temp-data/ramsey-contour-plot.pdf",
+    filename = file.path(
+        script_options$output_path,
+        str_glue("{script_options$output_name}-contour-plot.pdf")
+    ),
     width = 10,
     height = 10
 )
@@ -443,101 +452,123 @@ layout(
       )
   )
 fig_3d
-orca(
-    fig_3d, 
-    scale = 3,
-    file = "temp-data/3d-plot.pdf")
+
+# orca(
+#     fig_3d, 
+#     scale = 3,
+#     file = file.path(
+#         script_options$output_path,
+#         str_glue("{script_options$output_name}-3d-plot.pdf")
+#         )
+#     )
 
 
-long_test %>%
-    group_by(lambda, b_add, name) %>%
-    mutate(name = case_when(
-        name == "res_control_vis" ~ "B: Bracelet, Mu: Control",
-        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
-        )) %>%
-    filter(lambda < 0.3) %>%
-    ggplot(aes(
-        x = lambda,
-        y = value,
-        group = interaction(draw, name, b_add),
-        colour = name
-    )) +
-    geom_line(alpha = 0.1) +
-    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist") +
-    theme_minimal() +
-    theme(legend.position = "bottom") + 
-    labs(
-        x = "Shadow Cost of Public Funds",
-        y = "Optimal PoT Distance (meters)"
-    )  +
-    geom_line(
-        data =  . %>%
-            group_by(lambda, b_add, name)  %>%
-            summarise(value = mean(value)),
-        inherit.aes = FALSE,
-        aes(
-            x = lambda,
-            y = value,
-            colour = name
-        ),
-        linewidth = 3
-    ) + 
-    facet_wrap(~b_add)
 
-ggsave(
-    "temp-data/ramsey-plot.pdf",
-    width = 8,
-    height = 6
-)
+lambda_treat_grid = expand.grid(
+    draw = 1:min(max_draw, script_options$num_post_draws),
+    lambda = seq(from = 0, to = 0.15, length.out = seq_size),
+    b_add = seq(from = -2, to = 2, length.out = seq_size),
+    mu_add = 0
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(lambda, b_add, mu_add))
 
-
-long_test %>%
-    group_by(lambda, name)  %>%
-    summarise(value = median(value))
-
-long_test %>%
-    group_by(lambda, name) %>%
-    mutate(name = case_when(
-        name == "res_control_vis" ~ "B: Bracelet, Mu: Control",
-        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
-        )) %>%
-    filter(lambda < 0.3) %>%
-
-lambda_df = lambda_df %>%
+lambda_treat_grid = lambda_treat_grid %>%
     mutate(
-        lambda_funs = map(
-            lambda,
-            ~function(x) anon_f(x, lambda = .x)
-        ),
-        lambda_res = map(
-            lambda_funs,
-            ~optim(1, .x, method = "Brent", lower = 0, upper = 5000)
+        params_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = "control",
+                visibility_treatment = "control",
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            )
+        ) 
+
+lambda_treat_grid = lambda_treat_grid %>%
+    unnest(data)
+
+lambda_treat_grid = lambda_treat_grid %>%
+    mutate(
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add,
+                mu_add
+            ),
+            ~function(x) { find_optimal_incentive(distance = x*1000, lambda = ..1, params = ..2, b_add = ..3, mu_add = ..4) }
+        )
+        )
+
+lambda_treat_grid = lambda_treat_grid %>%
+    ungroup() %>%
+    mutate(
+        fit_vis = map(
+            funs_vis,
+            ~optim(
+                2.5, 
+                .x, 
+                lower = 0, 
+                upper = 18, 
+                method = "Brent",
+                control = list(
+                    abstol = 1e-12,
+                    reltol = 1e-12
+                    )
+                )
         )
     )
 
-lambda_df %>%
+lambda_treat_grid = lambda_treat_grid %>%
     mutate(
-        res = map_dbl(lambda_res, "par")
+        res_vis = map_dbl(fit_vis, "par")
+        )
+
+
+p_lambda = lambda_treat_grid %>%
+    select(draw, lambda, b_add, contains("res")) %>%
+    pivot_longer(
+        contains('res')
     ) %>%
-    select(lambda, res) %>%
+    # this seems to be doing v weird stuff:
+    # maybe the multiple equilibria thing?
+    filter(value > 1) %>%
     ggplot(aes(
-        x = lambda,
-        y = res
+        x = b_add,
+        y = value,
+        colour = lambda,
+        group = lambda
     )) +
-    geom_point()
+    geom_line() +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    labs(
+        x = "Shift in Norms/Additional Private Incentive",
+        y = "Optimal Distance (km)",
+        colour = latex2exp::TeX("\\lambda")
+    )
 
 
-me = lambda_df %>%
-    pull(lambda_funs) %>%
-    first()
-me(10)
-result = optim(1, anon_f, method = "Brent", lower = 0, upper = 5000)
-
-
-result
-
-
-
-
-
+ggsave(
+    plot = p_lambda,
+    file = file.path(
+        script_options$output_path,
+        str_glue("{script_options$output_name}-lambda-control.pdf")
+    ),
+    width = 8,
+    height = 6
+)
 
