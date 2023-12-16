@@ -259,23 +259,73 @@ baseline_worm_data = baseline_worm %>%
 
 # monitoring checks
 sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv")
+sens_imp_hh_df = read_csv("data/raw-data/Sensitization Monitoring Form-household.csv")
+
+
+unique_hh_message_df = sens_imp_hh_df %>%
+  mutate(
+    message_list = str_split(message, " ")
+  ) %>%
+  select(PARENT_KEY, message_list) %>%
+  unnest(message_list) %>%
+  group_by(PARENT_KEY) %>%
+  unique() %>%
+  summarise(message_list = list(as.numeric(message_list))) %>%
+  mutate(
+    knowledge_message = map_lgl(message_list, ~all(c(1, 2, 3, 4, 5) %in% .x)
+     ),
+    availability_message = map_lgl(message_list, ~all(c(6, 7) %in% .x))
+    )
+
 
 
 clean_sens_imp_df = sens_imp_df %>%
   filter(!is.na(enumerator)) %>%
   filter(!is.na(announcement)) %>%
   mutate(announce_church = str_detect(where, "1")) %>%
+  left_join(unique_hh_message_df, by = c("KEY" = "PARENT_KEY")) %>%
   select(
     cluster.id = cluster_id,
     announcement,
-    announce_church
+    announce_church,
+    knowledge_message,
+    availability_message
   ) %>%
   inner_join(cluster_treat_df, by = "cluster.id") %>%
   filter(!is.na(treat_dist)) %>%
   left_join(
     cluster.strat.data %>%
       select(cluster.id, county)
-  )
+  ) 
+
+
+# Add church and add announce
+
+# aggregate to household level (for messages Q)
+# then to community
+# first five (knowledge of deworming)
+# last two (knowledge of availability)
+
+
+# PoT verification monitoring
+clean_sens_summ_imp_df = clean_sens_imp_df %>%
+  group_by(cluster.id, treat_dist, county) %>%
+  summarise(
+    n_announce = sum(announcement, na.rm = TRUE),
+    n_announce_church = sum(announce_church, na.rm = TRUE),
+    n_knowledge_message = sum(knowledge_message, na.rm = TRUE),
+    n_avail_message = sum(availability_message, na.rm = TRUE),
+    n_message = sum(!is.na(knowledge_message) | !is.na(availability_message)),
+    n_total = n()
+  ) %>%
+  mutate(
+    pct_announce = n_announce / n_total,
+    pct_church = n_announce_church / n_total,
+    pct_knowledge_message = n_knowledge_message / n_message,
+    pct_avail_message = n_avail_message / n_message
+  ) 
+  
+  
 
 
 clean_implementation_vars = function(data)  {
@@ -314,8 +364,10 @@ implementation_vars = c(
 
 
 sens_vars = c(
-  "announcement",
-  "announce_church"
+  "pct_announce",
+  "pct_church",
+  "pct_knowledge_message",
+  "pct_avail_message"
   )
 
 # Distance/cluster size balance vars
@@ -332,6 +384,17 @@ takeup_vars = c(
 census_vars = c(
   "dewormed",
   "know_age" # just include this so fixest creates a list of fits...
+)
+
+
+praise_vars = c(
+  "praise_immuniz",
+  "praise_dewor"
+)
+
+stigma_vars = c(
+  "stigma_immuniz",
+  "stigma_dewor"
 )
 
 
@@ -394,6 +457,26 @@ social_perception_baseline = baseline.data %>%
     by = "cluster.id"
   ) %>%
   mutate(response_yes = response == "yes") 
+
+baseline.data %>% 
+  select(assigned.treatment, dist.pot.group, cluster.id, county, matches("^(praise|stigma)_[^_]+$")) %>%
+  select(praise_immunizeA, praise_immunizeB)
+
+praise_df = social_perception_baseline %>%
+  filter(topic %in% c("immuniz", "dewor")) %>%
+  pivot_wider(
+     values_from = response_yes,
+     names_from = c(praise.stigma, topic)
+  )  %>%
+  unnest(c(praise_immuniz, praise_dewor)) 
+
+stigma_df = social_perception_baseline %>%
+  filter(topic %in% c("immuniz", "dewor")) %>%
+  pivot_wider(
+     values_from = response_yes,
+     names_from = c(praise.stigma, topic)
+  )   %>%
+  unnest(c(stigma_immuniz, stigma_dewor))
 
 #### Endline
 endline_worm_data = endline.data %>%
@@ -515,14 +598,25 @@ pretreat_fit = feols(
 )
 
 sens_fit = feols(
-  data = clean_sens_imp_df,
+  data = clean_sens_summ_imp_df,
   .[sens_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
-  cluster = if(script_options$community_level) NULL else ~cluster.id,
-  vcov = if(script_options$community_level) "hetero"
+  vcov =  "hetero"
 )
 
 
 
+
+praise_fit = feols(
+  praise_df,
+  .[praise_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+  cluster = ~cluster.id
+)
+
+stigma_fit = feols(
+  stigma_df,
+  .[stigma_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+  cluster = ~cluster.id
+)
 
 # control mean >1 if we have county FE due to LPM, so just don't use county FE.
 # This is stupid but the world we live in.
@@ -555,7 +649,9 @@ balance_fits = c(
   census_fit,
   endline_implementation_fit,
   misc_fit,
-  sens_fit
+  sens_fit,
+  praise_fit,
+  stigma_fit
 )
 
 
