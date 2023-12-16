@@ -9,14 +9,14 @@ Options:
   --output-path=<path>  Path to find results [default: temp-data]
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
+  --save-error-draws  Save the entire posterior w/ each cluster's w^* draws
   
   "), 
   args = if (interactive()) "
-  95
-  --prior
+  96
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
-  1 
+  --model=REDUCED_FORM_NO_RESTRICT_DIST_CTS
+  1 2 3 4
   " else commandArgs(trailingOnly = TRUE)
 )
 library(tidyverse)
@@ -105,20 +105,21 @@ rvar_cols = cluster_error_draws %>%
   colnames()
 
 
-
-cluster_error_draws %>%
-  pivot_longer(
-    all_of(rvar_cols),
-    names_to = "variable"
-  )  %>%
-  saveRDS(
-    file.path(
-      script_options$output_path,
-      str_glue(
-        "rvar_processed_dist_{fit_type_str}{script_options$fit_version}_cluster_error_{script_options$model}_{chain_str}.rds"
-      )
-    ) 
-  )
+if (script_options$save_error_draws) {
+  cluster_error_draws %>%
+    pivot_longer(
+      all_of(rvar_cols),
+      names_to = "variable"
+    )  %>%
+    saveRDS(
+      file.path(
+        script_options$output_path,
+        str_glue(
+          "rvar_processed_dist_{fit_type_str}{script_options$fit_version}_cluster_error_{script_options$model}_{chain_str}.rds"
+        )
+      ) 
+    )
+}
 
 
 

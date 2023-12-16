@@ -94,3 +94,4 @@ postprocess_rf_models () {
      wait
 }
 
+postprocess_rf_models "REDUCED_FORM_NO_RESTRICT_DIST_CTS" 96 --load-from-csv

@@ -513,17 +513,24 @@ fit_model <- function(curr_stan_data, chains, threads, iter, use_cmdstanr, inclu
   } 
   
   if (use_cmdstanr) {
+
     dist_model <- cmdstan_model(
       file.path("stan_models", curr_stan_data$model_file),
       cpp_options = list(stan_threads = TRUE),
       include_paths = include_paths,
-      #stanc_options = list("O1")
     )
-    
+
+    # newer versions of cmdstanr won't accept a bunch of inputs whereas older 
+    # versions seem to silently ignore them. 
+    # Here we drop data.frames etc. that stan won't like
+    pruned_curr_stan_data = curr_stan_data %>%
+      discard(
+        ~ is_function(.x) | is.character(.) | is.null(.)
+      )  
+    pruned_curr_stan_data$analysis_data = NULL
+
     dist_model$sample(
-      data = curr_stan_data %>% 
-        discard(~ is_function(.x) | is.character(.)) %>% 
-        list_modify(analysis_data = NULL),
+      data = pruned_curr_stan_data,
       chains = chains,
       parallel_chains = chains,
       threads_per_chain = threads,
@@ -535,6 +542,8 @@ fit_model <- function(curr_stan_data, chains, threads, iter, use_cmdstanr, inclu
       adapt_delta = control$adapt_delta,
       max_treedepth = control$max_treedepth
     )
+
+
   } else { 
     stan_model(file.path("stan_models", curr_stan_data$model_file)) %>% 
       sampling(
@@ -565,9 +574,12 @@ stan_list <- function(models_info, stan_data, script_options, use_cmdstanr = FAL
       iter <- if (script_options$force_iter) iter else (curr_stan_data$iter %||% iter)
       
       fit_model(curr_stan_data, script_options$chains, script_options$threads, iter, use_cmdstanr, include_paths)
+
     }
+
     
     if (script_options$sequential) {
+
       models_info %>% 
         map(inner_sampler,
             stan_data = stan_data)

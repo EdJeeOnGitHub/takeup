@@ -1,5 +1,4 @@
 #!/usr/bin/Rscript
-
 script_options <- docopt::docopt(
   stringr::str_glue("Usage:
   run_takeup.R takeup prior [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds]
@@ -31,14 +30,13 @@ Options:
   args = if (interactive()) "
     takeup prior \
     --cmdstanr \
-    --outputname=dist_prior95 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB \
+    --outputname=test \
+    --models=REDUCED_FORM_NO_RESTRICT \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 800 \
     --chains=4 \
-    --sequential  \
-    --update
+    --sequential  
     " else commandArgs(trailingOnly = TRUE)
   # args = if (interactive()) "takeup cv --models=REDUCED_FORM_NO_RESTRICT --cmdstanr --include-paths=stan_models --update --output-path=data/stan_analysis_data --outputname=test --folds=2 --sequential" else commandArgs(trailingOnly = TRUE)
 
@@ -52,7 +50,6 @@ Options:
 library(magrittr)
 library(tidyverse)
 library(furrr)
-library(HRW)
 library(sf)
 library(loo)
 
@@ -525,7 +522,6 @@ treatment_map_design_matrix <- cluster_treatment_map %>%
   modelr::model_matrix(treatment_formula)
 
 # Beliefs Data ------------------------------------------------------------
-
 beliefs_treatment_formula <- ~ assigned_treatment 
 
 beliefs_treatment_map_design_matrix <- cluster_treatment_map %>%
@@ -724,10 +720,9 @@ stan_data <- lst(
   analysis_data,
   # SBC
   sbc = script_options$sbc
-) %>% 
-  list_modify(!!!map(models, pluck, "model_type") %>% set_names(~ str_c("MODEL_TYPE_", .))) %>% 
+)  %>%
+  # list_modify(!!!map(models, pluck, "model_type") %>% set_names(~ str_c("MODEL_TYPE_", .))) %>% 
   list_modify(!!!wtp_stan_data) 
-
 
 
 if (script_options$sbc & !script_options$takeup) {
@@ -770,6 +765,7 @@ if (script_options$takeup) {
       save(rank_stats, file = output_file_name)
 
     } else {
+      
       dist_fit <- models %>% 
         stan_list(
           stan_data, 
@@ -779,12 +775,21 @@ if (script_options$takeup) {
       
       if (script_options$cmdstanr) {
         dist_fit_obj <- dist_fit
-        
+        print(str_glue("Output Path: {script_options$output_path}")) 
+        print(str_glue("Output Name: {output_name}")) 
+
+        # BUG spaces in paths causing problems. Wait till it is fixed.
+        print(str_glue("Names dist_fit_obj: {names(dist_fit_obj)}"))
+
+        try(iwalk(dist_fit_obj, ~.x$save_output_files(
+          dir = script_options$output_path, 
+          basename = str_c(output_name, "_", .y), 
+          timestamp = FALSE, random = FALSE)))
+
         dist_fit %<>%
           imap(~ file.path(script_options$output_path, str_c(output_name, "_", .y, ".rds")))
-      
-        # BUG spaces in paths causing problems. Wait till it is fixed.
-        try(iwalk(dist_fit_obj, ~ .x$save_output_files(dir = script_options$output_path, basename = str_c(output_name, .y, sep = "_"), timestamp = FALSE, random = FALSE)))
+
+        print(str_glue("Dist Fit Path: {dist_fit}"))
         dist_fit_obj %>% 
           iwalk(~ {
             cat(.y, "Diagnosis ---------------------------------\n")
@@ -939,5 +944,7 @@ if (script_options$takeup) {
   
   write_rds(wtp_results, file.path(script_options$output_path, str_c(output_name, "_results.rds")))
 }
-  
+
+
 cat(str_glue("All done. Saved results to output ID '{output_name}'\n\n"))
+

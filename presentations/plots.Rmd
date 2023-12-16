@@ -185,6 +185,51 @@ sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 ```
 
 
+
+```{r}
+#| takeup-dynamics-plot,
+#| fig.cap = "Deworming Take-up By Day of Campaign",
+#| fig.width = 8, fig.height = 6
+
+after_msg_days <- seq(3, 11, 2)
+
+time_takeup_data <- analysis.data %>%  
+  filter(monitored, !is.na(sms.treatment)) %>% #, !hh.baseline.sample) %>% 
+  anti_join(outlier.cells, c("assigned.treatment","sms.treatment", "mon_status", "cluster.id", "phone_owner")) %>% 
+  group_by(assigned.treatment) %>% 
+  mutate(n.total = n()) %>% 
+  group_by(dewormed.day.any, add = TRUE) %>% 
+  summarize(takeup.prop = sum(dewormed.any) / first(n.total)) %>% 
+  ungroup %>% 
+  arrange(assigned.treatment, dewormed.day.any) %>% 
+  group_by(assigned.treatment) %>% 
+  mutate(cumul.takeup.prop = cumsum(takeup.prop)) %>% 
+  ungroup()
+
+takeup_dynamics_plot = time_takeup_data %>%
+  mutate(assigned.treatment = fct_relabel(assigned.treatment, str_to_title)) %>%
+  ggplot(aes(
+    x = dewormed.day.any,
+    y = takeup.prop,
+    colour = assigned.treatment,
+    fill = assigned.treatment
+  )) +
+  geom_col() +
+  scale_fill_canva("", palette = canva_palette_vibrant) +
+  scale_colour_canva("", palette = canva_palette_vibrant) +
+  labs(
+    x = "Day of Campaign Dewormed",
+    y = "Proportion"
+  ) +
+  scale_x_continuous(breaks = 1:12) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+takeup_dynamics_plot
+
+
+
+```
+
 ## Component checks
 
 
@@ -1365,7 +1410,26 @@ overall_pref_gift_df = bind_rows(
     mutate(assigned.treatment = fct_relevel(assigned.treatment, 
                                             "(All Arms)", "Control Arm", "Ink Arm", "Calendar Arm", "Bracelet Arm")) 
 
-overall_pref_gift_df
+
+
+
+overall_pref_gift_df %>%
+  filter(assigned.treatment %in% c("Bracelet Arm", "Calendar Arm")) %>%
+  filter(
+    dewormed == TRUE
+  ) %>%
+  ggplot(aes(
+    x = gift_choice,
+    y = pref.prop,
+    fill = dist.pot.group
+  )) +
+  geom_col(
+    position = position_dodge()
+  )  +
+  facet_wrap(
+    ~assigned.treatment,
+    ncol = 1
+    )
 
 overall_pref_gift_df %>%                                            
     ggplot(aes(gift_choice, pref.prop, fill = dewormed)) +
@@ -1932,11 +1996,11 @@ tidy_param_df %>%
 
 ```{r}
 #| take-up-prob-with-obs-takeup-and-linerange,
-#| fig.cap="structural model estimates of take-up probability by distance", 
-#| fig.note="this plot shows estimated take-up probability across bracelet and 
-#|  control over distance. take-up probability is calculated using the structural 
-#|  model's estimates of $w^*$ in each cluster and taking the complement of the gaussian cdf 
-#|  evalutaed at $w^*$. the sample consists of todo. outer ribbon: 90\\% credibility interval,
+#| fig.cap="Structural Model Estimates of Take-up Probability by Distance", 
+#| fig.note="This plot shows estimated take-up probability across bracelet and 
+#|  control over distance. Take-up probability is calculated using the structural 
+#|  model's estimates of $w^*$ in each cluster and taking the complement of the Gaussian CDF 
+#|  evalutaed at $w^*$.  Outer Ribbon: 90\\% credibility interval,
 #|  inner ribbon: 50\\% credibility interval."
 
 dist_prob_plot = 
@@ -2010,7 +2074,6 @@ dist_prob_plot +
     labels = str_to_title
   ) +
   theme(legend.position = "bottom") +
-  dist_caption + 
   labs(colour = "", fill = "") +
   NULL
 
