@@ -22,7 +22,6 @@ script_options = docopt::docopt(
         --single-chain  Only use first chain for draws (useful for debugging) 
         --fit-type=<fit-type>  Which fit type to use - prior predictive or posterior draws [default: fit] 
         --lambda=<lambda>  Lambda to use for optimal incentives [default: 0]
-
     "),
     args = if (interactive()) "
                             86
@@ -255,6 +254,60 @@ params_check = draw_treat_grid  %>%
     first() 
 params_check$centered_cluster_dist_beta_1ord
 params_check$visibility_treatment
+
+recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
+    # additional net benefit to get dewormed
+    params$beta = params$beta  +  b_add
+    params$centered_cluster_beta_1ord = params$centered_cluster_beta_1ord + mu_add
+    takeup_fun = find_pred_takeup(params)
+    takeup_list = takeup_fun(distance)
+    mu_rep_0 = calculate_mu_rep(
+                dist = 0,
+                base_mu_rep = params$base_mu_rep,
+                mu_beliefs_effect = 1,
+                beta = params$centered_cluster_beta_1ord,
+                dist_beta = params$centered_cluster_dist_beta_1ord,
+                beta_control = params$mu_beta_z_control,
+                dist_beta_control = params$mu_beta_d_control,
+                mu_rep_type = params$mu_rep_type, 
+                control = params$visibility_treatment == "control")
+    pr_vis_0 = mu_rep_0 / params$base_mu_rep
+    takeup_list$pr_vis_0 = pr_vis_0
+    return(takeup_list)
+}
+
+
+#' distance in meters
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0) {
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+    if (params$suppress_reputation) {
+        takeup_list$mu_rep = 0
+        takeup_list$mu_rep_deriv = 0
+        takeup_list$delta_v_star = 0
+        takeup_list$delta_v_star_deriv = 0
+    }
+    delta = takeup_list$delta
+    mu_rep_deriv = takeup_list$mu_rep_deriv
+    delta_v_star = takeup_list$delta_v_star
+    mu_rep = takeup_list$mu_rep
+    delta_v_star_deriv = takeup_list$delta_v_star_deriv
+    v_star = takeup_list$v_star
+    net_b = takeup_list$b # b is net benefit so add back
+    dist_norm = distance / sd_of_dist
+    b = net_b + delta * dist_norm 
+    total_error_sd = takeup_list$total_error_sd
+
+    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
+
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+
+    rhs = lambda * delta / hazard
+
+    diff = abs(lhs - rhs)
+    return(diff)
+}
+
+
 
 draw_treat_grid = draw_treat_grid %>%
     mutate(
@@ -721,162 +774,124 @@ ggsave(
 )
 
 
+## Externalities ... and repeated code
+externality_treat_grid = expand.grid(
+    draw = 1:min(max_draw, script_options$num_post_draws),
+    externality = seq(from = 0, to = abs(param_check$beta_b_control), length.out = seq_size),
+    b_add = seq(from = -2, to = 2, length.out = seq_size),
+    mu_add = 0,
+    lambda = 0
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(externality, lambda, b_add, mu_add))
 
-library(tidyverse)
-library(ggplot2)
+externality_treat_grid = externality_treat_grid %>%
+    mutate(
+        params_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = "control",
+                visibility_treatment = "control",
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            )
+        ) 
 
+externality_treat_grid = externality_treat_grid %>%
+    unnest(data)
 
-trunc_norm_variance = function(mu, sigma, a) {
-    alpha = (a - mu) / sigma
-    Z = 1 - pnorm(alpha)
-    tn_var = sigma^2 * (
-        1 
-        - ( - alpha * dnorm(alpha))/Z 
-        - (dnorm(alpha)/Z)^2 
+externality_treat_grid = externality_treat_grid %>%
+    mutate(
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add,
+                mu_add,
+                externality
+            ),
+            ~function(x) { 
+                find_optimal_incentive(
+                    distance = x*1000, 
+                    lambda = ..1, 
+                    params = ..2, 
+                    b_add = ..3, 
+                    mu_add = ..4,
+                    externality = ..5
+                    ) 
+                }
         )
-    return(tn_var)
-}
-
-trunc_norm_above_variance = function(mu, sigma, b) {
-    beta = (b - mu) / sigma
-    Z = pnorm(beta)
-
-    tn_var = sigma^2 * (
-        1 
-        - (beta * dnorm(beta))/Z 
-        - (dnorm(beta)/Z)^2 
         )
-    return(tn_var)
-}
 
-
-
-trunc_norm_grad = function(mu, sigma, a) {
-    alpha = (a - mu) / sigma
-    Z = 1 - pnorm(alpha)
-    sig_sq = sigma^2
-    term_1 =  (dnorm(alpha) * (1 - alpha^2))/Z
-    term_2 =  (alpha * dnorm(alpha)^2)/Z^2
-    term_3 = (2  * alpha * dnorm(alpha)^2)/Z^2
-    term_4 = -1*(2* dnorm(alpha)^3)/Z^3
-    grad = (term_1 + term_2 + term_3 + term_4)*sig_sq
-    return(grad)
-}
-
-trunc_norm_above_grad = function(mu, sigma, b) {
-    beta = (b - mu) / sigma
-    Z = pnorm(beta)
-    sig_sq = sigma^2
-    term_1 =  -1*(dnorm(beta) * (1 - beta^2))/Z
-    term_2 =  -1 * (beta * dnorm(beta)^2)/Z^2
-    term_3 = -1*(2  * beta * dnorm(beta)^2)/Z^2
-    term_4 = (2* dnorm(beta)^3)/Z^3
-    grad = (term_1 + term_2 + term_3 + term_4)*sig_sq
-    return(grad)
-}
-
-
-param_df = expand.grid(
-    mu = 0,
-    sigma = params_check$total_error_sd,
-    a = seq(from = -4, to = 4, length.out = 100)
-) %>%
-    as_tibble() 
-
-
-param_df = param_df %>%
+externality_treat_grid = externality_treat_grid %>%
+    ungroup() %>%
     mutate(
-        tn_var = pmap_dbl(
-            list(
-                mu,
-                sigma,
-                a
-            ),
-            ~trunc_norm_variance(mu = ..1, sigma = ..2, a = ..3)
-        ),
-        grad_var = pmap_dbl(
-            list(
-                mu,
-                sigma,
-                a
-            ),
-            ~trunc_norm_grad(mu = ..1, sigma = ..2, a = ..3)
-        ),
-        tn_above_var = pmap_dbl(
-            list(
-                mu,
-                sigma,
-                a
-            ),
-            ~trunc_norm_above_variance(mu = ..1, sigma = ..2, b = ..3)
-        ),
-        tn_above_grad_var = pmap_dbl(
-            list(
-                mu,
-                sigma,
-                a
-            ),
-            ~trunc_norm_above_grad(mu = ..1, sigma = ..2, b = ..3)
-        ),
-        pr_takeup = 1 - pnorm(a, sd = params_check$total_error_sd)
-    ) 
-
-param_df %>%
-    mutate(
-        weighted_var = pr_takeup * grad_var + (1 - pr_takeup) * tn_above_grad_var ,
-        ed = 1 - 2 * dnorm(a) * a
-    ) %>%
-    select(a, weighted_var, ed) %>%
-    ggplot(aes(
-        x = 1 - pnorm(a),
-        y = weighted_var
-    )) +
-    geom_line() +
-    geom_line(aes(y = ed), linetype = "longdash")
-
-ggsave(
-    "temp-plot.pdf",
-    width = 8, height = 6)
-
-
-p = param_df %>%
-    pivot_longer(
-        contains("var")
-    ) %>% 
-    mutate(
-        name = case_when(
-            name == "tn_var" ~ "Signal Variance",
-            name == "grad_var" ~ "Signal Variance Gradient",
-            name == "tn_above_var" ~ "No Signal Variance",
-            name == "tn_above_grad_var" ~ "No Signal Variance Gradient",
-            ),
-        name = factor(
-            name, 
-            levels = c(
-                "Signal Variance", 
-                "Signal Variance Gradient", 
-                "No Signal Variance", 
-                "No Signal Variance Gradient"
+        fit_vis = map(
+            funs_vis,
+            ~optim(
+                2.5, 
+                .x, 
+                lower = 0, 
+                upper = 18, 
+                method = "Brent",
+                control = list(
+                    abstol = 1e-12,
+                    reltol = 1e-12
+                    )
                 )
-                )
-    )  %>%
-    ggplot(aes(
-        x = pr_takeup,
-        y = value
-    )) +
-    geom_line() +
-    facet_wrap(~name, scales = "free") +
-    theme_minimal() +
-    labs(
-        x = "Pr(Takeup)",
-        y = "Value"
+        )
     )
 
+externality_treat_grid = externality_treat_grid %>%
+    mutate(
+        res_vis = map_dbl(fit_vis, "par")
+        )
+
+abs(param_check$beta_b_control)
+
+p_externality = externality_treat_grid %>%
+    select(draw, externality, lambda, b_add, contains("res")) %>%
+    pivot_longer(
+        contains('res')
+    ) %>%
+    mutate(externality_pct = 100*externality/abs(param_check$beta_b_control)) %>%
+    # this seems to be doing v weird stuff:
+    # maybe the multiple equilibria thing?
+    # filter(value > 1) %>%
+    ggplot(aes(
+        x = b_add,
+        y = value,
+        colour = externality_pct,
+        group = externality_pct
+    )) +
+    geom_line() +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    labs(
+        x = "Shift in Norms/Additional Private Incentive",
+        y = "Optimal Distance (km)",
+        colour = "Value of Externality (Relative to Control, %)"
+    )
+
+
 ggsave(
-    plot = p, 
+    plot = p_externality,
     file = file.path(
         script_options$output_path,
-        str_glue("{script_options$output_name}-v-star-signal-variance.pdf")
+        str_glue("{script_options$output_name}-externality-control.pdf")
     ),
-    width = 8, height = 6)
-
+    width = 8,
+    height = 6
+)
