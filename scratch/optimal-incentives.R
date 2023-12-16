@@ -2,9 +2,14 @@
 print(commandArgs(trailingOnly = TRUE))
 script_options = docopt::docopt(
     stringr::str_glue("Usage:
-    optimal-incentives.R <fit-version> <private-benefit-z> <visibility-z> [options] [ --from-csv | --to-csv ]
+    optimal-incentives.R <fit-version> <private-benefit-z> <visibility-z> [options] 
 
-    Takes posterior fits and calculates estimated takeup for a given distance.
+    Takes posterior fits and calculates optimal subsidy (PoT distance). There 
+    are multiple counterfactuals:
+        1. posterior - All posterior draws across all treatments - find Bayes optimal distance.
+        2. robust-externality - Find optimal distance varying the value of externalities for a given treatment.
+        3. robust-lambda - Find optimal distance varying cost of public funds for a given treatment.
+
 
 
     Options:
@@ -13,7 +18,6 @@ script_options = docopt::docopt(
         --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
         --output-path=<path>  Path to find results [default: {file.path('temp-data')}]
         --output-name=<output-name>  Prepended to output file
-        --num-post-draws=<num-post-draws>  Number of posterior draws to use [default: 200]
         --num-cores=<num-cores>  Number of cores to use [default: 8]
         --model=<model>  Which model to use [default: STRUCTURAL_LINEAR_U_SHOCKS]
         --data-input-path=<data-input-path>  Where village and PoT data is stored [default: {file.path('optim', 'data')}]
@@ -21,17 +25,27 @@ script_options = docopt::docopt(
         --suppress-reputation  Suppress reputational returns
         --single-chain  Only use first chain for draws (useful for debugging) 
         --fit-type=<fit-type>  Which fit type to use - prior predictive or posterior draws [default: fit] 
-        --lambda=<lambda>  Lambda to use for optimal incentives [default: 0]
+        --lambda=<lambda>  Lambda to use for optimal incentives across all treats [default: 0]
+        --externality=<externality>  Externality to use across all treats [default: 0]
+        --num-post-draws=<num-post-draws>  Number of posterior draws to use [default: 200]
+        --posterior  Estimate across entire posterior across all treatments.
+        --robust-externality  Estimate across externality grid for posterior median
+        --robust-lambda  Estimate across lambda grid for posterior median
+
+
     "),
     args = if (interactive()) "
                             86
                             control
                             control
                             --output-name=ramsey-control-lambda-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
-                            --from-csv
-                            --num-post-draws=1
+                            --num-post-draws=200
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+
+                            --posterior 
+                            --robust-externality
+                            --robust-lambda
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
@@ -57,6 +71,7 @@ source(file.path("dist_structural_util.R"))
 fit_version = script_options$fit_version
 
 script_options$lambda = as.numeric(script_options$lambda)
+script_options$num_post_draws = as.numeric(script_options$num_post_draws)
 
 struct_param_draws = read_csv(
     file.path(
@@ -68,11 +83,11 @@ struct_param_draws = read_csv(
 )
 
 
-struct_param_draws = struct_param_draws %>%
+
+posterior_mean_draw = struct_param_draws %>%
     group_by(.variable, k, j) %>%
     summarise(.value = mean(.value)) %>% 
     mutate(.draw = 1)
-
 
 script_options$num_post_draws = as.numeric(script_options$num_post_draws)
 
@@ -110,7 +125,7 @@ recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
 
 
 #' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0) {
     takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     if (params$suppress_reputation) {
         takeup_list$mu_rep = 0
@@ -131,7 +146,7 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
 
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
 
     rhs = lambda * delta / hazard
 
@@ -142,8 +157,7 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
 
 
 
-
-#### Optimal Incentives
+#### Estimation Across Posterior 
 treatments = c(
     "control",
     "ink",
@@ -151,32 +165,63 @@ treatments = c(
     "bracelet"
 )
 
-params_treatments = map(
-    treatments,
-    ~extract_params(
-        param_draws = struct_param_draws,
-        private_benefit_treatment = .x,
-        visibility_treatment = .x,
-        draw_id = 1,
-        dist_sd = sd_of_dist,
-        j_id = 1,
-        rep_cutoff = Inf,
-        dist_cutoff = Inf,
-        bounds = c(-Inf, Inf),
-        mu_rep_type = mu_rep_type,
-        suppress_reputation = FALSE,
-        static_signal = NA,
-        fix_mu_at_1 = FALSE,
-        fix_mu_distance = NULL,
-        static_delta_v_star = NA
-    )
-)
+unique_post_draw_ids = unique(struct_param_draws$.draw) 
 
-params_treatments
-funs_treatments = map(
-    params_treatments,
-    ~function(x) find_optimal_incentive(distance = x, lambda = 0, params = .x, b_add = 0)
-)
+full_posterior_df = expand.grid(
+    draw_id = sample(unique_post_draw_ids, min(script_options$num_post_draws, length(unique_post_draw_ids))),
+    treatment = treatments
+) %>%
+    as_tibble()
+
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        params = map2(
+            draw_id,
+            treatment,
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = .y,
+                visibility_treatment = .y,
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf,
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE,
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+        )
+    )
+
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        fun_treatments = map(
+            params,
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = .x, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality)
+                )
+        )
+        )
+
+plan(sequential)
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        fit_funs = map(
+            fun_treatments,
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000),
+            .progress = TRUE
+        )
+    )
 
 fit_funs_treatments = map(
     funs_treatments,
@@ -254,58 +299,6 @@ params_check = draw_treat_grid  %>%
     first() 
 params_check$centered_cluster_dist_beta_1ord
 params_check$visibility_treatment
-
-recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
-    # additional net benefit to get dewormed
-    params$beta = params$beta  +  b_add
-    params$centered_cluster_beta_1ord = params$centered_cluster_beta_1ord + mu_add
-    takeup_fun = find_pred_takeup(params)
-    takeup_list = takeup_fun(distance)
-    mu_rep_0 = calculate_mu_rep(
-                dist = 0,
-                base_mu_rep = params$base_mu_rep,
-                mu_beliefs_effect = 1,
-                beta = params$centered_cluster_beta_1ord,
-                dist_beta = params$centered_cluster_dist_beta_1ord,
-                beta_control = params$mu_beta_z_control,
-                dist_beta_control = params$mu_beta_d_control,
-                mu_rep_type = params$mu_rep_type, 
-                control = params$visibility_treatment == "control")
-    pr_vis_0 = mu_rep_0 / params$base_mu_rep
-    takeup_list$pr_vis_0 = pr_vis_0
-    return(takeup_list)
-}
-
-
-#' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0) {
-    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
-    if (params$suppress_reputation) {
-        takeup_list$mu_rep = 0
-        takeup_list$mu_rep_deriv = 0
-        takeup_list$delta_v_star = 0
-        takeup_list$delta_v_star_deriv = 0
-    }
-    delta = takeup_list$delta
-    mu_rep_deriv = takeup_list$mu_rep_deriv
-    delta_v_star = takeup_list$delta_v_star
-    mu_rep = takeup_list$mu_rep
-    delta_v_star_deriv = takeup_list$delta_v_star_deriv
-    v_star = takeup_list$v_star
-    net_b = takeup_list$b # b is net benefit so add back
-    dist_norm = distance / sd_of_dist
-    b = net_b + delta * dist_norm 
-    total_error_sd = takeup_list$total_error_sd
-
-    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
-
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
-
-    rhs = lambda * delta / hazard
-
-    diff = abs(lhs - rhs)
-    return(diff)
-}
 
 
 
