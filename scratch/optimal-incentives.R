@@ -38,7 +38,7 @@ script_options = docopt::docopt(
                             86
                             control
                             control
-                            --output-name=ramsey-control-lambda-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            --output-name=ramsey-b-control-mu-control-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=200
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
@@ -60,7 +60,6 @@ library(tidybayes)
 library(broom)
 library(nleqslv)
 library(cmdstanr)
-library(econometr)
 library(furrr)
 
 source(file.path("optim", "optim-functions.R"))
@@ -83,6 +82,9 @@ struct_param_draws = read_csv(
 )
 
 
+post_output_name = str_glue(
+    "posterior-optimal-distance-lambda_{script_options$lambda}-externality_{script_options$externality}-model_{script_options$model}-fit-version_{script_options$fit_version}.csv"
+)
 
 posterior_mean_draw = struct_param_draws %>%
     group_by(.variable, k, j) %>%
@@ -165,14 +167,16 @@ treatments = c(
     "bracelet"
 )
 
+if (script_options$posterior) {
+# generate grid of posterior draw IDs and treatments
 unique_post_draw_ids = unique(struct_param_draws$.draw) 
-
 full_posterior_df = expand.grid(
     draw_id = sample(unique_post_draw_ids, min(script_options$num_post_draws, length(unique_post_draw_ids))),
     treatment = treatments
 ) %>%
     as_tibble()
 
+# extract params for each posterior draw
 full_posterior_df = full_posterior_df %>%
     mutate(
         params = map2(
@@ -197,7 +201,7 @@ full_posterior_df = full_posterior_df %>%
             )
         )
     )
-
+# create anon functions for each param draw
 full_posterior_df = full_posterior_df %>%
     mutate(
         fun_treatments = map(
@@ -212,8 +216,7 @@ full_posterior_df = full_posterior_df %>%
                 )
         )
         )
-
-plan(sequential)
+# optimise funs to get optimal distance
 full_posterior_df = full_posterior_df %>%
     mutate(
         fit_funs = map(
@@ -222,38 +225,37 @@ full_posterior_df = full_posterior_df %>%
             .progress = TRUE
         )
     )
+# extract results
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        optimal_distance = map_dbl(fit_funs, "par")
+    )
+# save to csv
+full_posterior_df %>%
+    select(treatment, draw_id, optimal_distance)  %>%
+    write_csv(
+    file.path(
+        script_options$output_path,
+        post_output_name
+    )
+    )
+} # End posterior estimation
 
-fit_funs_treatments = map(
-    funs_treatments,
-    ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000)
-)
 
-optimal_distances = map_dbl(
-    fit_funs_treatments,
-    "par"
-)
-names(optimal_distances) = treatments
-
-optimal_distances
-
-
-max_draw = max(struct_param_draws$.draw)
-draw_treat_grid = expand.grid(
+# Estimate Optimal Distance holding visibility fixed, only vary private incentive
+b_df = expand.grid(
     draw = 1,
-    # lambda = seq(from = 0, to = 0.3, length.out = 3),
     lambda = script_options$lambda,
     b_add = seq(from = -3, to = 3, length.out = 20)
-    # treatment = script_options$treatment
 ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add))
-
-draw_treat_grid = draw_treat_grid %>%
+b_df = b_df %>%
     mutate(
         params_vis = map(
             draw,
             ~extract_params(
-                param_draws = struct_param_draws,
+                param_draws = posterior_mean_draw,
                 private_benefit_treatment = script_options$private_benefit_z,
                 visibility_treatment = script_options$visibility_z,
                 draw_id = .x,
@@ -273,7 +275,7 @@ draw_treat_grid = draw_treat_grid %>%
         params_control_vis = map(
             draw,
             ~extract_params(
-                param_draws = struct_param_draws,
+                param_draws = posterior_mean_draw,
                 private_benefit_treatment = script_options$private_benefit_z,
                 visibility_treatment = "control",
                 draw_id = .x,
@@ -291,18 +293,16 @@ draw_treat_grid = draw_treat_grid %>%
             )
             )
         ) 
-draw_treat_grid = draw_treat_grid %>%
+b_df = b_df %>%
     unnest(data)
 
-params_check = draw_treat_grid  %>%
+params_check = b_df  %>%
     pull(params_vis) %>%
     first() 
 params_check$centered_cluster_dist_beta_1ord
 params_check$visibility_treatment
 
-
-
-draw_treat_grid = draw_treat_grid %>%
+b_df = b_df %>%
     mutate(
         funs_vis = pmap(
             list(
@@ -323,20 +323,22 @@ draw_treat_grid = draw_treat_grid %>%
     ) %>%
     ungroup()
 
-draw_treat_grid = draw_treat_grid %>%
+b_df = b_df %>%
     ungroup() %>%
     mutate(
         fit_vis = map(
             funs_vis,
-            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000)
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000),
+            .progress = TRUE
         ),
         fit_control_vis = map(
             funs_control_vis,
-            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000)
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000),
+            .progress = TRUE
         )
     )
 
-draw_treat_grid = draw_treat_grid %>%
+b_df = b_df %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par"),
         res_control_vis = map_dbl(fit_control_vis, "par"),
@@ -356,11 +358,7 @@ draw_treat_grid = draw_treat_grid %>%
             )
     )
 
-
-    
-stop()
-
-draw_treat_grid %>%
+b_df %>%
     select(
         lambda, b_add, params_vis, res_vis
     ) %>%
@@ -372,7 +370,7 @@ draw_treat_grid %>%
             )
     )
 
-draw_treat_grid %>%
+b_df %>%
     select(
         lambda, b_add, params_vis, res_vis 
     ) %>%
@@ -413,7 +411,7 @@ find_optimal_incentive_first_best = function(distance, delta, mu) {
 }
 
 
-draw_treat_grid %>% 
+b_df %>% 
     select(
         draw,
         lambda,
@@ -429,9 +427,7 @@ draw_treat_grid %>%
     )
 
 
-
-
-long_draw_treat = draw_treat_grid %>%
+long_b_df = b_df %>%
     select(draw, lambda, b_add, pred_takeup, contains("res")) %>%
     pivot_longer(
         c(contains('res'), pred_takeup)
@@ -447,7 +443,8 @@ long_draw_treat = draw_treat_grid %>%
         "res_var"
     ))
 
-p_private_incentive_only = long_draw_treat %>%
+p_private_incentive_only = long_b_df %>%
+    filter(name_type == "res_var") %>%
     ggplot(aes(
         x = b_add,
         y = value,
@@ -461,13 +458,9 @@ p_private_incentive_only = long_draw_treat %>%
         x = "Additional Private Incentive to Get Dewormed",
         y = "Optimal PoT Distance (meters)"
     ) +
-    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist")  +
-    facet_wrap(~name_type, scales = "free") +
-    geom_hline(yintercept = 0.2, linetype = "longdash")
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist")  
 
 p_private_incentive_only
-
-
 
 
 ggsave(
@@ -482,26 +475,25 @@ ggsave(
 
 
 
-#### B and Mu
+#### Varying B and Mu
 seq_size = 30
-b_mu_draw_treat_grid = expand.grid(
-    draw = 1:min(max_draw, script_options$num_post_draws),
+b_mu_df = expand.grid(
+    draw = 1,
     lambda = script_options$lambda,
     b_add = seq(from = -2, to = 2, length.out = seq_size),
-    # b_add = 0,
     mu_add = seq(from = -4, to = 4, length.out = seq_size)
-    # treatment = script_options$treatment
 ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add, mu_add))
-b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+
+b_mu_df = b_mu_df %>%
     mutate(
         params_vis = map(
             draw,
             ~extract_params(
-                param_draws = struct_param_draws,
-                private_benefit_treatment = "bracelet",
-                visibility_treatment = "bracelet",
+                param_draws = posterior_mean_draw,
+                private_benefit_treatment = script_options$private_benefit_z,
+                visibility_treatment = script_options$visibility_z,
                 draw_id = .x,
                 dist_sd = sd_of_dist,
                 j_id = 1,
@@ -518,10 +510,10 @@ b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
             )
         ) 
 
-b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+b_mu_df = b_mu_df %>%
     unnest(data)
 
-b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+b_mu_df = b_mu_df %>%
     mutate(
         funs_vis = pmap(
             list(
@@ -534,21 +526,22 @@ b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
         )
         )
 
-b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+b_mu_df = b_mu_df %>%
     ungroup() %>%
     mutate(
         fit_vis = map(
             funs_vis,
-            ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent")
+            ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent"),
+            .progress = TRUE
         )
     )
 
-b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+b_mu_df = b_mu_df %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par")
         )
 
-b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
+b_mu_df = b_mu_df %>%
     mutate(
         takeup_list = pmap(
             list(
@@ -564,11 +557,8 @@ b_mu_draw_treat_grid = b_mu_draw_treat_grid %>%
         pr_obs = map_dbl(takeup_list, "pr_vis_0")
     )
 
-b_mu_draw_treat_grid  %>%
-    select(b_add, pr_obs, res_vis) %>%
-    tail()
 
-p_contour = b_mu_draw_treat_grid %>%
+p_contour = b_mu_df %>%
     select(
         draw,
         lambda,
@@ -576,7 +566,6 @@ p_contour = b_mu_draw_treat_grid %>%
         pr_obs,
         res_vis
     ) %>%
-    # filter(abs(b_add) < 2) %>%
     ggplot(aes(
         x = b_add,
         y = pr_obs,
@@ -596,6 +585,7 @@ p_contour = b_mu_draw_treat_grid %>%
     theme(
         legend.position = "bottom"
     )
+
 ggsave(
     p_contour,
     filename = file.path(
@@ -607,59 +597,10 @@ ggsave(
 )
 
 
-library(plotly)
-b_mat = b_mu_draw_treat_grid %>%
-    select(b_add, pr_obs, res_vis) %>%
-    pivot_wider(
-        names_from = b_add,
-        values_from = res_vis
-    ) 
-
-b_mat_mu = b_mat$pr_obs
-b_mat_b = b_mat %>%
-    select(-pr_obs) %>%
-    colnames() %>%
-    as.numeric()
-b_mat_z = b_mat %>%
-    select(-pr_obs) %>%
-    as.matrix()
-b_mat_z = b_mat_z * 1000
-
-fig = plot_ly(
-    x = b_mat_mu, 
-    y = b_mat_b, 
-    z = b_mat_z,
-    contours = list(
-    z = list(show = TRUE, start = min(b_mat_z), end = max(b_mat_z), size = 500))
-    ) %>% add_surface()
-fig_3d = fig %>%
-    hide_colorbar() %>%
-layout(
-    showlegend = FALSE,
-    scene = list(
-      camera=list(
-        eye = list(x=1.9/2, y=-4/2, z=2.5/2)
-        ),
-        yaxis = list(title = "Private Incentive"),
-        xaxis = list(title = "Visibility"),
-        zaxis = list(title = "Optimal Distance")
-      )
-  )
-fig_3d
-
-# orca(
-#     fig_3d, 
-#     scale = 3,
-#     file = file.path(
-#         script_options$output_path,
-#         str_glue("{script_options$output_name}-3d-plot.pdf")
-#         )
-#     )
-
-
-
-lambda_treat_grid = expand.grid(
-    draw = 1:min(max_draw, script_options$num_post_draws),
+## Varying Lambda
+if (script_options$robust_lambda) {
+lambda_df = expand.grid(
+    draw = 1,
     lambda = seq(from = 0, to = 0.15, length.out = seq_size),
     b_add = seq(from = -2, to = 2, length.out = seq_size),
     mu_add = 0
@@ -667,14 +608,14 @@ lambda_treat_grid = expand.grid(
     group_by(draw) %>%
     nest(data = c(lambda, b_add, mu_add))
 
-lambda_treat_grid = lambda_treat_grid %>%
+lambda_df = lambda_df %>%
     mutate(
         params_vis = map(
             draw,
             ~extract_params(
-                param_draws = struct_param_draws,
-                private_benefit_treatment = "control",
-                visibility_treatment = "control",
+                param_draws = posterior_mean_draw,
+                private_benefit_treatment = script_options$private_benefit_z,
+                visibility_treatment = script_options$visibility_z,
                 draw_id = .x,
                 dist_sd = sd_of_dist,
                 j_id = 1,
@@ -691,10 +632,10 @@ lambda_treat_grid = lambda_treat_grid %>%
             )
         ) 
 
-lambda_treat_grid = lambda_treat_grid %>%
+lambda_df = lambda_df %>%
     unnest(data)
 
-lambda_treat_grid = lambda_treat_grid %>%
+lambda_df = lambda_df %>%
     mutate(
         funs_vis = pmap(
             list(
@@ -707,7 +648,7 @@ lambda_treat_grid = lambda_treat_grid %>%
         )
         )
 
-lambda_treat_grid = lambda_treat_grid %>%
+lambda_df = lambda_df %>%
     ungroup() %>%
     mutate(
         fit_vis = map(
@@ -722,17 +663,18 @@ lambda_treat_grid = lambda_treat_grid %>%
                     abstol = 1e-12,
                     reltol = 1e-12
                     )
-                )
+                ),
+            .progress = TRUE
         )
     )
 
-lambda_treat_grid = lambda_treat_grid %>%
+lambda_df = lambda_df %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par")
         )
 
 
-p_lambda = lambda_treat_grid %>%
+p_lambda = lambda_df %>%
     select(draw, lambda, b_add, contains("res")) %>%
     pivot_longer(
         contains('res')
@@ -767,10 +709,15 @@ ggsave(
 )
 
 
+}
+
+
+## Varying Externality
+if (script_options$robust_externality) {
 ## Externalities ... and repeated code
-externality_treat_grid = expand.grid(
-    draw = 1:min(max_draw, script_options$num_post_draws),
-    externality = seq(from = 0, to = abs(param_check$beta_b_control), length.out = seq_size),
+externality_df = expand.grid(
+    draw = 1,
+    externality = seq(from = 0, to = abs(params_check$beta_b_control), length.out = seq_size),
     b_add = seq(from = -2, to = 2, length.out = seq_size),
     mu_add = 0,
     lambda = 0
@@ -778,14 +725,14 @@ externality_treat_grid = expand.grid(
     group_by(draw) %>%
     nest(data = c(externality, lambda, b_add, mu_add))
 
-externality_treat_grid = externality_treat_grid %>%
+externality_df = externality_df %>%
     mutate(
         params_vis = map(
             draw,
             ~extract_params(
-                param_draws = struct_param_draws,
-                private_benefit_treatment = "control",
-                visibility_treatment = "control",
+                param_draws = posterior_mean_draw,
+                private_benefit_treatment = script_options$private_benefit_z,
+                visibility_treatment = script_options$visibility_z,
                 draw_id = .x,
                 dist_sd = sd_of_dist,
                 j_id = 1,
@@ -802,10 +749,10 @@ externality_treat_grid = externality_treat_grid %>%
             )
         ) 
 
-externality_treat_grid = externality_treat_grid %>%
+externality_df = externality_df %>%
     unnest(data)
 
-externality_treat_grid = externality_treat_grid %>%
+externality_df = externality_df %>%
     mutate(
         funs_vis = pmap(
             list(
@@ -828,7 +775,7 @@ externality_treat_grid = externality_treat_grid %>%
         )
         )
 
-externality_treat_grid = externality_treat_grid %>%
+externality_df = externality_df %>%
     ungroup() %>%
     mutate(
         fit_vis = map(
@@ -843,23 +790,23 @@ externality_treat_grid = externality_treat_grid %>%
                     abstol = 1e-12,
                     reltol = 1e-12
                     )
-                )
+                ),
+                .progress = TRUE
         )
     )
 
-externality_treat_grid = externality_treat_grid %>%
+externality_df = externality_df %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par")
         )
 
-abs(param_check$beta_b_control)
 
-p_externality = externality_treat_grid %>%
+p_externality = externality_df %>%
     select(draw, externality, lambda, b_add, contains("res")) %>%
     pivot_longer(
         contains('res')
     ) %>%
-    mutate(externality_pct = 100*externality/abs(param_check$beta_b_control)) %>%
+    mutate(externality_pct = 100*externality/abs(params_check$beta_b_control)) %>%
     # this seems to be doing v weird stuff:
     # maybe the multiple equilibria thing?
     # filter(value > 1) %>%
@@ -875,7 +822,7 @@ p_externality = externality_treat_grid %>%
     labs(
         x = "Shift in Norms/Additional Private Incentive",
         y = "Optimal Distance (km)",
-        colour = "Value of Externality (Relative to Control, %)"
+        colour = "Value of Externality (Relative to Deworming Private Benefit, %)"
     )
 
 
@@ -888,3 +835,4 @@ ggsave(
     width = 8,
     height = 6
 )
+}
