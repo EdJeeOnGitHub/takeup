@@ -88,6 +88,109 @@ mu_rep_type = switch(
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP = 4
 )
 
+recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
+    # additional net benefit to get dewormed
+    params$beta = params$beta  +  b_add
+    params$centered_cluster_beta_1ord = params$centered_cluster_beta_1ord + mu_add
+    takeup_fun = find_pred_takeup(params)
+    takeup_list = takeup_fun(distance)
+    mu_rep_0 = calculate_mu_rep(
+                dist = 0,
+                base_mu_rep = params$base_mu_rep,
+                mu_beliefs_effect = 1,
+                beta = params$centered_cluster_beta_1ord,
+                dist_beta = params$centered_cluster_dist_beta_1ord,
+                beta_control = params$mu_beta_z_control,
+                dist_beta_control = params$mu_beta_d_control,
+                mu_rep_type = params$mu_rep_type, 
+                control = params$visibility_treatment == "control")
+    pr_vis_0 = mu_rep_0 / params$base_mu_rep
+    takeup_list$pr_vis_0 = pr_vis_0
+    return(takeup_list)
+}
+
+
+#' distance in meters
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+    if (params$suppress_reputation) {
+        takeup_list$mu_rep = 0
+        takeup_list$mu_rep_deriv = 0
+        takeup_list$delta_v_star = 0
+        takeup_list$delta_v_star_deriv = 0
+    }
+    delta = takeup_list$delta
+    mu_rep_deriv = takeup_list$mu_rep_deriv
+    delta_v_star = takeup_list$delta_v_star
+    mu_rep = takeup_list$mu_rep
+    delta_v_star_deriv = takeup_list$delta_v_star_deriv
+    v_star = takeup_list$v_star
+    net_b = takeup_list$b # b is net benefit so add back
+    dist_norm = distance / sd_of_dist
+    b = net_b + delta * dist_norm 
+    total_error_sd = takeup_list$total_error_sd
+
+    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
+
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+
+    rhs = lambda * delta / hazard
+
+    diff = abs(lhs - rhs)
+    return(diff)
+}
+
+
+
+
+
+#### Optimal Incentives
+treatments = c(
+    "control",
+    "ink",
+    "calendar",
+    "bracelet"
+)
+
+params_treatments = map(
+    treatments,
+    ~extract_params(
+        param_draws = struct_param_draws,
+        private_benefit_treatment = .x,
+        visibility_treatment = .x,
+        draw_id = 1,
+        dist_sd = sd_of_dist,
+        j_id = 1,
+        rep_cutoff = Inf,
+        dist_cutoff = Inf,
+        bounds = c(-Inf, Inf),
+        mu_rep_type = mu_rep_type,
+        suppress_reputation = FALSE,
+        static_signal = NA,
+        fix_mu_at_1 = FALSE,
+        fix_mu_distance = NULL,
+        static_delta_v_star = NA
+    )
+)
+
+params_treatments
+funs_treatments = map(
+    params_treatments,
+    ~function(x) find_optimal_incentive(distance = x, lambda = 0, params = .x, b_add = 0)
+)
+
+fit_funs_treatments = map(
+    funs_treatments,
+    ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000)
+)
+
+optimal_distances = map_dbl(
+    fit_funs_treatments,
+    "par"
+)
+names(optimal_distances) = treatments
+
+optimal_distances
 
 
 max_draw = max(struct_param_draws$.draw)
@@ -153,62 +256,6 @@ params_check = draw_treat_grid  %>%
 params_check$centered_cluster_dist_beta_1ord
 params_check$visibility_treatment
 
-recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
-    # additional net benefit to get dewormed
-    params$beta = params$beta  +  b_add
-    params$centered_cluster_beta_1ord = params$centered_cluster_beta_1ord + mu_add
-    takeup_fun = find_pred_takeup(params)
-    takeup_list = takeup_fun(distance)
-    mu_rep_0 = calculate_mu_rep(
-                dist = 0,
-                base_mu_rep = params$base_mu_rep,
-                mu_beliefs_effect = 1,
-                beta = params$centered_cluster_beta_1ord,
-                dist_beta = params$centered_cluster_dist_beta_1ord,
-                beta_control = params$mu_beta_z_control,
-                dist_beta_control = params$mu_beta_d_control,
-                mu_rep_type = params$mu_rep_type, 
-                control = params$visibility_treatment == "control")
-    pr_vis_0 = mu_rep_0 / params$base_mu_rep
-    takeup_list$pr_vis_0 = pr_vis_0
-    return(takeup_list)
-}
-
-
-#' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0) {
-    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
-    if (params$suppress_reputation) {
-        takeup_list$mu_rep = 0
-        takeup_list$mu_rep_deriv = 0
-        takeup_list$delta_v_star = 0
-        takeup_list$delta_v_star_deriv = 0
-    }
-    delta = takeup_list$delta
-    mu_rep_deriv = takeup_list$mu_rep_deriv
-    delta_v_star = takeup_list$delta_v_star
-    mu_rep = takeup_list$mu_rep
-    delta_v_star_deriv = takeup_list$delta_v_star_deriv
-    v_star = takeup_list$v_star
-    net_b = takeup_list$b # b is net benefit so add back
-    dist_norm = distance / sd_of_dist
-    b = net_b + delta * dist_norm 
-    total_error_sd = takeup_list$total_error_sd
-
-    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
-
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
-
-    rhs = lambda * delta / hazard
-
-    diff = abs(lhs - rhs)
-    return(diff)
-}
-
-
-
-
-
 draw_treat_grid = draw_treat_grid %>%
     mutate(
         funs_vis = pmap(
@@ -246,18 +293,113 @@ draw_treat_grid = draw_treat_grid %>%
 draw_treat_grid = draw_treat_grid %>%
     mutate(
         res_vis = map_dbl(fit_vis, "par"),
-        res_control_vis = map_dbl(fit_control_vis, "par")
+        res_control_vis = map_dbl(fit_control_vis, "par"),
+        takeup_list = pmap(
+            list(
+                res_vis,
+                params_vis,
+                b_add
+            ),
+            ~recalc_takeup(distance = ..1, params = ..2, b_add = ..3, mu_add = 0)
         )
+        ) %>%
+    mutate(
+        pred_takeup = map_dbl(
+            takeup_list, 
+            "pred_takeup"
+            )
+    )
+
+
+    
+stop()
+
+draw_treat_grid %>%
+    select(
+        lambda, b_add, params_vis, res_vis
+    ) %>%
+    mutate(
+        ed = map2_dbl(
+            b_add,
+            params_vis, 
+            ~analytical_delta(-.x, .y$total_error_sd)
+            )
+    )
+
+draw_treat_grid %>%
+    select(
+        lambda, b_add, params_vis, res_vis 
+    ) %>%
+    slice(1) %>%
+    pull(params_vis) %>%
+    first()
+
+
+
+
+find_optimal_incentive_first_best = function(distance, delta, mu) {
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+    if (params$suppress_reputation) {
+        takeup_list$mu_rep = 0
+        takeup_list$mu_rep_deriv = 0
+        takeup_list$delta_v_star = 0
+        takeup_list$delta_v_star_deriv = 0
+    }
+    delta = takeup_list$delta
+    mu_rep_deriv = takeup_list$mu_rep_deriv
+    delta_v_star = takeup_list$delta_v_star
+    mu_rep = takeup_list$mu_rep
+    delta_v_star_deriv = takeup_list$delta_v_star_deriv
+    v_star = takeup_list$v_star
+    net_b = takeup_list$b # b is net benefit so add back
+    dist_norm = distance / sd_of_dist
+    b = net_b + delta * dist_norm 
+    total_error_sd = takeup_list$total_error_sd
+
+    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
+
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+
+    rhs = lambda * delta / hazard
+
+    diff = abs(lhs - rhs)
+    return(diff)
+}
+
+
+draw_treat_grid %>% 
+    select(
+        draw,
+        lambda,
+        b_add,
+        contains("res"),
+        takeup_list
+    ) %>%
+    mutate(
+        pred_takeup = map_dbl(
+            takeup_list, 
+            "pred_takeup"
+            )
+    )
+
+
+
 
 long_draw_treat = draw_treat_grid %>%
-    select(draw, lambda, b_add, contains("res")) %>%
+    select(draw, lambda, b_add, pred_takeup, contains("res")) %>%
     pivot_longer(
-        contains('res')
+        c(contains('res'), pred_takeup)
     ) %>%
     mutate(name = case_when(
         name == "res_control_vis" ~ "B: Bracelet, Mu: Control",
-        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet"
-        )) 
+        name == "res_vis" ~ "B: Bracelet, Mu: Bracelet",
+        name == "pred_takeup" ~ "Predicted Takeup"
+        ))  %>%
+    mutate(name_type = if_else(
+        name == "Predicted Takeup",
+        "pred_var",
+        "res_var"
+    ))
 
 p_private_incentive_only = long_draw_treat %>%
     ggplot(aes(
@@ -273,7 +415,14 @@ p_private_incentive_only = long_draw_treat %>%
         x = "Additional Private Incentive to Get Dewormed",
         y = "Optimal PoT Distance (meters)"
     ) +
-    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist") 
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist")  +
+    facet_wrap(~name_type, scales = "free") +
+    geom_hline(yintercept = 0.2, linetype = "longdash")
+
+p_private_incentive_only
+
+
+
 
 ggsave(
     plot = p_private_incentive_only,
@@ -288,7 +437,6 @@ ggsave(
 
 
 #### B and Mu
-
 seq_size = 30
 b_mu_draw_treat_grid = expand.grid(
     draw = 1:min(max_draw, script_options$num_post_draws),
@@ -571,4 +719,164 @@ ggsave(
     width = 8,
     height = 6
 )
+
+
+
+library(tidyverse)
+library(ggplot2)
+
+
+trunc_norm_variance = function(mu, sigma, a) {
+    alpha = (a - mu) / sigma
+    Z = 1 - pnorm(alpha)
+    tn_var = sigma^2 * (
+        1 
+        - ( - alpha * dnorm(alpha))/Z 
+        - (dnorm(alpha)/Z)^2 
+        )
+    return(tn_var)
+}
+
+trunc_norm_above_variance = function(mu, sigma, b) {
+    beta = (b - mu) / sigma
+    Z = pnorm(beta)
+
+    tn_var = sigma^2 * (
+        1 
+        - (beta * dnorm(beta))/Z 
+        - (dnorm(beta)/Z)^2 
+        )
+    return(tn_var)
+}
+
+
+
+trunc_norm_grad = function(mu, sigma, a) {
+    alpha = (a - mu) / sigma
+    Z = 1 - pnorm(alpha)
+    sig_sq = sigma^2
+    term_1 =  (dnorm(alpha) * (1 - alpha^2))/Z
+    term_2 =  (alpha * dnorm(alpha)^2)/Z^2
+    term_3 = (2  * alpha * dnorm(alpha)^2)/Z^2
+    term_4 = -1*(2* dnorm(alpha)^3)/Z^3
+    grad = (term_1 + term_2 + term_3 + term_4)*sig_sq
+    return(grad)
+}
+
+trunc_norm_above_grad = function(mu, sigma, b) {
+    beta = (b - mu) / sigma
+    Z = pnorm(beta)
+    sig_sq = sigma^2
+    term_1 =  -1*(dnorm(beta) * (1 - beta^2))/Z
+    term_2 =  -1 * (beta * dnorm(beta)^2)/Z^2
+    term_3 = -1*(2  * beta * dnorm(beta)^2)/Z^2
+    term_4 = (2* dnorm(beta)^3)/Z^3
+    grad = (term_1 + term_2 + term_3 + term_4)*sig_sq
+    return(grad)
+}
+
+
+param_df = expand.grid(
+    mu = 0,
+    sigma = params_check$total_error_sd,
+    a = seq(from = -4, to = 4, length.out = 100)
+) %>%
+    as_tibble() 
+
+
+param_df = param_df %>%
+    mutate(
+        tn_var = pmap_dbl(
+            list(
+                mu,
+                sigma,
+                a
+            ),
+            ~trunc_norm_variance(mu = ..1, sigma = ..2, a = ..3)
+        ),
+        grad_var = pmap_dbl(
+            list(
+                mu,
+                sigma,
+                a
+            ),
+            ~trunc_norm_grad(mu = ..1, sigma = ..2, a = ..3)
+        ),
+        tn_above_var = pmap_dbl(
+            list(
+                mu,
+                sigma,
+                a
+            ),
+            ~trunc_norm_above_variance(mu = ..1, sigma = ..2, b = ..3)
+        ),
+        tn_above_grad_var = pmap_dbl(
+            list(
+                mu,
+                sigma,
+                a
+            ),
+            ~trunc_norm_above_grad(mu = ..1, sigma = ..2, b = ..3)
+        ),
+        pr_takeup = 1 - pnorm(a, sd = params_check$total_error_sd)
+    ) 
+
+param_df %>%
+    mutate(
+        weighted_var = pr_takeup * grad_var + (1 - pr_takeup) * tn_above_grad_var ,
+        ed = 1 - 2 * dnorm(a) * a
+    ) %>%
+    select(a, weighted_var, ed) %>%
+    ggplot(aes(
+        x = 1 - pnorm(a),
+        y = weighted_var
+    )) +
+    geom_line() +
+    geom_line(aes(y = ed), linetype = "longdash")
+
+ggsave(
+    "temp-plot.pdf",
+    width = 8, height = 6)
+
+
+p = param_df %>%
+    pivot_longer(
+        contains("var")
+    ) %>% 
+    mutate(
+        name = case_when(
+            name == "tn_var" ~ "Signal Variance",
+            name == "grad_var" ~ "Signal Variance Gradient",
+            name == "tn_above_var" ~ "No Signal Variance",
+            name == "tn_above_grad_var" ~ "No Signal Variance Gradient",
+            ),
+        name = factor(
+            name, 
+            levels = c(
+                "Signal Variance", 
+                "Signal Variance Gradient", 
+                "No Signal Variance", 
+                "No Signal Variance Gradient"
+                )
+                )
+    )  %>%
+    ggplot(aes(
+        x = pr_takeup,
+        y = value
+    )) +
+    geom_line() +
+    facet_wrap(~name, scales = "free") +
+    theme_minimal() +
+    labs(
+        x = "Pr(Takeup)",
+        y = "Value"
+    )
+
+ggsave(
+    plot = p, 
+    file = file.path(
+        script_options$output_path,
+        str_glue("{script_options$output_name}-v-star-signal-variance.pdf")
+    ),
+    width = 8, height = 6)
 
