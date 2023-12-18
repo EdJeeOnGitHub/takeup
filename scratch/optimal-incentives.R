@@ -36,14 +36,13 @@ script_options = docopt::docopt(
     "),
     args = if (interactive()) "
                             86
-                            control
-                            control
+                            bracelet
+                            bracelet
                             --output-name=ramsey-b-control-mu-control-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=200
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 
-                            --posterior 
                             --robust-externality
                             --robust-lambda
                               " 

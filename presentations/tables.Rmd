@@ -49,6 +49,7 @@ library(kableExtra)
 library(ggthemes)
 library(fixest)
 library(magrittr)
+library(stringr)
 
 if (interactive()) {
     params = lst(
@@ -87,7 +88,7 @@ knitr::opts_chunk$set(
     cache = params$cache, 
     warnings = FALSE,
     warning = FALSE,
-    cache.path = str_glue("takeup-{params$struct_models}{params$fit_version}-table-cache/"), 
+    cache.path = stringr::str_glue("takeup-{params$struct_models}{params$fit_version}-table-cache/"), 
     fig.path = str_glue("takeup-{params$struct_models}{params$fit_version}-table-fig-cache/"), 
     fig.align = "center")
 
@@ -3303,66 +3304,6 @@ baseline_perception_tbl %>%
 ```
 
 
-```{r}
-#| eval = FALSE
-
-cts_dist_fits = 
-  read_rds(
-    "temp-data/fully_cts_dist_balance.rds"
-  )
-
-cts_dist_fits %>%
-  map_dfr(tidy, .id = "lhs") %>%
-  left_join(
-    lhs_translation_df %>% 
-    select(lhs, clean_name)) %>%
-  mutate(lhs = clean_name) %>%
-  select(-clean_name) %>%
-  filter(term != "(Intercept)")  %>%
-  mutate(
-    estimate = round(estimate, digits),
-    std.error = round(std.error, digits),
-    stars = case_when(
-      p.value < 0.01 ~ "***",
-      p.value < 0.05 ~ "**", 
-      p.value < 0.1 ~ "*" , 
-      TRUE ~ ""
-    )
-  )  %>%
-  mutate(
-    estim_std = linebreak(paste0(estimate, stars, "\n", str_glue("({std.error})")), align = "c") 
-  ) %>%
-  select(
-    lhs, term,
-    estim_std
-  ) %>%  
-  spread(term, estim_std) %>%
-  left_join(
-    cts_distance_pval_df %>%
-      rename("Binned F-test $p$-value" = value),
-      by = c("lhs")
-  ) %>%
-  knitr::kable(
-      format = "latex",
-      col.names = c(
-        "", 
-        "Distance to PoT (km)",
-        "Distance to PoT squared (km)",
-        "F-test $p$-value, binned distance (750m)"
-        ),
-      escape = FALSE, 
-      booktabs = TRUE,
-      align = "lccc", 
-    linesep = "",
-      caption = "Continuous Distance: Balance Checks"
-  ) %>%
-  kable_styling(
-    latex_options = c("scale_down")
-  )   
-
-
-```
-
 ```{r, sample_n, results="asis"}
 
 # sample_meta_df = N_by_treat_dist_df %>%
@@ -3771,6 +3712,46 @@ struct_robustness_kbl_df %>%
   custom_save_latex_table(
     "robustness-struct-te-table"
   )
+
+
+```
+
+
+
+```{r}
+
+optim_post_name = "posterior-optimal-distance-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+
+optim_post_df = read_csv(
+  file.path(
+    "temp-data",
+    optim_post_name
+  )
+)
+
+optim_post_df %>%
+  mutate(
+    minus_control = optimal_distance
+  )
+
+optim_post_df %>%
+  group_by(
+    treatment
+  ) %>%
+  summarise(
+    mean_est = mean(optimal_distance),
+    per_0.025 = quantile(optimal_distance, 0.025),
+    per_0.975 = quantile(optimal_distance, 0.975)
+  ) %>%
+  mutate(across(where(is.numeric), round)) %>%
+  mutate(
+    estim_value = linebreak(
+      paste0(mean_est, "\n", "(", per_0.025, ", ", per_0.975, ")"), 
+      align = "c"
+      )
+  ) %>%
+  select(treatment, estim_value)
+
 
 
 ```
