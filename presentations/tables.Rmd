@@ -3872,7 +3872,7 @@ wide_pigou_optim_te_tbl_tex = optim_te_tbl %>%
   add_header_above(
     c(
       " " = 1,
-      "Welfare Maximising Distance" = 4
+      "Welfare Maximising Distance" = 3
       )
   ) 
 
