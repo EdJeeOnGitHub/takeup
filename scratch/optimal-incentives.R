@@ -23,6 +23,8 @@ script_options = docopt::docopt(
         --data-input-path=<data-input-path>  Where village and PoT data is stored [default: {file.path('optim', 'data')}]
         --data-input-name=<data-input-name>  Filename of village and PoT data [default: full-experiment-4-extra-pots.rds]
         --suppress-reputation  Suppress reputational returns
+        --static-signal-pm  Use static signalling value at distance cutoff for all treatments
+        --static-signal-distance=<static-signal-distance>  Distance to use for static signalling value [default: 1000]
         --single-chain  Only use first chain for draws (useful for debugging) 
         --fit-type=<fit-type>  Which fit type to use - prior predictive or posterior draws [default: fit] 
         --lambda=<lambda>  Lambda to use for optimal incentives across all treats [default: 0]
@@ -31,6 +33,7 @@ script_options = docopt::docopt(
         --posterior  Estimate across entire posterior across all treatments.
         --robust-externality  Estimate across externality grid for posterior median
         --robust-lambda  Estimate across lambda grid for posterior median
+        
 
 
     "),
@@ -38,13 +41,18 @@ script_options = docopt::docopt(
                             86
                             bracelet
                             bracelet
-                            --output-name=ramsey-b-control-mu-control-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
-                            --num-post-draws=200
+                            --output-name=ramsey-b-bracelet-mu-bracelet-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 
                             --robust-externality
                             --robust-lambda
+                            --posterior
+
+                            --static-signal-pm
+                            --static-signal-distance=500
+
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
@@ -70,6 +78,7 @@ fit_version = script_options$fit_version
 
 script_options$lambda = as.numeric(script_options$lambda)
 script_options$num_post_draws = as.numeric(script_options$num_post_draws)
+script_options$static_signal_distance = as.numeric(script_options$static_signal_distance)
 
 struct_param_draws = read_csv(
     file.path(
@@ -81,9 +90,17 @@ struct_param_draws = read_csv(
 )
 
 
-post_output_name = str_glue(
-    "posterior-optimal-distance-lambda_{script_options$lambda}-externality_{script_options$externality}-model_{script_options$model}-fit-version_{script_options$fit_version}.csv"
-)
+
+
+if (script_options$static_signal_pm) {
+    post_output_name = str_glue(
+        "posterior-optimal-distance-static_vstar-lambda_0-externality_0-model_{script_options$model}-fit-version_{script_options$fit_version}.csv"
+    )
+} else {
+    post_output_name = str_glue(
+        "posterior-optimal-distance-dynamic_vstar-lambda_{script_options$lambda}-externality_{script_options$externality}-model_{script_options$model}-fit-version_{script_options$fit_version}.csv"
+    )
+}
 
 posterior_mean_draw = struct_param_draws %>%
     group_by(.variable, k, j) %>%
@@ -102,6 +119,7 @@ mu_rep_type = switch(
     STRUCTURAL_LINEAR_U_SHOCKS_NO_REP = 3,
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP = 4
 )
+
 
 recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
     # additional net benefit to get dewormed
@@ -157,7 +175,6 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
 
 
 
-
 #### Estimation Across Posterior 
 treatments = c(
     "control",
@@ -175,17 +192,59 @@ full_posterior_df = expand.grid(
 ) %>%
     as_tibble()
 
+
+if (script_options$static_signal_pm == TRUE) {
+    # generate dynamic (non-static) prediction functions to calculate static signal 
+    # at required cutoff
+    true_pred_functions = map(
+        full_posterior_df$draw_id,
+        ~extract_params(
+            param_draws = struct_param_draws,
+            private_benefit_treatment = script_options$private_benefit_z,
+            visibility_treatment = script_options$visibility_z,
+            draw_id = .x,
+            dist_sd = sd_of_dist,
+            j_id = 1,
+            rep_cutoff = script_options$rep_cutoff,
+            dist_cutoff = script_options$dist_cutoff, 
+            bounds = script_options$bounds,
+            mu_rep_type = mu_rep_type,
+            suppress_reputation = script_options$suppress_reputation, 
+            static_signal = NA,
+            fix_mu_at_1 = FALSE,
+            fix_mu_distance = script_options$fix_mu_distance,
+            static_delta_v_star = NA
+        ) %>% find_pred_takeup()
+    )
+
+
+    static_pred_outputs = map(
+        true_pred_functions, 
+        ~.x(script_options$static_signal_distance)
+    )
+
+    delta_v_stars = map_dbl(static_pred_outputs, "delta_v_star")
+
+    full_posterior_df$static_delta_v_star = delta_v_stars
+}  else {
+    full_posterior_df$static_delta_v_star = NA
+}
+
+
+
 # extract params for each posterior draw
 full_posterior_df = full_posterior_df %>%
     mutate(
-        params = map2(
-            draw_id,
-            treatment,
+        params = pmap(
+            list(
+                draw_id,
+                treatment
+            ),
             ~extract_params(
                 param_draws = struct_param_draws,
-                private_benefit_treatment = .y,
-                visibility_treatment = .y,
-                draw_id = .x,
+                private_benefit_treatment = ..2,
+                visibility_treatment = ..2,
+                draw_id = ..1,
                 dist_sd = sd_of_dist,
                 j_id = 1,
                 rep_cutoff = Inf,
@@ -200,21 +259,59 @@ full_posterior_df = full_posterior_df %>%
             )
         )
     )
-# create anon functions for each param draw
-full_posterior_df = full_posterior_df %>%
-    mutate(
-        fun_treatments = map(
-            params,
-            ~function(x) find_optimal_incentive(
-                distance = x, 
-                lambda = script_options$lambda, 
-                params = .x, 
-                b_add = 0,
-                mu_add = 0,
-                externality = as.numeric(script_options$externality)
-                )
-        )
-        )
+
+find_optimal_static_delta_vstar_incentive = function(distance, params, static_delta_v_star) {
+    dist_renorm = distance/params$dist_sd
+    mu_rep = calculate_mu_rep(
+                dist = dist_renorm,
+                base_mu_rep = params$base_mu_rep,
+                mu_beliefs_effect = 1,
+                beta = params$centered_cluster_beta_1ord,
+                dist_beta = params$centered_cluster_dist_beta_1ord,
+                beta_control = params$mu_beta_z_control,
+                dist_beta_control = params$mu_beta_d_control,
+                mu_rep_type = params$mu_rep_type, 
+                control = params$visibility_treatment == "control")
+
+
+    lhs = static_delta_v_star*mu_rep/params$dist_beta_v 
+    rhs = dist_renorm
+
+    diff = abs(lhs - rhs)
+    return(diff)
+}
+
+
+if (script_options$static_signal_pm) {
+    # create anon functions for each param draw
+    full_posterior_df = full_posterior_df %>%
+        mutate(
+            fun_treatments = pmap(
+                list(params, static_delta_v_star),
+                ~function(x) find_optimal_static_delta_vstar_incentive(
+                    distance = x, 
+                    params = ..1, 
+                    static_delta_v_star = ..2
+                    )
+            )
+            )
+} else {
+    # create anon functions for each param draw
+    full_posterior_df = full_posterior_df %>%
+        mutate(
+            fun_treatments = map(
+                params,
+                ~function(x) find_optimal_incentive(
+                    distance = x, 
+                    lambda = script_options$lambda, 
+                    params = .x, 
+                    b_add = 0,
+                    mu_add = 0,
+                    externality = as.numeric(script_options$externality)
+                    )
+            )
+            )
+}
 # optimise funs to get optimal distance
 full_posterior_df = full_posterior_df %>%
     mutate(
@@ -231,7 +328,7 @@ full_posterior_df = full_posterior_df %>%
     )
 # save to csv
 full_posterior_df %>%
-    select(treatment, draw_id, optimal_distance)  %>%
+    select(treatment, draw_id,  optimal_distance)  %>%
     write_csv(
     file.path(
         script_options$output_path,
@@ -239,7 +336,6 @@ full_posterior_df %>%
     )
     )
 } # End posterior estimation
-
 
 # Estimate Optimal Distance holding visibility fixed, only vary private incentive
 b_df = expand.grid(
@@ -479,8 +575,8 @@ seq_size = 30
 b_mu_df = expand.grid(
     draw = 1,
     lambda = script_options$lambda,
-    b_add = seq(from = -2, to = 2, length.out = seq_size),
-    mu_add = seq(from = -4, to = 4, length.out = seq_size)
+    b_add = c(seq(from = -2, to = 2, length.out = seq_size), 0) %>% unique(),
+    mu_add = c(seq(from = -4, to = 4, length.out = seq_size), 0) %>% unique()
 ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add, mu_add))
@@ -555,7 +651,6 @@ b_mu_df = b_mu_df %>%
     mutate(
         pr_obs = map_dbl(takeup_list, "pr_vis_0")
     )
-
 
 p_contour = b_mu_df %>%
     select(
