@@ -3719,38 +3719,171 @@ struct_robustness_kbl_df %>%
 
 
 ```{r}
+# pigou-output
 
-optim_post_name = "posterior-optimal-distance-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+dynamic_optim_post_name = "posterior-optimal-distance-dynamic_vstar-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+static_optim_post_name = "posterior-optimal-distance-static_vstar-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
 
-optim_post_df = read_csv(
-  file.path(
-    "temp-data",
-    optim_post_name
-  )
-)
-
-optim_post_df %>%
+optim_post_df = imap_dfr(
+  lst(
+    dynamic_optim_post_name,
+    static_optim_post_name
+  ),
+  ~read_csv(file.path("temp-data", .x)),
+  .id = "vstar_type"
+) %>%
   mutate(
-    minus_control = optimal_distance
+    # regex to match very first word and stop before underscore
+    vstar_type = factor(str_extract(vstar_type, "^[^_]*"))
   )
 
-optim_post_df %>%
+
+optim_post_df  %>%
+  select(-contains('static')) %>%
+  pivot_wider(
+    names_from = vstar_type, values_from = optimal_distance
+  )  %>%
+  mutate(
+    difference = static - dynamic
+  ) %>%
+  group_by(treatment) %>%
+  summarise(
+    diff_pct = 100*mean(difference/dynamic, na.rm = TRUE),
+    mean_difference = mean(difference, na.rm = TRUE)
+  )
+
+
+optim_te_tbl = optim_post_df %>%
+  bind_rows(
+    optim_post_df  %>%
+      select(-contains('static')) %>%
+      pivot_wider(
+        names_from = vstar_type, values_from = optimal_distance
+      )  %>%
+      mutate(
+        difference = static - dynamic
+      )  %>%
+      select(
+        treatment, draw_id, optimal_distance = difference
+      ) %>%
+      mutate(vstar_type = "static - dynamic")
+  ) %>%
+  filter(!is.na(optimal_distance)) %>%
   group_by(
-    treatment
+    vstar_type, treatment
   ) %>%
   summarise(
     mean_est = mean(optimal_distance),
     per_0.025 = quantile(optimal_distance, 0.025),
     per_0.975 = quantile(optimal_distance, 0.975)
   ) %>%
-  mutate(across(where(is.numeric), round)) %>%
+  mutate(across(where(is.numeric), round))  %>%
   mutate(
     estim_value = linebreak(
       paste0(mean_est, "\n", "(", per_0.025, ", ", per_0.975, ")"), 
       align = "c"
       )
   ) %>%
-  select(treatment, estim_value)
+  select(vstar_type, treatment, estim_value) %>%
+  mutate(
+    vstar_type = str_replace(vstar_type, "static", "Fixed"),
+    vstar_type = str_replace(vstar_type, "dynamic", "Dynamic")
+  ) %>%
+  mutate(
+    treatment = factor(treatment, levels = c("control", "ink", "calendar", "bracelet")),
+    treatment = fct_relabel(treatment, str_to_title) %>% fct_rev,
+    vstar_type = factor(vstar_type, levels = c("Fixed - Dynamic", "Fixed", "Dynamic")) %>% fct_rev()
+  ) %>%
+  arrange(vstar_type, treatment)  %>%
+  ungroup()
+
+
+
+pigou_optim_te_tbl_tex = optim_te_tbl %>%
+  select(-vstar_type) %>%
+  kbl(
+    col.names = c(
+      "Treatment",
+      "Optimal Distance"
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lc", 
+    caption = "Welfare Maximising Distance - Results"
+  )  %>%
+  kable_styling(
+    # latex_options = c("scale_down")
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Dynamic $\\Delta(w^*)$" = 4, 
+      "Panel B: Fixed $\\Delta(w^*)|_{d=0.5km}$" = 4, 
+      "Panel C: Fixed - Dynamic" = 4
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3, 7, 12), hline_after = TRUE) 
+
+
+
+
+pigou_optim_te_tbl_tex
+
+pigou_optim_te_tbl_tex %>%
+  custom_save_latex_table(
+    "pigou-optim-te-table"
+  )
+
+
+```
+
+
+```{r}
+#wide-pigou
+wide_pigou_optim_te_tbl_tex = optim_te_tbl %>%
+  pivot_wider(
+    names_from = vstar_type, values_from = estim_value
+  )  %>%
+  kbl(
+    col.names = c(
+      "Treatment",
+      "Dynamic $\\Delta(w^*)$",
+      "Fixed $\\Delta(w^*)|_{d=0.5km}$",
+      "Fixed - Dynamic"
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lccc", 
+    caption = "Welfare Maximising Distance - Results"
+  )  %>%
+  kable_styling(
+    # latex_options = c("scale_down")
+  ) %>%
+  row_spec(c(3), hline_after = TRUE)  %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Welfare Maximising Distance" = 4
+      )
+  ) 
+
+
+wide_pigou_optim_te_tbl_tex
+
+wide_pigou_optim_te_tbl_tex %>%
+  custom_save_latex_table(
+    "wide-pigou-optim-te-table"
+  )
+
 
 
 
