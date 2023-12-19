@@ -33,7 +33,7 @@ script_options = docopt::docopt(
         --posterior  Estimate across entire posterior across all treatments.
         --robust-externality  Estimate across externality grid for posterior median
         --robust-lambda  Estimate across lambda grid for posterior median
-        
+        --check-derivative-positive  Verify that dw/dc is positive for parameter values we see        
 
 
     "),
@@ -929,4 +929,132 @@ ggsave(
     width = 8,
     height = 6
 )
+}
+
+
+
+if (script_options$check_derivative_positive) {
+anon_takeup_fun = function(distance, params) {
+    takeup_fun = find_pred_takeup(params)
+    takeup_output = takeup_fun(distance)
+    return(takeup_output)
+}
+
+
+
+unique_post_draw_ids = unique(struct_param_draws$.draw) 
+dist_posterior_df = expand.grid(
+    draw_id = sample(unique_post_draw_ids, min(100, length(unique_post_draw_ids))),
+    distance = c(
+        seq(from = 0, to = 2500, length.out = 20),
+        3000,
+        4000,
+        5000
+        ),
+    treatment = treatments
+) %>%
+    as_tibble()
+
+
+dist_posterior_df = dist_posterior_df %>%
+    mutate(
+        params = pmap(
+            list(
+                draw_id,
+                treatment
+            ),
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = ..2,
+                visibility_treatment = ..2,
+                draw_id = ..1,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf,
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE,
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            ),
+            .progress = TRUE
+        )
+    )
+
+dist_posterior_df = dist_posterior_df %>%
+    mutate(
+        takeup_output = map2(
+            distance,
+            params,
+            ~anon_takeup_fun(distance = .x, params = .y),
+            .progress = TRUE
+            ),
+        takeup_output = map2(
+            takeup_output,
+            params,
+            ~list_modify(.x, dist_delta = .y$dist_beta_v) 
+        )
+    )
+
+
+calc_numerator = function(takeup_output) {
+    dist_delta = takeup_output$dist_delta
+    mu_rep_deriv = takeup_output$mu_rep_deriv
+    mu_rep = takeup_output$mu_rep
+    delta_v_star = takeup_output$delta_v_star
+    delta_v_star_deriv = takeup_output$delta_v_star_deriv
+    numerator = dist_delta - mu_rep_deriv*delta_v_star
+    return(numerator)
+}
+
+calc_denominator = function(takeup_output) {
+    dist_delta = takeup_output$dist_delta
+    mu_rep_deriv = takeup_output$mu_rep_deriv
+    mu_rep = takeup_output$mu_rep
+    delta_v_star = takeup_output$delta_v_star
+    delta_v_star_deriv = takeup_output$delta_v_star_deriv
+    denominator = 1 + mu_rep*delta_v_star_deriv
+    return(denominator)
+}
+
+dist_posterior_df = dist_posterior_df %>%
+    mutate(
+        numerator = map_dbl(takeup_output, calc_numerator),
+        denominator = map_dbl(takeup_output, calc_denominator)
+    )
+
+
+p_deriv = dist_posterior_df %>%
+    mutate(
+        frac = numerator / denominator,
+        treatment = factor(treatment, levels = c("control", "ink", "calendar", "bracelet")),
+        treatment = fct_relabel(treatment, str_to_title)
+    ) %>%
+    ggplot(aes(
+        x = frac,
+        fill = treatment
+    )) +
+    geom_histogram() +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    geom_vline(xintercept = 0, linetype = "longdash") +
+    labs(
+        y = "Count",
+        x = "Derivative Value"
+    ) +
+    ggthemes::scale_fill_canva("", palette = "Primary colors with a vibrant twist")
+
+ggsave(
+    plot = p_deriv,
+    filename = file.path(
+        "temp-data",
+        "dydc-derivative-positive-check.pdf"
+    ),
+    width = 8,
+    height = 6
+)
+
 }
