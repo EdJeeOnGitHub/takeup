@@ -48,15 +48,14 @@ script_options = docopt::docopt(
 
                             --robust-externality
                             --robust-lambda
-                            --posterior
 
-                            --static-signal-pm
-                            --static-signal-distance=500
 
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
 
+                            # --static-signal-pm
+                            # --static-signal-distance=500
 
 
 set.seed(19484)
@@ -571,15 +570,22 @@ ggsave(
 
 
 ## Adding Variable Externalities
+# Calculate (very, very rough) implied benefit from Miguel and Kremer where 
+# externality benefit is up to 2x private direct benefit. We let externality 
+# increase to up to 1x coef on the control arm and have it decay linearly.
 externality_fun = function(dist_m, b, dist_sd) {
     x = dist_m / dist_sd
-    diff = 3*1000/dist_sd
-
-    c = 2*b + atan(b/diff)*diff/2
-    y = -1*atan(b/diff)*x + c
+    diff = 6*1000/dist_sd
+    y = -1*atan(b/diff)*x + b
+    y = max(0, y)
     return(y)
 }
-# check this works ed
+
+
+externality_fun(0, abs(params_check$beta_b_control), dist_sd = sd_of_dist)
+externality_fun(6000, abs(params_check$beta_b_control), dist_sd = sd_of_dist)
+abs(params_check$beta_b_control)
+
 find_optimal_incentive_varying_externality = function(distance, lambda, params, b_add = 0, mu_add = 0) {
     takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     if (params$suppress_reputation) {
@@ -691,7 +697,7 @@ b_mu_df = b_mu_df %>%
             .progress = TRUE
         ),
         fit_vary_ext_vis = map(
-            funs_vis,
+            funs_vary_externality,
             ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent")
         )
     )
@@ -765,7 +771,6 @@ ggsave(
     width = 10,
     height = 10
 )
-
 p_ext_contour = b_mu_df %>%
     select(
         draw,
@@ -793,6 +798,8 @@ p_ext_contour = b_mu_df %>%
     theme(
         legend.position = "bottom"
     )
+
+p_ext_contour
 
 ggsave(
     p_ext_contour,
