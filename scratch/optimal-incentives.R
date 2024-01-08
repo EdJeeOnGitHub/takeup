@@ -107,6 +107,7 @@ posterior_mean_draw = struct_param_draws %>%
     summarise(.value = mean(.value)) %>% 
     mutate(.draw = 1)
 
+
 script_options$num_post_draws = as.numeric(script_options$num_post_draws)
 
 sd_of_dist = read_rds("temp-data/sd_of_dist.rds")
@@ -569,6 +570,50 @@ ggsave(
 )
 
 
+## Adding Variable Externalities
+externality_fun = function(dist_m, b, dist_sd) {
+    x = dist_m / dist_sd
+    diff = 3*1000/dist_sd
+
+    c = 2*b + atan(b/diff)*diff/2
+    y = -1*atan(b/diff)*x + c
+    return(y)
+}
+# check this works ed
+find_optimal_incentive_varying_externality = function(distance, lambda, params, b_add = 0, mu_add = 0) {
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+    if (params$suppress_reputation) {
+        takeup_list$mu_rep = 0
+        takeup_list$mu_rep_deriv = 0
+        takeup_list$delta_v_star = 0
+        takeup_list$delta_v_star_deriv = 0
+    }
+    delta = takeup_list$delta
+    mu_rep_deriv = takeup_list$mu_rep_deriv
+    delta_v_star = takeup_list$delta_v_star
+    mu_rep = takeup_list$mu_rep
+    delta_v_star_deriv = takeup_list$delta_v_star_deriv
+    v_star = takeup_list$v_star
+    net_b = takeup_list$b # b is net benefit so add back
+    dist_norm = distance / sd_of_dist
+    b = net_b + delta * dist_norm 
+    total_error_sd = takeup_list$total_error_sd
+
+    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
+
+    externality = externality_fun(
+        distance,
+        abs(params$beta_b_control),
+        dist_sd = sd_of_dist
+    )
+
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+
+    rhs = lambda * delta / hazard
+
+    diff = abs(lhs - rhs)
+    return(diff)
+}
 
 #### Varying B and Mu
 seq_size = 30
@@ -618,6 +663,22 @@ b_mu_df = b_mu_df %>%
                 mu_add
             ),
             ~function(x) { find_optimal_incentive(distance = x*1000, lambda = ..1, params = ..2, b_add = ..3, mu_add = ..4) }
+        ),
+        funs_vary_externality = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add,
+                mu_add
+            ),
+            ~function(x) {find_optimal_incentive_varying_externality(
+                distance = x*1000,
+                lambda = ..1,
+                params = ..2,
+                b_add = ..3,
+                mu_add = ..4
+
+            )}
         )
         )
 
@@ -628,12 +689,17 @@ b_mu_df = b_mu_df %>%
             funs_vis,
             ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent"),
             .progress = TRUE
+        ),
+        fit_vary_ext_vis = map(
+            funs_vis,
+            ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent")
         )
     )
 
 b_mu_df = b_mu_df %>%
     mutate(
-        res_vis = map_dbl(fit_vis, "par")
+        res_vis = map_dbl(fit_vis, "par"),
+        res_vary_ext = map_dbl(fit_vary_ext_vis, "par")
         )
 
 b_mu_df = b_mu_df %>%
@@ -646,10 +712,20 @@ b_mu_df = b_mu_df %>%
                 mu_add
             ),
             ~recalc_takeup(distance = ..1*1000, params = ..2, b_add = ..3, mu_add = ..4)
+        ),
+        ext_takeup_list = pmap(
+            list(
+                res_vary_ext,
+                params_vis,
+                b_add,
+                mu_add
+            ),
+            ~recalc_takeup(distance = ..1*1000, params = ..2, b_add = ..3, mu_add = ..4)
         )
     )  %>%
     mutate(
-        pr_obs = map_dbl(takeup_list, "pr_vis_0")
+        pr_obs = map_dbl(takeup_list, "pr_vis_0"),
+        ext_pr_obs = map_dbl(ext_takeup_list, "pr_vis_0")
     )
 
 p_contour = b_mu_df %>%
@@ -685,6 +761,44 @@ ggsave(
     filename = file.path(
         script_options$output_path,
         str_glue("{script_options$output_name}-contour-plot.pdf")
+    ),
+    width = 10,
+    height = 10
+)
+
+p_ext_contour = b_mu_df %>%
+    select(
+        draw,
+        lambda,
+        b_add,
+        ext_pr_obs,
+        res_vary_ext
+    ) %>%
+    ggplot(aes(
+        x = b_add,
+        y = ext_pr_obs,
+        z = res_vary_ext
+    )) +
+    metR::geom_contour_fill() +
+    theme_minimal() +
+    scale_fill_viridis_c(
+         option = "inferno"
+    )  +
+    labs(
+        x = "Shift in Norms/Additional Private Incentive",
+        y = "Visibility (%)",
+        fill = "Optimal Distance (km)"
+    ) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(
+        legend.position = "bottom"
+    )
+
+ggsave(
+    p_ext_contour,
+    filename = file.path(
+        script_options$output_path,
+        str_glue("{script_options$output_name}-externality-contour-plot.pdf")
     ),
     width = 10,
     height = 10
@@ -819,6 +933,9 @@ externality_df = expand.grid(
     group_by(draw) %>%
     nest(data = c(externality, lambda, b_add, mu_add))
 
+params_check$beta_b_control
+
+params_check
 externality_df = externality_df %>%
     mutate(
         params_vis = map(
@@ -1058,3 +1175,27 @@ ggsave(
 )
 
 }
+
+
+#### Ed Externalities
+
+
+df = tibble(
+    x = seq(0, 6000, length.out = 500)
+) %>%
+    mutate(y = map_dbl(x, ~externality_fun(.x, abs(params_check$beta_b_control), sd_of_dist)))
+df
+
+df %>%
+    ggplot(aes(
+        x = x,
+        y = y
+    )) +
+    geom_point()
+
+
+df %>%
+    group_by(x >= 3) %>%
+    summarise(
+        mean_y = mean(y)
+    )
