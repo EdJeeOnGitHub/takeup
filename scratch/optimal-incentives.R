@@ -41,7 +41,7 @@ script_options = docopt::docopt(
                             86
                             bracelet
                             bracelet
-                            --output-name=ramsey-b-bracelet-mu-bracelet-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
@@ -771,6 +771,7 @@ ggsave(
     width = 10,
     height = 10
 )
+
 p_ext_contour = b_mu_df %>%
     select(
         draw,
@@ -782,12 +783,15 @@ p_ext_contour = b_mu_df %>%
     ggplot(aes(
         x = b_add,
         y = ext_pr_obs,
-        z = res_vary_ext
+        # have to compress fill scale since changes so skewed at higher values
+        z = asinh(asinh(res_vary_ext))
     )) +
     metR::geom_contour_fill() +
     theme_minimal() +
     scale_fill_viridis_c(
-         option = "inferno"
+        option = "inferno",
+         trans = "identity",
+        labels = function(x) round(sinh(sinh(x)), 1)
     )  +
     labs(
         x = "Shift in Norms/Additional Private Incentive",
@@ -796,10 +800,10 @@ p_ext_contour = b_mu_df %>%
     ) +
     scale_y_continuous(labels = scales::percent) +
     theme(
-        legend.position = "bottom"
-    )
+        legend.position = "bottom",
+        legend.text = element_text(angle = -45)
 
-p_ext_contour
+    )
 
 ggsave(
     p_ext_contour,
