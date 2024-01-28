@@ -14,13 +14,14 @@ Options:
   --exclude-params=<exclude-params>  Parameters to exclude [default: cluster_error]
   "), 
   args = if (interactive()) "
-  95
+  97
   --input-path=temp-data
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
+  --model=REDUCED_FORM_NO_RESTRICT
   --chain=1-4
   --exclude-params=cluster_error
-
+  --prior
+  ates levels
   " else commandArgs(trailingOnly = TRUE)
 )
 library(tidyverse)

@@ -13,9 +13,10 @@ Options:
   
   "), 
   args = if (interactive()) "
-  96
+  97
+  --prior
   --output-path=temp-data
-  --model=REDUCED_FORM_NO_RESTRICT_DIST_CTS
+  --model=REDUCED_FORM_NO_RESTRICT
   1 2 3 4
   " else commandArgs(trailingOnly = TRUE)
 )
