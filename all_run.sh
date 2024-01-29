@@ -13,7 +13,7 @@
 LATEST_VERSION=98
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
-SLURM_INOUT_DIR="data/stan_analysis_data"
+SLURM_INOUT_DIR="/projects/akaring/takeup-data/data/stan_analysis_data"
 ITER=800
 
 echo "Version: $VERSION"
