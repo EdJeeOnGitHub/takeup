@@ -77,6 +77,13 @@ for model in "${models[@]}"; do
   fi
 done
 
-postprocess_rf_models ${rf_model[@]} ${VERSION} ${POSTPROCESS_INOUT_ARGS}
+for model in "${rf_model[@]}"; do
+  postprocess_rf_models "$model" ${VERSION} ${POSTPROCESS_INOUT_ARGS} &
+done
 
-postprocess_struct_models ${struct_model[@]} ${VERSION}${POSTPROCESS_INOUT_ARGS}
+for model in "${struct_model[@]}"; do
+  postprocess_struct_models "$model" ${VERSION}${POSTPROCESS_INOUT_ARGS} &
+done
+
+# Wait for all background jobs to finish
+wait
