@@ -28,6 +28,7 @@ params:
     cache: FALSE
     width: 0.95
     fit: FALSE
+    stat: ci
 ---
 
 
@@ -51,8 +52,9 @@ if (interactive()) {
         table_output_path = "presentations/rf-tables",
         show_probs = FALSE,
         width = 0.95,
-        cache = TRUE,
-        fit = FALSE
+        cache = FALSE,
+        fit = FALSE,
+        stat = "p" # "ci"
     )
     source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
     source(file.path("analysis_util.R"))
@@ -77,6 +79,7 @@ knitr::opts_chunk$set(
     cache = params$cache, 
     warnings = FALSE,
     warning = FALSE,
+    message = FALSE,
     cache.path = stringr::str_glue("rf-takeup-table-cache/"), 
     fig.path = str_glue("rf-takeup-table-fig-cache/"), 
     fig.align = "center")
@@ -109,14 +112,21 @@ canva_palette_vibrant <- "Primary colors with a vibrant twist"
 theme_set(theme_minimal() +
             theme(legend.position = "bottom"))
 
+source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
+source(file.path("analysis_util.R"))
+source(file.path( "dist_structural_util.R"))
+source(file.path("multilvlr", "multilvlr_util.R"))
+
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
+
 rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
 rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
 cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
 load(file.path("data", "takeup_village_pot_dist.RData"))
 load(file.path("data", "analysis.RData"))
 
+baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
@@ -140,11 +150,369 @@ monitored_nosms_data <- analysis.data %>%
   ungroup()
 
 
-analysis_data <- monitored_nosms_data %>%
-    mutate(
-        assigned_treatment = assigned.treatment, 
-        assigned_dist_group = dist.pot.group
+analysis_data <- monitored_nosms_data
+
+## Load Census Data
+census_data_env = new.env()
+with_env = function(f, e = parent.frame()) {
+    stopifnot(is.function(f))
+    environment(f) = e
+    f
+}
+load_census_function = function(){
+  load(file.path("data", "takeup_census.RData"))
+  return(census.data)
+}
+census_data = with_env(load_census_function, census_data_env)() %>%
+  rename(census.consent = consent) # Rename this to reduce chance of error
+
+n_indiv_df = census_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+        n_per_cluster = sum(num.individuals)
     )
+
+
+clean_worm_covariates = function(data) {
+  cov_data = data %>%
+    unnest(when_treat) %>%
+    mutate(
+      who_worms_other = if_else(is.na(who_worms_other), "", who_worms_other),
+      stop_worms_other = replace_na(stop_worms_other, ""),
+      when_treat = replace_na(when_treat, "DK"),
+      # these are nested lists of responses so we map_lgl and use any()
+      all_can_get_worms = map2_lgl(
+        who_worms, 
+        who_worms_other,
+        ~any(
+          "everyone" %in% .x | 
+          str_detect(str_to_lower(.y), "any") | 
+          (("adult" %in% .x) & ("child" %in% .x)) |
+          ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
+      )
+      ), 
+      correct_when_treat = when_treat %in% c("every 3 months",
+                                     "every 6 months"), 
+      know_how_stop_worms = map2_lgl(
+        stop_worms, 
+        stop_worms_other,
+        ~any(.x %in% c(
+          "medicine", 
+          "wearing shoes", 
+          "using toilets", 
+          "wash hands") | str_detect(.y, "cooked|prepar|cook"))),
+      adult_in_family_treated = who_treated %in% c("adult", "both")
+    )
+
+  cov_data = cov_data %>%
+    mutate(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes"
+    )
+  
+    treated_past_present = "treated" %in% colnames(data) 
+    if (treated_past_present) {
+      cov_data = cov_data %>%
+        mutate(
+          treated_lgl = case_when(
+            treated == "yes" ~ TRUE, 
+            treated == "no" ~ FALSE, 
+            TRUE ~ NA
+          ),
+      family_treated_lgl = family_treated == "yes"
+        )
+    }
+    return(cov_data)
+}
+
+clean_pretreat_covariates = function(baseline_data, endline_data) {
+  drop_vars = c(
+    "starttime", 
+    "endtime", 
+    "age_census", 
+    "phone_census", 
+    "return",
+    "no_return",
+    "interview",
+    "no_interview",
+    "language_return",
+    "isValidated"
+    )
+  cov_data = bind_rows(
+    # baseline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "baseline"),
+    endline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "endline")
+  ) 
+  cov_data = cov_data %>%
+    mutate(
+      floor_tile_cement = floor == "Cement" | floor == "Tiles"
+    )
+  school_year_df = tribble(
+    ~school, ~years_schooling, 
+    "Never gone to school", 0,
+    "Primary 1", 1,
+    "Primary 2", 2,
+    "Primary 3", 3,
+    "Primary 4", 4,
+    "Primary 5", 5,
+    "Primary 6", 6,
+    "Primary 7", 7,
+    "Primary 8", 8,
+    "Secondary 1", 9,
+    "Secondary 2", 10,
+    "Secondary 3", 11,
+    "Secondary 4", 12,
+    "College", 13,
+    "University", 13
+  ) 
+  cov_data = cov_data %>%
+    mutate(
+      completed_primary = (school == "Primary 8" | str_detect(school, "Secondary|College|University"))
+    ) %>%
+    left_join(school_year_df) %>%
+    mutate(
+      have_phone_lgl = case_when(
+        have_phone == "Yes" ~ TRUE, 
+        have_phone == "No" ~ FALSE, 
+        TRUE ~ NA
+      )
+    )
+
+  # ethnicity and religion
+  cov_data = cov_data %>%
+    mutate(
+      ethnicity_luhya = ethnicity == "Luhya",
+      religion_christianity = religion == 1
+    )
+
+    return(cov_data)
+}
+
+
+baseline_worm = baseline.data %>%
+  clean_worm_covariates()
+clean_takeup_variables = function(data) {
+  data %>%
+    mutate(
+      female = gender == "female",
+      have_phone_lgl = phone_owner
+    )
+}
+analysis_data = analysis_data %>%
+  clean_takeup_variables()
+
+cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))  %>%
+  mutate(
+      treat_dist = paste0(
+      "treat: ", 
+      assigned.treatment,
+      ", dist: ", dist.pot.group
+      ) %>% factor()
+  ) %>%
+  select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
+  unique()
+# # creating a single treat x distance variable for balance testing
+# cluster_treat_df = analysis_data %>%
+#   mutate(
+#       treat_dist = paste0(
+#       "treat: ", 
+#       assigned.treatment,
+#       ", dist: ", dist.pot.group
+#       ) %>% factor()
+#   ) %>%
+#   select(cluster.id, treat_dist, cluster.dist.to.pot) %>%
+#   unique()
+
+
+pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
+  left_join(cluster_treat_df, by = "cluster.id") %>%
+  filter(!is.na(treat_dist))
+
+## Baseline Balance
+baseline_worm_data = baseline_worm %>%
+  inner_join(
+    cluster_treat_df, 
+    by = "cluster.id"
+  ) %>%
+  filter(!is.na(treat_dist))
+
+# monitoring checks
+sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv")
+sens_imp_hh_df = read_csv("data/raw-data/Sensitization Monitoring Form-household.csv")
+
+
+unique_hh_message_df = sens_imp_hh_df %>%
+  mutate(
+    message_list = str_split(message, " ")
+  ) %>%
+  select(PARENT_KEY, message_list) %>%
+  unnest(message_list) %>%
+  group_by(PARENT_KEY) %>%
+  unique() %>%
+  summarise(message_list = list(as.numeric(message_list))) %>%
+  mutate(
+    knowledge_message = map_lgl(message_list, ~all(c(1, 2, 3, 4, 5) %in% .x)
+     ),
+    availability_message = map_lgl(message_list, ~all(c(6, 7) %in% .x))
+    )
+
+
+
+clean_sens_imp_df = sens_imp_df %>%
+  filter(!is.na(enumerator)) %>%
+  filter(!is.na(announcement)) %>%
+  mutate(announce_church = str_detect(where, "1")) %>%
+  left_join(unique_hh_message_df, by = c("KEY" = "PARENT_KEY")) %>%
+  select(
+    cluster.id = cluster_id,
+    announcement,
+    announce_church,
+    knowledge_message,
+    availability_message
+  ) %>%
+  inner_join(cluster_treat_df, by = "cluster.id") %>%
+  filter(!is.na(treat_dist)) %>%
+  left_join(
+    cluster.strat.data %>%
+      select(cluster.id, county)
+  ) 
+
+
+# Add church and add announce
+
+# aggregate to household level (for messages Q)
+# then to community
+# first five (knowledge of deworming)
+# last two (knowledge of availability)
+
+
+# PoT verification monitoring
+clean_sens_summ_imp_df = clean_sens_imp_df %>%
+  group_by(cluster.id, treat_dist, county) %>%
+  summarise(
+    n_announce = sum(announcement, na.rm = TRUE),
+    n_announce_church = sum(announce_church, na.rm = TRUE),
+    n_knowledge_message = sum(knowledge_message, na.rm = TRUE),
+    n_avail_message = sum(availability_message, na.rm = TRUE),
+    n_message = sum(!is.na(knowledge_message) | !is.na(availability_message)),
+    n_total = n()
+  ) %>%
+  mutate(
+    pct_announce = n_announce / n_total,
+    pct_church = n_announce_church / n_total,
+    pct_knowledge_message = n_knowledge_message / n_message,
+    pct_avail_message = n_avail_message / n_message
+  ) 
+  
+  
+
+
+clean_implementation_vars = function(data)  {
+  data %>%
+    mutate(
+      know_deworm = know_deworm == "yes",
+      treat_begin = treat_begin == "knows",
+      treat_end = treat_end == "knows",
+      chv_visit =  chv_visit == "yes",
+      flyer = flyer == "yes"
+    )
+}
+
+
+worm_vars = c(
+  "treated_lgl", 
+  "know_how_stop_worms",
+  "all_can_get_worms",
+  "correct_when_treat",
+  "fully_aware_externalities",
+  "know_worms_infectious"
+)
+
+
+pretreat_vars = c(
+  "completed_primary", 
+  "floor_tile_cement",
+  "ethnicity_luhya",
+  "religion_christianity"
+)
+
+implementation_vars = c(
+  "chv_visit",
+  "flyer"
+)
+
+
+sens_vars = c(
+  "pct_announce",
+  "pct_church",
+  "pct_knowledge_message",
+  "pct_avail_message"
+  )
+
+# Distance/cluster size balance vars
+takeup_vars = c(
+  "n_per_cluster",
+  "female",
+  "have_phone_lgl",
+  "age.census",
+  "cluster.dist.to.pot"
+)
+
+
+# Indiv level balance variables
+census_vars = c(
+  "dewormed",
+  "know_age" # just include this so fixest creates a list of fits...
+)
+
+
+praise_vars = c(
+  "praise_immuniz",
+  "praise_dewor"
+)
+
+stigma_vars = c(
+  "stigma_immuniz",
+  "stigma_dewor"
+)
+
+
+clean_census_data = census_data %>%
+  filter(!is.na(assigned.treatment)) %>%
+  right_join(
+    analysis_data %>%
+      select(cluster.id, dist.pot.group, cluster.dist.to.pot) %>%
+      unique()
+  ) %>%
+  mutate(
+    female = gender == 2,
+    age = age.census,
+    have_phone_lgl = have_phone == "Yes" 
+    )
+
+analysis_data = analysis_data %>%
+    left_join(
+        n_indiv_df,
+        by = "cluster.id"
+    ) %>%
+    ungroup() %>%
+    mutate(have_phone_lgl = have_phone == "Yes")
+
+
+
+analysis_data = analysis_data %>%
+  mutate(
+      treat_dist = paste0(
+      "treat: ", 
+      assigned.treatment,
+      ", dist: ", dist.pot.group
+      ) %>% factor()
+    )  
+
+
 
 #' Save Latex table 
 #' 
@@ -214,24 +582,50 @@ create_comparisons = function(fit) {
         variables = list(assigned_treatment = c("calendar", "bracelet"))
     )
 
-    # far - close, by treat
-    close_far_comp =  hypotheses(
-        close_far_tes,
-        hypothesis = c(
-            "b2 - b1 = 0", 
-            "b4 - b3 = 0",
-            "b6 - b5 = 0"
+
+    filter_fun = function(data, treat) {
+        df_we_want = data %>%
+            filter(
+                lhs_term == treat
             )
+        string = paste0(df_we_want[df_we_want$assigned_dist_group == "far", "b_val"], " - ", df_we_want[df_we_want$assigned_dist_group == "close", "b_val"], " = 0")
+        return (string)
+    }
+    close_far_string_df = close_far_tes %>%
+        as_tibble() %>%
+        mutate(
+            b_val = paste0("b", 1:n())
+        ) %>%
+        select(contrast, b_val, assigned_dist_group) %>%
+    mutate(lhs_term = str_extract(contrast, "(?<=mean\\()\\w+"))
+
+    close_far_hypotheses = map_chr(
+        c("bracelet", "calendar", "ink"),
+        ~filter_fun(close_far_string_df, .x),
+    )
+    names(close_far_hypotheses) = c("bracelet", "calendar", "ink")
+
+    close_far_comp = hypotheses(
+        close_far_tes,
+        hypothesis = close_far_hypotheses
     ) %>%
         mutate(
             assigned_dist_group = "far - close"
-        )
-    close_far_comp$contrast = c("bracelet", "calendar", "ink")
+        ) %>%
+        as_tibble()
 
+    close_far_comp$contrast = names(close_far_hypotheses)
+    
+
+    d1_s = filter_fun(close_far_string_df, "bracelet") %>%
+        str_remove(" = 0")
+    d2_s = filter_fun(close_far_string_df, "calendar") %>%
+        str_remove(" = 0")
+    double_diff_hp = str_glue("{d1_s} - ({d2_s}) = 0")
 
     double_diff_bc_fc = hypotheses(
         close_far_tes,
-        "b2 - b1 - (b4 - b3) = 0"
+        double_diff_hp
         ) %>%
         mutate(
             contrast = "bracelet - calendar",
@@ -253,11 +647,24 @@ create_comparisons = function(fit) {
         variables = list(assigned_treatment = "control"),
         by = "assigned_dist_group"
     ) 
-    
+
+    cm_close_far_string = cm_close_far  %>%
+        as_tibble() %>%
+        mutate(
+            b_val = paste0("b", 1:n())
+        ) %>%
+        mutate(
+            assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far"))
+        ) %>%
+        arrange(assigned_dist_group) %>%
+        summarise(
+            b_str = paste0(b_val[assigned_dist_group == "far"], " - ", b_val[assigned_dist_group == "close"], " = 0")
+        ) %>%
+        pull(b_str)
     
     cm_close_far_diff = hypotheses(
         cm_close_far,
-        "b2 - b1 = 0"
+        cm_close_far_string
         )  %>%
         mutate(
             assigned_dist_group = "far - close",
@@ -432,13 +839,101 @@ nice_kbl_table = function(tbl, cap) {
 ```
 
 
+```{r}
 
+signal_comparisons = function(fit) {
+
+    close_far_tes = avg_comparisons(
+        fit,
+        variables = list(signal = c("reference")),
+        by = "assigned_dist_group"
+        ) %>%
+        as_tibble() %>%
+        mutate(
+            contrast = str_extract(contrast, "(?<=mean\\()\\w+")
+        )
+
+
+    combined_tes = avg_comparisons(
+        fit,
+        variables = list(signal = "reference")
+    ) %>%
+        as_tibble() %>%
+        mutate(
+            contrast = str_extract(contrast, "\\w+")
+        ) %>%
+        mutate(
+            assigned_dist_group = "combined"
+        )
+
+    nosignal_mean = avg_predictions(
+        fit,
+        variables = list(signal = "no signal"),
+        by = "assigned_dist_group"
+    ) %>%
+    as_tibble() %>%
+    mutate(
+        contrast = "no signal"
+    )
+
+    nosignal_combined = avg_predictions(
+        fit,
+        variables = list(signal = "no signal")
+    ) %>%
+        as_tibble() %>%
+        mutate(
+            assigned_dist_group = "combined"
+        ) %>%
+        mutate(contrast = "no signal")
+
+
+    double_diff = avg_comparisons(
+        fit,
+        variables = list(signal = "reference"),
+        by = "assigned_dist_group",
+        hypothesis = "b2 - b1 = 0",
+        equivalence = c(0, 0)
+    ) %>%
+    as_tibble() %>%
+        mutate(
+            assigned_dist_group = "far - close",
+            contrast = "signal"
+        ) %>%
+        mutate(
+            pval_onesided = p.value.noninf
+        )
+
+    tes_df = bind_rows(
+        close_far_tes,
+        combined_tes,
+        double_diff,
+        nosignal_combined,
+        nosignal_mean
+    )
+    return(tes_df)
+} 
+
+
+
+```
 
 
 #### Frequentist Estimates ####
 
 ```{r}
 #| freq-estimates
+analysis_data = analysis_data %>%
+    mutate(
+        county = factor(county),
+        cluster.id = factor(cluster.id),
+        assigned_treatment = assigned.treatment,
+        assigned_dist_group = dist.pot.group,
+        signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+        signal = factor(signal, levels = c("no signal", "signal"))
+    )
+
+
+
 probit_fit = analysis_data %>%
     feglm(
         dewormed ~ 0 + assigned_treatment:assigned_dist_group | county, 
@@ -449,24 +944,158 @@ probit_fit = analysis_data %>%
 
 probit_dist_fit = analysis_data %>%
     feglm(
-        dewormed ~ 0 + assigned_treatment:assigned_dist_group + standard_cluster.dist.to.pot + i(county, ref = "Busia"),
+        dewormed ~ 0 + assigned_treatment:assigned_dist_group + standard_cluster.dist.to.pot | county,
         data = ., 
         family = binomial(link = "probit"), 
         cluster = ~cluster.id
     ) 
+
+probit_control_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + 
+                    assigned_treatment:assigned_dist_group + 
+                    standard_cluster.dist.to.pot  +
+                    n_per_cluster +
+                    female +
+                    have_phone_lgl +
+                    age.census | county,
+        data = ., 
+        family = binomial(link = "probit"), 
+        cluster = ~cluster.id
+
+    )
+probit_signal_dist_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + signal:assigned_dist_group + cluster.dist.to.pot | county,
+        data = .,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id
+    )
+
+probit_signal_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + signal:assigned_dist_group  | county,
+        data = .,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id
+    )
+
+ols_fit = analysis_data %>%
+    feols(
+        dewormed ~ 0 + assigned_treatment:assigned_dist_group | county, 
+        data = ., 
+        cluster = ~cluster.id
+    ) 
+
+ols_dist_fit = analysis_data %>%
+    feols(
+        dewormed ~ 0 + assigned_treatment:assigned_dist_group + standard_cluster.dist.to.pot | county, 
+        data = ., 
+        cluster = ~cluster.id
+    ) 
+    
+
+
 rf_probit_tes = create_comparisons(probit_fit)
 rf_probit_dist_tes = create_comparisons(probit_dist_fit)
+rf_probit_control_tes = create_comparisons(probit_control_fit)
+rf_signal_dist_tes = signal_comparisons(probit_signal_dist_fit)
+rf_signal_tes = signal_comparisons(probit_signal_fit)
+rf_ols_tes = create_comparisons(ols_fit)
+rf_ols_dist_tes = create_comparisons(ols_dist_fit)
 
-rf_probit_tbl = prep_tbl(rf_probit_tes, stat = "ci")
-rf_probit_dist_tbl = prep_tbl(rf_probit_dist_tes, stat = "ci")
 
 
+rf_ols_tbl = prep_tbl(rf_ols_tes, stat = params$stat)
+rf_ols_dist_tbl = prep_tbl(rf_ols_dist_tes, stat = params$stat)
+rf_probit_tbl = prep_tbl(rf_probit_tes, stat = params$stat)
+rf_probit_dist_tbl = prep_tbl(rf_probit_dist_tes, stat = params$stat)
+rf_probit_control_tbl = prep_tbl(rf_probit_control_tes, stat = params$stat)
+
+
+rf_ols_kbl = nice_kbl_table(rf_ols_tbl, "Frequentist OLS (Clustering)")
+rf_ols_dist_kbl = nice_kbl_table(rf_ols_dist_tbl, "Frequentist OLS with Distance (Clustering)")
 rf_probit_kbl = nice_kbl_table(rf_probit_tbl, "Frequentist Probit (Clustering)")
 rf_probit_dist_kbl = nice_kbl_table(rf_probit_dist_tbl, "Frequentist Probit with Distance (Clustering)")
+rf_probit_control_kbl = nice_kbl_table(rf_probit_control_tbl, "Frequentist Probit with Controls (Clustering)")
+
 
 ```
 
+```{r}
+#| signal-dist-estimates, results="asis"
 
+
+rf_signal_dist_kbl = rf_signal_dist_tes %>%
+    mutate(across(where(is.numeric), round, 3)) %>%
+    mutate(
+        estim_std = if_else(
+            is.na(pval_onesided),
+            linebreak(paste0(estimate,"\n", str_glue("({conf.low}, {conf.high})")), align = "c"),
+            linebreak(paste0(
+                estimate,"\n", 
+                str_glue("({conf.low}, {conf.high})"), "\n",
+                str_glue("pval: {pval_onesided}")
+                ), align = "c")
+        )
+    ) %>%
+    select(
+        contrast,
+        assigned_dist_group,
+        estim_std
+    ) %>%
+    mutate(assigned_dist_group = factor(assigned_dist_group, levels = c("combined", "close", "far", "far - close"))) %>%
+    arrange(assigned_dist_group) %>%
+    pivot_wider(
+        names_from = assigned_dist_group,
+        values_from = estim_std
+    )  %>%
+    kbl(
+        escape = FALSE,
+        caption = "Frequentist Probit with Signal (Clustering + Distance)"
+    )
+rf_signal_dist_kbl %>%
+    custom_save_latex_table("rf-signal-dist")    
+
+
+```
+
+```{r}
+#| signal-estimates, results="asis"
+
+rf_signal_kbl = rf_signal_tes %>%
+    mutate(across(where(is.numeric), round, 3)) %>%
+    mutate(
+        estim_std = if_else(
+            is.na(pval_onesided),
+            linebreak(paste0(estimate,"\n", str_glue("({conf.low}, {conf.high})")), align = "c"),
+            linebreak(paste0(
+                estimate,"\n", 
+                str_glue("({conf.low}, {conf.high})"), "\n",
+                str_glue("pval: {pval_onesided}")
+                ), align = "c")
+        )
+    ) %>%
+    select(
+        contrast,
+        assigned_dist_group,
+        estim_std
+    ) %>%
+    mutate(assigned_dist_group = factor(assigned_dist_group, levels = c("combined", "close", "far", "far - close"))) %>%
+    arrange(assigned_dist_group) %>%
+    pivot_wider(
+        names_from = assigned_dist_group,
+        values_from = estim_std
+    )  %>%
+    kbl(
+        escape = FALSE,
+        caption = "Frequentist Probit with Signal (Clustering)"
+    )
+rf_signal_kbl %>%
+    custom_save_latex_table("rf-signal")    
+
+
+```
 
 ```{r}
 #| rf-probit-tbl, results="asis"
@@ -479,6 +1108,24 @@ rf_probit_kbl %>%
 #| rf-probit-dist-tbl, results="asis"
 rf_probit_dist_kbl %>%
     custom_save_latex_table("rf-probit-dist")
+```
+
+```{r}
+#| rf-probit-control-tbl, results="asis"
+rf_probit_control_kbl %>%
+    custom_save_latex_table("rf-probit-control")
+```
+
+
+
+```{r}
+rf_ols_kbl %>%
+    custom_save_latex_table("rf-ols")
+```
+
+```{r}
+rf_ols_dist_kbl %>%
+    custom_save_latex_table("rf-ols-dist")
 ```
 
 
@@ -520,6 +1167,38 @@ if (params$fit) {
 
 ```
 
+```{r}
+if (params$fit) {
+
+brm_flat_dist = brm(
+    data = analysis_data,
+    dewormed ~ (1 | cluster.id)  + county + standard_cluster.dist.to.pot + (assigned_treatment*assigned_dist_group),
+    family = bernoulli(link = "probit")
+)
+
+brm_flat_dist_comp_df = brm_flat_dist %>%
+    create_comparisons()
+brm_flat_dist_comp_df %>%
+    write_csv(
+        file.path(
+            params$table_output_path,
+            "brm_flat_dist_comp_df.csv"
+        )
+    )
+} else {
+
+
+brm_flat_dist_comp_df =
+    read_csv(
+        file.path(
+            params$table_output_path,
+            "brm_flat_dist_comp_df.csv"
+        )
+    )
+}
+```
+
+
 
 ```{r}
 if (params$fit) {
@@ -555,70 +1234,8 @@ brm_rf_hier_cluster_comp_df =
 
 
 ```{r}
-#| tighter-hier-priors + county
-if (params$fit) {
-
-    # ed-tighter priors
-
-default_priors = get_prior(
-    data = analysis_data,
-    dewormed ~ (1 | cluster.id + county) + (assigned_treatment*assigned_dist_group), 
-    family = bernoulli(link = "probit")
-)
-
-manual_priors = c(
-    set_prior(
-        "normal(0, 0.1)",
-        lb = 0,
-        class = "sd",
-        group = "cluster.id"
-    ),
-    set_prior(
-        "normal(0, 0.1)",
-        lb = 0,
-        class = "sd",
-        group = "county"
-    )
-    )
-
-
-brm_rf_fit_tight_hier_county_cluster = brm(
-    data = analysis_data,
-    dewormed ~ (1 | cluster.id) + (1 | county) + (assigned_treatment*assigned_dist_group),
-    family = bernoulli(link = "probit"),
-    prior = manual_priors
-)
-
-brm_rf_tight_hier_county_cluster_comp_df = brm_rf_fit_tight_hier_county_cluster %>%
-    create_comparisons()
-
-brm_rf_tight_hier_county_cluster_comp_df %>%
-    write_csv(
-        file.path(
-            params$table_output_path,
-            "brm_rf_tight_hier_county_cluster_comp_df.csv"
-        )
-    )
-} else {
-
-
-brm_rf_tight_hier_county_cluster_comp_df =
-    read_csv(
-        file.path(
-            params$table_output_path,
-            "brm_rf_tight_hier_county_cluster_comp_df.csv"
-        )
-    )
-}
-```
-
-
-```{r}
 #| tighter-hier-priors
 if (params$fit) {
-
-    # ed-tighter priors
-
 default_priors = get_prior(
     data = analysis_data,
     dewormed ~ (1 | cluster.id) + county + (assigned_treatment*assigned_dist_group), 
@@ -666,6 +1283,208 @@ brm_rf_tight_hier_cluster_comp_df =
 
 
 
+```{r}
+#| tighter-hier-priors-county
+if (params$fit) {
+
+
+default_priors = get_prior(
+    data = analysis_data,
+    dewormed ~ (1 | cluster.id) + (1 | county) + (assigned_treatment*assigned_dist_group), 
+    family = bernoulli(link = "probit")
+)
+
+manual_priors = c(
+    set_prior(
+        "normal(0, 0.1)",
+        lb = 0,
+        class = "sd",
+        group = "cluster.id"
+    ),
+    set_prior(
+        "normal(0, 0.1)",
+        lb = 0,
+        class = "sd",
+        group = "county"
+    ),
+    set_prior(
+        "normal(0, 0.25)",
+        class = "b"
+    ),
+    set_prior(
+        "normal(0, 0.75)",
+        class = "Intercept"
+    )
+)
+
+
+brm_rf_fit_tight_hier_county_cluster = brm(
+    data = analysis_data,
+    dewormed ~ (1 | cluster.id) + (1 | county) + (assigned_treatment:assigned_dist_group),
+    family = bernoulli(link = "probit"),
+    prior = manual_priors
+)
+
+brm_rf_tight_hier_county_cluster_comp_df = brm_rf_fit_tight_hier_county_cluster %>%
+    create_comparisons()
+
+brm_rf_tight_hier_county_cluster_comp_df %>%
+    write_csv(
+        file.path(
+            params$table_output_path,
+            "brm_rf_tight_hier_county_cluster_comp_df.csv"
+        )
+    )
+} else {
+
+
+brm_rf_tight_hier_county_cluster_comp_df =
+    read_csv(
+        file.path(
+            params$table_output_path,
+            "brm_rf_tight_hier_county_cluster_comp_df.csv"
+        )
+    )
+}
+```
+
+
+```{r}
+if (params$fit) {
+default_priors = get_prior(
+    data = analysis_data,
+    dewormed ~ 0 + (1 | cluster.id) + county + (assigned_treatment*assigned_dist_group), 
+    family = bernoulli(link = "probit")
+)
+
+manual_priors = c(
+    set_prior(
+        "normal(0, 0.1)",
+        lb = 0,
+        class = "sd",
+        group = "cluster.id"
+        ),
+    set_prior(
+        "normal(0, 0.25)",
+        class = "b"
+    ),
+    set_prior(
+        "normal(0, 0.75)",
+        class = "b",
+        coef = c("countyBusia", "countyKakamega", "countySiaya")
+    )
+)
+
+
+
+brm_nonflat_priors = brm(
+    data = analysis_data,
+    dewormed ~ 0 + (1 | cluster.id)  + county + (assigned_treatment*assigned_dist_group),
+    family = bernoulli(link = "probit"),
+    prior = manual_priors
+)
+
+
+code = stancode(brm_nonflat_priors)
+
+brm_non_flat_prior_comp_df = brm_nonflat_priors %>%
+    create_comparisons()
+
+brm_non_flat_prior_comp_df %>%
+    write_csv(
+        file.path(
+            params$table_output_path,
+            "brm_non_flat_prior_comp_df.csv"
+        )
+    )
+
+} else {
+brm_non_flat_prior_comp_df =
+    read_csv(
+        file.path(
+            params$table_output_path,
+            "brm_non_flat_prior_comp_df.csv"
+        )
+    )
+
+}
+
+
+
+
+```
+
+
+```{r}
+if (params$fit) {
+default_priors = get_prior(
+    data = analysis_data,
+    dewormed ~ 0 + (1 | cluster.id) + county + (assigned_treatment*assigned_dist_group), 
+    family = bernoulli(link = "probit")
+)
+
+
+manual_priors = c(
+    set_prior(
+        "normal(0, 0.1)",
+        lb = 0,
+        class = "sd",
+        group = "cluster.id"
+        ),
+    set_prior(
+        "normal(0, 0.25)",
+        class = "b"
+    ),
+    set_prior(
+        "normal(0, 0.75)",
+        class = "b",
+        coef = c("countyBusia", "countyKakamega", "countySiaya")
+    ),
+    set_prior(
+        "normal(0, 1)",
+        class = "b",
+        coef = "standard_cluster.dist.to.pot"
+    )
+)
+
+
+brm_nonflat_priors_dist = brm(
+    data = analysis_data,
+    dewormed ~ 0 + (1 | cluster.id)  + county + (assigned_treatment*assigned_dist_group) + standard_cluster.dist.to.pot,
+    family = bernoulli(link = "probit"),
+    prior = manual_priors
+)
+
+
+brm_non_flat_prior_dist_comp_df = brm_nonflat_priors_dist %>%
+    create_comparisons()
+
+brm_non_flat_prior_dist_comp_df %>%
+    write_csv(
+        file.path(
+            params$table_output_path,
+            "brm_non_flat_prior_dist_comp_df.csv"
+        )
+    )
+
+} else {
+brm_non_flat_prior_dist_comp_df =
+    read_csv(
+        file.path(
+            params$table_output_path,
+            "brm_non_flat_prior_dist_comp_df.csv"
+        )
+    )
+
+}
+
+
+
+
+```
+
+
+
 
 ```{r}
 
@@ -691,6 +1510,16 @@ brm_rf_hier_cluster_prep_tbl %>%
 ```
 
 ```{r}
+brm_flat_dist_prep_tbl = brm_flat_dist_comp_df %>%
+    prep_tbl(., stat = "ci") %>%
+    nice_kbl_table("Bayesian Probit: Flat Priors + Distance")
+brm_flat_dist_prep_tbl %>%
+    custom_save_latex_table("bayes-rf-probit-flat-priors-distance")
+
+```
+
+
+```{r}
 
 brm_rf_tight_hier_cluster_prep_tbl = brm_rf_tight_hier_cluster_comp_df %>%
     prep_tbl(., stat = "ci") %>%
@@ -714,7 +1543,29 @@ brm_rf_tight_hier_county_cluster_prep_tbl %>%
 
 ```
 
+```{r}
 
+brm_non_flat_prior_prep_tbl = brm_non_flat_prior_comp_df %>%
+    prep_tbl(., stat = "ci") %>%
+    nice_kbl_table("Bayesian Probit: Non-Flat Priors")
+
+brm_non_flat_prior_prep_tbl %>%
+    custom_save_latex_table("bayes-rf-probit-non-flat-priors")
+
+
+```
+
+```{r}
+
+brm_non_flat_prior_dist_prep_tbl = brm_non_flat_prior_dist_comp_df %>%
+    prep_tbl(., stat = "ci") %>%
+    nice_kbl_table("Bayesian Probit: Non-Flat Priors - Distance")
+
+brm_non_flat_prior_dist_prep_tbl %>%
+    custom_save_latex_table("bayes-rf-probit-non-flat-priors-distance")
+
+
+```
 
 #### Stan ####
 
@@ -724,25 +1575,63 @@ brm_rf_tight_hier_county_cluster_prep_tbl %>%
 
 library(tidyverse)
 
-ate_rvar_rf = read_rds(
-      file.path(
-        "temp-data",
-        str_glue("rvar_processed_dist_fit97_ates_REDUCED_FORM_NO_RESTRICT_1-4.rds")
-      ) 
-  )
-# weird bind_rows() bug with rvar cols
-ate_rvar_df = bind_rows(
-    ate_rvar_rf %>%
-      select(-value)
-) %>%
-mutate(
-    model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
-    fit_type = factor(fit_type),
-    model = factor(model)
+
+rfnr = "REDUCED_FORM_NO_RESTRICT"
+rfnrngp = "REDUCED_FORM_NO_RESTRICT_NO_GP"
+rfnrdb = "REDUCED_FORM_NO_RESTRICT_DIFFUSE_BETA"
+struct_dbdc = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
+
+models_we_want = tribble(
+    ~model, ~fit_version,
+    rfnr, 97,
+    rfnr, 98,
+    rfnrngp, 98,
+    rfnrdb, 99,
+    rfnr, 99,
+    struct_dbdc, 98
 
 )
+models_we_want %>%
+    mutate(
+        fp = file.path(
+            "temp-data",
+            str_glue(
+                "rvar_processed_dist_fit{fit_version}_ates_{model}_1-4.rds"
+            )
+        )
+    )  %>%
+    slice(6) %>%
+    pull(fp)
 
-ate_rvar_df$value = c(ate_rvar_rf$value)
+ate_rvar_df = models_we_want %>%
+    mutate(
+        fp = file.path(
+            "temp-data",
+            str_glue(
+                "rvar_processed_dist_fit{fit_version}_ates_{model}_1-4.rds"
+            )
+        )
+    ) %>%
+    select(-fit_version, -model) %>%
+    mutate(data = map(fp, read_rds)) %>%
+    select(-fp) %>%
+    unnest(data)
+
+
+
+
+# weird bind_rows() bug with rvar cols
+ate_rvar_df = ate_rvar_df %>%
+    mutate(
+        model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
+        fit_type = factor(fit_type),
+        model = factor(model)
+    )
+
+
+
+
+# ate_rvar_df$value = c(ate_rvar_rf$value)
 
 create_cis = function(.data, .width = 0.95) {
   med_fun = function(x) {
@@ -797,13 +1686,18 @@ create_ate_table = function(.data, .estimand, group_var = treatment) {
     )
 }
 
-incentive_ate_df =  ate_rvar_df %>%
-  create_ate_table(
-    .estimand = "overall",
-    group_var = treatment
-  )
 
-incentive_ate_df
+incentive_ate_df =  ate_rvar_df %>%
+    group_by(
+        model, fit_version
+    ) %>%
+    group_nest() %>%
+    mutate(
+        data = map2(data, model, ~mutate(.x, model = .y)),
+        ate_table = map(data, ~create_ate_table(.x, .estimand = "overall", group_var = treatment))
+    )
+
+
 
 
 ate_tbl_levels = c(
@@ -823,7 +1717,7 @@ recode_control_mean = function(data) {
 
 spread_rf = function(data) {
   data %>%
-    mutate(model_type = "rf") %>%
+    # mutate(model_type = "rf") %>%
     select(-model) %>%
     pivot_wider(
       names_from = model_type,
@@ -834,78 +1728,51 @@ spread_rf = function(data) {
     select(treatment, starts_with("rf"), starts_with("struct"))
 }
 
-incentive_ate_tbl = incentive_ate_df %>%
+incentive_ate_df = incentive_ate_df %>%
     mutate(
-        model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
-        fit_type = "fit",
-        model = factor(model)
+        tbl = map(
+            ate_table,
+            ~mutate(
+                .x,
+                model_type = if_else(str_detect(model, "STRUCT"), "struct", "rf") %>% factor(),
+                fit_type = "fit",
+                model = factor(model)
+            ) %>%
+            mutate(treatment = factor(treatment, levels = 
+                ate_tbl_levels
+            )) %>%
+            mutate(far_minus_close = far - close) %>%
+            arrange(treatment)   %>%
+            create_cis(.width = params$width) %>%
+            recode_control_mean()  %>%
+            spread_rf() 
+        )
+    )
 
-    ) %>%
-  mutate(treatment = factor(treatment, levels = 
-    ate_tbl_levels
-  )) %>%
-  mutate(far_minus_close = far - close) %>%
-  arrange(treatment)   %>%
-  create_cis(.width = params$width) %>%
-  recode_control_mean()  %>%
-  spread_rf() 
+incentive_ate_df = incentive_ate_df %>%
+    mutate(
+        cap_string = str_glue(
+            "Stan: {str_replace_all(model, '_', ' ')}, Version: {fit_version}"
+        ),
+        kbl_table = map2(
+            tbl, cap_string,
+            nice_kbl_table
+        )
+    )
 
-incentive_ate_tbl %>%
-    nice_kbl_table("Stan: Current Reduced Form (Ran Today)")
 
 
 
 ```
 
+
 ```{r}
-#| current-paper-result, eval=FALSE
+#| stan-tables, results="asis"
 
-curr_ate_rvar_rf = read_rds(
-      file.path(
-        "temp-data",
-        str_glue("rvar_processed_dist_fit95_ates_REDUCED_FORM_NO_RESTRICT_1-4.rds")
-      ) 
-  )
-# weird bind_rows() bug with rvar cols
-curr_ate_rvar_df = curr_ate_rvar_rf %>%
-    mutate(
-        model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
-        fit_type = factor(fit_type),
-        model = factor(model)
+incentive_ate_df %>%
+    pull(kbl_table) %>%
+    map(print)
 
-    )
-
-curr_ate_rvar_df %>%
-    pull(model)
-
-curr_incentive_ate_df =  curr_ate_rvar_df %>%
-  create_ate_table(
-    .estimand = "overall",
-    group_var = treatment
-  )
-
-
-
-
-curr_incentive_ate_tbl = curr_incentive_ate_df %>%
-    mutate(
-        model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
-        fit_type = "fit",
-        model = factor(model)
-
-    ) %>%
-  mutate(treatment = factor(treatment, levels = 
-    ate_tbl_levels
-  )) %>%
-  mutate(far_minus_close = far - close) %>%
-  arrange(treatment)   %>%
-  create_cis(.width = params$width) %>%
-  recode_control_mean()  %>%
-  spread_rf() 
-
-curr_incentive_ate_tbl %>%
-    nice_kbl_table("Stan: Paper Reduced Form (Ran Months Ago)")
- 
 ```
 
 ## Frequentist Probit (p-values) ##
