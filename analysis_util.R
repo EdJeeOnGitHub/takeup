@@ -1060,12 +1060,6 @@ plot_ate <- function(ate_summ_data, ate_data = NULL, combiner = NULL, data_prepa
 
 # Old plotting code -------------------------------------------------------
 
-prep.ref.group.col <- . %>% {
-      intercept.est <- filter(., term == "(intercept)") %$% estimate
-      mutate(., 
-             ate = estimate,
-             estimate = if_else(term != "(intercept)", estimate + intercept.est, estimate))
-    } 
 
 incentive.treat.barplot <- function(.data) { 
   .data %<>% 
@@ -1099,8 +1093,8 @@ incentive.treat.barplot <- function(.data) {
 
 # Table Generators --------------------------------------------------------
 
-pval.stars <- . %>% 
-  symnum(cutpoints = c(0, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ""))
+# pval.stars <- . %>% 
+#   symnum(cutpoints = c(0, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ""))
 
 print.reg.table <- function(.reg.table.data, 
                             caption = "", label = "", font.size = "footnotesize", estimate.buffer = TRUE, landscape = FALSE) {
