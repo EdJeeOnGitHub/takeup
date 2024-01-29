@@ -121,7 +121,7 @@ model {
     reduced_beta_cluster_raw ~ std_normal();
   }
   
-  reduced_beta_cluster_sd ~ normal(0.1, reduced_beta_cluster_sd_sd);
+  reduced_beta_cluster_sd ~ normal(0, reduced_beta_cluster_sd_sd);
   
   if (use_county_effects) {
     to_vector(reduced_beta_county_raw) ~ std_normal();
