@@ -682,7 +682,7 @@ externality_fit = clean_externality_df %>%
 
 judgement_fit = judge_analysis_data %>%
     feglm(
-        dewormed ~  0 + judge_score_dewor + assigned_treatment:assigned_dist_group | county,
+        dewormed ~  0 + judge_score_dewor + assigned_treatment:assigned_dist_group + i(county, ref = "Busia"),
         family = binomial(link = "probit"),
         cluster = ~cluster.id
     )
@@ -693,7 +693,7 @@ indiv_knowledge_fit = analysis_data %>%
             0 + 
             log(census_cluster_pop) + 
             obs_know_person  + 
-            assigned_treatment:assigned_dist_group | county,
+            assigned_treatment:assigned_dist_group + i(county, ref = "Busia"),
         family = binomial(link = "probit"),
         cluster = ~cluster.id
     )

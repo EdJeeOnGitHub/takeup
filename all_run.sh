@@ -1,31 +1,26 @@
-#!/usr/bin/env bash
-
-#SBATCH --partition=broadwl
-#SBATCH --job-name=takeup        # create a short name for your job
-#SBATCH --nodes=1                # node count
-#SBATCH --ntasks=1               # total number of tasks across all nodes
-#SBATCH --cpus-per-task=60       # cpu-cores per task (>1 if multi-threaded tasks)
+#!/bin/bash
 #SBATCH --mem-per-cpu=2G         # memory per cpu-core (4G is default)
+#SBATCH --cpus-per-task=8        # number of cores per task (4 is default)
 #SBATCH --time=0-10:00:00        # maximum time needed (HH:MM:SS)
 #SBATCH --mail-type=begin        # send email when job begins
 #SBATCH --mail-type=end          # send email when job ends
 #SBATCH --mail-user=edjee96@gmail.com
-#SBATCH --output=temp/log/takeup-%j.log
-#SBATCH --error=temp/log/takeup-%j.log
+#SBATCH --output=temp/log/takeup-%A_%a.log
+#SBATCH --error=temp/log/takeup-%A_%a.log
 #SBATCH --export=IN_SLURM=1
+#SBATCH --array=0-5          # create 10 tasks
 
-LATEST_VERSION=96
+LATEST_VERSION=98
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
 SLURM_INOUT_DIR=~/scratch-midway2
-ITER=400
-# MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
+ITER=800
 
 echo "Version: $VERSION"
+echo "Task ID: $SLURM_ARRAY_TASK_ID"
 
 if [[ -v IN_SLURM ]]; then
   echo "Running in SLURM..."
-	
 
   module load -f midway2 gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
 
@@ -41,47 +36,34 @@ else
   CORES=8
 fi
 
-STAN_THREADS=$((${CORES} / 4))
+STAN_THREADS=$((SLURM_CPUS_PER_TASK / 4))
 
-fit_models () {
-  models=(
-	# "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP" 
-    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL"
-    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL"
-    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL"
-    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL"
-    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS"
-	# "REDUCED_FORM_NO_RESTRICT_DIST_CTS"
-	# "REDUCED_FORM_NO_RESTRICT"
-  )
-
-  pids=()
-
-  for model in "${models[@]}"
-  do
-    Rscript --no-save \
-      --no-restore \
-      --verbose \
-      run_takeup.R takeup fit \
-      --models=${model} \
-      ${CMDSTAN_ARGS} \
-      ${OUTPUT_ARGS} \
-      --update-output \
-      --threads=${STAN_THREADS} \
-      --outputname=dist_fit${VERSION} \
-      --num-mix-groups=1 \
-      --chains=4 \
-      --iter=${ITER} \
-      --sequential > temp/log/output-${model}-fit${VERSION}.txt 2>&1 &
-
-    pids+=($!)
-  done
-
-  # wait for all pids
-  for pid in ${pids[*]}; do
-    wait $pid
-  done
+fit_model () {
+  Rscript --no-save \
+    --no-restore \
+    --verbose \
+    run_takeup.R takeup fit \
+    --models=${1} \
+    ${CMDSTAN_ARGS} \
+    ${OUTPUT_ARGS} \
+    --threads=${STAN_THREADS} \
+    --outputname=dist_fit${VERSION} \
+    --num-mix-groups=1 \
+    --chains=4 \
+    --iter=${ITER} \
+    --sequential > temp/log/output-${1}-fit${VERSION}.txt 2>&1
 }
 
+models=(
+  "REDUCED_FORM_NO_RESTRICT"
+  "REDUCED_FORM_NO_RESTRICT_NO_GP"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
+)
 
-fit_models
+
+model=${models[${SLURM_ARRAY_TASK_ID}]}
+
+fit_model ${model}

@@ -1,4 +1,5 @@
 #!/usr/bin/Rscript
+print(commandArgs(trailingOnly = TRUE))
 script_options <- docopt::docopt(
   stringr::str_glue("Usage:
   run_takeup.R takeup prior [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds]
@@ -28,29 +29,25 @@ Options:
 "),
 
   args = if (interactive()) "
-    takeup prior \
+    takeup fit \
     --cmdstanr \
-    --outputname=test \
+    --outputname=dist_fit97 \
     --models=REDUCED_FORM_NO_RESTRICT \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 800 \
     --chains=4 \
+    --num-mix-groups=1 \
     --sequential  
     " else commandArgs(trailingOnly = TRUE)
   # args = if (interactive()) "takeup cv --models=REDUCED_FORM_NO_RESTRICT --cmdstanr --include-paths=stan_models --update --output-path=data/stan_analysis_data --outputname=test --folds=2 --sequential" else commandArgs(trailingOnly = TRUE)
 
 ) 
 
-
-
-    # --county-fe \
-    # --multilevel \
-
 library(magrittr)
 library(tidyverse)
 library(furrr)
-library(sf)
+# library(sf)
 library(loo)
 
 script_options %<>% 
@@ -374,7 +371,10 @@ models <- lst(
       list_modify(
         use_dist_cts = TRUE
       ),
-
+      REDUCED_FORM_NO_RESTRICT_NO_GP = .$REDUCED_FORM_NO_RESTRICT %>%
+      list_modify(
+        use_age_group_gp = FALSE
+      ),
     STRUCTURAL_LINEAR_U_SHOCKS_NO_SUBMODELS = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
         fit_wtp_model_to_data = FALSE,
@@ -417,6 +417,31 @@ models <- lst(
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
         mu_rep_type = 4
+      ),
+    ## Diffuse Priors
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        mu_rep_type = 4,
+        beta_intercept_sd = 1,
+        beta_ink_effect_sd = 1,
+        beta_calendar_effect_sd = 1,
+        beta_bracelet_effect_sd = 1
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        mu_rep_type = 4,
+        beta_intercept_sd = 1,
+        beta_ink_effect_sd = 1,
+        beta_calendar_effect_sd = 1,
+        beta_bracelet_effect_sd = 1,
+        structural_beta_county_sd_sd = 0.5,
+        structural_beta_cluster_sd_sd = 0.5
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        mu_rep_type = 4,
+        structural_beta_county_sd_sd = 0.5,
+        structural_beta_cluster_sd_sd = 0.5
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(

@@ -32,6 +32,7 @@ params:
     rf_models: REDUCED_FORM_NO_RESTRICT
     show_probs: FALSE
     cache: FALSE
+    width: 0.95
 ---
 
 
@@ -48,6 +49,7 @@ library(kableExtra)
 library(ggthemes)
 library(fixest)
 library(magrittr)
+library(stringr)
 
 if (interactive()) {
     params = lst(
@@ -60,6 +62,7 @@ if (interactive()) {
         struct_models = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB",
         rf_models = "REDUCED_FORM_NO_RESTRICT",
         show_probs = FALSE,
+        width = 0.95,
         cache = TRUE
     )
     source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
@@ -85,12 +88,14 @@ knitr::opts_chunk$set(
     cache = params$cache, 
     warnings = FALSE,
     warning = FALSE,
-    cache.path = str_glue("takeup-{params$struct_models}{params$fit_version}-table-cache/"), 
+    cache.path = stringr::str_glue("takeup-{params$struct_models}{params$fit_version}-table-cache/"), 
     fig.path = str_glue("takeup-{params$struct_models}{params$fit_version}-table-fig-cache/"), 
     fig.align = "center")
 
 dir.create("presentations/tables", showWarnings = FALSE)
 
+
+ci_width = as.numeric(params$width)
 ```
 
 
@@ -335,11 +340,11 @@ ate_rvar_df = bind_rows(
 )
 ate_rvar_df$value = c(ate_rvar_struct$value, ate_rvar_rf$value)
 
-create_cis = function(.data) {
+create_cis = function(.data, .width = 0.95) {
   med_fun = function(x) {
     mean_x = mean(x) %>% round(3)
-    conf.low = quantile(x, 0.05) %>% round(3)
-    conf.high = quantile(x, 0.95) %>% round(3)
+    conf.low = quantile(x, (1 - .width)/2) %>% round(3)
+    conf.high = quantile(x, 1 - (1 - .width)/2) %>% round(3)
   
     return_val = linebreak(
       paste0(
@@ -451,7 +456,7 @@ incentive_ate_tbl = incentive_ate_df %>%
   )) %>%
   mutate(far_minus_close = far - close) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean()  %>%
   spread_rf() %>%
   mutate(estimand = "overall")
@@ -461,7 +466,7 @@ private_ate_tbl = private_ate_df %>%
     ate_tbl_levels
   )) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean() %>%
   spread_rf() %>%
   mutate(estimand = "private")
@@ -473,7 +478,7 @@ signal_ate_tbl = signal_ate_df %>%
   )) %>%
   mutate(far_minus_close = far - close) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean() %>%
   spread_rf() %>%
   mutate(estimand = "signal")
@@ -499,8 +504,6 @@ latex_group_gap_space = "2em"
 
 
 ```{r, results="asis"}
-
-
 1+3
 
 te_kbl_df = all_ate_tbl %>% 
@@ -822,7 +825,7 @@ tidy_param_df %>%
   ) %>%
   select(model, tidy_draws) %>%
   unnest(tidy_draws) %>%
-  filter(.width == 0.9) %>%
+  filter(.width == params$width) %>%
   filter(treatment == "Control") %>%
   mutate(
     across(where(is.numeric), round, 3),
@@ -846,7 +849,7 @@ tidy_param_df %>%
   ) %>%
   select(model, tidy_draws) %>%
   unnest(tidy_draws) %>%
-  filter(.width == 0.9) %>%
+  filter(.width == params$width) %>%
   mutate(
     across(where(is.numeric), round, 3),
     estim_std = linebreak(
@@ -1009,6 +1012,8 @@ close_far_disagg_belief = disagg_base_belief_data  %>%
         per_0.5 = mean(prop), 
         per_0.05 = per_0.5 - cv(0.05)*std.error, 
         per_0.95 = per_0.5 + cv(0.05)*std.error,
+        per_0.975 = per_0.5 + cv(0.025)*std.error,
+        per_0.025 = per_0.5 - cv(0.025)*std.error,
         per_0.1 =  per_0.5 - cv(0.1)*std.error,
         per_0.9 =  per_0.5 + cv(0.1)*std.error,
         per_0.25 =  per_0.5 - cv(0.5)*std.error,
@@ -1039,6 +1044,8 @@ combined_disagg_belief = disagg_base_belief_data  %>%
         mean_est = mean(prop), 
         std.error = sd(prop)/sqrt(n()),
         per_0.5 = mean(prop), 
+        per_0.025 = per_0.5 - cv(0.025)*std.error,
+        per_0.975 = per_0.5 + cv(0.025)*std.error,
         per_0.05 = per_0.5 - cv(0.05)*std.error, 
         per_0.95 = per_0.5 + cv(0.05)*std.error,
         per_0.1 =  per_0.5 - cv(0.1)*std.error,
@@ -1078,14 +1085,14 @@ wide_disagg_belief_input_df = comp_belief_data %>%
     distance = assigned_dist_group, 
     knowledge_type,
     mean_est, 
-    per_0.05, 
-    per_0.95, 
+    per_0.025, 
+    per_0.975, 
     ord = belief_type
   )  %>%
   mutate(across(where(is.numeric), round, 3)) %>%
   mutate(
     estim_value = linebreak(
-      paste0(mean_est, "\n", "(", per_0.05, ", ", per_0.95, ")"), 
+      paste0(mean_est, "\n", "(", per_0.025, ", ", per_0.975, ")"), 
       align = "c"
       )
   ) %>%
@@ -1308,7 +1315,7 @@ wtp_input_df = tidy_param_df %>%
   ) %>%
   filter(fit_type == "fit") %>%
   unnest(tidy_draws) %>%
-  filter(.width ==  .90) %>%
+  filter(.width ==  params$width) %>%
   left_join(tibble(pref_value_diff_idx = 1:21, val_diff = -seq(-100, 100, 10)), by = "pref_value_diff_idx")   %>%
   filter(val_diff %in% c(-50, 0, 50))  %>%
   mutate(
@@ -2820,7 +2827,14 @@ lhs_translation_df = tribble(
   "lhs: treat_end", "Know about MDA ends?", "implementation",
   "lhs: days_available", "Know length of MDA?", "implementation",
   "lhs: chv_visit", "Did a CHV visit you?", "implementation",
-  "lhs: announcement", "Was there an announcement about MDA in your community?", "implementation"
+  "lhs: stigma_dewor", "Would you stigmatise: Not deworming?", "baseline_worm",
+  "lhs: stigma_immuniz", "Would you stigmatise: Not immunizing a child?", "baseline_worm",
+  "lhs: praise_dewor", "Would you praise: Deworming?", "baseline_worm",
+  "lhs: praise_immuniz", "Would you praise: Immunizing a child?", "baseline_worm",
+
+  "lhs: pct_announce", "Was there an announcement about MDA in your community?", "implementation",
+  "lhs: pct_knowledge_message", "Did the CHV share knowledge of deworming practices?", "implementation",
+  "lhs: pct_avail_message", "Did the CHV share where to get dewormed?", "implementation"
 ) %>%
   mutate(
     lhs_no_prefix = str_remove(lhs, "lhs: ")
@@ -2828,16 +2842,15 @@ lhs_translation_df = tribble(
     mutate(sample = factor(sample, levels = c("takeup_sample", "pretreat", "baseline_worm", "census", "implementation")))
 
 
-
-
-
 ```
 
 ```{r}
 #| balance-creation, dependson="balance-setup"
+
 comp_wide_indiv_bal_df = create_balance_input(
     comp_balance_tidy_df %>% 
-      filter(comp_type == "treatment"), 
+      filter(comp_type == "treatment") %>%
+      mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)),
     col_order = col_order, 
     digits = 3, 
     comp_df = TRUE,
@@ -2889,11 +2902,11 @@ n_per_comp_panel_df = lhs_translation_df %>%
 
 
 panel_names = c(
-      str_glue("Panel A: Takeup sample covariates, $N={format(N_takeup, big.mark = ',')}$"),
-      str_glue("Panel B: Pretreat covariates, $N={format(N_pretreat, big.mark = ',')}$"), 
-      str_glue("Panel C: Baseline worm covariates, $N={format(N_baseline_worm, big.mark = ',')}$"),
+      str_glue("Panel A: Takeup sample, $N={format(N_takeup, big.mark = ',')}$"),
+      str_glue("Panel B: Pretreatment, $N={format(N_pretreat, big.mark = ',')}$"), 
+      str_glue("Panel C: Baseline knowledge, $N={format(N_baseline_worm, big.mark = ',')}$"),
       # str_glue("Panel C: Census covariates, $N={format(N_census,  big.mark = ',')}$"), 
-      str_glue("Panel D: Implementation covariates, $N={format(N_endline, big.mark = ',')}$")
+      str_glue("Panel D: Implementation, $N={format(N_endline, big.mark = ',')}$")
 ) 
 
 panel_list = n_per_comp_panel_df$n
@@ -2936,6 +2949,7 @@ comp_bal_table %>%
 dist_comp_df = inner_join(
  comp_balance_tidy_df %>%
   filter(comp_type == "distance")  %>%
+  mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)) %>%
   select(
     lhs,
     contains('lhs'),
@@ -3290,66 +3304,6 @@ baseline_perception_tbl %>%
 ```
 
 
-```{r}
-#| eval = FALSE
-
-cts_dist_fits = 
-  read_rds(
-    "temp-data/fully_cts_dist_balance.rds"
-  )
-
-cts_dist_fits %>%
-  map_dfr(tidy, .id = "lhs") %>%
-  left_join(
-    lhs_translation_df %>% 
-    select(lhs, clean_name)) %>%
-  mutate(lhs = clean_name) %>%
-  select(-clean_name) %>%
-  filter(term != "(Intercept)")  %>%
-  mutate(
-    estimate = round(estimate, digits),
-    std.error = round(std.error, digits),
-    stars = case_when(
-      p.value < 0.01 ~ "***",
-      p.value < 0.05 ~ "**", 
-      p.value < 0.1 ~ "*" , 
-      TRUE ~ ""
-    )
-  )  %>%
-  mutate(
-    estim_std = linebreak(paste0(estimate, stars, "\n", str_glue("({std.error})")), align = "c") 
-  ) %>%
-  select(
-    lhs, term,
-    estim_std
-  ) %>%  
-  spread(term, estim_std) %>%
-  left_join(
-    cts_distance_pval_df %>%
-      rename("Binned F-test $p$-value" = value),
-      by = c("lhs")
-  ) %>%
-  knitr::kable(
-      format = "latex",
-      col.names = c(
-        "", 
-        "Distance to PoT (km)",
-        "Distance to PoT squared (km)",
-        "F-test $p$-value, binned distance (750m)"
-        ),
-      escape = FALSE, 
-      booktabs = TRUE,
-      align = "lccc", 
-    linesep = "",
-      caption = "Continuous Distance: Balance Checks"
-  ) %>%
-  kable_styling(
-    latex_options = c("scale_down")
-  )   
-
-
-```
-
 ```{r, sample_n, results="asis"}
 
 # sample_meta_df = N_by_treat_dist_df %>%
@@ -3563,23 +3517,44 @@ pref_gift_fit_tbl
 
 
 
+## Robustness ATE Stuff
+
 ```{r}
-robustness_ate_rvar_df = read_rds(
-      file.path(
-        "temp-data",
-        str_glue("rvar_processed_dist_fit96_ates_REDUCED_FORM_NO_RESTRICT_DIST_CTS_1-4.rds")
-      ) 
-  )
 
-robustness_ate_rvar_df
 
-robustness_ate_df =  robustness_ate_rvar_df %>%
+ate_files = fs::dir_ls(
+  file.path(
+    here::here(),
+    "temp-data"
+  ),
+  regexp = "rvar_processed_dist_fit96_ates.*1-4\\.rds$"
+)
+
+robustness_ate_rvar_df = 
+  map_dfr(
+    ate_files,
+    read_rds,
+    .id = "filepath"
+  ) %>%
+  mutate(
+    filepath = basename(filepath),
+    model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
+    fit_type = factor(fit_type),
+    model = factor(model)
+    ) 
+
+
+
+
+rf_robustness_ate_df =  robustness_ate_rvar_df %>%
+  filter(fct_match(model, "REDUCED_FORM_NO_RESTRICT_DIST_CTS")) %>%
   create_ate_table(
     .estimand = "overall",
     group_var = treatment
   ) 
 
-robustness_ate_tbl = robustness_ate_df %>%
+
+rf_robustness_ate_tbl = rf_robustness_ate_df %>%
   mutate(treatment = factor(treatment, levels = 
     ate_tbl_levels
   )) %>%
@@ -3589,13 +3564,13 @@ robustness_ate_tbl = robustness_ate_df %>%
     .cols = c(combined, close, far, far_minus_close)
   ) %>%
   arrange(treatment)   %>%
-  create_cis() %>%
+  create_cis(.width = params$width) %>%
   recode_control_mean()  %>%
   mutate(estimand = "overall") %>%
   select(-model)
 
 
-robustness_kbl_df = robustness_ate_tbl %>% 
+rf_robustness_kbl_df = rf_robustness_ate_tbl %>% 
   arrange(treatment) %>%
   select(-estimand) %>%
   kbl(
@@ -3631,9 +3606,285 @@ robustness_kbl_df = robustness_ate_tbl %>%
       )
   ) %>%
   row_spec(c(3), hline_after = TRUE) 
-robustness_kbl_df %>%
+rf_robustness_kbl_df %>%
   custom_save_latex_table(
     "robustness-rf-cts-dist-te-table"
   )
+
+```
+
+
+
+```{r}
+
+struct_robustness_ate_df = robustness_ate_rvar_df %>%
+  filter(fct_match(model_type, "structural")) %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
+  ) 
+
+
+new_model_levels = c(
+  "High WTP Prior Mean",
+  "High WTP Prior Variance",
+  "No WTP Submodel",
+  "No Beliefs Submodel",
+  "No Submodels"
+)
+
+rename_models = function(data, variable) {
+  data %>%
+    mutate(
+      {{variable}} := case_when(
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL" ~ "High WTP Prior Mean",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL" ~ "High WTP Prior Variance",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL" ~ "No Beliefs Submodel",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL" ~ "No WTP Submodel",
+        model == "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS" ~ "No Submodels"
+      )
+    )
+}
+
+struct_robustness_ate_tbl = struct_robustness_ate_df %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  rename_with(
+    ~paste0("struct_", .),
+    .cols = c(combined, close, far, far_minus_close)
+  ) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean()  %>%
+  mutate(estimand = "overall")  %>%
+  rename_models(model) %>%
+  mutate(
+    model = factor(model, levels = new_model_levels)
+  )
+
+
+
+
+struct_robustness_kbl_df = struct_robustness_ate_tbl %>%
+  arrange(treatment, model) %>%
+  select(-estimand) %>%
+  kbl(
+    col.names = c(
+      # "Estimand", 
+      # "Treatment", 
+      "Model",
+      "Treatment",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "llcccc", 
+    caption = "Results"
+  )  %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ",
+      " ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 2,
+      "Structural" = 4
+      )
+  ) %>%
+  row_spec(c(5, 10, 15, 20), hline_after = TRUE) 
+
+struct_robustness_kbl_df
+
+struct_robustness_kbl_df %>%
+  custom_save_latex_table(
+    "robustness-struct-te-table"
+  )
+
+
+```
+
+
+
+```{r}
+# pigou-output
+
+dynamic_optim_post_name = "posterior-optimal-distance-dynamic_vstar-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+static_optim_post_name = "posterior-optimal-distance-static_vstar-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+
+optim_post_df = imap_dfr(
+  lst(
+    dynamic_optim_post_name,
+    static_optim_post_name
+  ),
+  ~read_csv(file.path("temp-data", .x)),
+  .id = "vstar_type"
+) %>%
+  mutate(
+    # regex to match very first word and stop before underscore
+    vstar_type = factor(str_extract(vstar_type, "^[^_]*"))
+  )
+
+
+optim_post_df  %>%
+  select(-contains('static')) %>%
+  pivot_wider(
+    names_from = vstar_type, values_from = optimal_distance
+  )  %>%
+  mutate(
+    difference = static - dynamic
+  ) %>%
+  group_by(treatment) %>%
+  summarise(
+    diff_pct = 100*mean(difference/dynamic, na.rm = TRUE),
+    mean_difference = mean(difference, na.rm = TRUE)
+  )
+
+
+optim_te_tbl = optim_post_df %>%
+  bind_rows(
+    optim_post_df  %>%
+      select(-contains('static')) %>%
+      pivot_wider(
+        names_from = vstar_type, values_from = optimal_distance
+      )  %>%
+      mutate(
+        difference = static - dynamic
+      )  %>%
+      select(
+        treatment, draw_id, optimal_distance = difference
+      ) %>%
+      mutate(vstar_type = "static - dynamic")
+  ) %>%
+  filter(!is.na(optimal_distance)) %>%
+  group_by(
+    vstar_type, treatment
+  ) %>%
+  summarise(
+    mean_est = mean(optimal_distance),
+    per_0.025 = quantile(optimal_distance, 0.025),
+    per_0.975 = quantile(optimal_distance, 0.975)
+  ) %>%
+  mutate(across(where(is.numeric), round))  %>%
+  mutate(
+    estim_value = linebreak(
+      paste0(mean_est, "\n", "(", per_0.025, ", ", per_0.975, ")"), 
+      align = "c"
+      )
+  ) %>%
+  select(vstar_type, treatment, estim_value) %>%
+  mutate(
+    vstar_type = str_replace(vstar_type, "static", "Fixed"),
+    vstar_type = str_replace(vstar_type, "dynamic", "Dynamic")
+  ) %>%
+  mutate(
+    treatment = factor(treatment, levels = c("control", "ink", "calendar", "bracelet")),
+    treatment = fct_relabel(treatment, str_to_title) %>% fct_rev,
+    vstar_type = factor(vstar_type, levels = c("Fixed - Dynamic", "Fixed", "Dynamic")) %>% fct_rev()
+  ) %>%
+  arrange(vstar_type, treatment)  %>%
+  ungroup()
+
+
+
+pigou_optim_te_tbl_tex = optim_te_tbl %>%
+  select(-vstar_type) %>%
+  kbl(
+    col.names = c(
+      "Treatment",
+      "Optimal Distance"
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lc", 
+    caption = "Welfare Maximising Distance - Results"
+  )  %>%
+  kable_styling(
+    # latex_options = c("scale_down")
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Dynamic $\\Delta(w^*)$" = 4, 
+      "Panel B: Fixed $\\Delta(w^*)|_{d=0.5km}$" = 4, 
+      "Panel C: Fixed - Dynamic" = 4
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3, 7, 12), hline_after = TRUE) 
+
+
+
+
+pigou_optim_te_tbl_tex
+
+pigou_optim_te_tbl_tex %>%
+  custom_save_latex_table(
+    "pigou-optim-te-table"
+  )
+
+
+```
+
+
+```{r}
+#wide-pigou
+wide_pigou_optim_te_tbl_tex = optim_te_tbl %>%
+  pivot_wider(
+    names_from = vstar_type, values_from = estim_value
+  )  %>%
+  kbl(
+    col.names = c(
+      "Treatment",
+      "Dynamic $\\Delta(w^*)$",
+      "Fixed $\\Delta(w^*)|_{d=0.5km}$",
+      "Fixed - Dynamic"
+    ), 
+    format = "latex", 
+    linesep = "",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lccc", 
+    caption = "Welfare Maximising Distance - Results"
+  )  %>%
+  kable_styling(
+    # latex_options = c("scale_down")
+  ) %>%
+  row_spec(c(3), hline_after = TRUE)  %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Welfare Maximising Distance" = 3
+      )
+  ) 
+
+
+wide_pigou_optim_te_tbl_tex
+
+wide_pigou_optim_te_tbl_tex %>%
+  custom_save_latex_table(
+    "wide-pigou-optim-te-table"
+  )
+
+
+
 
 ```
