@@ -54,16 +54,28 @@ fit_model () {
     --sequential > temp/log/output-${1}-fit${VERSION}.txt 2>&1
 }
 
+source quick_postprocess.sh
+
 models=(
   "REDUCED_FORM_NO_RESTRICT"
   "REDUCED_FORM_NO_RESTRICT_NO_GP"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
+  # "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
+  # "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
+  # "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
 )
 
-
 model=${models[${SLURM_ARRAY_TASK_ID}]}
+rf_model=()
+struct_model=()
 
-fit_model ${model}
+for model in "${models[@]}"; do
+  if [[ $model == *"REDUCED"* ]]; then
+    rf_model+=("$model")
+  else
+    struct_model+=("$model")
+  fi
+done
+
+postprocess_rf_models "${rf_model[@]}" 97 
+postprocess_struct_models "${struct_model[@]}" 97 
