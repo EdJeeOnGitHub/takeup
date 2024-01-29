@@ -13,7 +13,7 @@
 LATEST_VERSION=98
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
-SLURM_INOUT_DIR="/projects/akaring/takeup-data/data/stan_analysis_data"
+SLURM_INOUT_DIR="/project/akaring/takeup-data/data/stan_analysis_data"
 ITER=800
 
 echo "Version: $VERSION"
@@ -54,16 +54,30 @@ fit_model () {
     --sequential > temp/log/output-${1}-fit${VERSION}.txt 2>&1
 }
 
+source quick_postprocess.sh
+
 models=(
   "REDUCED_FORM_NO_RESTRICT"
   "REDUCED_FORM_NO_RESTRICT_NO_GP"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
+  # "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
+  # "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
+  # "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
 )
 
-
 model=${models[${SLURM_ARRAY_TASK_ID}]}
+rf_model=()
+struct_model=()
+
+for model in "${models[@]}"; do
+  if [[ $model == *"REDUCED"* ]]; then
+    rf_model+=("$model")
+  else
+    struct_model+=("$model")
+  fi
+done
 
 fit_model ${model}
+wait
+postprocess_rf_models "${rf_model[@]}" ${VERSION} ${POSTPROCESS_INOUT_ARGS}
+postprocess_struct_models "${struct_model[@]}" ${VERSION} ${POSTPROCESS_INOUT_ARGS}
