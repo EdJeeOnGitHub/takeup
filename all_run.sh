@@ -78,6 +78,6 @@ for model in "${models[@]}"; do
 done
 
 fit_model ${model}
+postprocess_rf_models "${rf_model[@]}" ${VERSION} &
+postprocess_struct_models "${struct_model[@]}" ${VERSION}
 wait
-postprocess_rf_models "${rf_model[@]}" ${VERSION} ${POSTPROCESS_INOUT_ARGS}
-postprocess_struct_models "${struct_model[@]}" ${VERSION} ${POSTPROCESS_INOUT_ARGS}
