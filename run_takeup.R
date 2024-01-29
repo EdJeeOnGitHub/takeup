@@ -31,7 +31,7 @@ Options:
   args = if (interactive()) "
     takeup fit \
     --cmdstanr \
-    --outputname=dist_fit97 \
+    --outputname=dist_fit99 \
     --models=REDUCED_FORM_NO_RESTRICT \
     --output-path=data/stan_analysis_data \
     --threads=3 \
@@ -373,6 +373,18 @@ models <- lst(
       ),
       REDUCED_FORM_NO_RESTRICT_NO_GP = .$REDUCED_FORM_NO_RESTRICT %>%
       list_modify(
+        use_age_group_gp = FALSE
+      ),
+      REDUCED_FORM_NO_RESTRICT_DIFFUSE_BETA = .$REDUCED_FORM_NO_RESTRICT %>%
+      list_modify(
+        beta_intercept_sd = 1,
+        beta_far_effect_sd = 1,
+        beta_ink_effect_sd = 1,
+        beta_calendar_effect_sd = 1,
+        beta_bracelet_effect_sd = 1,
+        beta_far_ink_effect_sd = 1,
+        beta_far_calendar_effect_sd = 1, 
+        beta_far_bracelet_effect_sd = 1,
         use_age_group_gp = FALSE
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_NO_SUBMODELS = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
