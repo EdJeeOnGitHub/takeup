@@ -77,5 +77,5 @@ for model in "${models[@]}"; do
   fi
 done
 
-postprocess_rf_models "${rf_model[@]}" 97 
-postprocess_struct_models "${struct_model[@]}" 97 
+postprocess_rf_models "${rf_model[@]}" ${VERSION}
+postprocess_struct_models "${struct_model[@]}" ${VERSION}
