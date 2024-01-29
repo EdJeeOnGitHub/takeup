@@ -168,7 +168,7 @@ models <- lst(
   STRUCTURAL_LINEAR_U_SHOCKS = lst(
     model_file = "takeup_struct.stan",
     pars = struct_model_stan_pars,
-    control = lst(max_treedepth = 12, adapt_delta = 0.99),
+    control = lst(max_treedepth = 12, adapt_delta = 0.9999),
     use_binomial = FALSE,
     use_cost_model = cost_model_types["param_linear"],
     use_private_incentive_restrictions = FALSE,
