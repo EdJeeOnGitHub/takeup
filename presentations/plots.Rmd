@@ -29,7 +29,7 @@ params:
   fit_version: 95
   input_path: data/stan_analysis_data
   output_path: temp-data
-  struct_model: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
+  struct_model: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB
   rf_model: REDUCED_FORM_NO_RESTRICT
   plot_caption: TRUE
   component_checks: FALSE
@@ -1889,7 +1889,7 @@ ggsave(
 #| wtp-post,
 #| fig.cap="willingness-to-pay estimates",
 #| fig.note = "calendar valued at 47.2ksh more than bracelet with a 90\\% credibility 
-#|  interval of $[41.2, 52.8]$.
+#|  interval of ${[41.2, 52.8]}$.
 #|  line range: 90\\% credible interval.
 #|  outer box: 80\\% credible interval. inner box: 50\\% credible interval.
 #|  thick vertical line: median. point: mean.  preferences estimated using 998 individuals
@@ -2254,7 +2254,7 @@ sm_df =  bind_rows(
 
 ```{r}
 #| social-multiplier,
-#| fig.cap="estimated social multiplier over distance",
+#| fig.cap="Estimated Social Multiplier Over Distance",
 #| fig.note = "this plot shows the social multiplier estimated using the structural 
 #|  model. the plot shows how sensitive take-up is to changes in cost. for the ink and 
 #|  bracelet treatment arm, as distance 
@@ -2410,14 +2410,15 @@ sm_df %>%
 ```
 
 ```{r}
-#| fig.cap="estimated social multiplier over distance - components",
-#| fig.note = "this plot shows the social multiplier components estimated using the structural 
-#|  model. the plot decomposes how much of the social multiplier is driven by the 
-#|  $\\delta$ component versus how much is driven by changes in visibility 
-#|  across distance. the full line shows the entire social multiplier whilst the 
-#|  dashed line shows the $\\delta$ component - the difference between the two 
+#| sm-decomp,
+#| fig.cap="Estimated Social Multiplier Over Distance - Components",
+#| fig.note = "This plot shows the social multiplier components estimated using the structural 
+#|  model. The plot decomposes how much of the social multiplier is driven by the 
+#|  $\\Delta$ component versus how much is driven by changes in visibility 
+#|  across distance. The full line shows the entire social multiplier whilst the 
+#|  dashed line shows the $\\Delta$ component - the difference between the two 
 #|  lines is driven by changes in $\\mu$ visibility.
-#|  line: median."
+#|  Line: median."
 
 tidy_param_df %>%
   filter(param == "sm_draws") %>%
@@ -2719,6 +2720,9 @@ include_graphics("~/projects/takeup/temp-data/sms-noreminder/TE-by-sms-incentive
 
 include_graphics("~/projects/takeup/temp-data/sms-noreminder/TE-diff-by-sms-incentive.pdf", rel_path = FALSE)
 ```
+
+
+
 
 
 #### distance to closest school ####

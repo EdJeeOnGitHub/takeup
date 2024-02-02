@@ -28,7 +28,7 @@ params:
     cache: FALSE
     width: 0.95
     fit: FALSE
-    stat: ci
+    stat: std.error
 ---
 
 
@@ -54,7 +54,7 @@ if (interactive()) {
         width = 0.95,
         cache = FALSE,
         fit = FALSE,
-        stat = "p" # "ci"
+        stat = "std.error" # "ci", "p", "std.error"
     )
     source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
     source(file.path("analysis_util.R"))
@@ -563,23 +563,36 @@ custom_save_latex_table = function(table, table_name){
 #| comparisons-functions
 create_comparisons = function(fit) {
     close_far_tes = avg_comparisons(
+        fit, 
+        variables = list(assigned_treatment = "reference"),
+        by = "assigned_dist_group",
+        type = "response"
+    )
+
+    close_far_tes = avg_comparisons(
         fit,
         variables = list(assigned_treatment = "reference"),
-        by = "assigned_dist_group"
+        by = "assigned_dist_group",
+        type = "response"
     ) 
+
     combined_tes = avg_comparisons(
         fit,
-        variables = list(assigned_treatment = "reference")
+        variables = list(assigned_treatment = "reference"),
+        type = "response"
     )
     # bracelet - calendar
     close_far_bc = avg_comparisons(
         fit,
         variables = list(assigned_treatment = c("calendar", "bracelet")),
-        by = "assigned_dist_group"
+        by = "assigned_dist_group",
+        type = "response"
     )
+
     combined_bc = avg_comparisons(
         fit,
-        variables = list(assigned_treatment = c("calendar", "bracelet"))
+        variables = list(assigned_treatment = c("calendar", "bracelet")),
+        type = "response"
     )
 
 
@@ -605,9 +618,11 @@ create_comparisons = function(fit) {
     )
     names(close_far_hypotheses) = c("bracelet", "calendar", "ink")
 
+
     close_far_comp = hypotheses(
         close_far_tes,
-        hypothesis = close_far_hypotheses
+        hypothesis = close_far_hypotheses,
+        type = "response"
     ) %>%
         mutate(
             assigned_dist_group = "far - close"
@@ -625,7 +640,8 @@ create_comparisons = function(fit) {
 
     double_diff_bc_fc = hypotheses(
         close_far_tes,
-        double_diff_hp
+        double_diff_hp,
+        type = "response"
         ) %>%
         mutate(
             contrast = "bracelet - calendar",
@@ -642,26 +658,51 @@ create_comparisons = function(fit) {
             contrast = "control",
             assigned_dist_group = "combined"
         )
-    cm_close_far = avg_predictions(
-        fit,
-        variables = list(assigned_treatment = "control"),
-        by = "assigned_dist_group"
-    ) 
+    cts_distance = all(str_detect(coef(fit), "dist_group") == FALSE)
+    if (cts_distance) {
 
-    cm_close_far_string = cm_close_far  %>%
-        as_tibble() %>%
-        mutate(
-            b_val = paste0("b", 1:n())
-        ) %>%
-        mutate(
-            assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far"))
-        ) %>%
-        arrange(assigned_dist_group) %>%
-        summarise(
-            b_str = paste0(b_val[assigned_dist_group == "far"], " - ", b_val[assigned_dist_group == "close"], " = 0")
-        ) %>%
-        pull(b_str)
+
+        rep_distances = analysis_data %>%
+            group_by(assigned_dist_group) %>%
+            summarise(
+                mean_distance = mean(standard_cluster.dist.to.pot)
+            ) %>%
+            mutate(assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far"))) %>%
+            arrange(assigned_dist_group) %>%
+            pull()
+
+        cm_close_far = predictions(
+            fit,
+            variables = list(assigned_treatment = "control"),
+            newdata = datagrid(standard_cluster.dist.to.pot = rep_distances)
+        )  
+        cm_close_far_string = "b2 - b1 = 0"
+        cm_dist_order = c('close', 'far')
+
+    } else {
+        cm_close_far = avg_predictions(
+            fit,
+            variables = list(assigned_treatment = "control"),
+            by = "assigned_dist_group"
+        ) 
+        cm_close_far_string = cm_close_far  %>%
+            as_tibble() %>%
+            mutate(
+                b_val = paste0("b", 1:n())
+            ) %>%
+            mutate(
+                assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far"))
+            ) %>%
+            arrange(assigned_dist_group) %>%
+            summarise(
+                b_str = paste0(b_val[assigned_dist_group == "far"], " - ", b_val[assigned_dist_group == "close"], " = 0")
+            ) %>%
+            pull(b_str)
+        cm_dist_order = cm_close_far$assigned_dist_group
     
+    }
+    
+
     cm_close_far_diff = hypotheses(
         cm_close_far,
         cm_close_far_string
@@ -675,6 +716,7 @@ create_comparisons = function(fit) {
         mutate(
             contrast = "control"
         )
+    cm_close_far$assigned_dist_group = cm_dist_order
     # check if p.value present (i.e. not bayes)
     pval_present = "p.value" %in% colnames(close_far_comp)
     if (pval_present) {
@@ -753,23 +795,32 @@ prep_tbl = function(tes, stat = "ci") {
         "calendar",
         "ink",
         "bracelet - calendar",
-        "control"
+        "Any signal - no signal",
+        "control",
+        "$p$(Any signal > No signal)"
     )
+
+
 
 
     if (stat == "ci") {
         tes = tes %>%
             mutate(
                 val = paste0(
+                    "(",
                     round(conf.low, 3),
                     ", ",
-                    round(conf.high, 3)
+                    round(conf.high, 3),
+                    ")"
                 )
             )
+    } else if (stat == "std.error"){
+        tes = tes %>%
+            mutate(val = paste0("{[", round(std.error, 3), "]}"))
     } else {
         tes = tes %>%
             mutate(
-                val = round(p.value, 3)
+                val = paste0("{[", round(p.value, 3), "]}")
             )
     }
     
@@ -781,7 +832,7 @@ prep_tbl = function(tes, stat = "ci") {
             estim_std = if_else(
                 is.na(conf.low),
                 linebreak(paste0(estimate), align = "c"),
-                linebreak(paste0(estimate,"\n", str_glue("({val})")), align = "c") 
+                linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
             )
         ) %>%
         select(-estimate, -any_of(c("p.value", "conf.low", "conf.high")), -val) %>%
@@ -795,12 +846,18 @@ prep_tbl = function(tes, stat = "ci") {
             names_from = assigned_dist_group,
             values_from = estim_std
         )  %>%
-        mutate(contrast = fct_relabel(contrast, str_to_title)) 
+        mutate(
+            contrast = fct_relabel(contrast, str_to_title),
+            contrast = fct_recode(contrast, "$p$(Any signal > No signal)" = "$P$(Any Signal > No Signal)")
+        )
     return(tbl)
 }
 
-nice_kbl_table = function(tbl, cap) {
-  tbl %>%
+nice_kbl_table = function(tbl, cap, stat = params$stat) {
+
+  linesep_str = if_else(stat == "ci", "\\addlinespace", "")
+
+  nice_kbl = tbl %>%
   kbl(
     col.names = c(
       # "Estimand", 
@@ -809,7 +866,7 @@ nice_kbl_table = function(tbl, cap) {
       paste0("(", 1:4, ")")
     ), 
     format = "latex", 
-    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    linesep = linesep_str, 
     booktabs = TRUE, 
     escape = FALSE, 
     align = "lcccc", 
@@ -846,7 +903,8 @@ signal_comparisons = function(fit) {
     close_far_tes = avg_comparisons(
         fit,
         variables = list(signal = c("reference")),
-        by = "assigned_dist_group"
+        by = "assigned_dist_group",
+        equivalence = c(0, 0)
         ) %>%
         as_tibble() %>%
         mutate(
@@ -856,7 +914,8 @@ signal_comparisons = function(fit) {
 
     combined_tes = avg_comparisons(
         fit,
-        variables = list(signal = "reference")
+        variables = list(signal = "reference"),
+        equivalence = c(0, 0)
     ) %>%
         as_tibble() %>%
         mutate(
@@ -869,7 +928,8 @@ signal_comparisons = function(fit) {
     nosignal_mean = avg_predictions(
         fit,
         variables = list(signal = "no signal"),
-        by = "assigned_dist_group"
+        by = "assigned_dist_group",
+        equivalence = c(0, 0)
     ) %>%
     as_tibble() %>%
     mutate(
@@ -878,7 +938,8 @@ signal_comparisons = function(fit) {
 
     nosignal_combined = avg_predictions(
         fit,
-        variables = list(signal = "no signal")
+        variables = list(signal = "no signal"),
+        equivalence = c(0, 0)
     ) %>%
         as_tibble() %>%
         mutate(
@@ -909,7 +970,8 @@ signal_comparisons = function(fit) {
         double_diff,
         nosignal_combined,
         nosignal_mean
-    )
+    ) %>%
+    mutate(pval_onesided = p.value.noninf)
     return(tes_df)
 } 
 
@@ -949,6 +1011,14 @@ probit_dist_fit = analysis_data %>%
         family = binomial(link = "probit"), 
         cluster = ~cluster.id
     ) 
+
+probit_dist_cts_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + assigned_treatment*standard_cluster.dist.to.pot | county,
+        data = ., 
+        family = binomial(link = "probit"), 
+        cluster = ~cluster.id
+    )
 
 probit_control_fit = analysis_data %>%
     feglm(
@@ -1001,16 +1071,62 @@ rf_probit_dist_tes = create_comparisons(probit_dist_fit)
 rf_probit_control_tes = create_comparisons(probit_control_fit)
 rf_signal_dist_tes = signal_comparisons(probit_signal_dist_fit)
 rf_signal_tes = signal_comparisons(probit_signal_fit)
+# rf_probit_cts_dist_tes = create_comparisons(probit_dist_cts_fit)
 rf_ols_tes = create_comparisons(ols_fit)
 rf_ols_dist_tes = create_comparisons(ols_dist_fit)
 
 
+rf_signal_dist_subset_tes = rf_signal_dist_tes %>%
+    filter(contrast != "no signal") %>%
+    mutate(
+        contrast = case_when(
+            contrast == "signal" ~ "Any signal - no signal",
+            TRUE ~ contrast
+        )
+    )
+
+rf_signal_dist_subset_tes %>%
+    select(contrast, assigned_dist_group, pval_onesided)
 
 rf_ols_tbl = prep_tbl(rf_ols_tes, stat = params$stat)
 rf_ols_dist_tbl = prep_tbl(rf_ols_dist_tes, stat = params$stat)
-rf_probit_tbl = prep_tbl(rf_probit_tes, stat = params$stat)
-rf_probit_dist_tbl = prep_tbl(rf_probit_dist_tes, stat = params$stat)
+rf_probit_tbl = prep_tbl(bind_rows(rf_probit_tes, rf_signal_dist_subset_tes), stat = params$stat)
+rf_probit_dist_tbl = prep_tbl(
+    bind_rows(
+        rf_probit_dist_tes, 
+        rf_signal_dist_subset_tes
+        ), 
+        stat = params$stat)
+
+rf_probit_dist_pval_tbl = prep_tbl(
+    bind_rows(
+        rf_probit_dist_tes,
+        rf_signal_dist_subset_tes %>%
+            mutate(
+                estimate = pval_onesided,
+                conf.low = NA,
+                conf.high = NA,
+                contrast = "$p$(Any signal > No signal)"
+                )
+        ),
+        stat = params$stat
+    )
+
 rf_probit_control_tbl = prep_tbl(rf_probit_control_tes, stat = params$stat)
+# rf_probit_cts_dist_tbl = prep_tbl(rf_probit_cts_dist_tes, stat = params$stat)
+rf_probit_dist_all_pval_tbl = prep_tbl(
+    bind_rows(
+        rf_probit_dist_tes,
+        rf_signal_dist_subset_tes %>%
+            mutate(
+                estimate = pval_onesided,
+                conf.low = NA,
+                conf.high = NA,
+                contrast = "$p$(Any signal > No signal)"
+                )
+        ),
+        stat = "p" 
+    )
 
 
 rf_ols_kbl = nice_kbl_table(rf_ols_tbl, "Frequentist OLS (Clustering)")
@@ -1018,14 +1134,17 @@ rf_ols_dist_kbl = nice_kbl_table(rf_ols_dist_tbl, "Frequentist OLS with Distance
 rf_probit_kbl = nice_kbl_table(rf_probit_tbl, "Frequentist Probit (Clustering)")
 rf_probit_dist_kbl = nice_kbl_table(rf_probit_dist_tbl, "Frequentist Probit with Distance (Clustering)")
 rf_probit_control_kbl = nice_kbl_table(rf_probit_control_tbl, "Frequentist Probit with Controls (Clustering)")
+# rf_probit_cts_dist_kbl = nice_kbl_table(rf_probit_cts_dist_tbl, "Frequentist Probit with CTS Distance (Clustering + CTS Distance)")
+rf_probit_dist_pval_kbl = nice_kbl_table(rf_probit_dist_pval_tbl, "Frequentist Probit with Distance (Clustering + P-Value)")
+
+rf_probit_dist_all_pval_kbl = nice_kbl_table(rf_probit_dist_all_pval_tbl, "Frequentist Probit with Distance (Clustering + P-Value) Only P-values")
+
 
 
 ```
 
 ```{r}
 #| signal-dist-estimates, results="asis"
-
-
 rf_signal_dist_kbl = rf_signal_dist_tes %>%
     mutate(across(where(is.numeric), round, 3)) %>%
     mutate(
@@ -1110,6 +1229,28 @@ rf_probit_dist_kbl %>%
     custom_save_latex_table("rf-probit-dist")
 ```
 
+
+```{r}
+#| rf-probit-dist-pval-tbl, results="asis"
+rf_probit_dist_pval_kbl %>%
+    custom_save_latex_table("rf-probit-dist-pval")
+```
+
+```{r}
+rf_probit_dist_all_pval_kbl %>%
+    custom_save_latex_table("rf-probit-dist-all-pval")
+
+```
+
+
+```{r}
+#| rf-probit-cts-dist-tbl, results="asis"
+# rf_probit_cts_dist_kbl %>%
+#     custom_save_latex_table("rf-probit-cts-dist")
+```
+
+
+
 ```{r}
 #| rf-probit-control-tbl, results="asis"
 rf_probit_control_kbl %>%
@@ -1176,6 +1317,15 @@ brm_flat_dist = brm(
     family = bernoulli(link = "probit")
 )
 
+saveRDS(
+    list(brm_model = brm_flat_dist, data = analysis_data),
+    file.path(
+        "data",
+        "stan_analysis_data",
+        "brm_flat_dist_fit.rds"
+    )
+    )
+
 brm_flat_dist_comp_df = brm_flat_dist %>%
     create_comparisons()
 brm_flat_dist_comp_df %>%
@@ -1199,6 +1349,21 @@ brm_flat_dist_comp_df =
 ```
 
 
+```{r}
+
+
+install.packages("fixest", force = TRUE)
+
+probit_signal_dist_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + signal:assigned_dist_group + cluster.dist.to.pot | county,
+        data = .,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id
+    )
+
+```
+
 
 ```{r}
 if (params$fit) {
@@ -1209,6 +1374,14 @@ brm_rf_fit_hier_cluster = brm(
     family = bernoulli(link = "probit")
 )
 
+saveRDS(
+    list(brm_model = brm_rf_fit_hier_cluster, data = analysis_data),
+    file.path(
+        "data",
+        "stan_analysis_data",
+        "brm_rf_fit_hier_cluster_fit.rds"
+    )
+    )
 brm_rf_hier_cluster_comp_df = brm_rf_fit_hier_cluster %>%
     create_comparisons()
 brm_rf_hier_cluster_comp_df %>%
@@ -1580,6 +1753,8 @@ rfnr = "REDUCED_FORM_NO_RESTRICT"
 rfnrngp = "REDUCED_FORM_NO_RESTRICT_NO_GP"
 rfnrdb = "REDUCED_FORM_NO_RESTRICT_DIFFUSE_BETA"
 struct_dbdc = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
+struct_hier_s = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_SOB"
+struct_hier_f = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB"
 
 models_we_want = tribble(
     ~model, ~fit_version,
@@ -1588,20 +1763,11 @@ models_we_want = tribble(
     rfnrngp, 98,
     rfnrdb, 99,
     rfnr, 99,
-    struct_dbdc, 98
+    struct_dbdc, 98,
+    struct_hier_s, 98,
+    struct_hier_f, 98
 
 )
-models_we_want %>%
-    mutate(
-        fp = file.path(
-            "temp-data",
-            str_glue(
-                "rvar_processed_dist_fit{fit_version}_ates_{model}_1-4.rds"
-            )
-        )
-    )  %>%
-    slice(6) %>%
-    pull(fp)
 
 ate_rvar_df = models_we_want %>%
     mutate(
@@ -1620,7 +1786,6 @@ ate_rvar_df = models_we_want %>%
 
 
 
-# weird bind_rows() bug with rvar cols
 ate_rvar_df = ate_rvar_df %>%
     mutate(
         model_type = if_else(str_detect(model, "STRUCT"), "structural", "reduced form") %>% factor(),
@@ -1633,7 +1798,7 @@ ate_rvar_df = ate_rvar_df %>%
 
 # ate_rvar_df$value = c(ate_rvar_rf$value)
 
-create_cis = function(.data, .width = 0.95) {
+create_cis = function(.data, .width = 0.9) {
   med_fun = function(x) {
     mean_x = mean(x) %>% round(3)
     conf.low = quantile(x, (1 - .width)/2) %>% round(3)

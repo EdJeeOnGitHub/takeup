@@ -489,9 +489,10 @@ generate_initializer <- function(num_treatments,
           cluster_mu_rep = if (!use_mu_cluster_effects || (suppress_reputation && !salience)) array(0, num_treatments) else matrix(mu_rep, num_clusters, num_treatments, byrow = TRUE),
           lambda_v_mix = rep(1 / num_mix, num_mix),
           v_mix_mean = as.array(0.1),
-          v_sd = rbeta(1, 8, 1),
+          v_sd = rbeta(1, 8, 1)
           
-          group_dist_mix = MCMCpack::rdirichlet(2, rep(10, num_dist_mix))
+          # group_dist_mix = c(0, 0)
+          # MCMCpack::rdirichlet(2, rep(10, num_dist_mix))
         )
         
         base_list %>% 
