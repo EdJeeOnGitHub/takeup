@@ -31,17 +31,16 @@ Options:
   args = if (interactive()) "
     takeup fit \
     --cmdstanr \
-    --outputname=dist_fit99 \
-    --models=REDUCED_FORM_NO_RESTRICT \
+    --outputname=dist_fit101 \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB \
     --output-path=data/stan_analysis_data \
-    --threads=3 \
-    --iter 800 \
-    --chains=4 \
+    --threads=2 \
+    --iter 400 \
+    --chains=2 \
     --num-mix-groups=1 \
     --sequential  
     " else commandArgs(trailingOnly = TRUE)
   # args = if (interactive()) "takeup cv --models=REDUCED_FORM_NO_RESTRICT --cmdstanr --include-paths=stan_models --update --output-path=data/stan_analysis_data --outputname=test --folds=2 --sequential" else commandArgs(trailingOnly = TRUE)
-
 ) 
 
 library(magrittr)
@@ -202,6 +201,9 @@ models <- lst(
     
     structural_beta_county_sd_sd = 0.1,
     structural_beta_cluster_sd_sd = 0.1,
+    raw_cluster_sd_sd = 0.25,
+
+    use_cluster_fixed_effect = FALSE,
     
     wtp_value_utility_sd = 0.0001,
     wtp_value_utility_mean = 0.0,
@@ -489,6 +491,17 @@ models <- lst(
         BELIEFS_ORDER = 1,
         mu_rep_type = 4,
         use_cluster_effects = TRUE,
+        use_county_effects = TRUE,
+        structural_beta_county_sd_sd = 0.1,
+        structural_beta_cluster_sd_sd = 0.1
+
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FIXED_FOB = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        BELIEFS_ORDER = 1,
+        mu_rep_type = 4,
+        use_cluster_effects = FALSE,
+        use_cluster_fixed_effect = TRUE,
         use_county_effects = TRUE,
         structural_beta_county_sd_sd = 0.1,
         structural_beta_cluster_sd_sd = 0.1
