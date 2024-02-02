@@ -48,6 +48,8 @@ data {
   int<lower = 0, upper = 1> USE_MAP_IN_OPTIM;
   int<lower = 0, upper = 1> GEN_OPTIM;
 
+  real<lower=0> raw_cluster_sd_sd; // If cluster level shock, SD of that shock SD
+  int<lower=0, upper=1> use_cluster_fixed_effect;
 
   // Sim Delta
   
@@ -89,8 +91,8 @@ parameters {
   real<lower = (use_private_incentive_restrictions ? 0 : negative_infinity())> beta_calendar_effect;
   real<lower = (use_private_incentive_restrictions ? 0 : negative_infinity())> beta_bracelet_effect;
   
-  vector[use_cluster_effects ? num_clusters : 0] structural_beta_cluster_raw;
-  row_vector<lower = 0>[use_cluster_effects ? 1 : 0] structural_beta_cluster_sd;
+  vector[use_cluster_fixed_effect ? num_clusters : 0] structural_beta_cluster_raw;
+  row_vector<lower = 0>[use_cluster_fixed_effect ? 1 : 0] structural_beta_cluster_sd;
   
   vector[use_county_effects ? num_counties : 0] structural_beta_county_raw;
   row_vector<lower = 0>[use_county_effects ? 1 : 0] structural_beta_county_sd;
@@ -98,7 +100,9 @@ parameters {
   // Reputational Returns
   
   real<lower = 0> base_mu_rep;
-  vector<lower = 0>[use_cluster_effects ? num_clusters : 1] raw_u_sd;
+  // vector<lower = 0>[use_cluster_effects ? num_clusters : 1] raw_u_sd;
+  vector<lower = 0>[1] raw_u_sd;
+  vector<lower=0>[use_cluster_effects ? num_clusters : 0] raw_cluster_sd_tilde;
   
   // Linear Parametric Cost
   
@@ -146,6 +150,7 @@ transformed parameters {
   
   vector<lower = 0>[use_cluster_effects ?  num_clusters : num_treatments] u_sd;
   vector<lower = 0>[use_cluster_effects ? num_clusters : num_treatments] total_error_sd;
+  vector<lower=0>[use_cluster_effects ? num_clusters : 0] raw_cluster_sd;
 
 
   if (BELIEFS_ORDER == 1) {
@@ -157,8 +162,9 @@ transformed parameters {
     centered_cluster_dist_beta_beliefs = centered_cluster_dist_beta_2ord;
   }
 
+  raw_cluster_sd = raw_cluster_sd_tilde .* raw_cluster_sd_sd;
   if (use_cluster_effects) {
-    u_sd = raw_u_sd;
+    u_sd = raw_u_sd[1] + raw_cluster_sd;
   }
   if (use_homoskedastic_shocks && use_cluster_effects == 0) {
     u_sd = rep_vector(raw_u_sd[1], num_treatments);
@@ -224,8 +230,13 @@ transformed parameters {
                                       to_vector(cluster_quadratic_dist_cost)[long_cluster_by_treatment_index]);
   
   structural_cluster_benefit_cost = structural_treatment_effect[cluster_assigned_dist_group_treatment] - cluster_dist_cost;
-  
-  if (use_cluster_effects) {
+
+  // If we're using cluster effects, we want u_{ic} = e_{i} + \gamma_c
+  // i.e. latent shock has common cluster component.
+  // This code is adding another cluster on top of that directly however
+  // We're double counting the cluster effect: cluster level latent shock +
+  // cluster effect directly on beta 
+  if (use_cluster_fixed_effect) {
     //use_cluster_effects
     // for now turn off beta level shock
     structural_beta_cluster = structural_beta_cluster_raw * structural_beta_cluster_sd[1];
@@ -301,8 +312,8 @@ transformed parameters {
     if (use_cluster_effects) {
       structural_cluster_takeup_prob = Phi_approx(- structural_cluster_obs_v ./ total_error_sd)';
     } else {
+      // Index clusters by their treatment (in case error sd varying w/ treatment)
       structural_cluster_takeup_prob = Phi_approx(- structural_cluster_obs_v ./ total_error_sd[cluster_incentive_treatment_id])';
-
     }
   }
 }
@@ -345,8 +356,8 @@ model {
     dist_quadratic_beta_v ~ normal(0, 1);
   }
   
-  if (use_cluster_effects) {
-    // to_vector(structural_beta_cluster_raw) ~ std_normal();
+  if (use_cluster_fixed_effect) {
+    to_vector(structural_beta_cluster_raw) ~ std_normal();
     structural_beta_cluster_raw ~ std_normal();
     structural_beta_cluster_sd ~ normal(0, structural_beta_cluster_sd_sd);
   }
@@ -357,6 +368,7 @@ model {
   }
 
   raw_u_sd ~ inv_gamma(raw_u_sd_alpha, raw_u_sd_beta);
+  raw_cluster_sd_tilde ~ std_normal();
 
   if (fit_model_to_data) {
     // Take-up Likelihood 
@@ -489,8 +501,11 @@ generated quantities {
       
       real rep_linear_dist_cost = linear_dist_cost[cluster_assigned_dist_group_treatment[cluster_index]];
       real rep_quadratic_dist_cost = quadratic_dist_cost[cluster_assigned_dist_group_treatment[cluster_index]];
-      
-      rep_beta_cluster[1:num_treatments] = use_cluster_effects ? to_vector(normal_rng(rep_array(0, num_treatments), structural_beta_cluster_sd')) : rep_vector(0, num_treatments);
+
+    rep_beta_cluster[1:num_treatments] =  rep_vector(0, num_treatments);
+     if (use_cluster_fixed_effect) {
+      rep_beta_cluster[1:num_treatments] =  to_vector(normal_rng(rep_array(0, num_treatments), structural_beta_cluster_sd'));
+     } 
       rep_beta_cluster[(num_treatments + 2):num_dist_group_treatments] = rep_beta_cluster[2:num_treatments];
       
       rep_beta_county[1:num_treatments] = use_county_effects ? to_vector(normal_rng(rep_array(0, num_treatments), structural_beta_county_sd')) : rep_vector(0, num_treatments);
