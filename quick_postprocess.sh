@@ -38,7 +38,7 @@ postprocess_struct_models () {
 	    $2 \
             $3 \
             --model=$1 \
-            1 2 3 4 > temp/log/struct-postprocess_$1_$2.txt 2>&1 &
+            1 2 3 4  &
     Rscript --no-save \
             --no-restore \
             --verbose \
@@ -47,7 +47,7 @@ postprocess_struct_models () {
             $3 \
             --model=$1 \
             --prior \
-            1 2 3 4 > temp/log/struct-postprocess_$1_$2.txt 2>&1  &
+            1 2 3 4   &
     Rscript --no-save \
             --no-restore \
             --verbose \
@@ -55,7 +55,7 @@ postprocess_struct_models () {
 	    $2 \
             $3 \
             --model=$1 \
-            1 2 3 4 > temp/log/struct-postprocess_$1_$2.txt 2>&1 &
+            1 2 3 4  &
     Rscript --no-save \
             --no-restore \
             --verbose \
@@ -63,7 +63,7 @@ postprocess_struct_models () {
 	    $2 \
             $3 \
             --model=$1 \
-            1 2 3 4 > temp/log/struct-postprocess_$1_$2.txt 2>&1 &
+            1 2 3 4  &
    wait
 }
 
@@ -94,4 +94,4 @@ postprocess_rf_models () {
      wait
 }
 
-postprocess_rf_models "REDUCED_FORM_NO_RESTRICT" 97 
+#postprocess_rf_models "REDUCED_FORM_NO_RESTRICT" 97 
