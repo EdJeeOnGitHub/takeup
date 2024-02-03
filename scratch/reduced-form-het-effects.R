@@ -44,6 +44,23 @@ analysis_data <- monitored_nosms_data %>%
     assigned_treatment = assigned.treatment, 
     assigned_dist_group = dist.pot.group)
 
+
+
+#### Frequentist Reduced Form Estimates ####
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 social_perception_data = baseline.data %>% 
   select(matches("^(praise|stigma)_[^_]+$")) %>% 
   gather(key = key, value = response) %>% 
@@ -430,30 +447,27 @@ cov_analysis_data = analysis_data %>%
 
 
 #### Fits
-
 probit_fit = analysis_data %>%
     feglm(
-        dewormed ~ 0 + assigned_treatment:assigned_dist_group | county, 
+        dewormed ~ 0 + assigned_treatment:assigned_dist_group + i(county, ref = "Busia"), 
         data = ., 
         family = binomial(link = "probit"), 
         cluster = ~cluster.id
     ) 
-
 probit_dist_fit = analysis_data %>%
     feglm(
-        dewormed ~ 0 + assigned_treatment:assigned_dist_group + standard_cluster.dist.to.pot | county,
+        dewormed ~ 0 + assigned_treatment:assigned_dist_group + standard_cluster.dist.to.pot + i(county, ref = "Busia"),
         data = ., 
         family = binomial(link = "probit"), 
         cluster = ~cluster.id
     ) 
-
 probit_control_fit = cov_analysis_data %>%
     feglm(
         dewormed ~ 0 + assigned_treatment:assigned_dist_group + 
         frac_externality_knowledge +
         frac_ever_dewormed +
         frac_dewormed_last_12_uncond +
-        frac_know_treat_yearly | county, 
+        frac_know_treat_yearly + i(county, ref = "Busia"), 
         data = ., 
         family = binomial(link = "probit"),
         cluster = ~cluster.id
@@ -461,6 +475,13 @@ probit_control_fit = cov_analysis_data %>%
 
 normal_pred_hat = predictions(
     probit_fit,
+    newdata = datagrid(
+        assigned_dist_group = unique(analysis_data$assigned_dist_group),
+        assigned_treatment = unique(analysis_data$assigned_treatment)
+    )
+)
+dist_pred_hat = predictions(
+    probit_dist_fit,
     newdata = datagrid(
         assigned_dist_group = unique(analysis_data$assigned_dist_group),
         assigned_treatment = unique(analysis_data$assigned_treatment)
@@ -511,14 +532,21 @@ comp_pred_hat = comparisons(
     )
 )
 
+dist_bar = analysis_data %>%
+    group_by(assigned_dist_group) %>%
+    summarise(
+        standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot)
+    )
 
 pred_dist_df = comparisons(
     probit_dist_fit, 
     variables = "assigned_treatment", 
     newdata = datagrid(
-        assigned_dist_group = unique(analysis_data$assigned_dist_group)
+        assigned_dist_group = unique(analysis_data$assigned_dist_group),
+        standard_cluster.dist.to.pot = dist_bar %>% pull(standard_cluster.dist.to.pot)
     )
 )
+
 pred_df = comparisons(
     probit_fit, 
     variables = "assigned_treatment", 
@@ -526,6 +554,66 @@ pred_df = comparisons(
         assigned_dist_group = unique(analysis_data$assigned_dist_group)
     )
 )
+
+pred_df %>%
+    as_tibble() %>%
+    select(
+        contrast,
+        assigned_dist_group,
+        estimate, 
+        conf.low,
+        conf.high,
+        p.value
+    )
+
+quick_plot = function(x) {
+    x %>%
+        ggplot(aes(
+            x = estimate,
+            xmin = conf.low,
+            xmax = conf.high,
+            y = contrast
+        )) +
+        facet_wrap(~assigned_dist_group, ncol = 1) +
+        geom_pointrange() +
+        theme_minimal() +
+        geom_vline(xintercept = 0, linetype = "longdash")
+}
+
+pred_dist_df %>%
+    as_tibble()  %>%
+    left_join(
+        dist_bar %>% rename(dg = assigned_dist_group),
+        by = "standard_cluster.dist.to.pot"
+    )  %>%
+    filter(dg == assigned_dist_group) %>%
+    select(
+        contrast,
+        assigned_dist_group,
+        estimate, 
+        conf.low,
+        conf.high,
+        p.value
+    )  %>%
+    mutate(
+        contrast = str_extract(contrast, "\\w+")
+    ) %>%
+    mutate(
+        contrast = factor(contrast, levels = c("bracelet", "calendar", "ink")) %>% fct_rev()
+    ) %>%
+    quick_plot()
+
+
+pred_df %>%
+    as_tibble() %>%
+    mutate(
+        contrast = str_extract(contrast, "\\w+")
+    ) %>%
+    mutate(
+        contrast = factor(contrast, levels = c("bracelet", "calendar", "ink")) %>% fct_rev()
+    ) %>%
+    quick_plot()
+
 
 
 pred_dist_df %>%
@@ -667,7 +755,7 @@ ggsave(
 #### Regressions ####
 probit_fit = analysis_data %>%
     feglm(
-        dewormed ~ 0 + assigned_treatment:assigned_dist_group | county, 
+        dewormed ~ 0 + assigned_treatment:assigned_dist_group + i(county, ref = "Busia"), 
         data = ., 
         family = binomial(link = "probit"), 
         cluster = ~cluster.id
@@ -747,6 +835,11 @@ etable(
     postprocess.tex = tex_postprocessing,
     file = "presentations/tables/rf-mechanism-full-regression-table.tex"
 )
+
+stop()
+
+
+etable(probit_fit, probit_dist_fit)
 
 
 
