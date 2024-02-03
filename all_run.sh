@@ -8,9 +8,9 @@
 #SBATCH --output=temp/log/takeup-%A_%a.log
 #SBATCH --error=temp/log/takeup-%A_%a.log
 #SBATCH --export=IN_SLURM=1
-#SBATCH --array=0-5          # create 10 tasks
+#SBATCH --array=0-2          # create 10 task
 
-LATEST_VERSION=98
+LATEST_VERSION=101
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
 SLURM_INOUT_DIR="/project/akaring/takeup-data/data/stan_analysis_data"
@@ -24,8 +24,8 @@ if [[ -v IN_SLURM ]]; then
 
   module load -f midway2 gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
 
-  OUTPUT_ARGS="--output-path=${SLURM_INOUT_DIR}"
-  POSTPROCESS_INOUT_ARGS="--input-path=${SLURM_INOUT_DIR} --output-path=${SLURM_INOUT_DIR}"
+  OUTPUT_ARGS=" --output-path=${SLURM_INOUT_DIR}"
+  POSTPROCESS_INOUT_ARGS=" --input-path=${SLURM_INOUT_DIR} --output-path=${SLURM_INOUT_DIR}"
   CORES=$SLURM_CPUS_PER_TASK
 
   echo "Running with ${CORES} cores."
@@ -57,33 +57,37 @@ fit_model () {
 source quick_postprocess.sh
 
 models=(
-  "REDUCED_FORM_NO_RESTRICT"
-  "REDUCED_FORM_NO_RESTRICT_NO_GP"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
+#  "REDUCED_FORM_NO_RESTRICT"
+#  "REDUCED_FORM_NO_RESTRICT_NO_GP"
+   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
+#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA"
+#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER"
+#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_CLUSTER"
+   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB"
+   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FIXED_FOB"
 )
 
 model=${models[${SLURM_ARRAY_TASK_ID}]}
 rf_model=()
 struct_model=()
 
-for model in "${models[@]}"; do
-  if [[ $model == *"REDUCED"* ]]; then
-    rf_model+=("$model")
-  else
-    struct_model+=("$model")
-  fi
-done
+fit_model ${model}
 
-for model in "${rf_model[@]}"; do
-  postprocess_rf_models "$model" ${VERSION} ${POSTPROCESS_INOUT_ARGS} &
-done
-
-for model in "${struct_model[@]}"; do
-  postprocess_struct_models "$model" ${VERSION}${POSTPROCESS_INOUT_ARGS} &
-done
-
-# Wait for all background jobs to finish
-wait
+#for model in "${models[@]}"; do
+#  if [[ $model == *"REDUCED"* ]]; then
+#    rf_model+=("$model")
+#  else
+#    struct_model+=("$model")
+#  fi
+#done
+#
+#for rf_model in "${rf_model[@]}"; do
+#  postprocess_rf_models "$rf_model" ${VERSION} ${POSTPROCESS_INOUT_ARGS} &
+#done
+#
+#for s_model in "${struct_model[@]}"; do
+#  postprocess_struct_models "$s_model" ${VERSION} ${POSTPROCESS_INOUT_ARGS} &
+#done
+#
+### Wait for all background jobs to finish
+#wait
