@@ -13,7 +13,7 @@ Options:
   
   "), 
   args = if (interactive()) "
-  100 98
+  101 98
   --output-path=temp-data
   --struct-model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB
   --rf-model=brm_flat_dist_fit
@@ -26,7 +26,6 @@ library(posterior)
 library(tidybayes)
 
 
-            #   reduced_cluster_benefit_cost[obs_cluster_id[included_monitored_obs]] + rows_dot_product(cluster_treatment_design_matrix[obs_cluster_id[included_monitored_obs]], reduced_beta_age_group[obs_age_group[included_monitored_obs]])
 source("quick_postprocess_functions.R")
 
 # N.B. treat_idx (the second idx, is the mu (signalling) idx)
