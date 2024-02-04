@@ -24,10 +24,16 @@ library(tidyverse)
 library(cmdstanr)
 library(posterior)
 library(tidybayes)
+library(brms)
+library(ggthemes)
+library(latex2exp)
 
 
 source("quick_postprocess_functions.R")
 
+canva_pal = "Primary colors with a vibrant twist"
+
+dist_sd = readRDS("temp-data/sd_of_dist.rds")
 # N.B. treat_idx (the second idx, is the mu (signalling) idx)
 treat_idx_mapper = tibble(
   treat_idx = 1:4,
@@ -160,7 +166,6 @@ rf_dist_vstar_draws_raw = tidybayes::linpred_rvars(
     ungroup()
 
 
-
 rf_vstar_draws_raw = bind_rows(
     rf_nodist_vstar_draws_raw %>% mutate(model = "reduced form - no distance"),
     rf_dist_vstar_draws_raw %>% mutate(model = "reduced form - distance")
@@ -169,53 +174,131 @@ rf_vstar_draws_raw = bind_rows(
 vstar_draws = bind_rows(
     struct_vstar_draws_raw %>% mutate(model = "structural"),
     rf_vstar_draws_raw
+) %>%
+    mutate(
+        assigned_treatment = factor(assigned_treatment, levels = c("control", "ink", "calendar", "bracelet")) ,
+        assigned_treatment = fct_relabel(assigned_treatment, str_to_title) %>% fct_rev 
+    )
+
+
+vstar_draws = vstar_draws %>%
+    mutate(
+        cluster_mean = mean(structural_cluster_obs_v),
+        demean_w_cluster = structural_cluster_obs_v - cluster_mean 
+    ) 
+
+
+create_within_across_sigma_wstar = function(draws) {
+    var_within = draws %>%
+        group_by(model) %>%
+        mutate(
+            posterior_variance_within_cluster = var(structural_cluster_obs_v)
+        )
+    var_across = draws %>%
+        group_by(model) %>%
+        summarise(
+            variance_across_clusters = rvar_var(structural_cluster_obs_v)
+        ) %>%
+        unnest_rvars()
+    comp_w_draws = bind_rows(
+        var_within %>%
+            select(model,  sigma_w = posterior_variance_within_cluster)  %>%
+            mutate(type = "Within"),
+        var_across %>%
+            select(model, sigma_w = variance_across_clusters)  %>%
+            mutate(type = "Across")
+    ) %>%
+    ungroup()
+    return(comp_w_draws)
+}
+
+comp_var_df = create_within_across_sigma_wstar(vstar_draws)
+
+
+p_sigma_comp = comp_var_df %>%
+    filter(model != "reduced form - no distance") %>%
+    mutate(
+        model = case_when(
+            model == "reduced form - distance" ~ "Reduced Form",
+            model == "structural" ~ "Structural"
+        )
+    ) %>%
+    ggplot(aes(
+        x = sigma_w,
+        fill = model
+    )) +
+    geom_density(
+        alpha = 0.5
+    ) +
+    facet_wrap(~type, scales = "free") + 
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    scale_fill_canva(
+        "", 
+        palette = canva_pal
+    ) +
+    labs(
+        x = TeX('$\\sigma_{w^*}$')
+    )
+
+
+ggsave(
+    plot = p_sigma_comp,
+    file.path(
+       script_options$output_path, 
+       "sigma_comp.pdf"
+    ),
+    width = 8,
+    height = 6
+)
+
+cluster_mean_draws = vstar_draws %>%
+    filter(model != "reduced form - no distance") %>%
+    select(
+        model,
+        assigned_treatment,
+        assigned_dist_group,
+        cluster_id,
+        cluster_mean,
+        standard_cluster.dist.to.pot
+    ) 
+within_cluster_draws = vstar_draws %>%
+    select(
+        model,
+        assigned_treatment,
+        assigned_dist_group,
+        cluster_id,
+        demean_w_cluster,
+        standard_cluster.dist.to.pot
+    ) %>%
+    filter(model != "reduced form - no distance") %>%
+    unnest_rvars() %>%
+    ungroup()
+
+comp_w_draws = bind_rows(
+    within_cluster_draws %>% 
+        rename(w_star = demean_w_cluster) %>%
+        mutate(type = "Within Cluster"),
+    cluster_mean_draws %>%
+        rename(w_star = cluster_mean) %>%
+        mutate(type = "Across Cluster")
 )
 
 
-vstar_draws %>%
-    mutate(
-        e_v = mean(structural_cluster_obs_v)
-    ) %>%
-    filter(model != "reduced form - no distance") %>%
+comp_w_draws %>%
     ggplot(aes(
-        x = e_v,
-        y = interaction(assigned_treatment),
+        x = w_star,
         fill = model
-    ), alpha = 0.1) +
-    ggridges::geom_density_ridges(alpha = 0.5) +
-    ggridges::theme_ridges() +
-    theme(legend.position = "bottom") +
-    facet_wrap(~assigned_dist_group) +
-    ggthemes::scale_fill_canva("", palette = "Primary colors with a vibrant twist") 
+    )) +
+    geom_density(alpha = 0.5)  +
+    theme_minimal() +
+    theme(legend.position = "bottom")  +
+    facet_wrap(~type, scales = "free") +
+    scale_fill_canva(
+        "", 
+        palette = canva_pal
+        )  
 
-vstar_draws %>%
-    group_by(
-        model,
-        assigned_treatment,
-        assigned_dist_group
-    ) %>%
-    mutate(
-        within_var = var(structural_cluster_obs_v),
-        across_var = rvar_var(structural_cluster_obs_v)
-    ) %>%
-    select(
-        model,
-        cluster_id,
-        assigned_treatment,
-        assigned_dist_group,
-        within_var,
-        across_var
-    )  %>%
-    ggplot(aes(
-        xdist = across_var,
-        y = 
-    ))
-    
-    
-    
-    
-    
-    
 
 
 vstar_stats = vstar_draws %>%
@@ -261,11 +344,9 @@ vstar_stats = vstar_draws %>%
         contains("heterogeneity")
         )   
 
-vstar_stats %>%
-    select(-contains("no distance")) %>%
-    View()
 
 max_dist = max(vstar_draws$standard_cluster.dist.to.pot, na.rm = TRUE)*1.05
+
 
 overall_mean_vstar = vstar_draws %>%
     group_by(
@@ -282,6 +363,13 @@ overall_mean_vstar = vstar_draws %>%
             0,
             max_dist
         )
+    ) %>%
+    mutate(
+        model = case_when(
+            model == "reduced form - distance" ~ "Reduced Form",
+            model == "structural" ~ "Structural"
+        ),
+        dist = standard_cluster.dist.to.pot * dist_sd
     )
 
 
@@ -289,62 +377,55 @@ summ_vstar_draws =  vstar_draws %>%
     median_qi(
         structural_cluster_obs_v
     )  %>%
-    to_broom_names()
+    to_broom_names() %>%
+    mutate(
+        model = case_when(
+            model == "reduced form - distance" ~ "Reduced Form",
+            model == "structural" ~ "Structural"
+        )
+    ) %>%
+    mutate(
+        dist = standard_cluster.dist.to.pot * dist_sd
+    )
 
-stop()
 
 
 
-summ_vstar_draws %>%
+p_dist_plot = summ_vstar_draws %>%
     filter(model != "reduced form - no distance")  %>%
     ggplot(aes(
         x = structural_cluster_obs_v,
-        xmin = conf.low,
-        xmax = conf.high,
-        y = standard_cluster.dist.to.pot,
-        colour = assigned_dist_group
+        y = dist/1000,
+        colour = model
     )) +
-    facet_grid(model ~ assigned_treatment)  +
-    geom_pointrange()  +
+    facet_grid(assigned_treatment~ model)  +
+    geom_pointrange(aes(
+        xmin = conf.low,
+        xmax = conf.high
+    ))  +
     geom_point(
         data = overall_mean_vstar %>% filter(model != "reduced form - no distance"),
-        inherit.aes = FALSE,
         aes(
             x = mean_v,
-            y = standard_cluster.dist.to.pot,
-            group = assigned_dist_group,
-            colour = assigned_dist_group
+            colour = model
         ),
         shape = 4
     ) +
-    theme_minimal() +
-    theme(legend.position = "none")
+    theme_minimal()  +
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist")  +
+    theme(legend.position = "bottom") +
+    labs(
+        x = TeX("$w*$"),
+        y = "Distance (km)"
+    )
 
 
-vstar_udraws = vstar_draws %>%
-    unnest_rvars()
-
-vstar_udraws %>%
-filter(model %in% c("reduced form - distance", "structural")) %>%
-  mutate(
-    assigned_dist_group = str_to_title(assigned_dist_group),
-    assigned_treatment = str_to_title(assigned_treatment)
-  ) %>%
-  ggplot(aes(
-    x = structural_cluster_obs_v
-  )) +
-  # geom_histogram(position = position_dodge(0.5), bins = 60) +
-  geom_histogram(
-    aes(
-      structural_cluster_obs_v, 
-      y = after_stat(ndensity), 
-      fill = model)
-      , 
-        position = "dodge", alpha = 0.75) +
-  facet_grid(assigned_treatment ~ assigned_dist_group)  +
-  theme_minimal() +
-  theme(legend.position = "bottom") +
-  ggthemes::scale_fill_canva("", palette = "Primary colors with a vibrant twist") +
-  labs(
-    y = "", x = latex2exp::TeX("$w*$")
-  ) 
+ggsave(
+    plot = p_dist_plot,
+    file.path(
+       script_options$output_path, 
+       "vstar_dist_plot.pdf"
+    ),
+    width = 10,
+    height = 10
+)
