@@ -14,7 +14,7 @@ Options:
   "), 
   args = if (interactive()) "
   101 98
-  --output-path=temp-data
+  --output-path=temp-data/w_distribution
   --struct-model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB
   --rf-model=brm_flat_dist_fit
   1
@@ -28,6 +28,8 @@ library(brms)
 library(ggthemes)
 library(latex2exp)
 
+
+dir.create(script_options$output_path, showWarnings = FALSE)
 
 source("quick_postprocess_functions.R")
 
@@ -242,11 +244,54 @@ p_sigma_comp = comp_var_df %>%
     )
 
 
+
 ggsave(
     plot = p_sigma_comp,
     file.path(
        script_options$output_path, 
        "sigma_comp.pdf"
+    ),
+    width = 8,
+    height = 6
+)
+
+
+p_sigma_comp_hist = comp_var_df %>%
+    filter(model != "reduced form - no distance") %>%
+    mutate(
+        model = case_when(
+            model == "reduced form - distance" ~ "Reduced Form",
+            model == "structural" ~ "Structural"
+        )
+    ) %>%
+    ggplot(aes(
+        x = sigma_w,
+        fill = model
+    )) +
+    geom_histogram(
+        alpha = 0.5,
+        colour = "black",
+        bins = 30,
+        position = position_dodge()
+    ) +
+    facet_wrap(~type, scales = "free") + 
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    scale_fill_canva(
+        "", 
+        palette = canva_pal
+    ) +
+    labs(
+        x = TeX('$\\sigma_{w^*}$')
+    )
+
+p_sigma_comp_hist
+
+ggsave(
+    plot = p_sigma_comp_hist,
+    file.path(
+       script_options$output_path, 
+       "sigma_comp_hist.pdf"
     ),
     width = 8,
     height = 6
@@ -419,12 +464,62 @@ p_dist_plot = summ_vstar_draws %>%
         y = "Distance (km)"
     )
 
+p_dist_plot
 
 ggsave(
     plot = p_dist_plot,
     file.path(
        script_options$output_path, 
        "vstar_dist_plot.pdf"
+    ),
+    width = 10,
+    height = 10
+)
+
+
+
+p_dist_w = vstar_draws %>%
+    select(
+        model,
+        fit_version,
+        fit_type,
+        assigned_treatment,
+        assigned_dist_group,
+        structural_cluster_obs_v
+    ) %>%
+    filter(
+        model != "reduced form - no distance"
+    ) %>%
+    unnest_rvars() %>%
+    ggplot(aes(
+        x = structural_cluster_obs_v,
+        fill = model
+    )) +
+    geom_histogram(
+        alpha = 0.75,
+        colour = "black",
+        # bins = 30,
+        position = position_dodge()
+    ) +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    scale_fill_canva(
+        "", 
+        palette = canva_pal
+    ) +
+    labs(
+        x = TeX('$w^*$')
+    ) +
+    facet_grid(
+        assigned_treatment~assigned_dist_group
+    ) 
+
+
+ggsave(
+    plot = p_dist_w,
+    file.path(
+       script_options$output_path, 
+       "w_distribution.pdf"
     ),
     width = 10,
     height = 10
