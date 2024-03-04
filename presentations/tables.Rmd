@@ -3888,3 +3888,220 @@ wide_pigou_optim_te_tbl_tex %>%
 
 
 ```
+
+
+# Robustness Structural Model With Clustering
+
+
+
+```{r}
+#| robustness-struct-te-table, eval=FALSE
+
+ate_rvar_struct_robust = read_rds(
+    file.path(
+      "temp-data",
+      str_glue(
+          "rvar_processed_dist_fit101_ates_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB_1-4.rds"
+      )
+    )
+  )
+
+struct_ate_robust_df =  ate_rvar_struct_robust %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
+  )
+
+
+
+signal_ate_robust_df = ate_rvar_struct_robust %>%
+  mutate(mu_treatment = str_to_title(mu_treatment)) %>%
+  create_ate_table(
+    .estimand = "signal",
+    group_var = mu_treatment
+  )
+
+private_ate_robust_df = ate_rvar_struct_robust %>%
+  create_ate_table(
+    .estimand = "private",
+    group_var = treatment
+  )
+
+
+ate_tbl_levels = c(
+    "Bracelet",
+    "Calendar",
+    "Ink",
+    "bracelet_minus_calendar",
+    "Control"
+)
+
+robust_incentive_ate_tbl = struct_ate_robust_df %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean()  %>%
+  mutate(estimand = "overall")
+
+robust_private_ate_tbl = private_ate_robust_df %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  mutate(estimand = "private")
+
+robust_signal_ate_tbl = signal_ate_robust_df %>%
+  rename(treatment = mu_treatment) %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  mutate(estimand = "signal")
+
+
+
+robust_all_ate_tbl = bind_rows(
+  robust_incentive_ate_tbl,
+  robust_signal_ate_tbl,
+  robust_private_ate_tbl
+) %>%
+  mutate(estimand = factor(estimand, levels = c('private', 'signal', 'overall')) %>% fct_rev) %>%
+  select(estimand, treatment, everything())
+
+robust_all_ate_tbl
+```
+
+
+```{r}
+latex_group_gap_space = "2em"
+1+2
+```
+
+
+```{r, results="asis"}
+1+3
+
+robust_te_kbl_df = robust_all_ate_tbl %>% 
+  arrange(estimand, treatment) %>%
+  select(-estimand) %>%
+  select(-model) %>%
+  kbl(
+    col.names = c(
+      # "Estimand", 
+      # "Treatment", 
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    # linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    # align = "lcccc", 
+    caption = "Results"
+  )  %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  # add_header_above(
+  #   c(
+  #     " " = 1,
+  #     "Structural" = 4
+  #     )
+  # ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Overall" = 5, 
+      "Panel B: Signalling" = 5, 
+      "Panel C: Private" = 5
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3, 8, 13), hline_after = TRUE) 
+
+robust_te_kbl_df
+
+robust_te_kbl_df %>%
+  custom_save_latex_table(
+    "cluster-robust-struct-te-table"
+  )
+
+x = 1 + 5
+```
+
+
+
+```{r}
+
+robust_overall_te_kbl_df = robust_all_ate_tbl %>% 
+  arrange(estimand, treatment) %>%
+  filter(estimand == "overall") %>%
+  select(-estimand) %>%
+  select(-model) %>%
+  kbl(
+    col.names = c(
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Overall Results") %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Structural" = 4
+      )
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Overall" = 5
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3), hline_after = TRUE) 
+
+robust_overall_te_kbl_df %>%
+  custom_save_latex_table("cluster-robust-struct-overall-te-table")
+
+
+```
