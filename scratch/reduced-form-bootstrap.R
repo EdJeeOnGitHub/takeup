@@ -655,14 +655,6 @@ actual_bayesian_bs_fit = function(seed, data = analysis_data) {
 } 
 
 
-# library(furrr)
-# plan(multisession)
-# bs_draws = future_map_dfr(
-#     1:100,
-#     bs_fit,
-#     .progress = TRUE,
-#     .options = furrr_options(seed = TRUE)
-# )
 
 bs_draws = map_dfr(
     1:500,
@@ -924,7 +916,7 @@ prep_tbl = function(tes, stat = "ci") {
     return(tbl)
 }
 
-nice_kbl_table = function(tbl, cap, stat = params$stat) {
+nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up", stat = params$stat) {
 
   linesep_str = if_else(stat == "ci", "\\addlinespace", "")
 
@@ -933,7 +925,7 @@ nice_kbl_table = function(tbl, cap, stat = params$stat) {
     col.names = c(
       # "Estimand", 
       # "Treatment", 
-      "Dependent variable: Take-up",
+      outcome_var,
       paste0("(", 1:4, ")")
     ), 
     format = "latex", 
@@ -1036,3 +1028,252 @@ main_spec_tbl_weird_order %>%
   custom_save_latex_table(
     table_name = "rf_main_spec_tbl_weird_order"
   )
+
+
+
+
+disagg_base_belief_data = analysis_data %>%
+  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
+  nest_join(
+    endline.know.table.data %>% 
+      filter(fct_match(know.table.type, "table.A")),
+    by = "KEY.individ", 
+    name = "knowledge_data"
+  ) %>% 
+  mutate(
+    map_dfr(knowledge_data, ~ {
+      tibble(
+        obs_know_person = sum(.x$num.recognized),
+        obs_know_person_prop = mean(.x$num.recognized),
+        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
+        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
+        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
+        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
+        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
+        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
+      )
+    }
+  )) %>%
+    filter(obs_know_person > 0)  %>%
+    select(
+      KEY.individ, 
+      contains("know"), 
+      assigned.treatment, 
+      dist.pot.group, 
+      assigned_dist_group,
+      cluster.id,
+      cluster.dist.to.pot,
+      standard_cluster.dist.to.pot,
+      county
+      ) %>%
+    mutate(
+        doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed, 
+        doesnt_think_other_knows = obs_know_person - thinks_other_knows
+    ) %>% 
+    select(KEY.individ, 
+           assigned.treatment,
+           assigned_dist_group,
+           obs_know_person,
+           knows_other_dewormed_yes,
+           knows_other_dewormed_no,
+           doesnt_know_other_dewormed, 
+           thinks_other_knows_yes, 
+           thinks_other_knows_no, 
+           doesnt_think_other_knows,
+           cluster.id,
+            cluster.dist.to.pot,
+            standard_cluster.dist.to.pot,
+           county
+           ) %>%
+    gather(variable, value, 
+        knows_other_dewormed_yes:doesnt_think_other_knows)   %>%
+    mutate(knowledge_type = case_when(
+        str_detect(variable, "_yes") ~ "yes",
+        str_detect(variable, "_no") ~ "no",
+        str_detect(variable, "doesnt") ~ "doesn't know"
+    )) %>%
+    mutate(belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord")) %>%
+    mutate(prop = value/obs_know_person) 
+
+know_df = disagg_base_belief_data %>%
+  filter(knowledge_type == "doesn't know") %>%
+  mutate(
+    prop_knows = 1 - prop
+  ) %>%
+  group_by(cluster.id) %>%
+  mutate(cluster_id = cur_group_id()) %>%
+  ungroup() %>%
+  mutate(
+      county = factor(county),
+      cluster.id = factor(cluster.id),
+      assigned_treatment = assigned.treatment,
+      signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+      signal = factor(signal, levels = c("no signal", "signal"))
+  ) 
+  
+
+
+pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
+    if (realised_fit == TRUE) {
+        data$wt = 1
+    } else {
+        data$wt = weights[data$cluster_id]
+    }
+    fit = f(data, weights = ~wt)
+    data$pred = predict(fit)
+    signal_fit = f_signal(data, weights = ~wt)
+    data$signal_pred = predict(signal_fit)
+    data = data %>%
+        select(
+            assigned_dist_group,
+            assigned_treatment,
+            signal,
+            standard_cluster.dist.to.pot,
+            pred,
+            signal_pred
+        )
+    return(data)
+}
+
+
+
+bayes_bs_f = function(seed, f, f_signal, data = know_df) {
+    set.seed(seed)
+    n_clusters = length(unique(data$cluster.id))
+    alpha = rep(1, n_clusters)
+    weights = generate_dirichlet(alpha, 1)
+    bs_fit = pred_bs_f(f, f_signal, data, weights = weights) %>%
+        create_bs_preds()
+    bs_fit$seed = seed
+    return(bs_fit)
+} 
+
+actual_bayesian_bs_fit = function(seed, f, f_signal, data = know_df) {
+    bs_fit = pred_bs_f(f, f_signal, data, 1, realised_fit = TRUE) %>%
+        create_bs_preds()
+    bs_fit$seed = seed
+    return(bs_fit)
+} 
+
+
+
+f_know = function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county,
+    data = data,
+    weights = weights
+  )
+}
+
+f_know_signal = function(data, weights) {
+  feols(
+    prop_knows ~ signal + standard_cluster.dist.to.pot + i(signal, standard_cluster.dist.to.pot, "no signal") | county,
+    data = data,
+    weights = weights
+  )
+}
+
+
+fob_know_bs_draws = map_dfr(
+    1:500,
+    ~bayes_bs_f(
+        seed = .x, 
+        f = f_know, 
+        f_signal = f_know_signal, 
+        data = know_df %>% 
+          filter(belief_type == "1ord")
+    ),
+    .progress = TRUE
+)
+
+
+know_bs_te_draws = fob_know_bs_draws %>%
+    filter(!is.na(assigned_treatment)) %>%
+    select(-signal) %>%
+    create_tes() %>%
+    add_predictions()  %>%
+    rename(estimate = mean_pred)
+
+know_bs_signal_draws = fob_know_bs_draws %>%
+    filter(!is.na(signal)) %>%
+    select(-assigned_treatment) %>%
+    create_signal_tes() %>%
+    add_signal_predictions() %>%
+    rename(
+      assigned_treatment = signal,
+      estimate = mean_pred
+    )
+
+
+
+realised_know_fit = actual_bayesian_bs_fit(
+  seed = "realised fit", 
+  f = f_know, 
+  f_signal = f_know_signal,
+  data = know_df %>% 
+    filter(belief_type == "1ord"))
+
+realised_know_signal_fit = realised_know_fit %>%
+    filter(!is.na(signal)) %>%
+    select(-assigned_treatment) %>%
+    create_signal_tes() %>%
+    add_signal_predictions()  %>%
+    rename(realised_pred = mean_pred, assigned_treatment = signal) %>%
+    select(assigned_dist_group, assigned_treatment, realised_pred)
+
+
+realised_know_te_fit = realised_know_fit %>%
+    filter(!is.na(assigned_treatment)) %>%
+    select(-signal) %>%
+    create_tes() %>%
+    add_predictions()  %>%
+    rename(realised_pred = mean_pred) %>%
+    select(assigned_dist_group, assigned_treatment, realised_pred)
+
+
+clean_know_signal_tes = add_summ_stats(know_bs_signal_draws, realised_know_signal_fit)
+clean_know_tes = add_summ_stats(know_bs_te_draws, realised_know_te_fit)
+
+clean_know_df = bind_rows(
+  clean_know_tes,
+  clean_know_signal_tes
+) %>%
+  mutate(
+    show_pval_only = assigned_treatment %in% pval_only_terms
+  ) %>%
+  filter(assigned_treatment != "no signal")
+
+
+clean_know_df %>%
+  prep_tbl(stat = params$stat) %>%
+  nice_kbl_table(
+    cap = "Average Treatment Effects: Knowledge",
+    outcome_var = "Dependent variable: First-order beliefs"
+  ) %>%
+  custom_save_latex_table(
+    table_name = "rf_know_spec_tbl"
+  )
+
+clean_know_df %>%
+  prep_tbl(stat = params$stat) %>%
+  mutate(
+    assigned_treatment = fct_relevel(
+      assigned_treatment, 
+      c(
+        "Control", "$p$(Any Signal > No Signal)", "$p$(Bracelet > Calendar)", 
+        "Bracelet", "Calendar", "Ink"
+      ))) %>% 
+    arrange(assigned_treatment) %>%
+  nice_kbl_table(
+    cap = "Average Treatment Effects: Knowledge",
+    outcome_var = "Dependent variable: First-order beliefs"
+  ) %>%
+  custom_save_latex_table(
+    table_name = "rf_know_spec_tbl_weird_order"
+  )
+
+
+    
+
+clean_know_df %>%
+  write_csv("temp-data/knowledge-tidy-tes.csv")  
