@@ -558,7 +558,8 @@ create_bs_preds = function(pred_df) {
         signal_pred = pred_df %>%
             group_by(signal, assigned_dist_group) %>%
             summarise(
-                mean_pred = mean(signal_pred)
+                mean_pred = mean(signal_pred),
+                .groups = "drop"
             ) %>%
             bind_rows(
             pred_df %>%
@@ -598,8 +599,8 @@ generate_dirichlet <- function(alpha, n) {
   return(dirichlet_samples)
 }
 
-quick_bayes_pred = function(data, weights) {
-    if (is.na(weights)) {
+quick_bayes_pred = function(data, weights, realised_fit = FALSE) {
+    if (realised_fit == TRUE) {
         data$wt = 1
     } else {
         data$wt = weights[data$cluster_id]
@@ -647,7 +648,7 @@ bayesian_bs_fit = function(seed, data = analysis_data) {
 } 
 
 actual_bayesian_bs_fit = function(seed, data = analysis_data) {
-    bs_fit = quick_bayes_pred(data, weights = NA) %>%
+    bs_fit = quick_bayes_pred(data, realised_fit = TRUE) %>%
         create_bs_preds()
     bs_fit$seed = seed
     return(bs_fit)
@@ -754,13 +755,18 @@ clean_bs_te_draws = bs_draws %>%
     filter(!is.na(assigned_treatment)) %>%
     select(-signal) %>%
     create_tes() %>%
-    add_predictions()  
+    add_predictions()  %>%
+    rename(estimate = mean_pred)
 
 clean_bs_signal_draws = bs_draws %>%
     filter(!is.na(signal)) %>%
     select(-assigned_treatment) %>%
     create_signal_tes() %>%
-    add_signal_predictions() 
+    add_signal_predictions() %>%
+    rename(
+      assigned_treatment = signal,
+      estimate = mean_pred
+    )
 
 
 
@@ -776,107 +782,77 @@ estimate_actual_fit = function(split_data = split_analysis_data) {
 }
 
 actual_fit = estimate_actual_fit()
-bs_actual_fit = actual_bayesian_bs_fit(seed = "realised fit")
+bs_actual_fit = actual_bayesian_bs_fit(seed = "realised fit") 
 
-actual_fit %>%
+realised_signal_fit = bs_actual_fit %>%
+    filter(!is.na(signal)) %>%
+    select(-assigned_treatment) %>%
+    create_signal_tes() %>%
+    add_signal_predictions()  %>%
+    rename(realised_pred = mean_pred, assigned_treatment = signal) %>%
+    select(assigned_dist_group, assigned_treatment, realised_pred)
+
+realised_te_fit = bs_actual_fit %>%
     filter(!is.na(assigned_treatment)) %>%
     select(-signal) %>%
     create_tes() %>%
-    add_predictions() 
+    add_predictions()  %>%
+    rename(realised_pred = mean_pred) %>%
+    select(assigned_dist_group, assigned_treatment, realised_pred)
 
-bs_actual_fit %>%
-    filter(!is.na(assigned_treatment)) %>%
-    select(-signal) %>%
-    create_tes() %>%
-    add_predictions() 
-
-ci_width = 0.95
-
-
-clean_signal_tes = clean_bs_signal_draws %>%
-    group_by(
-        signal,
-        assigned_dist_group
-    ) %>%
-    summarise(
-        std_error = sd(mean_pred),
-        conf.low = quantile(mean_pred, (1 - ci_width)/2),
-        conf.high = quantile(mean_pred, 1 - (1 - ci_width)/2)
-    ) %>%
-    left_join(
-        actual_fit %>%
-            filter(!is.na(signal)) %>%
-            select(-assigned_treatment) %>%
-            create_signal_tes() %>%
-            add_signal_predictions()  %>%
-            rename(realised_pred = mean_pred) %>%
-            select(assigned_dist_group, signal, realised_pred),
-        by = c("assigned_dist_group", "signal")
-    ) %>%
-    mutate(
-        p.value = 2*pnorm(-abs(realised_pred)/std_error),
-        oneside_pval = pnorm(-realised_pred/std_error)
-    ) %>%
-    mutate(
-        p.value = round(p.value, 4),
-        oneside_pval = round(oneside_pval, 4)
-    ) %>%
-    rename(assigned_treatment = signal) %>%
-    select(
-        assigned_treatment, 
-        assigned_dist_group, 
-        realised_pred, 
-        std_error, 
-        p.value, 
-        oneside_pval) %>%
-    rename(estimate = realised_pred) 
+add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
+    clean_tes = bs_draws %>%
+      group_by(
+          assigned_treatment,
+          assigned_dist_group
+      ) %>%
+      summarise(
+          std_error = sd(estimate),
+          conf.low = quantile(estimate, (1 - ci_width)/2),
+          conf.high = quantile(estimate, 1 - (1 - ci_width)/2)
+      ) %>%
+      left_join(
+          actual_fit,
+          by = c("assigned_dist_group", "assigned_treatment")
+      ) %>%
+      mutate(
+          pval = 2*pnorm(-abs(realised_pred)/std_error),
+          oneside_pval = pnorm(-realised_pred/std_error)
+      ) %>%
+      mutate(
+          pval = round(pval, 4),
+          oneside_pval = round(oneside_pval, 4)
+      ) %>%
+      select(
+          assigned_treatment, 
+          assigned_dist_group, 
+          realised_pred, 
+          std_error, 
+          conf.low,
+          conf.high,
+          pval, 
+          oneside_pval) %>%
+      rename(estimate = realised_pred) 
+      return(clean_tes)
+}
 
 
-clean_tes = clean_bs_te_draws %>%
-    group_by(
-        assigned_treatment,
-        assigned_dist_group
-    ) %>%
-    summarise(
-        std_error = sd(mean_pred),
-        conf.low = quantile(mean_pred, (1 - ci_width)/2),
-        conf.high = quantile(mean_pred, 1 - (1 - ci_width)/2)
-    ) %>%
-    left_join(
-        actual_fit %>%
-            filter(!is.na(assigned_treatment)) %>%
-            select(-signal) %>%
-            create_tes() %>%
-            add_predictions()  %>%
-            rename(realised_pred = mean_pred) %>%
-            select(assigned_dist_group, assigned_treatment, realised_pred),
-        by = c("assigned_dist_group", "assigned_treatment")
-    ) %>%
-    mutate(
-        p.value = 2*pnorm(-abs(realised_pred)/std_error),
-        opval = pnorm(-realised_pred/std_error)
-    ) %>%
-    mutate(
-        p.value = round(p.value, 4),
-        opval = round(opval, 4)
-    ) %>%
-    select(assigned_treatment, assigned_dist_group, realised_pred, std_error, p.value, opval) %>%
-    rename(estimate = realised_pred)  %>%
-    mutate(
-        assigned_treatment = factor(
-            assigned_treatment,
-            levels = c("control", "bracelet - calendar", "ink", "calendar", "bracelet")
-        ),
-        assigned_dist_group = factor(
-            assigned_dist_group,
-            levels = c("combined", "close", "far", "far - close")
-        )
-    )  %>%
-    arrange(assigned_treatment, assigned_dist_group)
+clean_signal_tes = add_summ_stats(clean_bs_signal_draws, realised_signal_fit)
+clean_tes = add_summ_stats(clean_bs_te_draws, realised_te_fit)
 
-clean_tes
 
-clean_signal_tes
+pval_only_terms = c("bracelet - calendar", "signal")
+
+combined_clean_tes = bind_rows(
+  clean_tes,
+  clean_signal_tes
+) %>%
+  mutate(
+    show_pval_only = assigned_treatment %in% pval_only_terms
+  ) %>%
+  filter(assigned_treatment != "no signal") 
+
+
 
 
 prep_tbl = function(tes, stat = "ci") {
@@ -891,12 +867,10 @@ prep_tbl = function(tes, stat = "ci") {
         "bracelet",
         "calendar",
         "ink",
-        "bracelet - calendar",
         "control",
-        "$p$(Bracelet > Calendar)",
-        "$p$(Any signal > No signal)"
+        "signal",
+        "bracelet - calendar"
     )
-
 
 
 
@@ -913,40 +887,40 @@ prep_tbl = function(tes, stat = "ci") {
             )
     } else if (stat == "std.error"){
         tes = tes %>%
-            mutate(val = paste0("{[", round(std.error, 3), "]}"))
+            mutate(val = paste0("{[", round(std_error, 3), "]}"))
     } else {
         tes = tes %>%
             mutate(
-                val = paste0("{[", round(p.value, 3), "]}")
+                val = paste0("{[", round(pval, 3), "]}")
             )
     }
-    
 
     tbl =  tes %>%
-        select(contrast, assigned_dist_group, estimate, conf.low, conf.high, val)  %>%
-        mutate(across(where(is.numeric), round, 3)) %>%
+        select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, oneside_pval, show_pval_only)  %>%
+        mutate(across(where(is.numeric), ~round(.x, 3))) %>%
         mutate(
             estim_std = if_else(
-                is.na(conf.low),
-                linebreak(paste0(estimate), align = "c"),
+                show_pval_only,
+                linebreak(paste0(oneside_pval), align = "c"),
                 linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
             )
         ) %>%
-        select(-estimate, -any_of(c("p.value", "conf.low", "conf.high")), -val) %>%
+        select(assigned_treatment, assigned_dist_group, estim_std) %>%
         mutate(
             assigned_dist_group = factor(assigned_dist_group, tbl_dist_levels),
             assigned_dist_group = fct_relabel(assigned_dist_group, str_to_title),
-            contrast = factor(contrast, tbl_contrast_levels)
+            assigned_treatment = factor(assigned_treatment, tbl_contrast_levels)
         ) %>%
-        arrange(assigned_dist_group, contrast) %>%
+        arrange(assigned_dist_group, assigned_treatment) %>%
         pivot_wider(
             names_from = assigned_dist_group,
             values_from = estim_std
-        )  %>%
+        ) %>%
         mutate(
-            contrast = fct_relabel(contrast, str_to_title),
-            contrast = fct_recode(contrast, "$p$(Any signal > No signal)" = "$P$(Any Signal > No Signal)")
-        )
+            assigned_treatment = fct_relabel(assigned_treatment, str_to_title),
+            assigned_treatment = fct_recode(assigned_treatment, "$p$(Any Signal > No Signal)" = "Signal"),
+            assigned_treatment = fct_recode(assigned_treatment, "$p$(Bracelet > Calendar)" = "Bracelet - Calendar")
+        ) 
     return(tbl)
 }
 
@@ -988,5 +962,77 @@ nice_kbl_table = function(tbl, cap, stat = params$stat) {
       )
   ) %>%
   row_spec(c(3), hline_after = TRUE) 
-
 }
+
+
+
+main_spec_tbl = combined_clean_tes %>%
+  prep_tbl(stat = params$stat) %>%
+  nice_kbl_table(
+    cap = "Average Treatment Effects: Reduced Form"
+    )
+
+main_spec_tbl_weird_order =  combined_clean_tes %>%
+  prep_tbl(stat = params$stat) %>%
+  mutate(
+    assigned_treatment = fct_relevel(
+      assigned_treatment, 
+      c(
+        "Control", "$p$(Any Signal > No Signal)", "$p$(Bracelet > Calendar)", 
+        "Bracelet", "Calendar", "Ink"
+      ))) %>% 
+    arrange(assigned_treatment) %>%
+  nice_kbl_table(
+    cap = "Average Treatment Effects: Reduced Form"
+  )
+    
+
+
+custom_save_latex_table = function(table, table_name, table_output_path = params$table_output_path){
+  table_conn = file(
+    file.path(
+      table_output_path, paste0(table_name, ".tex")
+    )
+  )
+  # Create space in latex due to rmd bug with \\ immediately followed by [
+  # table = table  %>%
+  #   str_replace_all(., "removeme12345", "  ")
+
+  attr(table, "kable_meta")$contents = str_replace_all(attr(table, "kable_meta")$contents, "removeme12345", " ")
+  table[1] = str_replace_all(table[1], "removeme12345", " ")
+
+
+  clean_table = table %>%
+    str_remove(
+      ., 
+      fixed("\\begin{table}")
+    ) %>%
+    str_remove(
+      .,
+      "\\\\caption\\{.*\\}"
+    ) %>%
+    str_remove(
+      ., 
+      "\\\\end\\{table\\}"
+    ) 
+    
+    
+    clean_table %>%
+      writeLines(
+        table_conn
+      )
+    close(table_conn)
+
+    return(table)
+}
+
+
+main_spec_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_main_spec_tbl"
+  )
+
+main_spec_tbl_weird_order %>%
+  custom_save_latex_table(
+    table_name = "rf_main_spec_tbl_weird_order"
+  )
