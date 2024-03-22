@@ -532,11 +532,12 @@ split_analysis_data = split(analysis_data, analysis_data$cluster.id)
 
 
 
-create_bs_preds = function(pred_df) {
+create_bs_preds = function(pred_df, ...) {
     preds = pred_df %>%
         group_by(
             assigned_treatment,
-            assigned_dist_group
+            assigned_dist_group,
+            ...
         ) %>%
         summarise(
             mean_pred = mean(pred),
@@ -545,7 +546,8 @@ create_bs_preds = function(pred_df) {
         bind_rows(
             pred_df %>%
                 group_by(
-                    assigned_treatment
+                    assigned_treatment,
+                    ...
                 ) %>%
                 summarise(
                     mean_pred = mean(pred),
@@ -556,7 +558,7 @@ create_bs_preds = function(pred_df) {
                 )
         )
         signal_pred = pred_df %>%
-            group_by(signal, assigned_dist_group) %>%
+            group_by(signal, assigned_dist_group, ...) %>%
             summarise(
                 mean_pred = mean(signal_pred),
                 .groups = "drop"
@@ -564,7 +566,8 @@ create_bs_preds = function(pred_df) {
             bind_rows(
             pred_df %>%
                 group_by(
-                    signal
+                    signal, 
+                    ...
                 ) %>%
                 summarise(
                     mean_pred = mean(signal_pred)
@@ -576,13 +579,13 @@ create_bs_preds = function(pred_df) {
     preds = bind_rows(preds, signal_pred)
        return(preds)
 }
-bs_fit = function(seed, split_data = split_analysis_data) {
+bs_fit = function(seed, split_data = split_analysis_data, ...) {
     set.seed(seed)
     ids = names(split_data)
     sampled_ids = sample(ids, length(ids), replace = TRUE)
     bs_df = create_bs_data(split_data, sampled_ids)
     bs_fit = quick_pred(bs_df) %>%
-        create_bs_preds()
+        create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 }
@@ -636,20 +639,20 @@ quick_bayes_pred = function(data, weights, realised_fit = FALSE) {
 }
 
 
-bayesian_bs_fit = function(seed, data = analysis_data) {
+bayesian_bs_fit = function(seed, data = analysis_data, ...) {
     set.seed(seed)
     n_clusters = length(unique(data$cluster.id))
     alpha = rep(1, n_clusters)
     weights = generate_dirichlet(alpha, 1)
     bs_fit = quick_bayes_pred(data, weights = weights) %>%
-        create_bs_preds()
+        create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
 
-actual_bayesian_bs_fit = function(seed, data = analysis_data) {
+actual_bayesian_bs_fit = function(seed, data = analysis_data, ...) {
     bs_fit = quick_bayes_pred(data, realised_fit = TRUE) %>%
-        create_bs_preds()
+        create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
@@ -663,10 +666,10 @@ bs_draws = map_dfr(
 )
 
 
-add_predictions = function(draws) {
+add_predictions = function(draws, ...) {
     bra_minus_cal = draws %>%
             filter(assigned_treatment == "bracelet" | assigned_treatment == "calendar") %>%
-            group_by(seed, assigned_dist_group) %>%
+            group_by(seed, assigned_dist_group, ...) %>%
             summarise(
                 mean_pred = mean_pred[assigned_treatment == "bracelet"] - mean_pred[assigned_treatment == "calendar"],
             ) %>%
@@ -677,7 +680,7 @@ add_predictions = function(draws) {
     fc_draws = draws %>%
     group_by(
         seed,
-        assigned_treatment
+        assigned_treatment, ...
     ) %>%
     summarise(
         mean_pred = mean_pred[assigned_dist_group == "far"] - mean_pred[assigned_dist_group == "close"],
@@ -700,11 +703,12 @@ add_predictions = function(draws) {
     return(draws)
 }
 
-add_signal_predictions = function(draws) {
+add_signal_predictions = function(draws, ...) {
     fc_draws = draws %>%
     group_by(
         seed,
-        signal
+        signal,
+        ...
     ) %>%
     summarise(
         mean_pred = mean_pred[assigned_dist_group == "far"] - mean_pred[assigned_dist_group == "close"],
@@ -727,38 +731,51 @@ add_signal_predictions = function(draws) {
     return(draws)
 }
 
-create_tes = function(draws) {
+create_tes = function(draws, ...) {
     draws %>%
-        group_by(seed, assigned_dist_group) %>%
+        group_by(seed, assigned_dist_group, ...) %>%
         mutate(
             mean_pred = if_else(assigned_treatment == "control", mean_pred, mean_pred - mean_pred[assigned_treatment == "control"])
         )
 }
 
-create_signal_tes = function(draws) {
+create_signal_tes = function(draws, ...) {
     draws %>%
-        group_by(seed, assigned_dist_group) %>%
+        group_by(seed, assigned_dist_group, ...) %>%
         mutate(
             mean_pred = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
         )
 }
 
+
+clean_signal_draws = function(draws, ...) {
+    draws %>%
+        filter(!is.na(signal)) %>%
+        select(-assigned_treatment) %>%
+        create_signal_tes(., ...) %>%
+        add_signal_predictions(., ...) %>%
+        rename(
+            assigned_treatment = signal,
+            estimate = mean_pred
+        )
+}
+
+clean_te_draws = function(draws, ...) {
+    draws %>%
+        filter(!is.na(assigned_treatment)) %>%
+        select(-signal) %>%
+        create_tes(., ...) %>%
+        add_predictions(., ...)  %>%
+        rename(estimate = mean_pred)
+}
+
+
+
 clean_bs_te_draws = bs_draws %>%
-    filter(!is.na(assigned_treatment)) %>%
-    select(-signal) %>%
-    create_tes() %>%
-    add_predictions()  %>%
-    rename(estimate = mean_pred)
+  clean_te_draws()
 
 clean_bs_signal_draws = bs_draws %>%
-    filter(!is.na(signal)) %>%
-    select(-assigned_treatment) %>%
-    create_signal_tes() %>%
-    add_signal_predictions() %>%
-    rename(
-      assigned_treatment = signal,
-      estimate = mean_pred
-    )
+  clean_signal_draws()
 
 
 
@@ -777,26 +794,20 @@ actual_fit = estimate_actual_fit()
 bs_actual_fit = actual_bayesian_bs_fit(seed = "realised fit") 
 
 realised_signal_fit = bs_actual_fit %>%
-    filter(!is.na(signal)) %>%
-    select(-assigned_treatment) %>%
-    create_signal_tes() %>%
-    add_signal_predictions()  %>%
-    rename(realised_pred = mean_pred, assigned_treatment = signal) %>%
-    select(assigned_dist_group, assigned_treatment, realised_pred)
+  clean_signal_draws() %>%
+  rename(realised_pred = estimate) %>%
+  select(realised_pred, assigned_dist_group, assigned_treatment)
 
 realised_te_fit = bs_actual_fit %>%
-    filter(!is.na(assigned_treatment)) %>%
-    select(-signal) %>%
-    create_tes() %>%
-    add_predictions()  %>%
-    rename(realised_pred = mean_pred) %>%
-    select(assigned_dist_group, assigned_treatment, realised_pred)
+  clean_te_draws() %>%
+  rename(realised_pred = estimate) %>%
+  select(realised_pred, assigned_dist_group, assigned_treatment)
 
 add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
     clean_tes = bs_draws %>%
       group_by(
           assigned_treatment,
-          assigned_dist_group
+          assigned_dist_group,
       ) %>%
       summarise(
           std_error = sd(estimate),
@@ -910,8 +921,9 @@ prep_tbl = function(tes, stat = "ci") {
         ) %>%
         mutate(
             assigned_treatment = fct_relabel(assigned_treatment, str_to_title),
-            assigned_treatment = fct_recode(assigned_treatment, "$p$(Any Signal > No Signal)" = "Signal"),
-            assigned_treatment = fct_recode(assigned_treatment, "$p$(Bracelet > Calendar)" = "Bracelet - Calendar")
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal > No Signal, $p$-value"  = "Signal"), 
+            # "$p$(Any Signal > No Signal)"
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet > Calendar, $p$-value" = "Bracelet - Calendar")
         ) 
     return(tbl)
 }
@@ -970,15 +982,17 @@ main_spec_tbl_weird_order =  combined_clean_tes %>%
     assigned_treatment = fct_relevel(
       assigned_treatment, 
       c(
-        "Control", "$p$(Any Signal > No Signal)", "$p$(Bracelet > Calendar)", 
+        "Control", "$H0$: Any Signal > No Signal, $p$-value",
+        "$H0$: Bracelet > Calendar, $p$-value",
         "Bracelet", "Calendar", "Ink"
       ))) %>% 
     arrange(assigned_treatment) %>%
   nice_kbl_table(
     cap = "Average Treatment Effects: Reduced Form"
   )
-    
 
+combined_clean_tes %>%
+  write_csv("temp-data/reducedform-tidy-tes.csv")  
 
 custom_save_latex_table = function(table, table_name, table_output_path = params$table_output_path){
   table_conn = file(
@@ -1030,7 +1044,7 @@ main_spec_tbl_weird_order %>%
   )
 
 
-
+#### Beliefs -------------------------------------------------------------------
 
 disagg_base_belief_data = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
@@ -1130,27 +1144,28 @@ pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
             signal,
             standard_cluster.dist.to.pot,
             pred,
-            signal_pred
+            signal_pred,
+            any_of("sms_treatment")
         )
     return(data)
 }
 
 
 
-bayes_bs_f = function(seed, f, f_signal, data = know_df) {
+bayes_bs_f = function(seed, f, f_signal, data = know_df, ...) {
     set.seed(seed)
     n_clusters = length(unique(data$cluster.id))
     alpha = rep(1, n_clusters)
     weights = generate_dirichlet(alpha, 1)
     bs_fit = pred_bs_f(f, f_signal, data, weights = weights) %>%
-        create_bs_preds()
+        create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
 
-actual_bayesian_bs_fit = function(seed, f, f_signal, data = know_df) {
+actual_bayesian_bs_fit = function(seed, f, f_signal, data = know_df, ...) {
     bs_fit = pred_bs_f(f, f_signal, data, 1, realised_fit = TRUE) %>%
-        create_bs_preds()
+        create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
@@ -1188,21 +1203,10 @@ fob_know_bs_draws = map_dfr(
 
 
 know_bs_te_draws = fob_know_bs_draws %>%
-    filter(!is.na(assigned_treatment)) %>%
-    select(-signal) %>%
-    create_tes() %>%
-    add_predictions()  %>%
-    rename(estimate = mean_pred)
+  clean_te_draws()
 
 know_bs_signal_draws = fob_know_bs_draws %>%
-    filter(!is.na(signal)) %>%
-    select(-assigned_treatment) %>%
-    create_signal_tes() %>%
-    add_signal_predictions() %>%
-    rename(
-      assigned_treatment = signal,
-      estimate = mean_pred
-    )
+  clean_signal_draws()
 
 
 
@@ -1214,20 +1218,14 @@ realised_know_fit = actual_bayesian_bs_fit(
     filter(belief_type == "1ord"))
 
 realised_know_signal_fit = realised_know_fit %>%
-    filter(!is.na(signal)) %>%
-    select(-assigned_treatment) %>%
-    create_signal_tes() %>%
-    add_signal_predictions()  %>%
-    rename(realised_pred = mean_pred, assigned_treatment = signal) %>%
+    clean_signal_draws() %>%
+    rename(realised_pred = estimate) %>%
     select(assigned_dist_group, assigned_treatment, realised_pred)
 
 
 realised_know_te_fit = realised_know_fit %>%
-    filter(!is.na(assigned_treatment)) %>%
-    select(-signal) %>%
-    create_tes() %>%
-    add_predictions()  %>%
-    rename(realised_pred = mean_pred) %>%
+    clean_te_draws() %>%
+    rename(realised_pred = estimate) %>%
     select(assigned_dist_group, assigned_treatment, realised_pred)
 
 
@@ -1260,8 +1258,11 @@ clean_know_df %>%
     assigned_treatment = fct_relevel(
       assigned_treatment, 
       c(
-        "Control", "$p$(Any Signal > No Signal)", "$p$(Bracelet > Calendar)", 
+
+        "Control", "$H0$: Any Signal > No Signal, $p$-value",
+        "$H0$: Bracelet > Calendar, $p$-value",
         "Bracelet", "Calendar", "Ink"
+
       ))) %>% 
     arrange(assigned_treatment) %>%
   nice_kbl_table(
@@ -1277,3 +1278,254 @@ clean_know_df %>%
 
 clean_know_df %>%
   write_csv("temp-data/knowledge-tidy-tes.csv")  
+
+
+#### SMS -----------------------------------------------------------------------
+
+
+
+monitored_sms_data <- analysis.data %>% 
+  filter(mon_status == "monitored") %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+
+
+
+sms_analysis_data <- monitored_sms_data %>% 
+    mutate(
+    assigned_treatment = assigned.treatment, 
+    assigned_dist_group = dist.pot.group, 
+    sms_treatment = sms.treatment.2, 
+    phone_owner = if_else(phone_owner == TRUE, "phone", "nophone"), 
+    sms_treatment = str_replace_all(sms_treatment, "\\.", "")) %>%
+    # reminder.only only present in control condition
+    filter(phone_owner == "phone") %>%
+    mutate(sms_treatment = factor(sms_treatment)) %>%
+    mutate(
+        county = factor(county),
+        cluster.id = factor(cluster.id),
+        assigned_treatment = assigned.treatment,
+        assigned_dist_group = dist.pot.group,
+        signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+        signal = factor(signal, levels = c("no signal", "signal"))
+    )
+
+
+
+
+
+f_sms = function(data, weights) {
+  feglm(
+    dewormed ~ 0  + 
+      assigned_treatment + 
+      standard_cluster.dist.to.pot + 
+      sms_treatment + 
+      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      i(assigned_treatment, sms_treatment, "control") +
+      i(sms_treatment, standard_cluster.dist.to.pot) +
+      sms_treatment:assigned_treatment:standard_cluster.dist.to.pot 
+      | county,
+    data = data,
+    weights = weights,
+    family = binomial(link = "probit")
+  )
+}
+
+f_sms_signal = function(data, weights) {
+  feglm(
+    dewormed ~ 0 +
+      signal + 
+      standard_cluster.dist.to.pot + 
+      sms_treatment + 
+      i(signal, standard_cluster.dist.to.pot, "no signal") +
+      i(signal, sms_treatment, "no signal") +
+      i(sms_treatment, standard_cluster.dist.to.pot) +
+      sms_treatment:signal:standard_cluster.dist.to.pot 
+      | county,
+    data = data,
+    weights = weights,
+    family = binomial(link = "probit")
+  )
+}
+
+
+sms_bs_draws = map_dfr(
+    1:500,
+    ~bayes_bs_f(
+        seed = .x, 
+        f = f_sms, 
+        f_signal = f_sms_signal, 
+        data = sms_analysis_data,
+        sms_treatment
+    ),
+    .progress = TRUE
+)
+
+
+clean_bs_sms_signal_draws = sms_bs_draws %>%
+  clean_signal_draws(sms_treatment)
+
+clean_bs_sms_te_draws = sms_bs_draws %>%
+  clean_te_draws(sms_treatment)
+
+
+create_sms_te = function(draws) {
+  draws %>%
+    group_by(seed, assigned_dist_group, sms_treatment) %>%
+    mutate(
+      te = if_else(assigned_treatment == "control", mean_pred, mean_pred - mean_pred[assigned_treatment == "control"])
+    )  %>%
+    ungroup() %>%
+    group_by(seed, assigned_dist_group, assigned_treatment) %>%
+    mutate(
+      diff_te = te - te[sms_treatment == "smscontrol"]
+    ) 
+}
+
+sms_bs_tes = sms_bs_draws %>%
+  filter(!is.na(assigned_treatment)) %>%
+  select(-signal) %>%
+  add_predictions(sms_treatment)  %>%
+  create_sms_te() %>%
+  rename(estimate = diff_te)
+
+sms_signal_bs_tes = sms_bs_draws %>%
+  filter(!is.na(signal)) %>%
+  select(-assigned_treatment) %>%
+  add_signal_predictions(sms_treatment) %>%
+  group_by(seed, assigned_dist_group, sms_treatment) %>%
+    mutate(
+      te = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
+    )  %>%
+    ungroup() %>%
+    group_by(seed, assigned_dist_group, signal) %>%
+    mutate(
+      diff_te = te - te[sms_treatment == "smscontrol"]
+   )  %>%
+  rename(estimate = diff_te)  %>%
+  rename(assigned_treatment = signal)
+
+
+realised_sms_fit = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = f_sms,
+  f_signal = f_sms_signal,
+  data = sms_analysis_data,
+  sms_treatment
+)
+
+
+realised_sms_tes = realised_sms_fit %>%
+  filter(!is.na(assigned_treatment)) %>%
+  select(-signal) %>%
+  add_predictions(sms_treatment)  %>%
+  create_sms_te() %>%
+  ungroup() %>%
+  rename(realised_pred = diff_te) %>%
+  select(assigned_dist_group, assigned_treatment, sms_treatment, realised_pred)
+
+realised_sms_signal_fit = realised_sms_fit %>%
+  filter(!is.na(signal)) %>%
+  select(-assigned_treatment) %>%
+  add_signal_predictions(sms_treatment) %>%
+  group_by(seed, assigned_dist_group, sms_treatment) %>%
+    mutate(
+      te = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
+    )  %>%
+    ungroup() %>%
+    group_by(seed, assigned_dist_group, signal) %>%
+    mutate(
+      diff_te = te - te[sms_treatment == "smscontrol"]
+   )  %>%
+  rename(realised_pred = diff_te) %>%
+  ungroup() %>%
+  select(assigned_dist_group, assigned_treatment = signal, sms_treatment, realised_pred)
+
+
+realised_sms_tes
+realised_sms_signal_fit
+
+both_sms_fits = bind_rows(
+  sms_bs_tes,
+  sms_signal_bs_tes
+) %>%
+  mutate(
+    show_pval_only = assigned_treatment %in% pval_only_terms
+  ) %>%
+  filter(assigned_treatment != "no signal") 
+
+realised_sms_both = bind_rows(
+  realised_sms_signal_fit,
+  realised_sms_tes
+) 
+
+
+
+    clean_sms_tes = both_sms_fits %>%
+      group_by(
+          assigned_treatment,
+          assigned_dist_group,
+          sms_treatment
+      ) %>%
+      summarise(
+          std_error = sd(estimate),
+          conf.low = quantile(estimate, (1 - ci_width)/2),
+          conf.high = quantile(estimate, 1 - (1 - ci_width)/2)
+      ) %>%
+      left_join(
+          realised_sms_both,
+          by = c("assigned_dist_group", "assigned_treatment", "sms_treatment")
+      ) %>%
+      mutate(
+          pval = 2*pnorm(-abs(realised_pred)/std_error),
+          oneside_pval = pnorm(-realised_pred/std_error)
+      ) %>%
+      mutate(
+          pval = round(pval, 4),
+          oneside_pval = round(oneside_pval, 4)
+      ) %>%
+      select(
+          assigned_treatment, 
+          assigned_dist_group, 
+          sms_treatment,
+          realised_pred, 
+          std_error, 
+          conf.low,
+          conf.high,
+          pval, 
+          oneside_pval) %>%
+      rename(estimate = realised_pred)  %>%
+      filter(sms_treatment != "smscontrol")
+
+clean_sms_tes %>%
+  write_csv("temp-data/differential-tes-by-sms.csv")
+
+clean_sms_tes %>%
+  filter(assigned_treatment != "control") %>%
+  select(assigned_treatment, assigned_dist_group, sms_treatment, pval, oneside_pval)
+
+
+clean_sms_tes %>%
+  filter(sms_treatment != "smscontrol")  %>%
+  mutate(show_pval_only = FALSE) %>%
+  filter(sms_treatment != "reminderonly") %>%
+  mutate(
+    show_pval_only = assigned_treatment %in% pval_only_terms
+  ) %>%
+  prep_tbl(stat = params$stat) %>%
+  nice_kbl_table(
+    cap = "Heterogeneous SMS Average Treatment Effects",
+    outcome_var = "Dependent variable: Take-up"
+  ) %>%
+  custom_save_latex_table(
+    table_name = "sms_diff_tes_tbl"
+  )
+
+
+
