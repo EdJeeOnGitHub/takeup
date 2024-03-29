@@ -792,6 +792,12 @@ realised_te_fit = bs_actual_fit %>%
     rename(realised_pred = mean_pred) %>%
     select(assigned_dist_group, assigned_treatment, realised_pred)
 
+round_pval = function(pvals, digits = 3) {
+    pvals = round(pvals, digits)
+    pvals = if_else(pvals == 0, "<0.001", as.character(pvals))
+    return(pvals)
+}
+
 add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
     clean_tes = bs_draws %>%
       group_by(
@@ -812,8 +818,8 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
           oneside_pval = pnorm(-realised_pred/std_error)
       ) %>%
       mutate(
-          pval = round(pval, 4),
-          oneside_pval = round(oneside_pval, 4)
+          pval = round_pval(pval, 3),
+          oneside_pval = round_pval(oneside_pval, 3)
       ) %>%
       select(
           assigned_treatment, 
@@ -883,7 +889,7 @@ prep_tbl = function(tes, stat = "ci") {
     } else {
         tes = tes %>%
             mutate(
-                val = paste0("{[", round(pval, 3), "]}")
+                val = paste0("{[", round_pval(pval, 3), "]}")
             )
     }
 
@@ -1029,8 +1035,7 @@ main_spec_tbl_weird_order %>%
     table_name = "rf_main_spec_tbl_weird_order"
   )
 
-
-
+combined_clean_tes
 
 disagg_base_belief_data = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
