@@ -725,6 +725,13 @@ estimate_actual_fit = function(split_data = split_analysis_data) {
     return(bs_fit)
 }
 
+
+round_pval = function(pvals, digits = 3) {
+    pvals = round(pvals, digits)
+    pvals = if_else(pvals == 0, "<0.001", as.character(pvals))
+    return(pvals)
+}
+
 add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
     clean_tes = bs_draws %>%
       group_by(
@@ -745,8 +752,8 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
           oneside_pval = pnorm(-realised_pred/std_error)
       ) %>%
       mutate(
-          pval = round(pval, 4),
-          oneside_pval = round(oneside_pval, 4)
+          pval = round_pval(pval, 3),
+          oneside_pval = round_pval(oneside_pval, 3)
       ) %>%
       select(
           assigned_treatment, 
@@ -879,7 +886,7 @@ prep_tbl = function(tes, stat = "ci") {
     } else {
         tes = tes %>%
             mutate(
-                val = paste0("{[", round(pval, 3), "]}")
+                val = paste0("{[", round_pval(pval, 3), "]}")
             )
     }
 
@@ -1325,7 +1332,7 @@ clean_know_df %>%
 
 #### SMS -----------------------------------------------------------------------
 
-
+stop()
 
 monitored_sms_data <- analysis.data %>% 
   filter(mon_status == "monitored") %>% 
@@ -1572,3 +1579,67 @@ clean_sms_tes %>%
 
 
 
+
+p_sms_tes = clean_sms_tes %>%
+  filter(sms_treatment != "smscontrol")  %>%
+  mutate(show_pval_only = FALSE)  %>%
+  filter(assigned_treatment != "signal") %>%
+  select(
+    assigned_treatment,
+    assigned_dist_group,
+    sms_treatment,
+    estimate,
+    conf.low,
+    conf.high
+  ) %>%
+  mutate(
+    assigned_treatment = case_when(
+      assigned_treatment == "bracelet - calendar" ~ "Bracelet - Calendar",
+      assigned_treatment == "bracelet" ~ "Bracelet",
+      assigned_treatment == "calendar" ~ "Calendar",
+      assigned_treatment == "ink" ~ "Ink",
+      assigned_treatment == "control" ~ "Control Mean",
+    ),
+    assigned_treatment = factor(
+      assigned_treatment,
+      levels = c(
+        "Control Mean",
+        "Bracelet - Calendar",
+        "Ink",
+        "Calendar",
+        "Bracelet"
+      )
+    ),
+    assigned_dist_group = str_to_title(assigned_dist_group),
+    sms_treatment = case_when(
+      sms_treatment == "smscontrol" ~ "SMS Control",
+      sms_treatment == "reminderonly" ~ "Reminder Only",
+      sms_treatment == "socialinfo" ~ "Social Info"
+    )
+  ) %>%
+  ggplot(aes(
+    x = estimate,
+    xmin = conf.low,
+    xmax = conf.high,
+    y = assigned_treatment,
+    colour = sms_treatment
+  )) +
+  geom_pointrange(
+    position = position_dodge(width = 0.5)
+  ) +
+  facet_wrap(~assigned_dist_group) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  ) +
+  labs(
+    x = "Estimate",
+    y = "",
+    colour = ""
+  ) +
+  scale_colour_canva(
+    "",
+    palette = "Primary colors with a vibrant twist"
+  )
+
+ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
