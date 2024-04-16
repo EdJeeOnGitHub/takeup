@@ -32,7 +32,7 @@ Options:
     takeup fit \
     --cmdstanr \
     --outputname=dist_fit101 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP \
     --output-path=data/stan_analysis_data \
     --threads=2 \
     --iter 400 \
@@ -46,7 +46,6 @@ Options:
 library(magrittr)
 library(tidyverse)
 library(furrr)
-# library(sf)
 library(loo)
 
 script_options %<>% 
@@ -137,7 +136,24 @@ nosms_data <- analysis.data %>%
 #   unique()
 
 analysis_data <- monitored_nosms_data %>% 
-  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group)
+  ungroup() %>%
+  mutate(
+    assigned_treatment = assigned.treatment, 
+    assigned_dist_group = dist.pot.group,
+    standard_hh.dist.to.pot = standardize(dist.to.pot),
+    indiv_id = row_number()
+    )
+
+if (str_detect(script_options$models, "INDIV_DIST_INDIV_FP")) {
+  analysis_data = analysis_data %>%
+    mutate(
+      old_cluster_id = cluster_id,
+      cluster.id = indiv_id, 
+      cluster_id = indiv_id,
+      standard_cluster.dist.to.pot = standard_hh.dist.to.pot
+      )
+}
+
 
 # Models ------------------------------------------------------------------
 
@@ -429,6 +445,10 @@ models <- lst(
         mu_rep_type = 2
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        mu_rep_type = 4
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
       list_modify(
         mu_rep_type = 4
       ),
