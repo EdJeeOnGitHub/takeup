@@ -32,7 +32,7 @@ Options:
     takeup fit \
     --cmdstanr \
     --outputname=dist_fit101 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP \
     --output-path=data/stan_analysis_data \
     --threads=2 \
     --iter 400 \
@@ -452,6 +452,11 @@ models <- lst(
       list_modify(
         mu_rep_type = 4
       ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
+      list_modify(
+        mu_rep_type = 4,
+       model_file = "takeup_struct_private_info.stan",
+      ),
     ## Diffuse Priors
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
@@ -698,7 +703,10 @@ stan_data <- lst(
   cluster_standard_dist = distinct(analysis_data, cluster_id, standard_cluster.dist.to.pot) %>% 
     arrange(cluster_id) %>% 
     pull(standard_cluster.dist.to.pot),
-  
+
+  indiv_standard_dist = analysis_data %>%
+    pull(standard_hh.dist.to.pot),
+
   cluster_treatment_map,
   
   # Rate of change

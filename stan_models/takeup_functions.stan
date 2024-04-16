@@ -147,6 +147,17 @@ real expected_delta_part(real v, real xc, array[] real theta, data array[] real 
   return v * exp(v_lpdf + wmv_lcdf);
 }
 
+vector expected_delta(vector w, real total_error_sd, real u_sd) {
+  vector[num_elements(w)] F_w = Phi_approx(w / total_error_sd); 
+  vector[num_elements(w)] r;
+
+  r = (-1/u_sd) * exp(-0.5 * (w^2)/(1 + u_sd^2)) * (1/sqrt(2*pi())) * sqrt((u_sd^2)/(1 + u_sd^2));
+ 
+  // real delta_part = integrate_1d(expected_delta_part, negative_infinity(), positive_infinity(), { w, u_sd }, x_r, x_i, 0.00001);
+
+  return - r ./ (F_w .* (1 - F_w));
+}
+
 real expected_delta(real w, real total_error_sd, real u_sd, data array[] real x_r, data array[] int x_i) {
   real F_w = Phi_approx(w / total_error_sd); 
   real r;
