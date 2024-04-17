@@ -10,14 +10,14 @@ Options:
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
   --save-error-draws  Save the entire posterior w/ each cluster's w^* draws
-  
+
   "), 
   args = if (interactive()) "
-  97
-  --prior
+  102
   --output-path=temp-data
-  --model=REDUCED_FORM_NO_RESTRICT
-  1 2 3 4
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP
+  --save-error-draws
+  1 2 
   " else commandArgs(trailingOnly = TRUE)
 )
 library(tidyverse)
@@ -26,6 +26,8 @@ library(posterior)
 library(tidybayes)
 
 model_type = if_else(str_detect(script_options$model, "STRUCT"), "structural", "reduced form")
+indiv_model = if_else(str_detect(script_options$model, "INDIV_DIST"), TRUE, FALSE)
+
 source("quick_postprocess_functions.R")
 
 # N.B. treat_idx (the second idx, is the mu (signalling) idx)
@@ -53,27 +55,129 @@ cluster_mapper = analysis_data %>%
     assigned_dist_group
   ) %>% unique()
 
-if (model_type == "structural") {
-  cluster_error_draws_raw = load_param_draws(
-    fit_version = script_options$fit_version,
-    model = script_options$model,
-    chain = script_options$chain,
-    prior_predictive = script_options$prior,
-    input_path = script_options$input_path,
-    cluster_cf_cutoff[dist_treat_idx, treat_idx, cluster_idx],
-    total_error_sd[treat_idx]
-  )
+
+fit_type_str = if_else(script_options$prior, "prior", "fit")
+if (length(script_options$chain) > 1) {
+  chain_str = str_glue("{min(script_options$chain)}-{max(script_options$chain)}")
 } else {
+  chain_str = script_options$chain
+}
+
+
+
+if (indiv_model) {
+
   cluster_error_draws_raw = load_param_draws(
     fit_version = script_options$fit_version,
     model = script_options$model,
     chain = script_options$chain,
     prior_predictive = script_options$prior,
     input_path = script_options$input_path,
-    cluster_cf_cutoff[dist_treat_idx, treat_idx, cluster_idx]
+    takeup_pr[i]
   ) %>%
-    mutate(total_error_sd = 1)
+  bind_cols(
+    analysis_data %>%
+      mutate(indiv_id = row_number()) %>%
+      select(
+        cluster_id,
+        assigned_treatment,
+        assigned_dist_group
+      ) 
+  )
+
+  cluster_error_draws = cluster_error_draws_raw %>%
+    mutate(
+      treatment = str_to_title(assigned_treatment), 
+      dist_group = assigned_dist_group,
+      mu_treatment = treatment
+      ) %>%
+    rename(pr_takeup = takeup_pr) 
+
+
+## Since output from indiv model much larger (9,800 rvars, instead of 144)
+## calculate TEs here in same format as tables and save to RDS.
+
+init_incentive_tes = cluster_error_draws %>%
+      filter(dist_group == assigned_dist_group) %>%
+      filter((mu_treatment == treatment) | model_type == "reduced form") %>%
+      create_tes(group_var = treatment) %>%
+      mutate(estimand = "overall") 
+
+incentive_tes = bind_rows(
+  init_incentive_tes,
+  init_incentive_tes %>%
+    filter(treatment %in% c("Bracelet", "Calendar")) %>%
+    group_by(
+      fit_type,
+      model,
+      fit_version,
+      estimand,
+      dist_group
+    ) %>%
+    summarise(
+      pr_takeup = pr_takeup[treatment == "Bracelet"] - pr_takeup[treatment == "Calendar"]
+    ) %>%
+    mutate(
+      treatment = "bracelet_minus_calendar"
+    )
+) %>%
+  ungroup()
+
+
+wide_incentive_tes = incentive_tes %>%
+  pivot_wider(
+    names_from = dist_group,
+    values_from = pr_takeup
+  )  %>%
+  mutate(
+    far_minus_close = far - close
+  )  
+  
+wide_te_rvar_cols = wide_incentive_tes %>%
+  select(where(is_rvar)) %>%
+  colnames()
+  
+  
+wide_incentive_tes  %>%
+    pivot_longer(
+      all_of(wide_te_rvar_cols),
+      names_to = "variable"
+    )   %>%
+    saveRDS(
+      file.path(
+        script_options$output_path,
+        str_glue(
+          "rvar_processed_dist_{fit_type_str}{script_options$fit_version}_INDIV_incentive_tes_{script_options$model}_{chain_str}.rds"
+        )
+      ) 
+    )
+
+
 }
+
+if (!indiv_model) {
+  if (model_type == "structural") {
+    cluster_error_draws_raw = load_param_draws(
+      fit_version = script_options$fit_version,
+      model = script_options$model,
+      chain = script_options$chain,
+      prior_predictive = script_options$prior,
+      input_path = script_options$input_path,
+      cluster_cf_cutoff[dist_treat_idx, treat_idx, cluster_idx],
+      total_error_sd[treat_idx]
+    )
+  } else {
+    cluster_error_draws_raw = load_param_draws(
+      fit_version = script_options$fit_version,
+      model = script_options$model,
+      chain = script_options$chain,
+      prior_predictive = script_options$prior,
+      input_path = script_options$input_path,
+      cluster_cf_cutoff[dist_treat_idx, treat_idx, cluster_idx]
+    ) %>%
+      mutate(total_error_sd = 1)
+  }
+
 
 rvar_pnorm = rfun(pnorm)
 cluster_error_draws = cluster_error_draws_raw %>%
@@ -94,12 +198,9 @@ cluster_error_draws = cluster_error_draws_raw %>%
   ) %>%
   mutate(model_type = model_type)
 
-fit_type_str = if_else(script_options$prior, "prior", "fit")
-if (length(script_options$chain) > 1) {
-  chain_str = str_glue("{min(script_options$chain)}-{max(script_options$chain)}")
-} else {
-  chain_str = script_options$chain
 }
+
+
 
 rvar_cols = cluster_error_draws %>%
   select(where(is_rvar)) %>%
@@ -165,7 +266,7 @@ incentive_tes = cluster_error_draws %>%
       filter((mu_treatment == treatment) | model_type == "reduced form") %>%
       create_tes(group_var = treatment) %>%
       mutate(estimand = "overall")
-if (model_type == "structural") {
+if (model_type == "structural" & !indiv_model) {
   signal_tes = cluster_error_draws %>%
     filter(treatment == "Control") %>%
     create_tes(group_var = mu_treatment) %>%
@@ -233,18 +334,18 @@ incentive_levels %>%
 #       "rvar_processed_dist_fit95_ates_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_STRATA_FOB_1-2.rds"
 #     ) 
 # )
-# create_cis = function(.data) {
-#   med_fun = function(x) {
-#     mean_x = mean(x) %>% round(3)
-#     conf.low = quantile(x, 0.05) %>% round(3)
-#     conf.high = quantile(x, 0.95) %>% round(3)
-#     return(paste0(
-#       mean_x, " (", conf.low, ", ", conf.high, ")"
-#     ))
-#   }
-#   .data %>%
-#     mutate(across(where(is_rvar), med_fun))
-# }
+create_cis = function(.data) {
+  med_fun = function(x) {
+    mean_x = mean(x) %>% round(3)
+    conf.low = quantile(x, 0.025) %>% round(3)
+    conf.high = quantile(x, 0.975) %>% round(3)
+    return(paste0(
+      mean_x, " (", conf.low, ", ", conf.high, ")"
+    ))
+  }
+  .data %>%
+    mutate(across(where(is_rvar), med_fun))
+}
 
 # wide_struct_tes = all_tes %>% 
 #     filter(estimand == "overall") %>%
@@ -295,7 +396,7 @@ incentive_levels %>%
 # all_tes %>%
 #     filter(estimand == "overall") %>%
 #     select(
-#       dist_treatment,
+#       treatment,
 #       dist_group,
 #       pr_takeup
 #     ) %>%
@@ -303,23 +404,33 @@ incentive_levels %>%
 #       names_from = dist_group,
 #       values_from = pr_takeup
 #     ) %>%
-#     select(dist_treatment, combined, close, far) %>%
-#     arrange(dist_treatment) %>%
+#     select(treatment, combined, close, far) %>%
+#     arrange(treatment) %>%
 #     bind_rows(
 #       # bracelet minus calendar row
 #       all_tes %>%
-#         filter(dist_treatment %in% c("bracelet", "calendar")) %>%
+#         filter(treatment %in% c("Bracelet", "Calendar")) %>%
 #         filter(estimand == "overall") %>%
-#         pivot_wider(names_from = dist_treatment, values_from = pr_takeup) %>%
+#         pivot_wider(names_from = treatment, values_from = pr_takeup) %>%
 #         mutate(
-#           bracelet_minus_calendar = bracelet - calendar
+#           bracelet_minus_calendar = Bracelet - Calendar
 #         ) %>%
 #         select(dist_group, bracelet_minus_calendar) %>%
 #         pivot_wider(
 #           names_from = dist_group,
 #           values_from = bracelet_minus_calendar
 #         ) %>%
-#         mutate(dist_treatment = "bracelet_minus_calendar")
+#         mutate(treatment = "bracelet_minus_calendar")
 #     ) %>%
 #     create_cis() %>%
+#     mutate(
+#       treatment = factor(treatment, levels = c(
+#         "bracelet_minus_calendar",
+#         "Control",
+#         "Ink",
+#         "Calendar",
+#         "Bracelet"
+#       )) %>% fct_rev
+#     ) %>%
+#     arrange(treatment) %>%
 #     View()

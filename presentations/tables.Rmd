@@ -4105,3 +4105,125 @@ robust_overall_te_kbl_df %>%
 
 
 ```
+
+# Robustness Structural Model Individual Distance Cost, Community Info
+
+
+```{r}
+
+ate_rvar_struct_indiv_dist_community_fp = read_rds(
+    file.path(
+      "temp-data",
+      "rvar_processed_dist_fit102_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_1-2.rds"
+    )
+  )
+
+ate_tbl_indiv_dist_community_fp = ate_rvar_struct_indiv_dist_community_fp %>%
+  create_cis(.width = params$width) %>%
+  select(
+    treatment, variable, value
+  ) %>%
+  mutate(variable = factor(variable, levels = c("combined", "close", "far", "far_minus_close"))) %>%
+  arrange(variable) %>%
+  pivot_wider(
+    names_from = variable,
+    values_from = value
+  ) %>%
+  recode_control_mean() %>%
+  mutate(
+    treatment = factor(treatment, levels = c("Bracelet", "Calendar", "Ink", "Bracelet - Calendar", "Control mean"))
+  )  %>%
+  arrange(treatment)
+
+
+create_robustness_tbl = function(data) {
+data %>%
+  kbl(
+    col.names = c(
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Overall Results") %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Structural" = 4
+      )
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Overall" = 5
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3), hline_after = TRUE) 
+}
+
+
+ate_tbl_indiv_dist_community_fp %>%
+  create_robustness_tbl()  %>%
+  custom_save_latex_table("indiv-dist-community-fp-robust-struct-overall-te-table")
+
+
+
+```
+
+# Robustness Structural Model Individual Distance Cost, Individual FP
+
+
+```{r}
+
+ate_rvar_struct_indiv_dist_indiv_fp = read_rds(
+    file.path(
+      "temp-data",
+      "rvar_processed_dist_fit102_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP_1-2.rds"
+    )
+  )
+
+ate_tbl_indiv_dist_indiv_fp = ate_rvar_struct_indiv_dist_indiv_fp %>%
+  create_cis(.width = params$width) %>%
+  select(
+    treatment, variable, value
+  ) %>%
+  mutate(variable = factor(variable, levels = c("combined", "close", "far", "far_minus_close"))) %>%
+  arrange(variable) %>%
+  pivot_wider(
+    names_from = variable,
+    values_from = value
+  ) %>%
+  recode_control_mean() %>%
+  mutate(
+    treatment = factor(treatment, levels = c("Bracelet", "Calendar", "Ink", "Bracelet - Calendar", "Control mean"))
+  )  %>%
+  arrange(treatment)
+
+
+
+ate_tbl_indiv_dist_indiv_fp %>%
+  create_robustness_tbl()  %>%
+  custom_save_latex_table("indiv-dist-indiv-fp-robust-struct-overall-te-table")
+
+
+
+```
