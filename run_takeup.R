@@ -31,11 +31,11 @@ Options:
   args = if (interactive()) "
     takeup fit \
     --cmdstanr \
-    --outputname=dist_fit101 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP \
+    --outputname=dist_fit102 \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP \
     --output-path=data/stan_analysis_data \
-    --threads=2 \
-    --iter 400 \
+    --threads=3 \
+    --iter 200 \
     --chains=2 \
     --num-mix-groups=1 \
     --sequential  
@@ -229,7 +229,6 @@ models <- lst(
     raw_u_sd_alpha = 3.3, 
     # raw_u_sd_alpha = 10, # dist_fit89 -> high u sd 
     raw_u_sd_beta = 1.1,
-
 
 
 
@@ -450,7 +449,10 @@ models <- lst(
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
       list_modify(
-        mu_rep_type = 4
+        mu_rep_type = 4,
+        # model too big to generate quantities, so just work with estimated probs in 
+        # parameters section directly -- THIS NEEDS TO BE UPDATED IF TAKEUP_STRUCT CHANGES
+        model_file = "takeup_struct_no_generated_quantities.stan"
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
       list_modify(

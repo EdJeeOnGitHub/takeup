@@ -57,12 +57,7 @@ data {
   vector[num_sim_delta_w] sim_delta_w;
   
   // Hyperparam
-  
   real<lower = 0> mu_rep_sd;
-
-
-  // Private vs Community Knowledge
-  vector[num_obs] indiv_standard_dist;
 }
 
 transformed data {
@@ -70,8 +65,6 @@ transformed data {
 #include wtp_transformed_data.stan
 #include takeup_transformed_data.stan
 #include beliefs_transformed_data.stan
-
-// [obs_cluster_id[included_monitored_obs]]
 
   array[1] real dummy_xr = { 1.0 }; 
   array[1] int dummy_xi = { 1 }; 
@@ -322,42 +315,6 @@ transformed parameters {
       structural_cluster_takeup_prob = Phi_approx(- structural_cluster_obs_v ./ total_error_sd[cluster_incentive_treatment_id])';
     }
   }
-
-    vector[num_obs] indiv_mu_rep;
-    vector[num_obs] indiv_dist_cost;
-    vector[num_obs] takeup_linear_predictor;
-    vector[num_obs] takeup_pr;
-    vector[num_obs] indiv_delta_vstar;
-
-    // HH's V* is the community centroid cost (i.e. V* calculated at cluster level above)
-    indiv_delta_vstar = expected_delta(structural_cluster_obs_v[obs_cluster_id[included_monitored_obs]], total_error_sd[1], u_sd[1]);
-
-    indiv_mu_rep = calculate_mu_rep(
-        // treatment ids; array[] int
-        cluster_incentive_treatment_id[obs_cluster_id[included_monitored_obs]], 
-        // distance; vector
-        indiv_standard_dist,
-        // base mu rep; real
-        base_mu_rep, 
-        // mu_beliefs_effect; real
-        1, 
-        // design matrix; matrix
-        beliefs_treatment_map_design_matrix, 
-        // beta; matrix
-        centered_cluster_beta_beliefs[obs_cluster_id[included_monitored_obs], ], 
-        // dist_beta; matrix
-        centered_cluster_dist_beta_beliefs[obs_cluster_id[included_monitored_obs],],
-        // mu rep type; int
-        mu_rep_type
-    );
-
-    indiv_dist_cost = dist_beta_v[1] * indiv_standard_dist;
-    
-    takeup_linear_predictor = structural_treatment_effect[cluster_assigned_dist_group_treatment[obs_cluster_id]] - 
-                                indiv_dist_cost + 
-                                indiv_mu_rep .* indiv_delta_vstar;
-    // total error sd doesn't vary with treatment so just use first one
-    takeup_pr = Phi_approx(takeup_linear_predictor ./ total_error_sd[1]);
 }
 
 model {
@@ -414,15 +371,15 @@ model {
 
   if (fit_model_to_data) {
     // Take-up Likelihood 
-    // if (use_binomial) {
-    //   // Age groups not supported
-    //   cluster_takeup_count[included_clusters, 1] ~ binomial(cluster_size[included_clusters, 1], structural_cluster_takeup_prob[included_clusters]);
-    // } else {
-    //   takeup[included_monitored_obs] ~ bernoulli(structural_cluster_takeup_prob[obs_cluster_id[included_monitored_obs]]);
-    // }
-    takeup[included_monitored_obs] ~ bernoulli(takeup_pr);
+    if (use_binomial) {
+      // Age groups not supported
+      cluster_takeup_count[included_clusters, 1] ~ binomial(cluster_size[included_clusters, 1], structural_cluster_takeup_prob[included_clusters]);
+    } else {
+      takeup[included_monitored_obs] ~ bernoulli(structural_cluster_takeup_prob[obs_cluster_id[included_monitored_obs]]);
+    }
   }
 }
 
 generated quantities {
+
 }
