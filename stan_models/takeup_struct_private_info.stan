@@ -20,6 +20,7 @@ transformed parameters {
     #include struct_section_transformed_parameters.stan
     // Additional private/community info stuff
     vector[num_obs] takeup_linear_predictor;
+    vector[num_obs] indiv_dist_cost;
     vector[num_obs] takeup_pr;
 
     indiv_dist_cost = dist_beta_v[1] * indiv_standard_dist;

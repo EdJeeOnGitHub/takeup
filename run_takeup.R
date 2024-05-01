@@ -32,7 +32,7 @@ Options:
     takeup fit \
     --cmdstanr \
     --outputname=dist_fit102 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 200 \
