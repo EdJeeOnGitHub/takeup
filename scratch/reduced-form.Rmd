@@ -136,15 +136,19 @@ nosms_data <- analysis.data %>%
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
             by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
   group_by(cluster.id) %>% 
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
+
+
 
 monitored_nosms_data <- analysis.data %>% 
   filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
             by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
   group_by(cluster.id) %>% 
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
@@ -561,6 +565,8 @@ custom_save_latex_table = function(table, table_name){
 
 ```{r}
 #| comparisons-functions
+
+
 create_comparisons = function(fit) {
     close_far_tes = avg_comparisons(
         fit, 
@@ -569,32 +575,67 @@ create_comparisons = function(fit) {
         type = "response"
     )
 
-    close_far_tes = avg_comparisons(
-        fit,
-        variables = list(assigned_treatment = "reference"),
-        by = "assigned_dist_group",
-        type = "response"
-    ) 
 
     combined_tes = avg_comparisons(
         fit,
         variables = list(assigned_treatment = "reference"),
         type = "response"
     )
-    # bracelet - calendar
-    close_far_bc = avg_comparisons(
-        fit,
-        variables = list(assigned_treatment = c("calendar", "bracelet")),
-        by = "assigned_dist_group",
-        type = "response"
+
+    create_hyp_bc_combined = function(data) {
+        df = data %>%
+            as_tibble()  %>%
+            mutate(
+                bra = str_detect(contrast, "bracelet") ,
+                cal = str_detect(contrast, "calendar") 
+            )
+        bra_idx = which(df$bra)
+        cal_idx = which(df$cal)
+        hyp_string = paste0("b", bra_idx, " - b", cal_idx, " = 0")
+        return(hyp_string)
+    }
+    create_hyp_bc = function(data, dist) {
+        df = data %>%
+            as_tibble()  %>%
+            mutate(
+                bra = str_detect(contrast, "bracelet") & assigned_dist_group == dist,
+                cal = str_detect(contrast, "calendar") & assigned_dist_group == dist
+            )
+        bra_idx = which(df$bra)
+        cal_idx = which(df$cal)
+        hyp_string = paste0("b", bra_idx, " - b", cal_idx, " = 0")
+        return(hyp_string)
+    }
+
+    bc_close_string = create_hyp_bc(close_far_tes, "close")
+    bc_far_string = create_hyp_bc(close_far_tes, "far") 
+    bc_combined_string = create_hyp_bc_combined(combined_tes)
+
+
+    close_bc = hypotheses(
+        close_far_tes,
+        hypothesis = bc_close_string)
+    far_bc = hypotheses(
+        close_far_tes,
+        hypothesis = bc_far_string)
+    combined_bc = hypotheses(
+        combined_tes,
+        hypothesis = bc_combined_string
     )
 
-    combined_bc = avg_comparisons(
-        fit,
-        variables = list(assigned_treatment = c("calendar", "bracelet")),
-        type = "response"
-    )
 
+
+    create_hp_vector = function(data, treat) {
+        data %>%
+            mutate(
+                mat_value =  case_when(
+                    lhs_term == treat & assigned_dist_group == "far" ~ 1,
+                    lhs_term == treat & assigned_dist_group == "close" ~ -1,
+                    TRUE ~ 0
+                )
+                ) %>%
+                pull(mat_value)
+    }
 
     filter_fun = function(data, treat) {
         df_we_want = data %>%
@@ -619,17 +660,30 @@ create_comparisons = function(fit) {
     names(close_far_hypotheses) = c("bracelet", "calendar", "ink")
 
 
-    close_far_comp = hypotheses(
-        close_far_tes,
-        hypothesis = close_far_hypotheses,
-        type = "response"
-    ) %>%
-        mutate(
-            assigned_dist_group = "far - close"
-        ) %>%
-        as_tibble()
+    close_far_hypotheses_vec = map(
+        c("bracelet", "calendar", "ink"),
+        ~create_hp_vector(close_far_string_df, .x) 
+    ) 
+    close_far_hypotheses_vec
 
-    close_far_comp$contrast = names(close_far_hypotheses)
+
+    close_far_comp = close_far_hypotheses_vec %>%
+        map(
+            ~hypotheses(
+                close_far_tes,
+                hypothesis = .x,
+                type = "response"
+            )
+        ) %>%
+        map(as_tibble) %>%
+        bind_rows() %>%
+        mutate(
+            assigned_dist_group = "far - close",
+            contrast = c("bracelet", "calendar", "ink")
+        )
+
+
+
     
 
     d1_s = filter_fun(close_far_string_df, "bracelet") %>%
@@ -659,64 +713,35 @@ create_comparisons = function(fit) {
             assigned_dist_group = "combined"
         )
     cts_distance = all(str_detect(coef(fit), "dist_group") == FALSE)
-    if (cts_distance) {
-
-
-        rep_distances = analysis_data %>%
-            group_by(assigned_dist_group) %>%
-            summarise(
-                mean_distance = mean(standard_cluster.dist.to.pot)
-            ) %>%
-            mutate(assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far"))) %>%
-            arrange(assigned_dist_group) %>%
-            pull()
-
-        cm_close_far = predictions(
-            fit,
-            variables = list(assigned_treatment = "control"),
-            newdata = datagrid(standard_cluster.dist.to.pot = rep_distances)
-        )  
-        cm_close_far_string = "b2 - b1 = 0"
-        cm_dist_order = c('close', 'far')
-
-    } else {
-        cm_close_far = avg_predictions(
-            fit,
-            variables = list(assigned_treatment = "control"),
-            by = "assigned_dist_group"
-        ) 
-        cm_close_far_string = cm_close_far  %>%
-            as_tibble() %>%
-            mutate(
-                b_val = paste0("b", 1:n())
-            ) %>%
-            mutate(
-                assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far"))
-            ) %>%
-            arrange(assigned_dist_group) %>%
-            summarise(
-                b_str = paste0(b_val[assigned_dist_group == "far"], " - ", b_val[assigned_dist_group == "close"], " = 0")
-            ) %>%
-            pull(b_str)
-        cm_dist_order = cm_close_far$assigned_dist_group
     
-    }
-    
-
-    cm_close_far_diff = hypotheses(
-        cm_close_far,
-        cm_close_far_string
-        )  %>%
+    cm_close_far = analysis_data %>%
+        filter(
+            assigned_treatment == "control"
+        ) %>%
+        group_by(assigned_dist_group) %>%
+        summarise(
+            estimate = mean(dewormed)
+        ) %>%
         mutate(
+            contrast = "control"
+        )
+    cm_combined = analysis_data %>%
+        filter(assigned_treatment == "control") %>%
+        summarise(
+            estimate = mean(dewormed)
+        ) %>%
+        mutate(
+            contrast = "control",
+            assigned_dist_group = "combined"
+        )
+
+    cm_close_far_diff = cm_close_far %>%
+        summarise(
+            estimate = estimate[assigned_dist_group == "far"] - estimate[assigned_dist_group == "close"],
             assigned_dist_group = "far - close",
             contrast = "control"
         )
-    cm_close_far = cm_close_far  %>%
-        as_tibble() %>%
-        mutate(
-            contrast = "control"
-        )
-    cm_close_far$assigned_dist_group = cm_dist_order
+
     # check if p.value present (i.e. not bayes)
     pval_present = "p.value" %in% colnames(close_far_comp)
     if (pval_present) {
@@ -760,8 +785,9 @@ create_comparisons = function(fit) {
     tes = bind_rows(
         close_far_tes,
         combined_tes %>% as_tibble()  %>% mutate(assigned_dist_group = "combined"),
-        close_far_bc,
-        combined_bc %>% mutate(assigned_dist_group = "combined"),
+        close_bc %>% mutate(contrast = "bracelet - calendar", assigned_dist_group = "close"), 
+        far_bc %>% mutate(contrast = "bracelet - calendar", assigned_dist_group = "far"),
+        combined_bc %>% mutate(contrast = "bracelet - calendar", assigned_dist_group = "combined"),
         close_far_comp,
         # control means
         cm_combined,
@@ -778,7 +804,6 @@ create_comparisons = function(fit) {
         mutate(
             contrast = str_remove(contrast, " - control")
         )
-
     return(tes)
 }
 
@@ -898,8 +923,8 @@ nice_kbl_table = function(tbl, cap, stat = params$stat) {
 
 ```{r}
 
-signal_comparisons = function(fit) {
 
+signal_comparisons = function(fit) {
     close_far_tes = avg_comparisons(
         fit,
         variables = list(signal = c("reference")),
@@ -972,6 +997,8 @@ signal_comparisons = function(fit) {
         nosignal_mean
     ) %>%
     mutate(pval_onesided = p.value.noninf)
+
+
     return(tes_df)
 } 
 
@@ -1011,13 +1038,37 @@ probit_dist_fit = analysis_data %>%
         cluster = ~cluster.id
     ) 
 
-probit_dist_cts_fit = analysis_data %>%
+probit_hh_dist_cts_fit = analysis_data %>%
+    mutate(assigned_treatment = factor(assigned_treatment)) %>%
     feglm(
-        dewormed ~ 0 + assigned_treatment*standard_cluster.dist.to.pot | county,
+        dewormed ~ 0 + assigned_treatment + standard_dist.to.pot  + i(assigned_treatment, standard_dist.to.pot, "control") | county,
         data = ., 
         family = binomial(link = "probit"), 
         cluster = ~cluster.id
     )
+
+probit_dist_cts_fit = analysis_data %>%
+    mutate(assigned_treatment = factor(assigned_treatment)) %>%
+    feglm(
+        dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot  + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county,
+        data = ., 
+        family = binomial(link = "probit"), 
+        cluster = ~cluster.id
+    )
+
+
+bind_rows(
+probit_hh_dist_cts_fit %>%
+    tidy() %>%
+    select(term, estimate, std.error, p.value) %>%
+    mutate(dist = "hh distance"),
+probit_dist_cts_fit %>%
+    tidy() %>%
+    select(term, estimate, std.error, p.value) %>%
+    mutate(dist = "cluster centroid")
+) %>%
+    mutate(p.value = round(p.value, 4))
+
 
 probit_control_fit = analysis_data %>%
     feglm(
@@ -1033,9 +1084,19 @@ probit_control_fit = analysis_data %>%
         cluster = ~cluster.id
 
     )
+
+
+probit_signal_dist_cts_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + signal + standard_cluster.dist.to.pot  + i(signal, standard_cluster.dist.to.pot, "no signal")  | county,
+        data = .,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id
+    )
+
 probit_signal_dist_fit = analysis_data %>%
     feglm(
-        dewormed ~ 0 + signal:assigned_dist_group + cluster.dist.to.pot | county,
+        dewormed ~ 0 + signal:assigned_dist_group + standard_cluster.dist.to.pot | county,
         data = .,
         family = binomial(link = "probit"),
         cluster = ~cluster.id
@@ -1049,6 +1110,38 @@ probit_signal_fit = analysis_data %>%
         cluster = ~cluster.id
     )
 
+
+
+
+signal_fits = analysis_data %>%
+    feglm(
+        dewormed ~ signal,
+        data = .,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id,
+        fsplit = ~assigned_dist_group
+    ) 
+
+analysis_data %>%
+    feglm(
+        dewormed ~ signal
+    )
+signal_fits[[1]]
+map(signal_fits, 
+    ~hypotheses(
+        .x,
+        "b2 = 0",
+        equivalence = c(0, 0)
+    ) %>%
+    select(p.value.noninf)
+)
+
+hypotheses(
+    avg_comparisons(signal_fits[[3]], by = "assigned_dist_group")
+    )
+
+comparisonsprobit_signal_dist_cts_fit
+
 ols_fit = analysis_data %>%
     feols(
         dewormed ~ 0 + assigned_treatment:assigned_dist_group | county, 
@@ -1058,22 +1151,84 @@ ols_fit = analysis_data %>%
 
 ols_dist_fit = analysis_data %>%
     feols(
-        dewormed ~ 0 + assigned_treatment:assigned_dist_group + standard_cluster.dist.to.pot | county, 
+        dewormed ~ 0 + assigned_treatment*standard_cluster.dist.to.pot | county, 
         data = ., 
         cluster = ~cluster.id
     ) 
-    
 
+ols_dist_fit  %>%
+    tidy() %>%
+    mutate(p.value = round(p.value, digits = 4))
+
+probit_dist_cts_fit  %>%
+    tidy() %>%
+    mutate(p.value = round(p.value, digits = 4))
+
+
+library(margins)
+
+
+
+probit_signal_fit = 
+    feglm(
+        data = analysis_data,
+        dewormed ~ 0 + signal:assigned_dist_group  | county,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id
+    )
+
+margins(probit_signal_fit)
 
 rf_probit_tes = create_comparisons(probit_fit)
 rf_probit_dist_tes = create_comparisons(probit_dist_fit)
 rf_probit_control_tes = create_comparisons(probit_control_fit)
+
 rf_signal_dist_tes = signal_comparisons(probit_signal_dist_fit)
 rf_signal_tes = signal_comparisons(probit_signal_fit)
-# rf_probit_cts_dist_tes = create_comparisons(probit_dist_cts_fit)
+rf_signal_cts_dist_tes = signal_comparisons(probit_signal_dist_cts_fit)
+
+
+rf_signal_tes %>%
+    select(contrast, assigned_dist_group, estimate, std.error, p.value, pval_onesided) %>%
+    mutate(
+        p.value = round(p.value, 4)
+    )
+
+rf_probit_cts_dist_tes = create_comparisons(probit_dist_cts_fit)
+
+rf_probit_cts_hh_dist_tes = create_comparisons(probit_hh_dist_cts_fit)
 rf_ols_tes = create_comparisons(ols_fit)
 rf_ols_dist_tes = create_comparisons(ols_dist_fit)
 
+rf_signal_tes %>%
+    select(term, contrast, assigned_dist_group, p.value) %>%
+    mutate(p.value = round(p.value, 4))
+
+rf_signal_cts_dist_tes %>%
+    select(term, contrast, assigned_dist_group, p.value) %>%
+    mutate(p.value = round(p.value, 4))
+
+rf_probit_dist_tes %>%
+    select(contrast, assigned_dist_group, estimate, std.error, p.value)
+
+rf_probit_cts_dist_tes %>%
+    select(contrast, assigned_dist_group, estimate, std.error, p.value)
+
+rf_probit_cts_hh_dist_tes %>%
+    select(contrast, assigned_dist_group, estimate, std.error, p.value)
+
+probit_dist_cts_fit %>%
+    tidy()
+
+
+rf_signal_cts_dist_subset_tes = rf_signal_cts_dist_tes %>%
+    filter(contrast != "no signal") %>%
+    mutate(
+        contrast = case_when(
+            contrast == "signal" ~ "Any signal - no signal",
+            TRUE ~ contrast
+        )
+    )
 
 rf_signal_dist_subset_tes = rf_signal_dist_tes %>%
     filter(contrast != "no signal") %>%
@@ -1111,8 +1266,25 @@ rf_probit_dist_pval_tbl = prep_tbl(
         stat = params$stat
     )
 
+rf_probit_cts_dist_pval_tbl = prep_tbl(
+    bind_rows(
+        rf_probit_cts_dist_tes,
+        rf_signal_cts_dist_subset_tes %>%
+            mutate(
+                estimate = pval_onesided,
+                conf.low = NA,
+                conf.high = NA,
+                contrast = "$p$(Any signal > No signal)"
+                )
+        ),
+        stat = params$stat
+    )
+
+
 rf_probit_control_tbl = prep_tbl(rf_probit_control_tes, stat = params$stat)
-# rf_probit_cts_dist_tbl = prep_tbl(rf_probit_cts_dist_tes, stat = params$stat)
+rf_probit_cts_dist_tbl = prep_tbl(rf_probit_cts_dist_tes, stat = params$stat)
+
+
 rf_probit_dist_all_pval_tbl = prep_tbl(
     bind_rows(
         rf_probit_dist_tes,
@@ -1133,11 +1305,12 @@ rf_ols_dist_kbl = nice_kbl_table(rf_ols_dist_tbl, "Frequentist OLS with Distance
 rf_probit_kbl = nice_kbl_table(rf_probit_tbl, "Frequentist Probit (Clustering)")
 rf_probit_dist_kbl = nice_kbl_table(rf_probit_dist_tbl, "Frequentist Probit with Distance (Clustering)")
 rf_probit_control_kbl = nice_kbl_table(rf_probit_control_tbl, "Frequentist Probit with Controls (Clustering)")
-# rf_probit_cts_dist_kbl = nice_kbl_table(rf_probit_cts_dist_tbl, "Frequentist Probit with CTS Distance (Clustering + CTS Distance)")
+rf_probit_cts_dist_kbl = nice_kbl_table(rf_probit_cts_dist_tbl, "Frequentist Probit with CTS Distance (Clustering + CTS Distance)")
 rf_probit_dist_pval_kbl = nice_kbl_table(rf_probit_dist_pval_tbl, "Frequentist Probit with Distance (Clustering + P-Value)")
 
 rf_probit_dist_all_pval_kbl = nice_kbl_table(rf_probit_dist_all_pval_tbl, "Frequentist Probit with Distance (Clustering + P-Value) Only P-values")
 
+rf_probit_cts_dist_pval_kbl = nice_kbl_table(rf_probit_cts_dist_pval_tbl, "Frequentist Probit with CTS Distance (Clustering + CTS Distance) + P-Values")
 
 
 ```
@@ -1235,6 +1408,14 @@ rf_probit_dist_pval_kbl %>%
     custom_save_latex_table("rf-probit-dist-pval")
 ```
 
+
+```{r}
+rf_probit_cts_dist_pval_kbl %>%
+    custom_save_latex_table("rf-probit-cts-dist-pval")
+
+```
+
+
 ```{r}
 rf_probit_dist_all_pval_kbl %>%
     custom_save_latex_table("rf-probit-dist-all-pval")
@@ -1244,8 +1425,8 @@ rf_probit_dist_all_pval_kbl %>%
 
 ```{r}
 #| rf-probit-cts-dist-tbl, results="asis"
-# rf_probit_cts_dist_kbl %>%
-#     custom_save_latex_table("rf-probit-cts-dist")
+rf_probit_cts_dist_kbl %>%
+    custom_save_latex_table("rf-probit-cts-dist")
 ```
 
 
@@ -1954,3 +2135,56 @@ rf_probit_dist_tes %>%
 
 ```
 
+
+
+
+
+```{r}
+#| bootstrap-fit
+# clusbootglm(
+# model,
+# data,
+# clusterid,
+# family = gaussian,
+# B = 5000,
+# confint.level = 0.95,
+# n.cores = 1
+# )
+
+
+library(ClusterBootstrap)
+fit = clusbootglm(
+    dewormed ~ 0 + assigned_treatment*standard_cluster.dist.to.pot + county,
+    data = analysis_data,
+    clusterid = cluster.id,
+    family = binomial(link = probit),
+    B = 5,
+    confint.level = 0.95
+)
+
+fit$coefficients
+
+
+boot_fit = function(
+    
+    subset_data = analysis_data
+)
+
+    feglm(
+        dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county,
+        data = analysis_data,
+        family = binomial(link = probit)
+    )
+
+probit_signal_dist_cts_fit = analysis_data %>%
+    feglm(
+        dewormed ~ 0 + signal + standard_cluster.dist.to.pot  + i(signal, standard_cluster.dist.to.pot, "no signal")  | county,
+        data = .,
+        family = binomial(link = "probit"),
+        cluster = ~cluster.id
+    )
+
+
+
+
+```

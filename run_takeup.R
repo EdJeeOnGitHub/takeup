@@ -32,7 +32,7 @@ Options:
     takeup fit \
     --cmdstanr \
     --outputname=dist_fit102 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 200 \
@@ -455,6 +455,11 @@ models <- lst(
         model_file = "takeup_struct_no_generated_quantities.stan"
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
+      list_modify(
+        mu_rep_type = 4,
+       model_file = "takeup_struct_private_info_cluster_vis.stan",
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
       list_modify(
         mu_rep_type = 4,
        model_file = "takeup_struct_private_info.stan",
