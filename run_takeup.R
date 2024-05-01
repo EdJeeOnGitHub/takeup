@@ -457,6 +457,11 @@ models <- lst(
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
       list_modify(
         mu_rep_type = 4,
+       model_file = "takeup_struct_private_info_cluster_vis.stan",
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS = .$STRUCTURAL_LINEAR_U_SHOCKS  %>%
+      list_modify(
+        mu_rep_type = 4,
        model_file = "takeup_struct_private_info.stan",
       ),
     ## Diffuse Priors
