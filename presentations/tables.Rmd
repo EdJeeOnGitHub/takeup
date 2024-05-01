@@ -4197,7 +4197,7 @@ ate_tbl_indiv_dist_community_fp %>%
 ate_rvar_struct_indiv_dist_indiv_fp = read_rds(
     file.path(
       "temp-data",
-      "rvar_processed_dist_fit102_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP_1-2.rds"
+      "rvar_processed_dist_fit104_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP_1-2.rds"
     )
   )
 

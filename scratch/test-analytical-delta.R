@@ -221,7 +221,7 @@ expose_cmdstanr_functions <- function(model_path, include_paths = NULL,
 
 
 
-exposed_funcs = expose_cmdstanr_functions(model_path = "stan_models/ed-stan-funcs.stan") 
+# exposed_funcs = expose_cmdstanr_functions(model_path = "stan_models/ed-stan-funcs.stan") 
 
 
 
@@ -319,12 +319,33 @@ bc_rvar_df = bc_draw_df %>%
 draw_bc_rvar_df = bc_rvar_df %>%
   unnest_rvars()
 
-draw_bc_rvar_df
-library(furrr)
-plan(multicore, workers = 8)
+
+
+draw_bc_rvar_df %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    across(
+      c(structural_cluster_benefit_cost, obs_cluster_mu_rep, total_error_sd, u_sd),
+      mean
+    )
+  ) %>%
+  write_csv(
+    "temp-data/mean-bc-rvar.csv"
+  )
+
+draw_bc_rvar_df %>%
+  pull(dist) %>%
+  unique() 
+
+# library(furrr)
+# plan(multicore, workers = 8)
 draw_bc_rvar_df = draw_bc_rvar_df %>%
+  arrange(dist) %>%
+  filter(.draw == 1) %>%
+  head(100) %>%
+  filter(assigned_treatment == "control") %>%
   mutate(
-      R_v_star = future_pmap(
+      R_v_star = pmap(
         list(
           dist, 
           structural_cluster_benefit_cost,
@@ -342,6 +363,18 @@ draw_bc_rvar_df = draw_bc_rvar_df %>%
       )
   )
 )
+
+draw_bc_rvar_df %>%
+  unnest_wider(R_v_star) %>%
+  ungroup() %>%
+  select(dist, structural_cluster_benefit_cost, obs_cluster_mu_rep, total_error_sd, u_sd, v_star)
+
+
+  ggplot(aes(
+    x = dist,
+    y = v_star
+  )) +
+  geom_point()
 
 draw_bc_rvar_df = draw_bc_rvar_df %>%
   mutate(

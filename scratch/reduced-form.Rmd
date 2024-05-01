@@ -995,7 +995,6 @@ analysis_data = analysis_data %>%
     )
 
 
-
 probit_fit = analysis_data %>%
     feglm(
         dewormed ~ 0 + assigned_treatment:assigned_dist_group | county, 
@@ -1765,8 +1764,8 @@ models_we_want = tribble(
     rfnr, 99,
     struct_dbdc, 98,
     struct_hier_s, 98,
-    struct_hier_f, 98
-
+    struct_hier_f, 98,
+    struct_hier_f, 101
 )
 
 ate_rvar_df = models_we_want %>%
