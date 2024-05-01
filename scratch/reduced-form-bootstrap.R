@@ -998,7 +998,6 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
     return(table)
 }
 
-
 #### Frequentist Estimates ####
 split_analysis_data = split(analysis_data, analysis_data$cluster.id)
 #| freq-estimates
@@ -1011,6 +1010,73 @@ analysis_data = analysis_data %>%
         signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
         signal = factor(signal, levels = c("no signal", "signal"))
     )
+
+
+cluster_dispersion_df = analysis_data %>%
+  group_by(
+    assigned_treatment,
+    cluster_id
+  ) %>%
+  summarise(
+    mse_dist_to_cluster = mean(((dist.to.pot - cluster.dist.to.pot)/1000)^2)
+  ) %>%
+  mutate(
+    dispersed_community = mse_dist_to_cluster > 0.5
+  ) %>%
+  ungroup()
+
+outlier_analysis_data = analysis_data %>%
+    left_join(cluster_dispersion_df %>% select(-assigned_treatment), by = "cluster_id")  
+
+no_outlier_analysis_data = outlier_analysis_data %>%
+  filter(!dispersed_community) %>%
+  group_by(cluster.id) %>%
+  mutate(cluster_id = cur_group_id()) %>%
+  ungroup()
+
+#### Distance Checks -----------------------------------------------------------
+# outlier_analysis_data %>%
+#   filter(dispersed_community == TRUE) %>%
+#   select(
+#     cluster_id,
+#     assigned_treatment,
+#     cluster.dist.to.pot,
+#     dist.to.pot
+#   ) %>%
+#   group_by(cluster_id) %>%
+#   mutate(
+#     mean_dist.to.pot = mean(dist.to.pot)
+#   ) %>%
+#   ggplot() +
+#   geom_histogram(
+#     aes(x = dist.to.pot, fill = factor(cluster_id))
+#   ) +
+#   geom_vline(
+#     aes(
+#       xintercept = mean_dist.to.pot
+#     ),
+#     linetype = "dotted"
+#   ) +
+#   geom_vline(
+#     aes(
+#       xintercept = cluster.dist.to.pot
+#     ),
+#     linetype = "longdash"
+#   ) +
+#   facet_wrap(~assigned_treatment + cluster_id) +
+#   labs(
+#     x = "Distance to PoT (m)",
+#     y = "Count",
+#     fill = "Cluster",
+#     title = "Distribution of Distances in Outlier Clusters",
+#     caption = "Dashed line represents the cluster's centroid distance to the PoT. Dotted line the mean distance to the PoT."
+#   )
+# ggsave(
+#   "temp-data/dist-distance-to-pot-outliers.png",
+#   width = 10,
+#   height = 10
+# )
+#### Distance Checks End -------------------------------------------------------
 
 main_spec_regression = function(data, weights) {
   feglm(
@@ -1213,6 +1279,43 @@ community_control_spec_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_communitycontrol_spec_tbl_weird_order"
   )
+
+#### Outliers-------------------------------------------------------------------
+
+no_outlier_spec = create_regression_output(
+  data = no_outlier_analysis_data,
+  f = main_spec_regression,
+  f_signal = main_spec_signal_regression
+)
+
+no_outlier_spec$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-nooutlier-tidy-tes.csv")  
+
+
+no_outlier_spec$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_nooutlier_spec_tbl_weird_order"
+  )
+
+## Community dist + HH dist control with no outliers
+no_outlier_community_control_spec_output = create_regression_output(
+  data = no_outlier_analysis_data,
+  f = community_control_spec_regression,
+  f_signal = community_control_spec_signal_regression
+)
+
+
+no_outlier_community_control_spec_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-nooutliercommunitycontrol-tidy-tes.csv")  
+
+
+
+no_outlier_community_control_spec_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_nooutliercommunitycontrol_spec_tbl_weird_order"
+  )
+
+# recalculate cluster id
 
 #### Beliefs -------------------------------------------------------------------
 
