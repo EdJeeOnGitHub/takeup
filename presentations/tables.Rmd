@@ -4227,3 +4227,42 @@ ate_tbl_indiv_dist_indiv_fp %>%
 
 
 ```
+
+# Robustness Structural Model Individual Distance Cost, Community FP, Indiv Vis
+
+
+```{r}
+
+ate_rvar_struct_indiv_dist_community_fp_indiv_vis = read_rds(
+    file.path(
+      "temp-data",
+      "rvar_processed_dist_fit102_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS_1-2.rds"
+    )
+  )
+
+ate_tbl_indiv_dist_community_fp_indiv_vis = ate_rvar_struct_indiv_dist_community_fp_indiv_vis %>%
+  create_cis(.width = params$width) %>%
+  select(
+    treatment, variable, value
+  ) %>%
+  mutate(variable = factor(variable, levels = c("combined", "close", "far", "far_minus_close"))) %>%
+  arrange(variable) %>%
+  pivot_wider(
+    names_from = variable,
+    values_from = value
+  ) %>%
+  recode_control_mean() %>%
+  mutate(
+    treatment = factor(treatment, levels = c("Bracelet", "Calendar", "Ink", "Bracelet - Calendar", "Control mean"))
+  )  %>%
+  arrange(treatment)
+
+
+
+ate_tbl_indiv_dist_community_fp_indiv_vis %>%
+  create_robustness_tbl()  %>%
+  custom_save_latex_table("indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table")
+
+
+
+```
