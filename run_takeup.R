@@ -152,8 +152,12 @@ if (str_detect(script_options$models, "INDIV_DIST_INDIV_FP")) {
 }
 
 if (str_detect(script_options$models, "NO_OUTLIERS")) {
+  # recalculate cluster id
   analysis_data = analysis_data %>%
-    filter(!dispersed_community)
+    filter(!dispersed_community) %>%
+    group_by(cluster.id) %>% 
+    mutate(cluster_id = cur_group_id()) %>% 
+    ungroup()
 }
 
 
