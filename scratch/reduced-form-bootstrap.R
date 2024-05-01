@@ -1012,7 +1012,6 @@ analysis_data = analysis_data %>%
         signal = factor(signal, levels = c("no signal", "signal"))
     )
 
-
 main_spec_regression = function(data, weights) {
   feglm(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
@@ -1135,6 +1134,49 @@ discrete_distance_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_discrete_dist_tbl_weird_order"
   )
+
+## HH Dist regression
+hh_spec_regression = function(data, weights) {
+  feglm(
+    dewormed ~ 0 + assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control") | county, 
+    data = data,
+    family = binomial(link = "probit"),
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+hh_spec_signal_regression = function(data, weights) {
+  feglm(
+    dewormed ~ 0 + signal + dist.to.pot + i(signal, dist.to.pot, "no signal") | county, 
+    data = data,
+    family = binomial(link = "probit"),
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+hh_spec_output = create_regression_output(
+  data = analysis_data,
+  f = hh_spec_regression,
+  f_signal = hh_spec_signal_regression
+)
+
+
+hh_spec_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-hhdist-tidy-tes.csv")  
+
+
+hh_spec_output$default_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_hh_spec_tbl"
+  )
+
+hh_spec_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_hh_spec_tbl_weird_order"
+  )
+
+
 
 
 #### Beliefs -------------------------------------------------------------------
