@@ -4230,13 +4230,12 @@ ate_tbl_indiv_dist_indiv_fp %>%
 
 # Robustness Structural Model Individual Distance Cost, Community FP, Indiv Vis
 
-
 ```{r}
 
 ate_rvar_struct_indiv_dist_community_fp_indiv_vis = read_rds(
     file.path(
       "temp-data",
-      "rvar_processed_dist_fit102_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS_1-2.rds"
+      "rvar_processed_dist_fit103_INDIV_incentive_tes_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS_1-2.rds"
     )
   )
 
@@ -4262,6 +4261,85 @@ ate_tbl_indiv_dist_community_fp_indiv_vis = ate_rvar_struct_indiv_dist_community
 ate_tbl_indiv_dist_community_fp_indiv_vis %>%
   create_robustness_tbl()  %>%
   custom_save_latex_table("indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table")
+
+
+
+```
+
+# Robustness Structural Model Main Spec, Dropping Outlier Clusters 
+
+```{r}
+
+ate_rvar_struct_no_outliers = read_rds(
+    file.path(
+      "temp-data",
+      "rvar_processed_dist_fit103_ates_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS_1-2.rds"
+    )
+  )
+
+incentive_ate_df_no_outliers =  ate_rvar_struct_no_outliers %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
+  ) %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean()  %>%
+  mutate(estimand = "overall")
+
+incentive_ate_no_outliers_kbl = incentive_ate_df_no_outliers %>%
+  select(-model, -estimand) %>%
+  arrange(treatment) %>%
+  select(-contains("rf_")) %>%
+  kbl(
+    col.names = c(
+      "Dependent variable: Take-up",
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Overall Results") %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Structural" = 4
+      )
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Overall" = 5
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  )  %>%
+  row_spec(c(3), hline_after = TRUE) 
+
+
+incentive_ate_no_outliers_kbl %>%
+  custom_save_latex_table("struct-robustness-nooutliers-overall-te-table")
 
 
 
