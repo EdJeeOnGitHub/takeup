@@ -1,7 +1,6 @@
 library(tidyverse)
 library(posterior)
 library(tidybayes)
-library(marginaleffects)
 library(broom)
 library(data.table)
 library(knitr)
@@ -771,7 +770,8 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
 # wrapper function for all of the above
 create_regression_output = function(data, f, f_signal, B_draws = 500, 
                                     stat = params$stat,
-                                    caption = "Average Treatment Effects: Reduced Form") {
+                                    caption = "Average Treatment Effects: Reduced Form",
+                                    dependent_var = "Dependent variable: Take-up") {
   bs_draws = map_dfr(
     1:B_draws,
     ~bayes_bs_f(
@@ -821,7 +821,8 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
   default_tbl = overall_summ %>%
     prep_tbl(stat = params$stat) %>%
     nice_kbl_table(
-      cap = caption
+      cap = caption,
+      outcome_var = dependent_var
       )
     
   different_order_tbl = overall_summ %>%
@@ -836,7 +837,8 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
         ))) %>% 
       arrange(assigned_treatment) %>%
     nice_kbl_table(
-      cap = caption
+      cap = caption,
+      outcome_var = dependent_var
     )
 
   return(list(
@@ -1034,43 +1036,74 @@ no_outlier_analysis_data = outlier_analysis_data %>%
   mutate(cluster_id = cur_group_id()) %>%
   ungroup()
 
-#### Distance Checks -----------------------------------------------------------
-# outlier_analysis_data %>%
-#   filter(dispersed_community == TRUE) %>%
-#   select(
-#     cluster_id,
-#     assigned_treatment,
-#     cluster.dist.to.pot,
-#     dist.to.pot
+# not super kosher but additional robustness check we can perform if refs ask
+# splitting some dispersed clusters into a close/far cluster
+# split_outlier_data = outlier_analysis_data %>%
+#   group_by(
+#     cluster_id
 #   ) %>%
-#   group_by(cluster_id) %>%
 #   mutate(
-#     mean_dist.to.pot = mean(dist.to.pot)
-#   ) %>%
-#   ggplot() +
-#   geom_histogram(
-#     aes(x = dist.to.pot, fill = factor(cluster_id))
-#   ) +
-#   geom_vline(
-#     aes(
-#       xintercept = mean_dist.to.pot
-#     ),
-#     linetype = "dotted"
-#   ) +
-#   geom_vline(
-#     aes(
-#       xintercept = cluster.dist.to.pot
-#     ),
-#     linetype = "longdash"
-#   ) +
-#   facet_wrap(~assigned_treatment + cluster_id) +
-#   labs(
-#     x = "Distance to PoT (m)",
-#     y = "Count",
-#     fill = "Cluster",
-#     title = "Distribution of Distances in Outlier Clusters",
-#     caption = "Dashed line represents the cluster's centroid distance to the PoT. Dotted line the mean distance to the PoT."
-#   )
+#     mean_dist.to.pot = mean(dist.to.pot),
+#     cluster_split = case_when(
+#       dispersed_community == FALSE ~ as.character(cluster_id), 
+#       dispersed_community == TRUE & dist.to.pot < mean_dist.to.pot ~ paste0(cluster_id, " - close"),
+#       dispersed_community == TRUE & dist.to.pot >= mean_dist.to.pot ~ paste0(cluster_id, " - far")
+#     )
+#   )  %>%
+#   ungroup() %>%
+#   group_by(cluster_split) %>%
+#   mutate(mean_dist.to.pot = mean(dist.to.pot)) %>%
+#   mutate(
+#     cluster_id = cur_group_id(),
+#     assigned_dist_group = if_else(str_detect(cluster_split, "close") & mean_dist.to.pot < 1250, "close", assigned_dist_group),
+#     assigned_dist_group = if_else(str_detect(cluster_split, "far") & mean_dist.to.pot > 1250, "far", assigned_dist_group)
+#   )  %>%
+#   ungroup()
+
+#### Distance Checks -----------------------------------------------------------
+outlier_analysis_data %>%
+  filter(dispersed_community == TRUE) %>%
+  select(
+    cluster_id,
+    assigned_treatment,
+    cluster.dist.to.pot,
+    dist.to.pot
+  ) %>%
+  group_by(cluster_id) %>%
+  mutate(
+    mean_dist.to.pot = mean(dist.to.pot),
+    median_dist.to.pot = median(dist.to.pot)
+  ) %>%
+  ggplot() +
+  geom_histogram(
+    aes(x = dist.to.pot, fill = factor(cluster_id))
+  ) +
+  geom_vline(
+    aes(
+      xintercept = mean_dist.to.pot
+    ),
+    linetype = "dotted"
+  ) +
+  geom_vline(
+    aes(
+      xintercept = cluster.dist.to.pot
+    ),
+    linetype = "longdash"
+  ) +
+  geom_vline(
+    aes(
+      xintercept = median_dist.to.pot
+    ),
+    linetype = "dotdash"
+  ) +
+  facet_wrap(~assigned_treatment + cluster_id) +
+  labs(
+    x = "Distance to PoT (m)",
+    y = "Count",
+    fill = "Cluster",
+    title = "Distribution of Distances in Outlier Clusters",
+    caption = "Dashed line represents the cluster's centroid distance to the PoT. Dotted line the mean distance to the PoT."
+  )
 # ggsave(
 #   "temp-data/dist-distance-to-pot-outliers.png",
 #   width = 10,
@@ -1303,20 +1336,12 @@ no_outlier_community_control_spec_output = create_regression_output(
   f = community_control_spec_regression,
   f_signal = community_control_spec_signal_regression
 )
-
-
 no_outlier_community_control_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-robustness-nooutliercommunitycontrol-tidy-tes.csv")  
-
-
-
 no_outlier_community_control_spec_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_nooutliercommunitycontrol_spec_tbl_weird_order"
   )
-
-# recalculate cluster id
-
 #### Beliefs -------------------------------------------------------------------
 
 disagg_base_belief_data = analysis_data %>%
@@ -1351,6 +1376,7 @@ disagg_base_belief_data = analysis_data %>%
       cluster.id,
       cluster.dist.to.pot,
       standard_cluster.dist.to.pot,
+      dist.to.pot,
       county
       ) %>%
     mutate(
@@ -1368,8 +1394,9 @@ disagg_base_belief_data = analysis_data %>%
            thinks_other_knows_no, 
            doesnt_think_other_knows,
            cluster.id,
-            cluster.dist.to.pot,
-            standard_cluster.dist.to.pot,
+           cluster.dist.to.pot,
+           standard_cluster.dist.to.pot,
+           dist.to.pot,
            county
            ) %>%
     gather(variable, value, 
@@ -1417,6 +1444,37 @@ f_know_signal = function(data, weights) {
     weights = weights
   )
 }
+
+hh_f_know = function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control") | county,
+    data = data,
+    weights = weights
+  )
+}
+
+hh_f_know_signal = function(data, weights) {
+  feols(
+    prop_knows ~ signal + dist.to.pot + i(signal, dist.to.pot, "no signal") | county,
+    data = data,
+    weights = weights
+  )
+}
+## robustness HH dist
+robust_hh_fob_output = create_regression_output(
+  data = know_df %>%
+    filter(belief_type == "1ord"),
+  f = hh_f_know,
+  f_signal = hh_f_know_signal,
+  dependent_var = "Dependent variable: First-order beliefs"
+)
+robust_hh_fob_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-hhdist-fob-tidy-tes.csv")  
+robust_hh_fob_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_hhdist_fob_spec_tbl_weird_order"
+  )
+ 
 
 
 fob_know_bs_draws = map_dfr(
@@ -1512,7 +1570,6 @@ clean_know_df %>%
 
 #### SMS -----------------------------------------------------------------------
 
-stop()
 
 monitored_sms_data <- analysis.data %>% 
   filter(mon_status == "monitored") %>% 
