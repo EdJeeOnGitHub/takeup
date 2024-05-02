@@ -1460,6 +1460,36 @@ hh_f_know_signal = function(data, weights) {
     weights = weights
   )
 }
+
+
+discrete_f_know = function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    weights = weights
+  )
+}
+discrete_f_know_signal = function(data, weights) {
+  feols(
+    prop_knows ~ signal + assigned_dist_group + i(signal, assigned_dist_group, "no signal") | county,
+    data = data,
+    weights = weights
+  )
+}
+
+discrete_fob_output = create_regression_output(
+  data = know_df %>%
+    filter(belief_type == "1ord"),
+  f = discrete_f_know,
+  f_signal = discrete_f_know_signal,
+  dependent_var = "Dependent variable: First-order beliefs"
+)
+discrete_fob_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-discrete-fob-tidy-tes.csv")  
+discrete_fob_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_discrete_fob_spec_tbl_weird_order"
+  )
 ## robustness HH dist
 robust_hh_fob_output = create_regression_output(
   data = know_df %>%
