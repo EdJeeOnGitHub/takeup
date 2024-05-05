@@ -29,7 +29,7 @@ params:
   fit_version: 95
   input_path: data/stan_analysis_data
   output_path: temp-data
-  struct_model: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB
+  struct_model: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
   rf_model: REDUCED_FORM_NO_RESTRICT
   plot_caption: TRUE
   component_checks: FALSE
@@ -119,6 +119,14 @@ if (params$plot_caption) {
 } else {
   default_plot_caption = labs(caption = "")
 }
+
+freq_plot_caption = labs(
+  caption = "
+  Line range: 95% confidence interval.
+  Outer box: 80% confidence interval. Inner box: 50% confidence interval.
+  Point: Mean
+  "
+)
 
 dist_caption =  if(params$plot_caption) {
   labs(
@@ -2899,5 +2907,32 @@ gpt_endline_know_notknow_table_data %>%
     theme(
       panel.grid.major.x = element_blank() 
     )
+
+```
+
+### Frequentist Reduced Form Plots
+
+```{r}
+freq_rf_results = read_csv("temp-data/reducedform-tidy-tes.csv")  
+
+
+freq_rf_results %>%
+  filter(
+    assigned_treatment %in% c("ink", "calendar", "bracelet"),
+    assigned_dist_group != "far - close"
+  ) %>%
+  mutate(
+    assigned_dist_group = factor(assigned_dist_group, levels = c("combined", "close", "far")),
+    assigned_dist_group = fct_relabel(assigned_dist_group, str_to_title)
+    ) %>%
+  ggplot(aes(
+    x = estimate,
+    xmin = conf.low,
+    xmax = conf.high,
+    y = assigned_treatment
+  )) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  geom_pointrange()
+
 
 ```
