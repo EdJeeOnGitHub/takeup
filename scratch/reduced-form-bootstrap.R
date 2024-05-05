@@ -1154,6 +1154,44 @@ main_spec_output$different_order_tbl %>%
   )
 
 
+# main specification levels
+main_spec_bs_draws = map_dfr(
+  1:500,
+  ~bayes_bs_f(
+    seed = .x,
+    f = main_spec_regression,
+    f_signal = main_spec_signal_regression,
+    data = analysis_data
+  ),
+  .progress = TRUE
+  )
+
+main_spec_levels = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = main_spec_regression,
+  f_signal = main_spec_signal_regression,
+  data = analysis_data
+) %>%
+  filter(!is.na(assigned_treatment)) 
+
+main_spec_levels_ci = main_spec_bs_draws %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    conf.low = quantile(mean_pred, 0.025),
+    conf.high = quantile(mean_pred, 0.975)
+  ) %>%
+  filter(!is.na(assigned_treatment))
+
+tidy_main_spec_levels = left_join(
+  main_spec_levels,
+  main_spec_levels_ci,
+  by = c("assigned_treatment", "assigned_dist_group")
+) %>%
+  select(-signal, -seed) %>%
+  rename(estimate = mean_pred)
+tidy_main_spec_levels %>%
+  write_csv("temp-data/reducedform-tidy-levels.csv")  
+
 # Distance entering with its square
 nonlinear_distance_regression = function(data, weights) {
   feglm(
@@ -1490,6 +1528,7 @@ discrete_fob_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_discrete_fob_spec_tbl_weird_order"
   )
+
 ## robustness HH dist
 robust_hh_fob_output = create_regression_output(
   data = know_df %>%
@@ -1596,6 +1635,49 @@ clean_know_df %>%
 
 clean_know_df %>%
   write_csv("temp-data/knowledge-tidy-tes.csv")  
+
+
+## FOB Levels
+# main specification levels
+fob_bs_draws = map_dfr(
+  1:500,
+  ~bayes_bs_f(
+    seed = .x,
+    f = f_know,
+    f_signal = f_know_signal,
+    data = know_df %>%
+      filter(belief_type == "1ord")
+  ),
+  .progress = TRUE
+  )
+
+fob_levels_point = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = f_know,
+  f_signal = f_know_signal,
+  data = know_df %>%
+    filter(belief_type == "1ord")
+) %>%
+  filter(!is.na(assigned_treatment)) 
+
+fob_levels_ci = fob_bs_draws %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    conf.low = quantile(mean_pred, 0.025),
+    conf.high = quantile(mean_pred, 0.975)
+  ) %>%
+  filter(!is.na(assigned_treatment))
+
+fob_levels = left_join(
+  fob_levels_point,
+  fob_levels_ci,
+  by = c("assigned_treatment", "assigned_dist_group")
+) %>%
+  select(-signal, -seed) %>%
+  rename(estimate = mean_pred)
+
+fob_levels %>%
+  write_csv("temp-data/reducedformfob-tidy-levels.csv")  
 
 
 #### SMS -----------------------------------------------------------------------
