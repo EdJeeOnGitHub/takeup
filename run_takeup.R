@@ -32,7 +32,7 @@ Options:
     takeup fit \
     --cmdstanr \
     --outputname=dist_fit102 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 200 \
@@ -105,18 +105,6 @@ monitored_nosms_data <- analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
-# monitored_sms_data <- analysis.data %>% 
-#   filter(mon_status == "monitored") %>% 
-#   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-#             by = "cluster.id") %>% 
-#   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-#   group_by(cluster.id) %>% 
-#   mutate(cluster_id = cur_group_id()) %>% 
-#   ungroup()
-
-# add interaction for phone owner if we do all together
-# monitored_data %>% 
-#   select(phone_owner)
 
 nosms_data <- analysis.data %>% 
   filter(sms.treatment.2 == "sms.control") %>% 
@@ -127,13 +115,6 @@ nosms_data <- analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
-# analysis_sms_data <- monitored_sms_data %>% 
-#   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group)
-
-# reminder.only just in control
-# analysis_sms_data %>% 
-#   select(assigned_treatment, sms.treatment.2) %>%
-#   unique()
 
 analysis_data <- monitored_nosms_data %>% 
   ungroup() %>%
@@ -144,6 +125,22 @@ analysis_data <- monitored_nosms_data %>%
     indiv_id = row_number()
     )
 
+
+cluster_dispersion_df = analysis_data %>%
+  group_by(
+    assigned_treatment,
+    cluster_id
+  ) %>%
+  summarise(
+    mse_dist_to_cluster = mean(((dist.to.pot - cluster.dist.to.pot)/1000)^2)
+  ) %>%
+  mutate(
+    dispersed_community = mse_dist_to_cluster > 0.5
+  ) %>%
+  ungroup()
+analysis_data = analysis_data %>%
+  left_join(cluster_dispersion_df %>% select(-assigned_treatment), by = "cluster_id")  
+
 if (str_detect(script_options$models, "INDIV_DIST_INDIV_FP")) {
   analysis_data = analysis_data %>%
     mutate(
@@ -152,6 +149,15 @@ if (str_detect(script_options$models, "INDIV_DIST_INDIV_FP")) {
       cluster_id = indiv_id,
       standard_cluster.dist.to.pot = standard_hh.dist.to.pot
       )
+}
+
+if (str_detect(script_options$models, "NO_OUTLIERS")) {
+  # recalculate cluster id
+  analysis_data = analysis_data %>%
+    filter(!dispersed_community) %>%
+    group_by(cluster.id) %>% 
+    mutate(cluster_id = cur_group_id()) %>% 
+    ungroup()
 }
 
 
@@ -444,6 +450,10 @@ models <- lst(
         mu_rep_type = 2
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        mu_rep_type = 4
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
         mu_rep_type = 4
       ),

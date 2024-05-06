@@ -2912,27 +2912,209 @@ gpt_endline_know_notknow_table_data %>%
 
 ### Frequentist Reduced Form Plots
 
+#### ATEs
 ```{r}
+#| freq-rf-te-plot,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model",
+#| fig.width = 8, fig.height = 6
 freq_rf_results = read_csv("temp-data/reducedform-tidy-tes.csv")  
+
+munge_freq_results = function(data) {
+  data %>%
+    mutate(
+      assigned_dist_group = factor(assigned_dist_group, levels = c("combined", "close", "far")),
+      assigned_dist_group = fct_relabel(assigned_dist_group, str_to_title)
+      ) %>%
+    mutate(
+      assigned_treatment = factor(assigned_treatment, levels = c("bracelet", "calendar", "ink", "control")),
+      assigned_treatment = fct_relabel(assigned_treatment, str_to_title) %>% fct_rev
+      ) %>%
+    arrange(assigned_treatment)  %>%
+    group_by(assigned_treatment) %>%
+    mutate(treat_n = cur_group_id()) %>%
+    ungroup() %>%
+    mutate(
+      colors = canva_pal(canva_palette_vibrant)(4)[treat_n]
+    )
+}
+
 
 
 freq_rf_results %>%
   filter(
-    assigned_treatment %in% c("ink", "calendar", "bracelet"),
     assigned_dist_group != "far - close"
   ) %>%
-  mutate(
-    assigned_dist_group = factor(assigned_dist_group, levels = c("combined", "close", "far")),
-    assigned_dist_group = fct_relabel(assigned_dist_group, str_to_title)
-    ) %>%
+  munge_freq_results() %>%
+  filter(
+    assigned_treatment %in% c("Ink", "Calendar", "Bracelet"),
+  ) %>%
   ggplot(aes(
-    x = estimate,
-    xmin = conf.low,
-    xmax = conf.high,
     y = assigned_treatment
   )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      colour = colors
+    )
+  ) +
+  geom_point(aes(x = estimate, colour = colors), size = 1.8) +
+  geom_point(aes(x = estimate), color = "white", size = 0.6) +
   facet_wrap(~assigned_dist_group, ncol = 1) +
-  geom_pointrange()
-
-
+  scale_color_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
+  )
 ```
+
+```{r}
+#| freq-rf-levels-plot,
+#| fig.cap="Incentive Takeup Levels, Reduced Form Model",
+#| fig.width = 8, fig.height = 6
+
+freq_rf_levels = read_csv("temp-data/reducedform-tidy-levels.csv")  
+
+freq_rf_levels %>%
+  filter(
+    assigned_dist_group != "far - close"
+  ) %>%
+  munge_freq_results() %>%
+  filter(!is.na(assigned_treatment)) %>%
+  ggplot(aes(
+    y = assigned_treatment
+  )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      colour = colors
+    )
+  ) +
+  geom_point(aes(x = estimate, colour = colors), size = 1.8) +
+  geom_point(aes(x = estimate), color = "white", size = 0.6) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  scale_color_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
+  ) +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1)) 
+```
+
+#### FOBs
+
+```{r}
+#| fob-reduced-form,
+#| fig.cap="First Order Beliefs, Reduced Form Model",
+#| fig.width = 8, fig.height = 6
+
+fob_rf_te = read_csv("temp-data/knowledge-tidy-tes.csv")
+fob_rf_levels = read_csv("temp-data/reducedformfob-tidy-levels.csv")
+
+library(cowplot)
+plot_freq_style_fob = function(data, dodge_width) {
+  data %>%
+    ggplot(
+      aes(
+        y = assigned_treatment,
+        group = assigned_dist_group
+      )
+    ) +
+    geom_linerange(
+      aes(
+        xmin = conf.low,
+        xmax = conf.high,
+        colour = assigned_dist_group
+      ),
+      position = position_dodge(width = dodge_width)
+    ) +
+    geom_point(
+      aes(x = estimate, colour = assigned_dist_group), 
+      size = 1.8, 
+      position = position_dodge(width = dodge_width)
+      ) +
+    geom_point(
+      aes(x = estimate), 
+      color = "white", 
+      size = 0.6,
+      position = position_dodge(width = dodge_width)
+      )   +
+      labs(
+        colour = ""
+      ) +
+      scale_color_canva("", palette = canva_palette_vibrant) 
+}
+dodge_width = 0.5
+p1 = fob_rf_te %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_dist_group != "combined"
+  ) %>%
+  munge_freq_results() %>%
+  mutate(across(where(is.numeric), ~.x*100)) %>%
+  filter(
+    assigned_treatment %in% c("Control", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  mutate(
+    conf.high = if_else(assigned_treatment == "Control", NA_real_, conf.high),
+    conf.low = if_else(assigned_treatment == "Control", NA_real_, conf.low),
+    estimate = if_else(assigned_treatment == "Control", NA_real_, estimate),
+  ) %>%
+  plot_freq_style_fob(data = ., dodge_width = 0.5) +
+  labs(
+    x = "Percentage Points",
+    y = ""
+  ) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )
+
+
+
+p2 = fob_rf_levels %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_dist_group != "combined"
+  ) %>%
+  munge_freq_results() %>%
+  filter(
+    assigned_treatment %in% c("Control", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  plot_freq_style_fob(data = ., dodge_width = 0.5) +
+  labs(
+    x = "Proportion (%)",
+    y = ""
+  ) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  guides(colour = "none")
+
+rf_p_fob =   cowplot::plot_grid(
+    p2 + theme(legend.position = "none") + labs(title = "First Order Beliefs", subtitle = "Proportion"),
+    p1 + 
+      theme(legend.position = "none") + 
+      labs(
+        title = "", 
+        subtitle = "Treatment Effect",
+        caption = "Red indicates Far treatment group, blue indicates Close treatment group. 
+        95% confidence intervals shown calculated using wild cluster bootstrap."
+        ),
+    ncol = 2, axis = "b", align = "h" 
+  ) 
+rf_p_fob
+```
+
+
+
+
