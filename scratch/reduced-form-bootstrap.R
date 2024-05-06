@@ -1636,6 +1636,41 @@ clean_know_df %>%
 clean_know_df %>%
   write_csv("temp-data/knowledge-tidy-tes.csv")  
 
+#### FOB Main Spec + Controlling for HH Dist
+f_know_control_hh = function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county,
+    data = data,
+    weights = weights
+  )
+}
+
+f_know_control_hh_signal = function(data, weights) {
+  feols(
+    prop_knows ~ signal + standard_cluster.dist.to.pot + dist.to.pot + i(signal, standard_cluster.dist.to.pot, "no signal") | county,
+    data = data,
+    weights = weights
+  )
+}
+
+
+fob_control_hh = create_regression_output(
+  data = know_df %>%
+    filter(belief_type == "1ord"),
+  f = f_know_control_hh,
+  f_signal = f_know_control_hh_signal
+)
+
+
+fob_control_hh$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-fob-controlhh-tidy-tes.csv")  
+
+
+
+fob_control_hh$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_fob_controlhh_spec_tbl_weird_order"
+  )
 
 ## FOB Levels
 # main specification levels
