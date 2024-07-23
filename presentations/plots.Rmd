@@ -435,6 +435,88 @@ theme_set(theme_minimal() +
 
 #### Delta Expectation ####
 
+
+```{r}
+#| alternative-delta-with-u-example,
+#| fig.cap="Net reputational return, $\\mu\\Delta[w^*]$, as a function of take-up",
+#| fig.note="This plot shows how expected reputational return, $\\mu\\Delta[w^*]$ 
+#|  varies as cutoff type, $w^*$, changes. As $\\sigma_u$ increases, the 
+#|  reputational return falls as it becomes harder to infer someone's type based 
+#|  off actions." 
+
+sim_int <- expand.grid(
+  w = seq(-3, 3, 0.1),
+  u_sd = seq(0.0, 2.0, 0.05),
+  mu = seq(0.1, 1, 0.05)
+) %>% 
+  filter(u_sd == 0 | mu == 1) %>% 
+  rowwise() %>% 
+  mutate(
+    mu_delta = mu * calculate_delta(w, sqrt(1 + u_sd^2), u_sd),
+    mu_delta_deriv = mu * calculate_delta_deriv(w, sqrt(1 + u_sd^2), u_sd)
+  ) %>% 
+  ungroup() %>% 
+  pivot_longer(c(mu_delta, mu_delta_deriv), names_to = "delta_type")
+
+
+sim_ints_u_we_want = unique(sim_int$u_sd)[seq(from = 3, to = length(unique(sim_int$u_sd)) - 3, length.out = 3)]
+
+text_df = tibble(
+  w = c(-1.5, 0, 1.5), 
+  pr_takeup = pnorm(w/(sqrt(1 + sim_ints_u_we_want[2]^2))),
+  text = c("Respectable Acts", "Modal Acts", "Admirable Acts")
+) %>% 
+  mutate(
+    value = calculate_delta(w, sqrt(1 + sim_ints_u_we_want[2]^2), sim_ints_u_we_want[2])
+  )
+
+sigma_text_df = sim_int %>%
+      filter(w == -2) %>%
+      filter(u_sd %in% c(0.5, 1, 1.5)) %>%
+      filter(
+        delta_type == "mu_delta"
+      )
+
+sim_int %>% 
+  filter(delta_type == "mu_delta") %>%
+  filter(mu == 1)  %>%
+  mutate(
+    pr_takeup = pnorm(w/(sqrt(1 + u_sd^2))) 
+  )  %>%
+  mutate(
+    alpha = case_when(
+      u_sd  == 1 ~ 1, 
+      u_sd %in% sigma_text_df$u_sd ~ 0.3, 
+      TRUE ~ 0 
+      )
+  )  %>%
+  ggplot(aes(pr_takeup, value, alpha = alpha)) +
+  geom_line(
+    aes(group = u_sd)
+  ) +
+  annotate(
+    "text", 
+    x = c(1, 1, 1), 
+    y = sigma_text_df$value*0.95, 
+    label = c(
+      TeX("$\\sigma_u = 0.5$"),
+      TeX("$\\sigma_u = 1$"),
+      TeX("$\\sigma_u = 1.5$")
+    ),
+    alpha = 0.6,
+  hjust=0.5, size = 4, parse = TRUE,
+  vjust = 1
+  ) +
+  labs(
+    x = "Fraction Taking Up Treatment",
+    y = latex2exp::TeX(r"{$\mu\Delta\[w^*\]$}")
+  ) +
+  guides(alpha = "none") +
+  theme_minimal() +
+  NULL
+
+
+```
 ```{r}
 #| delta-with-u-example,
 #| fig.cap="Net reputational return, $\\mu\\Delta[w^*]$, as a function of cutoff type, $w^*$",
