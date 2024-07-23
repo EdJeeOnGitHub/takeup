@@ -3038,10 +3038,14 @@ freq_rf_results %>%
       xmin = conf.low,
       xmax = conf.high,
       colour = colors
-    )
+    ),
+    linewidth = 1.25
   ) +
-  geom_point(aes(x = estimate, colour = colors), size = 1.8) +
-  geom_point(aes(x = estimate), color = "white", size = 0.6) +
+  geom_point(
+    aes(x = estimate, colour = colors), 
+    size = 3.5) +
+  geom_point(aes(x = estimate), color = "white", 
+  size = 0.8) +
   facet_wrap(~assigned_dist_group, ncol = 1) +
   scale_color_identity() +
   geom_vline(
@@ -3076,9 +3080,10 @@ freq_rf_levels %>%
       xmin = conf.low,
       xmax = conf.high,
       colour = colors
-    )
+    ),
+    linewidth = 1.25
   ) +
-  geom_point(aes(x = estimate, colour = colors), size = 1.8) +
+  geom_point(aes(x = estimate, colour = colors), size = 3.5) +
   geom_point(aes(x = estimate), color = "white", size = 0.6) +
   facet_wrap(~assigned_dist_group, ncol = 1) +
   scale_color_identity() +
@@ -3119,17 +3124,18 @@ plot_freq_style_fob = function(data, dodge_width) {
         xmax = conf.high,
         colour = assigned_dist_group
       ),
+      linewidth = 1.25,
       position = position_dodge(width = dodge_width)
     ) +
     geom_point(
       aes(x = estimate, colour = assigned_dist_group), 
-      size = 1.8, 
+      size = 3.5, 
       position = position_dodge(width = dodge_width)
       ) +
     geom_point(
       aes(x = estimate), 
       color = "white", 
-      size = 0.6,
+      size = 0.8,
       position = position_dodge(width = dodge_width)
       )   +
       labs(
