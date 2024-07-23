@@ -2377,7 +2377,7 @@ plot_sm = function(sm_df, plot_prior = FALSE, plot_uncertainty = FALSE) {
       y = value,
       fill = treatment
     )) +
-    geom_line(aes(y = value, color = treatment)) +
+    geom_line(aes(y = value, color = treatment), linewidth = 1.25) +
     scale_color_discrete("", aesthetics = c("color", "fill"), labels = str_to_title) +
     labs(
       x = "Distance to Treatment (d) [km]" ,
