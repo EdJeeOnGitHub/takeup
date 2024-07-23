@@ -41,14 +41,13 @@ script_options = docopt::docopt(
                             86
                             bracelet
                             bracelet
-                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0-externality-0-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.1-externality-0.1-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 
-                            --robust-externality
-                            --robust-lambda
-
+                            --externality=0.1
+                            --lambda=0.1
 
                               " 
            else commandArgs(trailingOnly = TRUE)
@@ -613,20 +612,23 @@ find_optimal_incentive_varying_externality = function(distance, lambda, params, 
         dist_sd = sd_of_dist
     )
 
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    # lhs = (mu_rep_deriv * delta_v_star - delta) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    # rhs = lambda * delta / hazard
 
-    rhs = lambda * delta / hazard
+
+    lhs = log(mu_rep_deriv * delta_v_star - delta) + log(v_star + b + externality - lambda * delta * dist_norm)  - log(1 + mu_rep * delta_v_star_deriv)
+
+    rhs = log(lambda) + log(delta) - log(hazard)
 
     diff = abs(lhs - rhs)
     return(diff)
 }
-
 #### Varying B and Mu
-seq_size = 30
+seq_size = 25
 b_mu_df = expand.grid(
     draw = 1,
     lambda = script_options$lambda,
-    b_add = c(seq(from = -2, to = 2, length.out = seq_size), 0) %>% unique(),
+    b_add = c(seq(from = -2, to = 3, length.out = seq_size), 0) %>% unique(),
     mu_add = c(seq(from = -4, to = 4, length.out = seq_size), 0) %>% unique()
 ) %>% as_tibble() %>%
     group_by(draw) %>%
@@ -693,12 +695,26 @@ b_mu_df = b_mu_df %>%
     mutate(
         fit_vis = map(
             funs_vis,
-            ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent"),
+            ~optim(
+                2.5, 
+                .x, 
+                lower = 0, 
+                upper = 15, 
+                method = "Brent",
+                # control = list(abstol = 1e-10, reltol = 1e-10)
+                ),
             .progress = TRUE
         ),
         fit_vary_ext_vis = map(
             funs_vary_externality,
-            ~optim(2.5, .x, lower = 0, upper = 15, method = "Brent")
+            ~optim(
+                2.5, 
+                .x, 
+                lower = 0, 
+                upper = 15, 
+                method = "Brent",
+                # control = list(abstol = 1e-10, reltol = 1e-10)
+                )
         )
     )
 
@@ -759,8 +775,12 @@ p_contour = b_mu_df %>%
     ) +
     scale_y_continuous(labels = scales::percent) +
     theme(
-        legend.position = "bottom"
+        legend.position = "bottom",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
     )
+
+p_contour
 
 ggsave(
     p_contour,
@@ -768,8 +788,8 @@ ggsave(
         script_options$output_path,
         str_glue("{script_options$output_name}-contour-plot.pdf")
     ),
-    width = 10,
-    height = 10
+    width = 8,
+    height = 6
 )
 
 p_ext_contour = b_mu_df %>%
