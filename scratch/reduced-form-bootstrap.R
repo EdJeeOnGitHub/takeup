@@ -1212,7 +1212,7 @@ main_fit = feglm(
     nthreads = 1,
     cluster = ~cluster.id
 )
-etable(main_fit)
+
 etable(
   main_fit,
   dict = c(
@@ -1226,6 +1226,29 @@ etable(
     "county" = "County",
     "cluster.id" = "Cluster",
     dewormed = "Dewormed"
+    ),
+    headers = "",
+    replace = TRUE
+  )
+
+
+etable(
+  main_fit,
+  dict = c(
+    "assigned\\_treatment $=$ ink" = "Ink",
+    "assigned\\_treatment = calendar" = "Calendar",
+    "assigned\\_treatment = bracelet" = "Bracelet",
+    assigned_treatmentink = "Ink",
+    assigned_treatmentcalendar = "Calendar",
+    assigned_treatmentbracelet = "Bracelet",
+    "standard_cluster.dist.to.pot" = "Distance to PoT",
+    "county" = "County",
+    "cluster.id" = "Cluster",
+    dewormed = "Dewormed",
+    "assigned_treatment" = "Treatment",
+    "ink" = "Ink",
+    "calendar" = "Calendar",
+    "bracelet" = "Bracelet"
     ),
     headers = "",
     tex = TRUE,
