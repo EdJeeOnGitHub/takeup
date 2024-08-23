@@ -1563,12 +1563,12 @@ optim_summ_tbl = optim_summ_input_df %>%
     ),
     align = "llccc",
     booktabs = TRUE,
-    # format = "latex",
+    format = "latex",
     linesep = "",
     escape = FALSE
     ) %>%
   kableExtra::kable_styling(
-    # latex_options =  c("scale_down")
+    latex_options =  c("scale_down")
   ) %>%
   pack_rows(
     index = c(
@@ -1590,7 +1590,56 @@ optim_summ_tbl %>%
 
 ```
 
+```{r}
 
+
+optim_summ_tbl_diff_order =  optim_summ_input_df %>%
+  filter(distance_constraint == 3500 | allocation_type == "experimental") %>%
+  arrange(rep_type, mu_z, B_z) %>%
+  mutate(
+    mu_z = factor(
+      mu_z, 
+      levels = c("Control", "Bracelet", "Signal value fixed at bracelet 0.5km",  "No Visibility")
+    )
+  ) %>%
+  arrange(rep_type, mu_z, B_z) %>%
+  select(B_z, mu_z, n_pot, mean_demand, mean_dist)   %>%
+  knitr::kable(
+    col.names = c(
+      "Private benefit", 
+      "Visibility",
+      "Assigned PoTs", 
+      "Mean take-up", 
+      "Mean distance (km)"
+    ),
+    align = "llccc",
+    booktabs = TRUE,
+    format = "latex",
+    linesep = "",
+    escape = FALSE
+    ) %>%
+  kableExtra::kable_styling(
+    latex_options =  c("scale_down")
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Random allocation" = 1, 
+      "Panel B: Policymaker allocation" = 4
+    ), 
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space, 
+    hline_after = TRUE, 
+    hline_before = TRUE,
+    bold = TRUE
+  ) 
+
+
+optim_summ_tbl_diff_order %>%
+  custom_save_latex_table("optim-summ-table-diff-order")
+
+
+```
 
 ```{r}
 #| fixing-optim-table
@@ -3393,6 +3442,12 @@ tex_postprocessing = function(tex) {
 }
 
 
+header = 
+  list(
+    "(1) Sample: Control" = 1,
+    "(2) Sample: Control + Ink" = 1,
+    "(3) Sample: Control + Ink" = 1
+  )
 pref_fit_table_pp = fixest::etable(
   list(
     "(1) Sample: Control" = pref_fit_control,
@@ -3408,11 +3463,12 @@ pref_fit_table_pp = fixest::etable(
   ),
   tex = TRUE,
   depvar = FALSE,
-  title = "Preference for Calendar Gift Across Distance",
+  # title = "Preference for Calendar Gift Across Distance",
   style.tex = fixest::style.tex("aer"),
   file = "presentations/tables/pref-cal-gift.tex",
   replace = TRUE,
-  postprocess.tex = tex_postprocessing
+  postprocess.tex = tex_postprocessing,
+  headers = header
 )
 
 
@@ -3432,7 +3488,9 @@ pref_fit_table_no_pp = fixest::etable(
   tex = TRUE,
   depvar = FALSE,
   title = "Preference for Calendar Gift Across Distance",
-  style.tex = fixest::style.tex("aer"))
+  headers = header,
+  style.tex = fixest::style.tex("aer")
+  )
 
 
 pref_fit_table_no_pp
@@ -3493,7 +3551,12 @@ pref_gift_fit_not_dewormed
 
 
 pref_gift_fit = pref_gift_fit_dewormed 
-    
+
+pref_gift_fit_header = list(
+    "(1) Sample: Calendar" = 1,
+    "(2) Sample: Bracelet" = 1,
+    "(3) Sample: Both" = 1
+)  
     
 pref_gift_fit_tbl = fixest::etable(
   list(
@@ -3508,8 +3571,12 @@ pref_gift_fit_tbl = fixest::etable(
   ),
   tex = TRUE,
   depvar = FALSE,
-  title = "Preference for Bracelet Gift Across Distance",
-  style.tex = fixest::style.tex("aer"))
+  replace = TRUE,
+  # title = "Preference for Bracelet Gift Across Distance and Condition",
+  style.tex = fixest::style.tex("aer"),
+  headers = pref_gift_fit_header,
+  file = "presentations/tables/pref-gift-by-arm.tex"
+  )
 
 pref_gift_fit_tbl
 
@@ -3895,7 +3962,7 @@ wide_pigou_optim_te_tbl_tex %>%
 
 
 ```{r}
-#| robustness-struct-te-table, eval=FALSE
+#| robustness-struct-te-table, eval=TRUE
 
 ate_rvar_struct_robust = read_rds(
     file.path(

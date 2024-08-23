@@ -621,7 +621,31 @@ add_predictions = function(draws, ...) {
             mutate(
                 assigned_treatment = "bracelet - calendar"
             )
-    draws = bind_rows(draws, bra_minus_cal)
+    
+    bra_minus_control = draws %>%
+            filter(
+              assigned_treatment == "bracelet" 
+              ) %>%
+            group_by(seed, assigned_dist_group, ...) %>%
+            summarise(
+                mean_pred = mean_pred[assigned_treatment == "bracelet"],
+            ) %>%
+            mutate(
+                assigned_treatment = "bracelet - control"
+            )
+
+    bra_minus_no_signal = bind_rows(
+      bra_minus_cal,
+      bra_minus_control
+    ) %>%
+    group_by(seed, assigned_dist_group, ...) %>%
+    summarise(
+      mean_pred = mean(mean_pred)
+    ) %>%
+    mutate(assigned_treatment = "bracelet - no signal") 
+
+    draws = bind_rows(draws, bra_minus_cal, bra_minus_no_signal)
+
     fc_draws = draws %>%
     group_by(
         seed,
@@ -632,12 +656,13 @@ add_predictions = function(draws, ...) {
         assigned_dist_group = "far - close",
         .groups = "drop"
     )
+
     draws = bind_rows(draws, fc_draws) %>%
     ungroup() %>%
     mutate(
         assigned_treatment = factor(
             assigned_treatment,
-            levels = c("control", "bracelet - calendar", "ink", "calendar", "bracelet")
+            levels = c("control", "bracelet - calendar", "bracelet - no signal", "ink", "calendar", "bracelet")
         ),
         assigned_dist_group = factor(
             assigned_dist_group,
@@ -782,6 +807,7 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     ),
     .progress = TRUE
     )
+  
   clean_te_draws = bs_draws %>%
     clean_te_draws()
   clean_signal_draws = bs_draws %>%
@@ -802,7 +828,6 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     rename(realised_pred = estimate) %>%
     select(realised_pred, assigned_dist_group, assigned_treatment)
 
-
   signal_summ = add_summ_stats(clean_signal_draws, signal_fit)
   te_summ = add_summ_stats(clean_te_draws, te_fit)
 
@@ -818,21 +843,27 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     ) %>%
     filter(assigned_treatment != "no signal") 
 
+
   default_tbl = overall_summ %>%
     prep_tbl(stat = params$stat) %>%
     nice_kbl_table(
       cap = caption,
       outcome_var = dependent_var
       )
-    
+
+
   different_order_tbl = overall_summ %>%
     prep_tbl(stat = stat) %>%
     mutate(
       assigned_treatment = fct_relevel(
         assigned_treatment, 
         c(
-          "Control", "$H0$: Any Signal > No Signal, $p$-value",
+          "Control", 
+          "Bracelet - No Signal", 
+          "$H0$: Any Signal > No Signal, $p$-value",
+          "$H0$: Any Signal $\\neq$ No Signal, $p$-value",
           "$H0$: Bracelet > Calendar, $p$-value",
+          "$H0$: Bracelet $\\neq$ Calendar, $p$-value",
           "Bracelet", "Calendar", "Ink"
         ))) %>% 
       arrange(assigned_treatment) %>%
@@ -853,6 +884,7 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
 
 ### Table/Kable functions ------------------------------------------------------
 prep_tbl = function(tes, stat = "ci") {
+
     tbl_dist_levels = c(
         "combined",
         "close",
@@ -865,8 +897,11 @@ prep_tbl = function(tes, stat = "ci") {
         "calendar",
         "ink",
         "control",
+        "bracelet - no signal",
         "signal",
-        "bracelet - calendar"
+        "bracelet - calendar",
+        "signal two-side pval",
+        "bracelet - calendar two-side pval"
     )
 
 
@@ -892,8 +927,12 @@ prep_tbl = function(tes, stat = "ci") {
             )
     }
 
+
+
+
+
     tbl =  tes %>%
-        select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, oneside_pval, show_pval_only)  %>%
+        select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, pval, oneside_pval, show_pval_only)  %>%
         mutate(across(where(is.numeric), ~round(.x, 3))) %>%
         mutate(
             estim_std = if_else(
@@ -901,6 +940,15 @@ prep_tbl = function(tes, stat = "ci") {
                 linebreak(paste0(oneside_pval), align = "c"),
                 linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
             )
+        ) %>%
+        bind_rows(
+            filter(., show_pval_only == TRUE) %>%
+              mutate(
+                estim_std = linebreak(paste0(pval), align = "c")
+              ) %>%
+              mutate(
+                assigned_treatment = paste0(assigned_treatment, " two-side pval")
+              )
         ) %>%
         select(assigned_treatment, assigned_dist_group, estim_std) %>%
         mutate(
@@ -916,14 +964,17 @@ prep_tbl = function(tes, stat = "ci") {
         mutate(
             assigned_treatment = fct_relabel(assigned_treatment, str_to_title),
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal > No Signal, $p$-value"  = "Signal"), 
-            # "$p$(Any Signal > No Signal)"
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet > Calendar, $p$-value" = "Bracelet - Calendar")
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet > Calendar, $p$-value" = "Bracelet - Calendar"),
+
+
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal $\\neq$ No Signal, $p$-value"  = "Signal Two-Side Pval"), 
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet $\\neq$ Calendar, $p$-value" = "Bracelet - Calendar Two-Side Pval")
         ) 
+    
     return(tbl)
 }
 
 nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up", stat = params$stat) {
-
   linesep_str = if_else(stat == "ci", "\\addlinespace", "")
 
   nice_kbl = tbl %>%
@@ -959,7 +1010,7 @@ nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up",
       "Reduced Form" = 4
       )
   ) %>%
-  row_spec(c(3), hline_after = TRUE) 
+  row_spec(c(6), hline_after = TRUE) 
 }
 
 custom_save_latex_table = function(table, table_name, table_output_path = params$table_output_path){
@@ -1110,10 +1161,9 @@ outlier_analysis_data %>%
 #   height = 10
 # )
 #### Distance Checks End -------------------------------------------------------
-
 main_spec_regression = function(data, weights) {
   feglm(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county, 
     data = data,
     family = binomial(link = "probit"),
     nthreads = 1,
@@ -1132,12 +1182,12 @@ main_spec_signal_regression = function(data, weights) {
 }
 
 
+
 main_spec_output = create_regression_output(
   data = analysis_data,
   f = main_spec_regression,
   f_signal = main_spec_signal_regression
 )
-
 
 main_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-tidy-tes.csv")  
@@ -1152,6 +1202,41 @@ main_spec_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_main_spec_tbl_weird_order"
   )
+
+
+# coefs on main specification interaction terms
+main_fit = feglm(
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county, 
+    data = analysis_data,
+    family = binomial(link = "probit"),
+    nthreads = 1,
+    cluster = ~cluster.id
+)
+etable(main_fit)
+etable(
+  main_fit,
+  dict = c(
+    "assigned_treatment = ink" = "Ink",
+    "assigned_treatment = calendar" = "Calendar",
+    "assigned_treatment = bracelet" = "Bracelet",
+    assigned_treatmentink = "Ink",
+    assigned_treatmentcalendar = "Calendar",
+    assigned_treatmentbracelet = "Bracelet",
+    "standard_cluster.dist.to.pot" = "Distance to PoT",
+    "county" = "County",
+    "cluster.id" = "Cluster",
+    dewormed = "Dewormed"
+    ),
+    headers = "",
+    tex = TRUE,
+    style.tex = style.tex("aer"),
+    replace = TRUE,
+    file = 
+    file.path(
+      params$table_output_path, paste0("main_spec_regression_coefs", ".tex")
+    )
+  )
+
 
 
 # main specification levels
@@ -1275,7 +1360,7 @@ discrete_distance_output$different_order_tbl %>%
 ## HH Dist regression
 hh_spec_regression = function(data, weights) {
   feglm(
-    dewormed ~ 0 + assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control") | county, 
+    dewormed ~  0  + assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control") | county, 
     data = data,
     family = binomial(link = "probit"),
     nthreads = 1,
@@ -1529,6 +1614,23 @@ discrete_fob_output$different_order_tbl %>%
     table_name = "rf_discrete_fob_spec_tbl_weird_order"
   )
 
+## SOB Main Spec ---------------------------------------------------------------
+sob_fit = create_regression_output(
+  data = know_df %>%
+    filter(belief_type == "2ord"),
+  f = f_know,
+  f_signal = f_know_signal,
+  dependent_var = "Dependent variable: Second-order beliefs"
+)
+
+sob_fit$tidy_summary %>%
+  write_csv("temp-data/reducedform-sob-tidy-tes.csv")  
+sob_fit$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_sob_spec_tbl_weird_order"
+  )
+
+
 ## robustness HH dist
 robust_hh_fob_output = create_regression_output(
   data = know_df %>%
@@ -1589,6 +1691,7 @@ realised_know_te_fit = realised_know_fit %>%
 clean_know_signal_tes = add_summ_stats(know_bs_signal_draws, realised_know_signal_fit)
 clean_know_tes = add_summ_stats(know_bs_te_draws, realised_know_te_fit)
 
+pval_only_terms = c("bracelet - calendar", "signal")
 clean_know_df = bind_rows(
   clean_know_tes,
   clean_know_signal_tes
@@ -1616,10 +1719,13 @@ clean_know_df %>%
       assigned_treatment, 
       c(
 
-        "Control", "$H0$: Any Signal > No Signal, $p$-value",
+        "Control", 
+        "Bracelet - No Signal",
+        "$H0$: Any Signal > No Signal, $p$-value",
+        "$H0$: Any Signal $\\neq$ No Signal, $p$-value",
         "$H0$: Bracelet > Calendar, $p$-value",
+        "$H0$: Bracelet $\\neq$ Calendar, $p$-value",
         "Bracelet", "Calendar", "Ink"
-
       ))) %>% 
     arrange(assigned_treatment) %>%
   nice_kbl_table(
