@@ -588,9 +588,76 @@ pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
     return(data)
 }
 
+pred_bs_f_at_x = function(f, f_signal, data, weights, realised_fit = FALSE) {
+    if (realised_fit == TRUE) {
+        data$wt = 1
+    } else {
+        data$wt = weights[data$cluster_id]
+    }
+    fit = f(data, weights = ~wt)
+    data = data %>%
+        group_by(assigned_dist_group, assigned_treatment) %>%
+        mutate(
+          mean_standard_cluster.dist.to.pot = median(standard_cluster.dist.to.pot)
+        ) %>%
+        ungroup() 
 
+    collapsed_data = data %>%  
+      mutate(
+        standard_cluster.dist.to.pot = mean_standard_cluster.dist.to.pot,
+        county = "Kakamega"
+      ) %>%
+      select(
+        standard_cluster.dist.to.pot,
+        county,
+        assigned_dist_group,
+        assigned_treatment,
+        signal,
+        any_of("sms_treatment")
+      ) %>%
+      distinct()
 
+    pea_pred = collapsed_data %>%  
+      predict(
+        fit, newdata = .
+      )
 
+    collapsed_data$pred = pea_pred
+
+    signal_fit = f_signal(data, weights = ~wt)
+
+      pea_signal_pred = collapsed_data %>%
+        predict(
+          fit, newdata = .
+        )
+
+    collapsed_data$signal_pred = pea_signal_pred
+    collapsed_data = collapsed_data %>%
+        select(
+            assigned_dist_group,
+            assigned_treatment,
+            signal,
+            standard_cluster.dist.to.pot,
+            pred,
+            signal_pred,
+            any_of("sms_treatment")
+        )
+    
+
+    return(collapsed_data)
+
+}
+
+bayes_bs_f_at_x = function(seed, f, f_signal, data, ...) {
+    set.seed(seed)
+    n_clusters = length(unique(data$cluster.id))
+    alpha = rep(1, n_clusters)
+    weights = generate_dirichlet(alpha, 1)
+    bs_fit = pred_bs_f_at_x(f, f_signal, data, weights = weights) %>%
+        create_bs_preds(., ...)
+    bs_fit$seed = seed
+    return(bs_fit)
+} 
 
 bayes_bs_f = function(seed, f, f_signal, data, ...) {
     set.seed(seed)
@@ -603,6 +670,12 @@ bayes_bs_f = function(seed, f, f_signal, data, ...) {
     return(bs_fit)
 } 
 
+actual_bayesian_bs_fit_at_x = function(seed, f, f_signal, data, ...) {
+    bs_fit = pred_bs_f_at_x(f, f_signal, data, 1, realised_fit = TRUE) %>%
+        create_bs_preds(., ...)
+    bs_fit$seed = seed
+    return(bs_fit)
+} 
 actual_bayesian_bs_fit = function(seed, f, f_signal, data, ...) {
     bs_fit = pred_bs_f(f, f_signal, data, 1, realised_fit = TRUE) %>%
         create_bs_preds(., ...)
@@ -796,10 +869,19 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
 create_regression_output = function(data, f, f_signal, B_draws = 500, 
                                     stat = params$stat,
                                     caption = "Average Treatment Effects: Reduced Form",
-                                    dependent_var = "Dependent variable: Take-up") {
+                                    dependent_var = "Dependent variable: Take-up",
+                                    type = "APE"
+                                    ) {
+  if (type == "APE") {
+    bs_f = bayes_bs_f
+    actual_f = actual_bayesian_bs_fit
+  } else {
+    bs_f = bayes_bs_f_at_x
+    actual_f = actual_bayesian_bs_fit_at_x
+  }
   bs_draws = map_dfr(
     1:B_draws,
-    ~bayes_bs_f(
+    ~bs_f(
       seed = .x,
       f = f,
       f_signal = f_signal,
@@ -807,13 +889,12 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     ),
     .progress = TRUE
     )
-  
   clean_te_draws = bs_draws %>%
     clean_te_draws()
   clean_signal_draws = bs_draws %>%
     clean_signal_draws()
 
-  realised_fit = actual_bayesian_bs_fit(
+  realised_fit = actual_f(
     seed = "realised fit",
     f = f,
     f_signal = f_signal,
@@ -1163,7 +1244,7 @@ outlier_analysis_data %>%
 #### Distance Checks End -------------------------------------------------------
 main_spec_regression = function(data, weights) {
   feglm(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county, 
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
     data = data,
     family = binomial(link = "probit"),
     nthreads = 1,
@@ -1182,6 +1263,15 @@ main_spec_signal_regression = function(data, weights) {
 }
 
 
+main_spec_fit = feglm(
+  dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+  data = analysis_data,
+  family = binomial(link = "probit"),
+  nthreads = 1,
+  cluster = ~cluster.id
+)
+
+
 
 main_spec_output = create_regression_output(
   data = analysis_data,
@@ -1189,9 +1279,82 @@ main_spec_output = create_regression_output(
   f_signal = main_spec_signal_regression
 )
 
+
+PEA_main_spec_output = create_regression_output(
+  data = analysis_data,
+  f = main_spec_regression,
+  f_signal = main_spec_signal_regression,
+  type = "PEA"
+)
+
+
+PEA_main_spec_output$tidy_summary %>%
+  mutate(
+    type = "PEA"
+  ) %>%
+  print(n = 30)
+
+
+# # bind_rows(
+# #   PEA_main_spec_output$tidy_summary %>%
+# #     mutate(
+# #       type = "PEA"
+# #     ),
+# #   main_spec_output$tidy_summary %>%
+# #     mutate(type = "APE")
+# # ) %>%
+# #   filter(
+# #     assigned_treatment != "control",
+# #     assigned_treatment != "signal",
+# #     assigned_dist_group != "combined"
+# #     ) %>%
+# #   ggplot(aes(
+# #     x = estimate,
+# #     xmin = conf.low,
+# #     xmax = conf.high,
+# #     y = assigned_treatment,
+# #     colour = type
+# #   )) +
+# #   facet_wrap(
+# #     ~assigned_dist_group,
+# #     ncol = 1
+# #   ) +
+# #   geom_pointrange(
+# #     position = position_dodge(width = 0.5)
+# #   ) +
+# #   geom_vline(
+# #     xintercept = 0,
+# #     linetype = "longdash"
+# #   ) +
+# #   ggthemes::scale_color_canva(
+# #     "",
+# #     palette = "Primary colors with a vibrant twist"
+# #   ) +
+# #   labs(
+# #     x = "Estimates",
+# #     y = "Treatment"
+# #   )
+# ggsave(
+#   "temp-data/reducedform-ape-pea-comparison.pdf",
+#   width = 10,
+#   height = 10
+# )
+
+PEA_main_spec_output$default_tbl %>%
+  custom_save_latex_table(
+    table_name = "PEA_rf_main_spec_tbl"
+  )
+
+PEA_main_spec_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "PEA_rf_main_spec_tbl_weird_order"
+  )
+
 main_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-tidy-tes.csv")  
 
+PEA_main_spec_output$tidy_summary %>%
+  write_csv("temp-data/PEA-reducedform-tidy-tes.csv")  
 
 main_spec_output$default_tbl %>%
   custom_save_latex_table(
