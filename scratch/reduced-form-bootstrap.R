@@ -113,6 +113,8 @@ monitored_nosms_data <- analysis.data %>%
 
 analysis_data <- monitored_nosms_data
 
+dist_sd = sd(analysis_data$cluster.dist.to.pot)
+
 ## Load Census Data
 census_data_env = new.env()
 with_env = function(f, e = parent.frame()) {
@@ -596,19 +598,22 @@ pred_bs_f_at_x = function(f, f_signal, data, weights, realised_fit = FALSE) {
     }
     fit = f(data, weights = ~wt)
     data = data %>%
-        group_by(assigned_dist_group, assigned_treatment) %>%
+        group_by(assigned_treatment, assigned_dist_group) %>%
         mutate(
-          mean_standard_cluster.dist.to.pot = median(standard_cluster.dist.to.pot)
+          average_standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot),
+          average_dist.to.pot = mean(dist.to.pot)
         ) %>%
         ungroup() 
 
     collapsed_data = data %>%  
       mutate(
-        standard_cluster.dist.to.pot = mean_standard_cluster.dist.to.pot,
+        standard_cluster.dist.to.pot = average_standard_cluster.dist.to.pot,
+        dist.to.pot = average_dist.to.pot,
         county = "Kakamega"
       ) %>%
       select(
         standard_cluster.dist.to.pot,
+        dist.to.pot,
         county,
         assigned_dist_group,
         assigned_treatment,
@@ -1050,7 +1055,10 @@ prep_tbl = function(tes, stat = "ci") {
 
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal $\\neq$ No Signal, $p$-value"  = "Signal Two-Side Pval"), 
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet $\\neq$ Calendar, $p$-value" = "Bracelet - Calendar Two-Side Pval")
-        ) 
+        )  %>%
+        filter(
+          !(assigned_treatment %in% c("Bracelet - No Signal", "$H0$: Bracelet > Calendar, $p$-value", "$H0$: Any Signal > No Signal, $p$-value"))
+        )
     
     return(tbl)
 }
@@ -1091,7 +1099,7 @@ nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up",
       "Reduced Form" = 4
       )
   ) %>%
-  row_spec(c(6), hline_after = TRUE) 
+  row_spec(c(3), hline_after = TRUE) 
 }
 
 custom_save_latex_table = function(table, table_name, table_output_path = params$table_output_path){
@@ -1279,66 +1287,12 @@ main_spec_output = create_regression_output(
   f_signal = main_spec_signal_regression
 )
 
-
 PEA_main_spec_output = create_regression_output(
   data = analysis_data,
   f = main_spec_regression,
   f_signal = main_spec_signal_regression,
   type = "PEA"
 )
-
-
-PEA_main_spec_output$tidy_summary %>%
-  mutate(
-    type = "PEA"
-  ) %>%
-  print(n = 30)
-
-
-# # bind_rows(
-# #   PEA_main_spec_output$tidy_summary %>%
-# #     mutate(
-# #       type = "PEA"
-# #     ),
-# #   main_spec_output$tidy_summary %>%
-# #     mutate(type = "APE")
-# # ) %>%
-# #   filter(
-# #     assigned_treatment != "control",
-# #     assigned_treatment != "signal",
-# #     assigned_dist_group != "combined"
-# #     ) %>%
-# #   ggplot(aes(
-# #     x = estimate,
-# #     xmin = conf.low,
-# #     xmax = conf.high,
-# #     y = assigned_treatment,
-# #     colour = type
-# #   )) +
-# #   facet_wrap(
-# #     ~assigned_dist_group,
-# #     ncol = 1
-# #   ) +
-# #   geom_pointrange(
-# #     position = position_dodge(width = 0.5)
-# #   ) +
-# #   geom_vline(
-# #     xintercept = 0,
-# #     linetype = "longdash"
-# #   ) +
-# #   ggthemes::scale_color_canva(
-# #     "",
-# #     palette = "Primary colors with a vibrant twist"
-# #   ) +
-# #   labs(
-# #     x = "Estimates",
-# #     y = "Treatment"
-# #   )
-# ggsave(
-#   "temp-data/reducedform-ape-pea-comparison.pdf",
-#   width = 10,
-#   height = 10
-# )
 
 PEA_main_spec_output$default_tbl %>%
   custom_save_latex_table(
@@ -1486,7 +1440,8 @@ nonlinear_distance_signal_regression = function(data, weights) {
 nonlinear_distance_output = create_regression_output(
   data = analysis_data,
   f = nonlinear_distance_regression,
-  f_signal = nonlinear_distance_signal_regression
+  f_signal = nonlinear_distance_signal_regression,
+  type = "PEA"
 )
 
 nonlinear_distance_output$tidy_summary %>%
@@ -1526,7 +1481,8 @@ discrete_distance_signal_regression = function(data, weights) {
 discrete_distance_output = create_regression_output(
   data = analysis_data,
   f = discrete_distance_regression,
-  f_signal = discrete_distance_signal_regression
+  f_signal = discrete_distance_signal_regression,
+  type = "PEA"
 )
 
 discrete_distance_output$tidy_summary %>%
@@ -1566,7 +1522,8 @@ hh_spec_signal_regression = function(data, weights) {
 hh_spec_output = create_regression_output(
   data = analysis_data,
   f = hh_spec_regression,
-  f_signal = hh_spec_signal_regression
+  f_signal = hh_spec_signal_regression,
+  type = "PEA"
 )
 
 
@@ -1608,7 +1565,8 @@ community_control_spec_signal_regression = function(data, weights) {
 community_control_spec_output = create_regression_output(
   data = analysis_data,
   f = community_control_spec_regression,
-  f_signal = community_control_spec_signal_regression
+  f_signal = community_control_spec_signal_regression,
+  type = "PEA"
 )
 
 
@@ -1627,7 +1585,8 @@ community_control_spec_output$different_order_tbl %>%
 no_outlier_spec = create_regression_output(
   data = no_outlier_analysis_data,
   f = main_spec_regression,
-  f_signal = main_spec_signal_regression
+  f_signal = main_spec_signal_regression,
+  type = "PEA"
 )
 
 no_outlier_spec$tidy_summary %>%
@@ -1643,7 +1602,8 @@ no_outlier_spec$different_order_tbl %>%
 no_outlier_community_control_spec_output = create_regression_output(
   data = no_outlier_analysis_data,
   f = community_control_spec_regression,
-  f_signal = community_control_spec_signal_regression
+  f_signal = community_control_spec_signal_regression,
+  type = "PEA"
 )
 no_outlier_community_control_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-robustness-nooutliercommunitycontrol-tidy-tes.csv")  
