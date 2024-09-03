@@ -519,7 +519,39 @@ create_bs_preds = function(pred_df, ...) {
                 mutate(
                     assigned_dist_group = "combined"
                 )
-        )
+        ) %>%
+        mutate(type = "ape")
+
+
+    # pea_pred = pred_df %>%
+    #   group_by(
+    #       assigned_treatment,
+    #       assigned_dist_group,
+    #       ...
+    #   ) %>%
+    #   summarise(
+    #       pea_pred = mean(pred_pea),
+    #       .groups = "drop"
+    #   ) %>%
+    #   bind_rows(
+    #       pred_df %>%
+    #           group_by(
+    #               assigned_treatment,
+    #               ...
+    #           ) %>%
+    #           summarise(
+    #               pea_pred = mean(pred_pea),
+    #               .groups = "drop"
+    #           ) %>%
+    #           mutate(
+    #               assigned_dist_group = "combined"
+    #           )
+    #   ) %>%
+    #   mutate(
+    #     type = "pea"
+    #   )
+
+
         signal_pred = pred_df %>%
             group_by(signal, assigned_dist_group, ...) %>%
             summarise(
@@ -538,7 +570,9 @@ create_bs_preds = function(pred_df, ...) {
                 mutate(
                     assigned_dist_group = "combined"
                 )
-            )
+            ) %>%
+            mutate(type = "ape")
+          
     preds = bind_rows(preds, signal_pred)
        return(preds)
 }
@@ -573,6 +607,14 @@ pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
     }
     fit = f(data, weights = ~wt)
     data$pred = predict(fit)
+    data_pea = data %>%
+      group_by(assigned_treatment, assigned_dist_group) %>%
+      mutate(
+          standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot, na.rm = TRUE),
+          cluster.dist.to.pot = mean(cluster.dist.to.pot, na.rm = TRUE),
+          dist.to.pot = mean(dist.to.pot, na.rm = TRUE)
+      )
+    data$pred_pea = predict(fit, newdata = data_pea)
     signal_fit = f_signal(data, weights = ~wt)
     data$signal_pred = predict(signal_fit)
     data = data %>%
@@ -583,6 +625,7 @@ pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
             standard_cluster.dist.to.pot,
             pred,
             signal_pred,
+            pred_pea,
             any_of("sms_treatment")
         )
     return(data)
@@ -714,6 +757,7 @@ clean_te_draws = function(draws, ...) {
         rename(estimate = mean_pred)
 }
 
+
 estimate_actual_fit = function(split_data = split_analysis_data) {
     ids = names(split_data)
     sampled_ids = ids
@@ -783,9 +827,19 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     .progress = TRUE
     )
   clean_te_draws = bs_draws %>%
+    filter(type == "ape") %>%
     clean_te_draws()
+
   clean_signal_draws = bs_draws %>%
+    filter(type == "ape") %>%
     clean_signal_draws()
+
+
+  #  clean_pea_draws = bs_draws %>%
+  #   filter(type == "pea")  %>%
+  #   mutate(mean_pred = pea_pred) %>%
+  #   clean_te_draws()
+
 
   realised_fit = actual_bayesian_bs_fit(
     seed = "realised fit",
@@ -794,10 +848,12 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     data = data
   )
   signal_fit = realised_fit %>%
+    filter(type == "ape") %>%
     clean_signal_draws() %>%
     rename(realised_pred = estimate) %>%
     select(realised_pred, assigned_dist_group, assigned_treatment)
   te_fit = realised_fit %>%
+    filter(type == "ape") %>%
     clean_te_draws() %>%
     rename(realised_pred = estimate) %>%
     select(realised_pred, assigned_dist_group, assigned_treatment)
@@ -1137,7 +1193,6 @@ main_spec_output = create_regression_output(
   f = main_spec_regression,
   f_signal = main_spec_signal_regression
 )
-
 
 main_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-tidy-tes.csv")  
