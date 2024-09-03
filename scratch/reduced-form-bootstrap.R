@@ -1526,7 +1526,7 @@ discrete_distance_output = create_regression_output(
   data = analysis_data,
   f = discrete_distance_regression,
   f_signal = discrete_distance_signal_regression,
-  type = "PEA"
+  type = "APE"
 )
 
 discrete_distance_output$tidy_summary %>%
