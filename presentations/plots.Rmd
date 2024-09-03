@@ -147,7 +147,7 @@ models_we_want = c(
 quant_probs <- c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99)
 
 
-output_basepath = here("temp-data/output_dist_fit{fit_version}")
+output_basepath = here(str_glue("temp-data/output_dist_fit{fit_version}"))
 dir.create(output_basepath, showWarnings = FALSE)
 canva_palette_vibrant <- "Primary colors with a vibrant twist"
 
@@ -1802,14 +1802,13 @@ ggsave(
 default_ate_limits = c(-0.125, 0.15)
 
 
-
-
 structural_signalling_ate_plot = tidy_param_df %>%
   filter(
     fct_match(model_type, "structural"),
     fct_match(param, "ates")
     ) %>%
   mutate(tidy_draws = map(tidy_draws, filter, estimand == "signal")) %>%
+  mutate(tidy_draws = map(tidy_draws, filter, mu_treatment != "Control")) %>%
       plot_estimands(., 
                      tidy_draws, 
                      mu_treatment, 
@@ -1817,8 +1816,9 @@ structural_signalling_ate_plot = tidy_param_df %>%
                      single_prior_predict = TRUE, 
                      include_prior_predict = FALSE,
                      top_levels = default_top_levels) +
-        scale_x_continuous("", breaks = seq(-0.2, 0.2, 0.05), 
-          limits = default_ate_limits
+        scale_x_continuous("", 
+        # breaks = seq(-0.025, 0.1, 0.75), 
+        #   limits = c(-0.025, 0.075)
         ) +
         scale_y_discrete("", drop = TRUE) +
         labs(
@@ -2377,7 +2377,7 @@ plot_sm = function(sm_df, plot_prior = FALSE, plot_uncertainty = FALSE) {
       y = value,
       fill = treatment
     )) +
-    geom_line(aes(y = value, color = treatment)) +
+    geom_line(aes(y = value, color = treatment), linewidth = 1.25) +
     scale_color_discrete("", aesthetics = c("color", "fill"), labels = str_to_title) +
     labs(
       x = "Distance to Treatment (d) [km]" ,
@@ -3096,7 +3096,8 @@ freq_rf_levels %>%
     y = "",
     caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
   ) +
-  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1)) 
+  scale_x_continuous(breaks = seq(0.15, 0.55, 0.1), limits = c(0.15, 0.55)) 
+
 ```
 
 #### FOBs

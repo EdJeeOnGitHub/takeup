@@ -102,7 +102,7 @@ village_data %>%
         theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
         labs(
             title = "Optimal PoT Allocation Problem",
-            subtitle = "Black dots indicate villages. Triangles indicate potential clinic locations."
+            subtitle = "Black dots indicate communities. Triangles indicate potential clinic locations."
         )  +
         labs(x = "", y = "") + 
         NULL
@@ -170,7 +170,7 @@ plot_optimal_allocation = function(village_data,
     summ_df = optimal_data %>%
     group_by(draw) %>%
         mutate(
-            swf = sum(log(demand))
+            swf = round(mean(demand), 2)
         ) %>%
         ungroup() %>%
         summarise(
@@ -192,7 +192,7 @@ plot_optimal_allocation = function(village_data,
     )
 
     subtitle = str_glue(
-        "Average Distance: {round(mean_dist/1000, 2)}km, Social Welfare: {round(sw, 2)}"
+        "Average Distance: {round(mean_dist/1000, 2)}km, Policymaker's Utility: {round(sw, 2)}"
     )
     sub_str = str_glue("Assigned PoTs: {n_pots_used}")
 
@@ -258,14 +258,14 @@ plot_optimal_allocation = function(village_data,
 control_in_experiment = plot_optimal_allocation(village_data, pot_data, optimal_data)
 ggsave(
     file.path(
-        script_options$pdf_output_path,
+        # script_options$pdf_output_path,
+        "temp-data",
         str_glue(
-            "{script_options$output_basename}-control-used-optimal-allocation-plot.pdf"
+            "{script_options$output_basename}-control-used-experimental-allocation-plot.pdf"
         )
     ),
     width = 8, 
-    height = 6, 
-    dpi = 500
+    height = 6
 )
 
 

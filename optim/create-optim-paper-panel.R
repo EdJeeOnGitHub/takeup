@@ -38,6 +38,7 @@ pot_data = dist_data$pot_df
 n = nrow(village_data)
 m = nrow(pot_data)
 
+m
 
 wgs.84 = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 ## Loading Data
