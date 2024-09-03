@@ -2391,7 +2391,7 @@ plot_sm = function(sm_df, plot_prior = FALSE, plot_uncertainty = FALSE) {
       "",
       palette = canva_palette_vibrant
     ) +
-    geom_hline(yintercept = -1, linetype = "longdash" )
+    geom_hline(yintercept = 1, linetype = "longdash" )
 
 
   if (plot_prior) {
@@ -2442,11 +2442,12 @@ plot_sm = function(sm_df, plot_prior = FALSE, plot_uncertainty = FALSE) {
 
 sm_df %>%
   filter(variable == "sm_rescaled") %>%
+  mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
   plot_sm(plot_prior = TRUE, plot_uncertainty = FALSE) +
   annotate(
     "text", 
     x = 0.0 + 0.2, 
-    y = -1 - 0.02,
+    y = 1 + 0.02,
     label = "Amplification", 
     size = 3, 
     alpha = 0.7
@@ -2454,7 +2455,7 @@ sm_df %>%
   annotate(
     "text", 
     x = 2.5 , 
-    y = -1 + 0.02,
+    y = 1 - 0.02,
     label = "Mitigation", 
     size = 3,
     alpha = 0.7
@@ -2479,11 +2480,12 @@ sm_df %>%
 
 sm_df %>%
   filter(variable == "sm_rescaled") %>%
+  mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
   plot_sm(plot_prior = TRUE, plot_uncertainty = TRUE) +
   annotate(
     "text", 
     x = 0.0 + 0.2, 
-    y = -1 - 0.02,
+    y = 1 + 0.02,
     label = "Amplification", 
     size = 3, 
     alpha = 0.7
@@ -2491,7 +2493,7 @@ sm_df %>%
   annotate(
     "text", 
     x = 2.5 , 
-    y = -1 + 0.02,
+    y = 1 - 0.02,
     label = "Mitigation", 
     size = 3,
     alpha = 0.7
@@ -2516,6 +2518,7 @@ tidy_param_df %>%
   filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
   filter(roc_distance <= 2500) %>%
   filter(fit_type == "fit") %>%
+  mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
   ggplot(aes(
     x = roc_distance/1000,
     y = value,
@@ -2525,7 +2528,7 @@ tidy_param_df %>%
   geom_line() +
   facet_wrap(~treatment) +
   geom_hline(
-    yintercept = -1,
+    yintercept = 1,
     linetype = "longdash"
   ) +
   labs(
