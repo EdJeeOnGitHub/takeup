@@ -3,12 +3,9 @@ library(posterior)
 library(tidybayes)
 library(broom)
 library(data.table)
-library(knitr)
 library(kableExtra)
-library(ggthemes)
+library(knitr)
 library(fixest)
-library(magrittr)
-library(stringr)
 
 if (interactive()) {
     params = lst(
@@ -30,22 +27,6 @@ if (interactive()) {
     source(file.path("multilvlr", "multilvlr_util.R"))
 }
 
-models_we_want = c(params$struct_models, params$rf_models)
-
-options(
-    dplyr.show_progress = FALSE, 
-    digits = 4, 
-    knitr.kable.NA = '')
-
-knitr::opts_chunk$set(
-    echo = FALSE, 
-    cache = params$cache, 
-    warnings = FALSE,
-    warning = FALSE,
-    message = FALSE,
-    cache.path = stringr::str_glue("rf-takeup-table-cache/"), 
-    fig.path = str_glue("rf-takeup-table-fig-cache/"), 
-    fig.align = "center")
 
 dir.create("presentations/rf-tables", showWarnings = FALSE)
 
@@ -64,11 +45,7 @@ output_basepath = file.path(
 )
 
 
-canva_palette_vibrant <- "Primary colors with a vibrant twist"
-
-theme_set(theme_minimal() +
-            theme(legend.position = "bottom"))
-
+## Loading Scripts
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
 source(file.path( "dist_structural_util.R"))
@@ -76,7 +53,7 @@ source(file.path("multilvlr", "multilvlr_util.R"))
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
-
+## Loading Data
 rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
 rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
 cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
@@ -113,6 +90,7 @@ monitored_nosms_data <- analysis.data %>%
 
 analysis_data <- monitored_nosms_data
 
+sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 dist_sd = sd(analysis_data$cluster.dist.to.pot)
 
 ## Load Census Data
@@ -257,6 +235,7 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
 
 baseline_worm = baseline.data %>%
   clean_worm_covariates()
+
 clean_takeup_variables = function(data) {
   data %>%
     mutate(
@@ -264,9 +243,10 @@ clean_takeup_variables = function(data) {
       have_phone_lgl = phone_owner
     )
 }
+## Cleaning up analysis data
 analysis_data = analysis_data %>%
   clean_takeup_variables()
-
+## Getting cluster treatment assignment
 cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))  %>%
   mutate(
       treat_dist = paste0(
@@ -459,34 +439,6 @@ analysis_data = analysis_data %>%
 
 #### Functions for RF bootstrap ------------------------------------------------
 # Estimate and Predict to generate ATEs
-quick_pred = function(data) {
-    fit = 
-        feglm(
-            dewormed ~ 0 + assigned_treatment +  standard_cluster.dist.to.pot   + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county,
-            data = data, 
-            family = binomial(link = "probit"),
-            nthreads = 1
-        )
-    data$pred = predict(fit)
-    signal_fit = 
-        feglm(
-            dewormed ~ 0 + signal +   standard_cluster.dist.to.pot + i(signal, standard_cluster.dist.to.pot, "no signal") | county,
-            data = data, 
-            family = binomial(link = "probit"),
-            nthreads = 1
-        )
-    data$signal_pred = predict(signal_fit)
-    data = data %>%
-        select(
-            assigned_dist_group,
-            assigned_treatment,
-            signal,
-            standard_cluster.dist.to.pot,
-            pred,
-            signal_pred
-        )
-    return(data)
-}
 
 # For a given set of IDs, create bs data - n.b. this allows cluster to appear 
 # multiple times
@@ -500,7 +452,6 @@ create_bs_data = function(split_data, ids) {
 create_bs_preds = function(pred_df, ...) {
     # check if combined already present for PEAs
     combined_present = "combined" %in% pred_df$assigned_dist_group
-
     preds = pred_df %>%
         group_by(
             assigned_treatment,
@@ -508,10 +459,9 @@ create_bs_preds = function(pred_df, ...) {
             ...
         ) %>%
         summarise(
-            mean_pred = mean(pred),
+            mean_pred = mean(pred, na.rm = TRUE),
             .groups = "drop"
         )
-        
     if (!combined_present) {
       preds = preds %>%
         bind_rows(
@@ -521,7 +471,7 @@ create_bs_preds = function(pred_df, ...) {
                     ...
                 ) %>%
                 summarise(
-                    mean_pred = mean(pred),
+                    mean_pred = mean(pred, na.rm = TRUE),
                     .groups = "drop"
                 ) %>%
                 mutate(
@@ -531,23 +481,35 @@ create_bs_preds = function(pred_df, ...) {
     }
         
 
-        signal_pred = pred_df %>%
-            group_by(signal, assigned_dist_group, ...) %>%
-            summarise(
-                mean_pred = mean(signal_pred),
-                .groups = "drop"
-            ) 
+    signal_pred = pred_df %>%
+        mutate(
+          signal = case_when(
+            assigned_treatment %in% c("bracelet", "ink") ~ "signal",
+            assigned_treatment %in% c("calendar", "control") ~ "no signal"
+          )
+        ) %>%
+        group_by(signal, assigned_dist_group, ...) %>%
+        summarise(
+            mean_pred = mean(pred, na.rm = TRUE),
+            .groups = "drop"
+        ) 
             
     if (!combined_present) {
       signal_pred = signal_pred %>%
             bind_rows(
             pred_df %>%
+                mutate(
+                  signal = case_when(
+                    assigned_treatment %in% c("bracelet", "ink") ~ "signal",
+                    assigned_treatment %in% c("calendar", "control") ~ "no signal"
+                  )
+                ) %>%
                 group_by(
                     signal, 
                     ...
                 ) %>%
                 summarise(
-                    mean_pred = mean(signal_pred)
+                    mean_pred = mean(pred, na.rm = TRUE)
                 ) %>%
                 mutate(
                     assigned_dist_group = "combined"
@@ -559,16 +521,6 @@ create_bs_preds = function(pred_df, ...) {
        return(preds)
 }
 
-bs_fit = function(seed, split_data = split_analysis_data, ...) {
-    set.seed(seed)
-    ids = names(split_data)
-    sampled_ids = sample(ids, length(ids), replace = TRUE)
-    bs_df = create_bs_data(split_data, sampled_ids)
-    bs_fit = quick_pred(bs_df) %>%
-        create_bs_preds(., ...)
-    bs_fit$seed = seed
-    return(bs_fit)
-}
 
 
 # Function to generate samples from a Dirichlet distribution
@@ -582,39 +534,40 @@ generate_dirichlet <- function(alpha, n) {
   return(dirichlet_samples)
 }
 
-pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
+pred_bs_f = function(f, data, weights, realised_fit = FALSE) {
     if (realised_fit == TRUE) {
         data$wt = 1
     } else {
         data$wt = weights[data$cluster_id]
     }
     fit = f(data, weights = ~wt)
-    data$pred = predict(fit)
-    data_pea = data %>%
-      group_by(assigned_treatment, assigned_dist_group) %>%
-      mutate(
-          standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot, na.rm = TRUE),
-          cluster.dist.to.pot = mean(cluster.dist.to.pot, na.rm = TRUE),
-          dist.to.pot = mean(dist.to.pot, na.rm = TRUE)
-      )
-    data$pred_pea = predict(fit, newdata = data_pea)
-    signal_fit = f_signal(data, weights = ~wt)
-    data$signal_pred = predict(signal_fit)
-    data = data %>%
+
+    pred_data = bind_rows(
+      data %>%
+        mutate(assigned_treatment = "bracelet"),
+      data %>%
+        mutate(assigned_treatment = "calendar"),
+      data %>%
+        mutate(assigned_treatment = "ink"),
+      data %>%
+        mutate(assigned_treatment = "control")
+    )
+
+    pred_data$pred = predict(fit, newdata = pred_data)
+    data = pred_data %>%
         select(
             assigned_dist_group,
             assigned_treatment,
-            signal,
             standard_cluster.dist.to.pot,
             pred,
-            signal_pred,
-            pred_pea,
             any_of("sms_treatment")
         )
+
+
     return(data)
 }
 
-pred_bs_f_at_x = function(f, f_signal, data, weights, realised_fit = FALSE) {
+pred_bs_f_at_x = function(f,  data, weights, realised_fit = FALSE) {
     if (realised_fit == TRUE) {
         data$wt = 1
     } else {
@@ -622,7 +575,7 @@ pred_bs_f_at_x = function(f, f_signal, data, weights, realised_fit = FALSE) {
     }
     fit = f(data, weights = ~wt)
     data = data %>%
-        group_by(assigned_treatment, assigned_dist_group) %>%
+        group_by(assigned_dist_group) %>%
         mutate(
           average_standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot),
           average_dist.to.pot = mean(dist.to.pot)
@@ -667,12 +620,11 @@ pred_bs_f_at_x = function(f, f_signal, data, weights, realised_fit = FALSE) {
 
     collapsed_data$pred = pea_pred
 
-    signal_fit = f_signal(data, weights = ~wt)
 
-      pea_signal_pred = collapsed_data %>%
-        predict(
-          fit, newdata = .
-        )
+    pea_signal_pred = collapsed_data %>%
+      predict(
+        fit, newdata = .
+      )
 
     collapsed_data$signal_pred = pea_signal_pred
     collapsed_data = collapsed_data %>%
@@ -690,36 +642,36 @@ pred_bs_f_at_x = function(f, f_signal, data, weights, realised_fit = FALSE) {
 
 }
 
-bayes_bs_f_at_x = function(seed, f, f_signal, data, ...) {
+bayes_bs_f_at_x = function(seed, f, data, ...) {
     set.seed(seed)
     n_clusters = length(unique(data$cluster.id))
     alpha = rep(1, n_clusters)
     weights = generate_dirichlet(alpha, 1)
-    bs_fit = pred_bs_f_at_x(f, f_signal, data, weights = weights) %>%
+    bs_fit = pred_bs_f_at_x(f,  data, weights = weights) %>%
         create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
 
-bayes_bs_f = function(seed, f, f_signal, data, ...) {
+bayes_bs_f = function(seed, f, data, ...) {
     set.seed(seed)
     n_clusters = length(unique(data$cluster.id))
     alpha = rep(1, n_clusters)
     weights = generate_dirichlet(alpha, 1)
-    bs_fit = pred_bs_f(f, f_signal, data, weights = weights) %>%
+    bs_fit = pred_bs_f(f, data, weights = weights) %>%
         create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
 
-actual_bayesian_bs_fit_at_x = function(seed, f, f_signal, data, ...) {
-    bs_fit = pred_bs_f_at_x(f, f_signal, data, 1, realised_fit = TRUE) %>%
+actual_bayesian_bs_fit_at_x = function(seed, f,  data, ...) {
+    bs_fit = pred_bs_f_at_x(f,  data, 1, realised_fit = TRUE) %>%
         create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
 } 
-actual_bayesian_bs_fit = function(seed, f, f_signal, data, ...) {
-    bs_fit = pred_bs_f(f, f_signal, data, 1, realised_fit = TRUE) %>%
+actual_bayesian_bs_fit = function(seed, f,  data, ...) {
+    bs_fit = pred_bs_f(f,  data, 1, realised_fit = TRUE) %>%
         create_bs_preds(., ...)
     bs_fit$seed = seed
     return(bs_fit)
@@ -812,7 +764,6 @@ add_signal_predictions = function(draws, ...) {
             )
         ) 
 
-
     return(draws)
 }
 
@@ -855,16 +806,6 @@ clean_te_draws = function(draws, ...) {
 }
 
 
-estimate_actual_fit = function(split_data = split_analysis_data) {
-    ids = names(split_data)
-    sampled_ids = ids
-    bs_df = create_bs_data(split_data, sampled_ids)
-    bs_fit = quick_pred(bs_df) %>%
-        create_bs_preds()
-    bs_fit$seed = "actual fit"
-    return(bs_fit)
-}
-
 
 round_pval = function(pvals, digits = 3) {
     pvals = round(pvals, digits)
@@ -880,8 +821,8 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
       ) %>%
       summarise(
           std_error = sd(estimate),
-          conf.low = quantile(estimate, (1 - ci_width)/2),
-          conf.high = quantile(estimate, 1 - (1 - ci_width)/2)
+          conf.low = quantile(estimate, (1 - ci_width)/2, na.rm = TRUE),
+          conf.high = quantile(estimate, 1 - (1 - ci_width)/2, na.rm = TRUE)
       ) %>%
       left_join(
           actual_fit,
@@ -909,7 +850,7 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
 }
 
 # wrapper function for all of the above
-create_regression_output = function(data, f, f_signal, B_draws = 500, 
+create_regression_output = function(data, f,  B_draws = 500, 
                                     stat = params$stat,
                                     caption = "Average Treatment Effects: Reduced Form",
                                     dependent_var = "Dependent variable: Take-up",
@@ -927,22 +868,21 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     ~bs_f(
       seed = .x,
       f = f,
-      f_signal = f_signal,
       data = data
     ),
     .progress = TRUE
     )
 
-  clean_te_draws = bs_draws %>%
+
+  clean_te_draws_df = bs_draws %>%
     clean_te_draws()
 
-  clean_signal_draws = bs_draws %>%
+  clean_signal_draws_df = bs_draws %>%
     clean_signal_draws()
 
   realised_fit = actual_f(
     seed = "realised fit",
     f = f,
-    f_signal = f_signal,
     data = data
   )
 
@@ -951,13 +891,14 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     rename(realised_pred = estimate) %>%
     select(realised_pred, assigned_dist_group, assigned_treatment)
 
+
   te_fit = realised_fit %>%
     clean_te_draws() %>%
     rename(realised_pred = estimate) %>%
     select(realised_pred, assigned_dist_group, assigned_treatment)
 
-  signal_summ = add_summ_stats(clean_signal_draws, signal_fit)
-  te_summ = add_summ_stats(clean_te_draws, te_fit)
+  signal_summ = add_summ_stats(clean_signal_draws_df, signal_fit)
+  te_summ = add_summ_stats(clean_te_draws_df, te_fit)
 
 
   pval_only_terms = c("bracelet - calendar", "signal")
@@ -992,7 +933,7 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
           "$H0$: Any Signal $\\neq$ No Signal, $p$-value",
           "$H0$: Bracelet > Calendar, $p$-value",
           "$H0$: Bracelet $\\neq$ Calendar, $p$-value",
-          "Bracelet", "Calendar", "Ink"
+          "Ink", "Bracelet", "Calendar"
         ))) %>% 
       arrange(assigned_treatment) %>%
     nice_kbl_table(
@@ -1194,7 +1135,10 @@ analysis_data = analysis_data %>%
         signal = factor(signal, levels = c("no signal", "signal"))
     )
 
-
+analysis_data %>%
+  write_csv(
+    "temp-data/analysis-data.csv"
+  )
 cluster_dispersion_df = analysis_data %>%
   group_by(
     assigned_treatment,
@@ -1217,32 +1161,8 @@ no_outlier_analysis_data = outlier_analysis_data %>%
   mutate(cluster_id = cur_group_id()) %>%
   ungroup()
 
-# not super kosher but additional robustness check we can perform if refs ask
-# splitting some dispersed clusters into a close/far cluster
-# split_outlier_data = outlier_analysis_data %>%
-#   group_by(
-#     cluster_id
-#   ) %>%
-#   mutate(
-#     mean_dist.to.pot = mean(dist.to.pot),
-#     cluster_split = case_when(
-#       dispersed_community == FALSE ~ as.character(cluster_id), 
-#       dispersed_community == TRUE & dist.to.pot < mean_dist.to.pot ~ paste0(cluster_id, " - close"),
-#       dispersed_community == TRUE & dist.to.pot >= mean_dist.to.pot ~ paste0(cluster_id, " - far")
-#     )
-#   )  %>%
-#   ungroup() %>%
-#   group_by(cluster_split) %>%
-#   mutate(mean_dist.to.pot = mean(dist.to.pot)) %>%
-#   mutate(
-#     cluster_id = cur_group_id(),
-#     assigned_dist_group = if_else(str_detect(cluster_split, "close") & mean_dist.to.pot < 1250, "close", assigned_dist_group),
-#     assigned_dist_group = if_else(str_detect(cluster_split, "far") & mean_dist.to.pot > 1250, "far", assigned_dist_group)
-#   )  %>%
-#   ungroup()
-
 #### Distance Checks -----------------------------------------------------------
-outlier_analysis_data %>%
+p_outlier = outlier_analysis_data %>%
   filter(dispersed_community == TRUE) %>%
   select(
     cluster_id,
@@ -1295,47 +1215,29 @@ main_spec_regression = function(data, weights) {
   feglm(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
     data = data,
-    family = binomial(link = "probit"),
+    family = "probit",
     nthreads = 1,
     weights = ~wt
   )
 }
-
-main_spec_signal_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + signal + standard_cluster.dist.to.pot + i(signal, standard_cluster.dist.to.pot, "no signal") | county, 
-    data = data,
-    family = binomial(link = "probit"),
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-
-main_spec_fit = feglm(
-  dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
-  data = analysis_data,
-  family = binomial(link = "probit"),
-  nthreads = 1,
-  cluster = ~cluster.id
-)
 
 
 
 main_spec_output = create_regression_output(
   data = analysis_data,
-  f = main_spec_regression,
-  f_signal = main_spec_signal_regression
+  f = main_spec_regression
 )
+
+main_spec_output$tidy_summary %>%
+  mutate(across(where(is.numeric), round, 3)) %>%
+  print(n = 40) 
 
 
 PEA_main_spec_output = create_regression_output(
   data = analysis_data,
   f = main_spec_regression,
-  f_signal = main_spec_signal_regression,
   type = "PEA"
 )
-
 
 
 PEA_main_spec_output$default_tbl %>%
@@ -1347,6 +1249,13 @@ PEA_main_spec_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "PEA_rf_main_spec_tbl_weird_order"
   )
+
+
+main_spec_output$tidy_summary %>%
+  print(n = 30)
+
+PEA_main_spec_output$tidy_summary %>%
+  print(n = 30)
 
 main_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-tidy-tes.csv")  
@@ -1364,6 +1273,38 @@ main_spec_output$different_order_tbl %>%
     table_name = "rf_main_spec_tbl_weird_order"
   )
 
+
+main_spec_ols = function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+
+main_spec_ols_fit = feols(
+  dewormed ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + cluster.dist.to.pot | county, 
+  data = analysis_data %>%
+    mutate(cluster.dist.to.pot = cluster.dist.to.pot/1000),
+  nthreads = 1,
+  cluster = ~cluster.id
+)
+
+
+main_spec_fit = feglm(
+  dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+  data = analysis_data,
+  family = "probit",
+  nthreads = 1,
+  cluster = ~cluster.id
+)
+
+main_spec_ols_output = create_regression_output(
+  data = analysis_data,
+  f = main_spec_ols
+)
 
 # coefs on main specification interaction terms
 main_fit = feglm(
@@ -1425,11 +1366,10 @@ etable(
 
 # main specification levels
 main_spec_bs_draws = map_dfr(
-  1:500,
+  1:(999*5),
   ~bayes_bs_f(
     seed = .x,
     f = main_spec_regression,
-    f_signal = main_spec_signal_regression,
     data = analysis_data
   ),
   .progress = TRUE
@@ -1438,7 +1378,6 @@ main_spec_bs_draws = map_dfr(
 main_spec_levels = actual_bayesian_bs_fit(
   seed = "realised fit",
   f = main_spec_regression,
-  f_signal = main_spec_signal_regression,
   data = analysis_data
 ) %>%
   filter(!is.na(assigned_treatment)) 
@@ -1472,20 +1411,9 @@ nonlinear_distance_regression = function(data, weights) {
   )
 }
 
-nonlinear_distance_signal_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + signal + standard_cluster.dist.to.pot + standard_cluster.dist.to.pot^2 + i(signal, standard_cluster.dist.to.pot, "no signal") + i(signal, standard_cluster.dist.to.pot^2, "no signal") | county, 
-    data = data,
-    family = binomial(link = "probit"),
-    nthreads = 1,
-    weights = ~wt
-  )
-}
 nonlinear_distance_output = create_regression_output(
   data = analysis_data,
-  f = nonlinear_distance_regression,
-  f_signal = nonlinear_distance_signal_regression,
-  type = "PEA"
+  f = nonlinear_distance_regression
 )
 
 nonlinear_distance_output$tidy_summary %>%
@@ -1505,16 +1433,7 @@ nonlinear_distance_output$different_order_tbl %>%
 # discrete distance
 discrete_distance_regression = function(data, weights) {
   feglm(
-    dewormed ~ 0 + assigned_treatment + assigned_dist_group  + i(assigned_treatment, assigned_dist_group, "control")  | county, 
-    data = data,
-    family = binomial(link = "probit"),
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-discrete_distance_signal_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + signal + assigned_dist_group  + i(signal, assigned_dist_group, "no signal")  | county, 
+    dewormed ~ 0 + assigned_treatment + assigned_dist_group  + i(assigned_treatment, assigned_dist_group, "control") + standard_cluster.dist.to.pot | county, 
     data = data,
     family = binomial(link = "probit"),
     nthreads = 1,
@@ -1524,10 +1443,9 @@ discrete_distance_signal_regression = function(data, weights) {
 
 discrete_distance_output = create_regression_output(
   data = analysis_data,
-  f = discrete_distance_regression,
-  f_signal = discrete_distance_signal_regression,
-  type = "APE"
+  f = discrete_distance_regression
 )
+
 
 discrete_distance_output$tidy_summary %>%
   write_csv("temp-data/reducedform-robustness-discrete-dist-tidy-tes.csv")  
@@ -1553,21 +1471,10 @@ hh_spec_regression = function(data, weights) {
     weights = ~wt
   )
 }
-hh_spec_signal_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + signal + dist.to.pot + i(signal, dist.to.pot, "no signal") | county, 
-    data = data,
-    family = binomial(link = "probit"),
-    nthreads = 1,
-    weights = ~wt
-  )
-}
 
 hh_spec_output = create_regression_output(
   data = analysis_data,
-  f = hh_spec_regression,
-  f_signal = hh_spec_signal_regression,
-  type = "PEA"
+  f = hh_spec_regression
 )
 
 
@@ -1596,21 +1503,10 @@ community_control_spec_regression = function(data, weights) {
     weights = ~wt
   )
 }
-community_control_spec_signal_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + signal + standard_cluster.dist.to.pot  + i(signal, standard_cluster.dist.to.pot, "no signal") + dist.to.pot | county, 
-    data = data,
-    family = binomial(link = "probit"),
-    nthreads = 1,
-    weights = ~wt
-  )
-}
 
 community_control_spec_output = create_regression_output(
   data = analysis_data,
-  f = community_control_spec_regression,
-  f_signal = community_control_spec_signal_regression,
-  type = "PEA"
+  f = community_control_spec_regression
 )
 
 
@@ -1628,9 +1524,7 @@ community_control_spec_output$different_order_tbl %>%
 
 no_outlier_spec = create_regression_output(
   data = no_outlier_analysis_data,
-  f = main_spec_regression,
-  f_signal = main_spec_signal_regression,
-  type = "PEA"
+  f = main_spec_regression
 )
 
 no_outlier_spec$tidy_summary %>%
@@ -1645,9 +1539,7 @@ no_outlier_spec$different_order_tbl %>%
 ## Community dist + HH dist control with no outliers
 no_outlier_community_control_spec_output = create_regression_output(
   data = no_outlier_analysis_data,
-  f = community_control_spec_regression,
-  f_signal = community_control_spec_signal_regression,
-  type = "PEA"
+  f = community_control_spec_regression
 )
 no_outlier_community_control_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-robustness-nooutliercommunitycontrol-tidy-tes.csv")  
@@ -1777,14 +1669,7 @@ hh_f_know_signal = function(data, weights) {
 
 discrete_f_know = function(data, weights) {
   feols(
-    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
-    data = data,
-    weights = weights
-  )
-}
-discrete_f_know_signal = function(data, weights) {
-  feols(
-    prop_knows ~ signal + assigned_dist_group + i(signal, assigned_dist_group, "no signal") | county,
+    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + standard_cluster.dist.to.pot | county,
     data = data,
     weights = weights
   )
@@ -1794,11 +1679,12 @@ discrete_fob_output = create_regression_output(
   data = know_df %>%
     filter(belief_type == "1ord"),
   f = discrete_f_know,
-  f_signal = discrete_f_know_signal,
   dependent_var = "Dependent variable: First-order beliefs"
 )
+
 discrete_fob_output$tidy_summary %>%
   write_csv("temp-data/reducedform-robustness-discrete-fob-tidy-tes.csv")  
+
 discrete_fob_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_discrete_fob_spec_tbl_weird_order"
@@ -1809,7 +1695,6 @@ sob_fit = create_regression_output(
   data = know_df %>%
     filter(belief_type == "2ord"),
   f = f_know,
-  f_signal = f_know_signal,
   dependent_var = "Dependent variable: Second-order beliefs"
 )
 
@@ -1826,7 +1711,6 @@ robust_hh_fob_output = create_regression_output(
   data = know_df %>%
     filter(belief_type == "1ord"),
   f = hh_f_know,
-  f_signal = hh_f_know_signal,
   dependent_var = "Dependent variable: First-order beliefs"
 )
 robust_hh_fob_output$tidy_summary %>%
@@ -1843,7 +1727,6 @@ fob_know_bs_draws = map_dfr(
     ~bayes_bs_f(
         seed = .x, 
         f = f_know, 
-        f_signal = f_know_signal, 
         data = know_df %>% 
           filter(belief_type == "1ord")
     ),
@@ -1862,7 +1745,6 @@ know_bs_signal_draws = fob_know_bs_draws %>%
 realised_know_fit = actual_bayesian_bs_fit(
   seed = "realised fit", 
   f = f_know, 
-  f_signal = f_know_signal,
   data = know_df %>% 
     filter(belief_type == "1ord"))
 
@@ -1915,7 +1797,7 @@ clean_know_df %>%
         "$H0$: Any Signal $\\neq$ No Signal, $p$-value",
         "$H0$: Bracelet > Calendar, $p$-value",
         "$H0$: Bracelet $\\neq$ Calendar, $p$-value",
-        "Bracelet", "Calendar", "Ink"
+        "Ink", "Calendar", "Bracelet"
       ))) %>% 
     arrange(assigned_treatment) %>%
   nice_kbl_table(
@@ -1953,8 +1835,7 @@ f_know_control_hh_signal = function(data, weights) {
 fob_control_hh = create_regression_output(
   data = know_df %>%
     filter(belief_type == "1ord"),
-  f = f_know_control_hh,
-  f_signal = f_know_control_hh_signal
+  f = f_know_control_hh
 )
 
 
@@ -1975,7 +1856,6 @@ fob_bs_draws = map_dfr(
   ~bayes_bs_f(
     seed = .x,
     f = f_know,
-    f_signal = f_know_signal,
     data = know_df %>%
       filter(belief_type == "1ord")
   ),
@@ -1985,7 +1865,6 @@ fob_bs_draws = map_dfr(
 fob_levels_point = actual_bayesian_bs_fit(
   seed = "realised fit",
   f = f_know,
-  f_signal = f_know_signal,
   data = know_df %>%
     filter(belief_type == "1ord")
 ) %>%
@@ -2090,7 +1969,6 @@ sms_bs_draws = map_dfr(
     ~bayes_bs_f(
         seed = .x, 
         f = f_sms, 
-        f_signal = f_sms_signal, 
         data = sms_analysis_data,
         sms_treatment
     ),
@@ -2145,7 +2023,6 @@ sms_signal_bs_tes = sms_bs_draws %>%
 realised_sms_fit = actual_bayesian_bs_fit(
   seed = "realised fit",
   f = f_sms,
-  f_signal = f_sms_signal,
   data = sms_analysis_data,
   sms_treatment
 )
@@ -2257,7 +2134,7 @@ clean_sms_tes %>%
     table_name = "sms_diff_tes_tbl"
   )
 
-
+library(ggthemes)
 
 
 p_sms_tes = clean_sms_tes %>%
@@ -2323,3 +2200,5 @@ p_sms_tes = clean_sms_tes %>%
   )
 
 ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
+
+
