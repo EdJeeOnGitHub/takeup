@@ -41,13 +41,13 @@ script_options = docopt::docopt(
                             86
                             bracelet
                             bracelet
-                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.1-externality-0.1-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 
-                            --externality=0.1
-                            --lambda=0.1
+                            --externality=0.15
+                            --lambda=0.15
 
                               " 
            else commandArgs(trailingOnly = TRUE)
@@ -581,6 +581,20 @@ externality_fun = function(dist_m, b, dist_sd) {
 }
 
 
+ext_fun_demo_df = tibble(
+    x = seq(0, 6*1000, length.out = 100)
+) %>%
+    mutate(
+        y = map_dbl(x, ~externality_fun(.x, abs(params_check$beta_b_control), dist_sd = sd_of_dist))
+    )
+
+ext_fun_demo_df %>%
+    ggplot(aes(
+        x = x,
+        y = y
+    )) +
+    geom_point()
+
 externality_fun(0, abs(params_check$beta_b_control), dist_sd = sd_of_dist)
 externality_fun(6000, abs(params_check$beta_b_control), dist_sd = sd_of_dist)
 abs(params_check$beta_b_control)
@@ -606,14 +620,8 @@ find_optimal_incentive_varying_externality = function(distance, lambda, params, 
 
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
-    externality = externality_fun(
-        distance,
-        abs(params$beta_b_control),
-        dist_sd = sd_of_dist
-    )
 
-    # lhs = (mu_rep_deriv * delta_v_star - delta) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
-    # rhs = lambda * delta / hazard
+    externality = as.numeric(script_options$externality)*abs(params$beta_b_control)
 
 
     lhs = log(mu_rep_deriv * delta_v_star - delta) + log(v_star + b + externality - lambda * delta * dist_norm)  - log(1 + mu_rep * delta_v_star_deriv)
@@ -628,7 +636,7 @@ seq_size = 25
 b_mu_df = expand.grid(
     draw = 1,
     lambda = script_options$lambda,
-    b_add = c(seq(from = -2, to = 3, length.out = seq_size), 0) %>% unique(),
+    b_add = c(seq(from = -1.75, to = 3, length.out = seq_size), 0) %>% unique(),
     mu_add = c(seq(from = -4, to = 4, length.out = seq_size), 0) %>% unique()
 ) %>% as_tibble() %>%
     group_by(draw) %>%
@@ -734,20 +742,10 @@ b_mu_df = b_mu_df %>%
                 mu_add
             ),
             ~recalc_takeup(distance = ..1*1000, params = ..2, b_add = ..3, mu_add = ..4)
-        ),
-        ext_takeup_list = pmap(
-            list(
-                res_vary_ext,
-                params_vis,
-                b_add,
-                mu_add
-            ),
-            ~recalc_takeup(distance = ..1*1000, params = ..2, b_add = ..3, mu_add = ..4)
         )
     )  %>%
     mutate(
-        pr_obs = map_dbl(takeup_list, "pr_vis_0"),
-        ext_pr_obs = map_dbl(ext_takeup_list, "pr_vis_0")
+        pr_obs = map_dbl(takeup_list, "pr_vis_0")
     )
 
 p_contour = b_mu_df %>%
@@ -769,7 +767,7 @@ p_contour = b_mu_df %>%
          option = "inferno"
     )  +
     labs(
-        x = "Shift in Norms/Additional Private Incentive",
+        x = "Additional Private Incentive",
         y = "Visibility (%)",
         fill = "Optimal Distance (km)"
     ) +
@@ -804,7 +802,7 @@ p_ext_contour = b_mu_df %>%
         x = b_add,
         y = ext_pr_obs,
         # have to compress fill scale since changes so skewed at higher values
-        z = asinh(asinh(res_vary_ext))
+        z = res_vary_ext
     )) +
     metR::geom_contour_fill() +
     theme_minimal() +
