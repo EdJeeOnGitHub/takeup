@@ -436,6 +436,14 @@ analysis_data = analysis_data %>%
       ) %>% factor()
     )  
 
+analysis_data = analysis_data %>%
+  left_join(
+    pretreat_data %>%
+      select(KEY.individ, 
+      all_of(pretreat_vars)
+      ),
+      by = "KEY.individ"
+  )
 
 #### Functions for RF bootstrap ------------------------------------------------
 # Estimate and Predict to generate ATEs
@@ -2202,3 +2210,203 @@ p_sms_tes = clean_sms_tes %>%
 ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
 
 
+#### Heterogeneity by Covariates
+library(marginaleffects)
+analysis_data = analysis_data %>%
+  left_join(
+    baseline_worm %>%
+      group_by(cluster.id) %>%
+      summarise(
+        frac_externality = mean(fully_aware_externalities, na.rm = TRUE)
+      ) %>%
+      mutate(
+        frac_externality_gt_mean = frac_externality > mean(frac_externality, na.rm = TRUE),
+        cluster.id = factor(cluster.id)
+      ),
+      by = "cluster.id"
+  )
+
+clean_perception_data = baseline.data %>% 
+  select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
+  gather(key = key, value = response, -cluster.id) %>% 
+  separate(key, c("praise.stigma", "topic"), "_") %>% 
+  separate(topic, c("topic", "question.group"), -2)  %>%
+  filter(!is.na(response))  
+
+
+overall_judgement_score_df = clean_perception_data %>%
+  count(cluster.id, praise.stigma, topic, response)  %>%
+  group_by(cluster.id, praise.stigma, topic) %>% 
+  mutate(n = n/sum(n))   %>%
+  group_by(cluster.id) %>%
+  filter(response == "yes") %>%
+  summarise(
+    judge_score = prod(n), 
+  ) %>% 
+  ungroup() %>%
+  mutate(
+    mean_judge_score = mean(judge_score, na.rm = TRUE)
+  ) %>%
+  mutate(topic = "overall") %>%
+  mutate(
+    judge_score_gt_mean = judge_score > mean_judge_score
+  ) %>%
+  mutate(cluster.id = factor(cluster.id))
+
+
+judge_het_fit = analysis_data %>%
+  left_join(
+    overall_judgement_score_df %>% 
+      select(cluster.id, judge_score_gt_mean),
+      by = "cluster.id"
+  ) %>%
+  feglm(
+    dewormed ~ 0 + 
+      assigned_treatment + 
+      standard_cluster.dist.to.pot + 
+      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      judge_score_gt_mean +
+      i(assigned_treatment, judge_score_gt_mean, "control")  
+      | county,
+      family = "probit",
+      cluster = ~cluster.id
+  ) %>%
+  avg_comparisons(
+    variables = list(
+      assigned_treatment = "reference",
+      judge_score_gt_mean  = c(TRUE, FALSE)
+      ),
+    cross = TRUE
+  )  %>%
+  tidy(
+    conf.int = TRUE,
+  ) %>%
+  mutate(
+    het_variable = "judge_score_gt_mean"
+  )
+
+
+phone_het_fit = analysis_data %>%
+  feglm(
+    dewormed ~ 0 + 
+      assigned_treatment + 
+      standard_cluster.dist.to.pot + 
+      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      have_phone_lgl +
+      i(assigned_treatment, have_phone_lgl, "control")  
+      | county,
+      family = "probit",
+      cluster = ~cluster.id
+  ) %>%
+  avg_comparisons(
+    variables = list(
+      assigned_treatment = "reference",
+      have_phone_lgl  = c(TRUE, FALSE)
+      ),
+    cross = TRUE
+  ) %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(
+    het_variable = "have_phone_lgl"
+  )
+
+externality_het_fit = analysis_data %>%
+  feglm(
+    dewormed ~ 0 + 
+      assigned_treatment + 
+      standard_cluster.dist.to.pot + 
+      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      frac_externality_gt_mean +
+      i(assigned_treatment, frac_externality_gt_mean, "control")  
+      | county,
+      family = "probit",
+      cluster = ~cluster.id
+  ) %>%
+  avg_comparisons(
+    variables = list(
+      assigned_treatment = "reference",
+      frac_externality_gt_mean = c(TRUE, FALSE)
+      ),
+    cross = TRUE
+  ) %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(
+    het_variable = "frac_externality_gt_mean"
+  )
+
+gender_het_fit = analysis_data %>%
+  feglm(
+    dewormed ~ 0 + 
+      assigned_treatment + 
+      standard_cluster.dist.to.pot + 
+      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      gender +
+      i(assigned_treatment, gender, "control")  
+      | county,
+      family = "probit",
+      cluster = ~cluster.id
+  ) %>%
+  avg_comparisons(
+    variables = list(
+      assigned_treatment = "reference",
+      gender = c("male", "female")
+      ),
+    cross = TRUE
+  ) %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(
+    het_variable = "gender_female"
+  )
+
+het_fits = bind_rows(
+  gender_het_fit,
+  phone_het_fit,
+  judge_het_fit,
+  externality_het_fit
+) %>%
+  select(het_variable, contrast_assigned_treatment, estimate, std.error, p.value )
+
+het_tbl = het_fits %>%
+  mutate(
+    term = str_extract(
+      contrast_assigned_treatment,
+      "(?<=mean\\()\\w+"
+    )
+  ) %>%
+  select(
+    het_variable, term, estimate, std.error, p.value
+  ) %>%
+  mutate(
+    across(where(is.numeric), ~round(., 3)),
+    val = paste0("{[", std.error, "]}"),
+    estim_std = linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
+  ) %>%
+  select(het_variable, term, estim_std) %>%
+  mutate(term = str_to_title(term))  %>%
+  pivot_wider(
+    names_from = het_variable,
+    values_from = estim_std
+  )  %>%
+  kbl(
+    col.names = c(
+      "Heterogeneous Treatment Effects",
+      "Female",
+      "Phone Owner",
+      "Community Judgemental",
+      "Community Understand Externalities"
+      ),
+    booktabs = TRUE,
+    escape = FALSE,
+    align = "lcccc",
+    format = "latex"
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) 
+
+
+
+ het_tbl %>%
+  custom_save_latex_table(
+    table_name = "het-tes-tbl"
+  )
