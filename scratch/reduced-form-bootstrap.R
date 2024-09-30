@@ -2244,7 +2244,7 @@ analysis_data = analysis_data %>%
   mutate(
     age_gt_40 = age.census > 40
   ) %>%
-  mutate(assigned_treatment = factor(assigned_treatment, levels = c("control", "bracelet", "calendar", "ink"))) 
+  mutate(treatment = factor(assigned_treatment, levels = c("control", "bracelet", "calendar", "ink"))) 
 
 clean_perception_data = baseline.data %>% 
   select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
@@ -2276,34 +2276,167 @@ overall_judgement_score_df = clean_perception_data %>%
 
   
 
-  etable(
-    drop = "dist",
-    dict = c(
-      frac_externality_gt_mean = "Covariate",
-      frac_externality_gt_meanTRUE = "Covariate",
-      assigned_treatmentink = "Ink",
-      assigned_treatmentcalendar = "Calendar",
-      assigned_treatmentbracelet = "Bracelet",
-      "assigned_treatment = ink" = "Ink",
-      "assigned_treatment = calendar" = "Calendar",
-      "assigned_treatment = bracelet" = "Bracelet"
-    )
-  )
-
-
 
 age_het_fit = analysis_data %>%
   feols(
     dewormed ~ 0 + 
-      assigned_treatment + 
+      treatment + 
       standard_cluster.dist.to.pot + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      i(treatment, standard_cluster.dist.to.pot, "control") +
       age_gt_40 +
-      i(assigned_treatment, age_gt_40, "control")  
+      i(treatment, age_gt_40, "control")  
       | county,
-      family = "probit",
       cluster = ~cluster.id
   ) 
+
+
+judge_het_fit = analysis_data %>%
+  left_join(
+    overall_judgement_score_df %>% 
+      select(cluster.id, judge_score_gt_mean),
+      by = "cluster.id"
+  ) %>%
+  feols(
+    dewormed ~ 0 + 
+      treatment + 
+      standard_cluster.dist.to.pot + 
+      i(treatment, standard_cluster.dist.to.pot, "control") +
+      judge_score_gt_mean +
+      i(treatment, judge_score_gt_mean, "control")  
+      | county,
+      cluster = ~cluster.id
+  ) 
+
+phone_het_fit = analysis_data %>%
+  feols(
+    dewormed ~ 0 + 
+      treatment + 
+      standard_cluster.dist.to.pot + 
+      i(treatment, standard_cluster.dist.to.pot, "control") +
+      have_phone_lgl +
+      i(treatment, have_phone_lgl, "control")  
+      | county,
+      cluster = ~cluster.id
+  ) 
+  
+
+
+prevdeworm_het_fit = analysis_data %>%
+  feols(
+    dewormed ~ 0 + 
+      treatment + 
+      standard_cluster.dist.to.pot + 
+      i(treatment, standard_cluster.dist.to.pot, "control") +
+      frac_prev_dewormed_gt_mean +
+      i(treatment, frac_prev_dewormed_gt_mean, "control")  
+      | county,
+      cluster = ~cluster.id
+  )
+  
+externality_het_fit = analysis_data %>%
+  feols(
+    dewormed ~ 0 + 
+      treatment + 
+      standard_cluster.dist.to.pot + 
+      i(treatment, standard_cluster.dist.to.pot, "control") +
+      frac_externality_gt_mean +
+      i(treatment, frac_externality_gt_mean, "control")  
+      | county,
+      cluster = ~cluster.id
+  )
+
+
+gender_het_fit = analysis_data %>%
+  mutate(female = gender == "female") %>%
+  feols(
+    dewormed ~ 0 + 
+      treatment + 
+      standard_cluster.dist.to.pot + 
+      i(treatment, standard_cluster.dist.to.pot, "control") +
+      female +
+      i(treatment, female, "control")  
+      | county,
+      cluster = ~cluster.id
+  )
+
+tex_postprocessing = function(tex) {
+    tex %>%
+        str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
+        str_remove("\\\\end\\{table\\}") %>%
+        str_replace(
+          .,
+          "Covariate",
+          "\\\\midrule Covariate"
+        )
+}
+
+  etable(
+    list(
+      "Age $>40$" = age_het_fit,
+      "Female" = gender_het_fit,
+      "Phone Owner" = phone_het_fit,
+      "Judgement" = judge_het_fit,
+      "Previously Dewormed" = prevdeworm_het_fit,
+      "Externality Knowledge" = externality_het_fit
+    ),
+    drop = "dist",
+    dict = c(
+      frac_externality_gt_mean = "Covariate",
+      frac_externality_gt_meanTRUE = "Covariate",
+
+      age_gt_40 = "Covariate",
+      age_gt_40TRUE = "Covariate",
+
+      judge_score_gt_mean = "Covariate",
+      judge_score_gt_meanTRUE = "Covariate",
+
+
+      frac_prev_dewormed_gt_mean = "Covariate",
+      frac_prev_dewormed_gt_meanTRUE = "Covariate",
+
+      have_phone_lgl = "Covariate",
+      have_phone_lglTRUE = "Covariate",
+
+
+      female = "Covariate",
+      femaleTRUE = "Covariate",
+
+
+      treatmentink = "Ink",
+      treatmentcalendar = "Calendar",
+      treatmentbracelet = "Bracelet",
+      "treatment = ink" = "Ink",
+      "treatment = calendar" = "Calendar",
+      "treatment = bracelet" = "Bracelet",
+
+      "bracelet" = "Bracelet",
+      "calendar" = "Calendar",
+      "ink" = "Ink",
+      "cluster.id" = "Community"
+    ),
+    fitstat = c("my", "n"),
+    headers = list(
+      "Age $>40$" = 1,
+      "Female" = 1,
+      "Phone Owner" = 1,
+      "Judgemental" = 1,
+      "Prev Dewormed" = 1,
+      "Externality Knowledge" = 1
+    ),
+    depvar = FALSE,
+    file = file.path(
+      params$table_output_path, "het-tes.tex"
+    ),
+    drop.section = "fixef",
+    tex = TRUE, 
+    postprocess.tex = tex_postprocessing,
+    replace = TRUE,
+    style.df = style.df(
+      depvar.title = "", 
+      fixef.title = "")
+  )
+
+##### fits
 
 
 
