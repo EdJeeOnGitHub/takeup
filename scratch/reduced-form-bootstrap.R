@@ -590,14 +590,6 @@ pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
     }
     fit = f(data, weights = ~wt)
     data$pred = predict(fit)
-    data_pea = data %>%
-      group_by(assigned_treatment, assigned_dist_group) %>%
-      mutate(
-          standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot, na.rm = TRUE),
-          cluster.dist.to.pot = mean(cluster.dist.to.pot, na.rm = TRUE),
-          dist.to.pot = mean(dist.to.pot, na.rm = TRUE)
-      )
-    data$pred_pea = predict(fit, newdata = data_pea)
     signal_fit = f_signal(data, weights = ~wt)
     data$signal_pred = predict(signal_fit)
     data = data %>%
@@ -608,7 +600,6 @@ pred_bs_f = function(f, f_signal, data, weights, realised_fit = FALSE) {
             standard_cluster.dist.to.pot,
             pred,
             signal_pred,
-            pred_pea,
             any_of("sms_treatment")
         )
     return(data)
@@ -932,6 +923,17 @@ create_regression_output = function(data, f, f_signal, B_draws = 500,
     ),
     .progress = TRUE
     )
+  browser()
+
+  data$wt = 1
+  f_signal(data, NULL)
+
+  bs_draws %>%
+    filter(!is.na(signal)) %>%
+    group_by(signal, assigned_dist_group) %>%
+    summarise(
+      pred = mean(mean_pred)
+    )
 
   clean_te_draws = bs_draws %>%
     clean_te_draws()
@@ -1217,30 +1219,6 @@ no_outlier_analysis_data = outlier_analysis_data %>%
   mutate(cluster_id = cur_group_id()) %>%
   ungroup()
 
-# not super kosher but additional robustness check we can perform if refs ask
-# splitting some dispersed clusters into a close/far cluster
-# split_outlier_data = outlier_analysis_data %>%
-#   group_by(
-#     cluster_id
-#   ) %>%
-#   mutate(
-#     mean_dist.to.pot = mean(dist.to.pot),
-#     cluster_split = case_when(
-#       dispersed_community == FALSE ~ as.character(cluster_id), 
-#       dispersed_community == TRUE & dist.to.pot < mean_dist.to.pot ~ paste0(cluster_id, " - close"),
-#       dispersed_community == TRUE & dist.to.pot >= mean_dist.to.pot ~ paste0(cluster_id, " - far")
-#     )
-#   )  %>%
-#   ungroup() %>%
-#   group_by(cluster_split) %>%
-#   mutate(mean_dist.to.pot = mean(dist.to.pot)) %>%
-#   mutate(
-#     cluster_id = cur_group_id(),
-#     assigned_dist_group = if_else(str_detect(cluster_split, "close") & mean_dist.to.pot < 1250, "close", assigned_dist_group),
-#     assigned_dist_group = if_else(str_detect(cluster_split, "far") & mean_dist.to.pot > 1250, "far", assigned_dist_group)
-#   )  %>%
-#   ungroup()
-
 #### Distance Checks -----------------------------------------------------------
 outlier_analysis_data %>%
   filter(dispersed_community == TRUE) %>%
@@ -1321,13 +1299,14 @@ main_spec_fit = feglm(
 )
 
 
+main_spec_output$tidy_summary  %>%
+  print(n = 30)
 
 main_spec_output = create_regression_output(
   data = analysis_data,
   f = main_spec_regression,
   f_signal = main_spec_signal_regression
 )
-
 
 PEA_main_spec_output = create_regression_output(
   data = analysis_data,
