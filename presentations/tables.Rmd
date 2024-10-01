@@ -3505,24 +3505,25 @@ pref_gift_fit_not_dewormed = analysis_data %>%
     group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
     mutate(arm.size = n()) %>% 
     group_by(gift_choice, add = TRUE) %>%
-    filter(assigned.treatment %in% c("bracelet", "calendar")) %>%
+    filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
     filter(
       dewormed == FALSE
     )  %>%
     ungroup() %>%
-    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group) %>%
+    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group, county) %>%
     mutate(
       want_bracelet = gift_choice == "bracelet"
     )  %>%
-    group_by(assigned.treatment, dist.pot.group) %>%
+    group_by(assigned.treatment, dist.pot.group)  %>%
     fixest::feols(
-      data = .,
-      want_bracelet ~ dist.pot.group,
-      fsplit = ~assigned.treatment,
+      want_bracelet ~  assigned.treatment*dist.pot.group | county,
       cluster = ~cluster.id
-    ) 
+    )
 
 
+etable(
+  pref_gift_fit_not_dewormed
+)
 
 pref_gift_fit_dewormed = analysis_data %>%
     filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
