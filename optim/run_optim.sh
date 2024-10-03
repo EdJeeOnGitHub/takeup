@@ -10,8 +10,8 @@ PRED_DISTANCE="" # --pred-distance
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 NUM_POST_DRAWS=200
 POSTERIOR_MEDIAN="--posterior-median" # --posterior-median
-SKIP_PREDICTION=1 # 1
-SKIP_OA=1 # 1 or 0
+SKIP_PREDICTION=0 # 1
+SKIP_OA=0 # 1 or 0
 SKIP_PP=0 # 1 or 0
 RUN_TARGET_CREATION=1
 RUN_ESTIMATION="--run-estimation"
@@ -24,11 +24,11 @@ DATA_INPUT_NAME="${COUNTY}-many-pots-experiment.rds"
 CUTOFF="" # either no- or empty string
 SOLVER="gurobi"
 MANY_POTS="--many-pots" #"--many-pots"
-SUPPRESS_REP="suppress-rep-" # "suppress-rep-" #suppress-rep-
+SUPPRESS_REP="" # "suppress-rep-" #suppress-rep-
 CONSTRAINT_TARGET="rep"
-STATIC_SIGNAL_PM="" # "--static-signal-pm"
-STATIC_SIGNAL_DIST=
-DEMAND_NAME="" # "static-"
+STATIC_SIGNAL_PM="--static-signal-pm" # "--static-signal-pm"
+STATIC_SIGNAL_DIST=500
+DEMAND_NAME="static-" # "static-"
 
 mkdir -p ${OUTPUT_PATH}
 mkdir -p ${PLOT_OUTPUT_PATH}
