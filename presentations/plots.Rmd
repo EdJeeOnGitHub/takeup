@@ -2891,7 +2891,33 @@ ri_p_val_df = balance_data$ri_p_val_df
 realised_fit_df = balance_data$realised_fit_df
 
 
-plot_perm_fit_df %>%
+
+plot_perm_fit_df = plot_perm_fit_df %>%
+  mutate(
+    clean_name = case_when(
+      lhs == "lhs: age.census" ~ "Age",
+      lhs == "lhs: ethnicity_luhya" ~ "Main ethnicity/Luhya",
+      lhs == "lhs: have_phone_lgl" ~ "Phone owner",
+      lhs == "lhs: n_per_cluster" ~ "Number of individuals per community",
+      lhs == "lhs: religion_christianity" ~ "Christian",
+      TRUE ~ clean_name
+    )
+  )
+
+ri_p_val_df = ri_p_val_df %>%
+  mutate(
+    clean_name = case_when(
+      lhs == "lhs: age.census" ~ "Age",
+      lhs == "lhs: ethnicity_luhya" ~ "Main ethnicity/Luhya",
+      lhs == "lhs: have_phone_lgl" ~ "Phone owner",
+      lhs == "lhs: n_per_cluster" ~ "Number of individuals per community",
+      lhs == "lhs: religion_christianity" ~ "Christian",
+      TRUE ~ clean_name
+    )
+  )
+
+p_ri = plot_perm_fit_df %>%
+  filter(!is.na(clean_name)) %>%
   ggplot(aes(
     x = statistic
   )) +
@@ -2902,12 +2928,14 @@ plot_perm_fit_df %>%
     labeller = label_wrap_gen(width = 20)
     ) +
   geom_vline(
-    data = ri_p_val_df,
+    data = ri_p_val_df %>%
+      filter(!is.na(clean_name)),
     aes(xintercept = realised_statistic)
   ) +
   theme_bw() +
   geom_label(
-    data = ri_p_val_df,
+    data = ri_p_val_df %>%
+      filter(!is.na(clean_name)),
     aes(
     x = x,
     y = 40,
@@ -2918,6 +2946,12 @@ plot_perm_fit_df %>%
     y = "count"
   )
 
+ggsave(
+  plot = p_ri,
+  filename = "temp-data/dist-ri-plot.pdf",
+  width = 10,
+  height = 10
+)
 
 ```
 

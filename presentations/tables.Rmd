@@ -1378,7 +1378,7 @@ x = 1+1
 all_optim_df = read_csv(
   file.path(
     params$optim_input_path,
-    "posterior-clean-summ-optim.csv"
+    "posterior-clean-summ-optim-w-static-control.csv"
   )
 )  %>%
   mutate(fix_type = replace_na(fix_type, "no-fix"))
@@ -1397,6 +1397,11 @@ optim_group_vars = c(
         "model",
         "cutoff_type"
 )
+
+all_optim_df %>%
+  filter(private_benefit_z == "control") %>%
+  filter(visibility_z == "control") %>%
+  count(static_vstar)
 
 summ_optim_df = all_optim_df %>%
         group_by(
@@ -1501,7 +1506,6 @@ wide_summ_df_sup_rep = summ_optim_df %>%
   spread(variable, estim_value)
 
 
-
 optim_summ_input_df = bind_rows(
   wide_summ_df_rep %>% 
     mutate(rep_type = "rep") %>%
@@ -1511,26 +1515,28 @@ optim_summ_input_df = bind_rows(
 filter(fix_type == "no-fix" | is.na(fix_type)) %>%
   mutate(
     mu_z = if_else(rep_type == "suppress_rep", "No visibility", mu_z), 
-    mu_z = if_else(static_vstar == TRUE & mu_z == "bracelet", "Signal value fixed at 0.5km", mu_z), 
+    mu_z = case_when(
+      static_vstar == FALSE ~ str_to_title(mu_z),
+      static_vstar == TRUE & mu_z == "control" ~ "Signal value fixed at control 0.5km",
+      static_vstar == TRUE & mu_z == "bracelet" ~ "Signal value fixed at bracelet 0.5km",
+      TRUE ~ mu_z
+    )
   ) %>%
   mutate(mu_z = factor(
     mu_z, 
-    c("bracelet", 
-      "calendar", 
-      "ink", 
-      "control", 
-      "No visibility", 
-      "Signal value fixed at 0.5km"
+    c("Bracelet", 
+      "Calendar", 
+      "Ink", 
+      "Control", 
+      "No Visibility", 
+      "Signal value fixed at control 0.5km",
+      "Signal value fixed at bracelet 0.5km"
       )))  %>%
   mutate(B_z = factor(B_z, c("bracelet", "calendar", "ink", "control")))  %>%
   mutate(B_z = fct_relabel(B_z, str_to_title)) %>%
-  mutate(mu_z = fct_relabel(mu_z, str_to_title))  %>%
-  mutate(
-    mu_z = recode_factor(mu_z, "Signal Value Fixed At 0.5km" = "Signal value fixed at bracelet 0.5km")
-  ) %>%
   mutate(
     mu_z = fct_relevel(mu_z, 
-    c("Control", "Ink", "Calendar", "Signal value fixed at bracelet 0.5km", "Bracelet",  "No Visibility"))
+    c("Control", "Ink", "Calendar", "Signal value fixed at control 0.5km", "Signal value fixed at bracelet 0.5km", "Bracelet",  "No Visibility"))
   )  %>%
   mutate(
     mean_dist = if_else(
@@ -2854,6 +2860,8 @@ lhs_translation_df = tribble(
   ~lhs, ~clean_name, ~sample,
   "lhs: age.census", "Age", "takeup_sample",
   "lhs: all_can_get_worms", "Know everyone can be infected", "baseline_worm",
+  "lhs: know_children_get_worms", "Know children get worms", "baseline_worm",
+  "lhs: sick_worms_only", "Believe deworming is for the sick", "baseline_worm",
   "lhs: treated_lgl", "Dewormed in the past", "baseline_worm",
   "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
   "lhs: completed_primary", "Completed primary schooling", "pretreat",
@@ -2863,6 +2871,7 @@ lhs_translation_df = tribble(
   "lhs: female", "Female", "takeup_sample",
   "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
   "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
+  "lhs: know_medicine_stops_worms", "Know medicine stops worms", "baseline_worm",
   "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
   "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
   "lhs: years_schooling", "Years schooling", "pretreat",
@@ -2896,6 +2905,9 @@ lhs_translation_df = tribble(
 ```{r}
 #| balance-creation, dependson="balance-setup"
 
+
+
+
 comp_wide_indiv_bal_df = create_balance_input(
     comp_balance_tidy_df %>% 
       filter(comp_type == "treatment") %>%
@@ -2918,6 +2930,7 @@ comp_wide_indiv_bal_df = create_balance_input(
   select(-clean_name) %>%
   arrange(sample) %>%
   select(-sample)
+
 
 
 1+1
@@ -2985,7 +2998,7 @@ pack_rows(
 )
 
 
-
+comp_wide_indiv_bal_df
 
 comp_bal_table %>%
   custom_save_latex_table("comp-balance-table")
