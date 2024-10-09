@@ -39,19 +39,27 @@ script_options = docopt::docopt(
     "),
     args = if (interactive()) "
                             86
-                            bracelet
-                            bracelet
-                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            control
+                            control
+                            --output-name=ramsey-control-mu-control-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 
                             --externality=0.15
                             --lambda=0.15
+                            
+                            --posterior
+
+                            --robust-lambda
+
+                            --static-signal-pm
+                            --static-signal-distance=500
 
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
+                            # --output-name=ramsey-bracelet-mu-bracelet-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 
                             # --static-signal-pm
                             # --static-signal-distance=500
@@ -77,6 +85,7 @@ fit_version = script_options$fit_version
 script_options$lambda = as.numeric(script_options$lambda)
 script_options$num_post_draws = as.numeric(script_options$num_post_draws)
 script_options$static_signal_distance = as.numeric(script_options$static_signal_distance)
+externality = as.numeric(script_options$externality)
 
 struct_param_draws = read_csv(
     file.path(
@@ -92,7 +101,7 @@ struct_param_draws = read_csv(
 
 if (script_options$static_signal_pm) {
     post_output_name = str_glue(
-        "posterior-optimal-distance-static_vstar-lambda_0-externality_0-model_{script_options$model}-fit-version_{script_options$fit_version}.csv"
+        "posterior-optimal-distance-static_vstar-lambda_{script_options$lambda}-externality_{script_options$externality}-model_{script_options$model}-fit-version_{script_options$fit_version}.csv"
     )
 } else {
     post_output_name = str_glue(
@@ -164,7 +173,8 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
 
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    externality_val = externality*abs(params$beta_b_control)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
 
     rhs = lambda * delta / hazard
 
@@ -222,6 +232,8 @@ if (script_options$static_signal_pm == TRUE) {
         ~.x(script_options$static_signal_distance)
     )
 
+    static_pred_outputs[[1]]
+
     delta_v_stars = map_dbl(static_pred_outputs, "delta_v_star")
 
     full_posterior_df$static_delta_v_star = delta_v_stars
@@ -259,26 +271,45 @@ full_posterior_df = full_posterior_df %>%
         )
     )
 
-find_optimal_static_delta_vstar_incentive = function(distance, params, static_delta_v_star) {
-    dist_renorm = distance/params$dist_sd
-    mu_rep = calculate_mu_rep(
-                dist = dist_renorm,
-                base_mu_rep = params$base_mu_rep,
-                mu_beliefs_effect = 1,
-                beta = params$centered_cluster_beta_1ord,
-                dist_beta = params$centered_cluster_dist_beta_1ord,
-                beta_control = params$mu_beta_z_control,
-                dist_beta_control = params$mu_beta_d_control,
-                mu_rep_type = params$mu_rep_type, 
-                control = params$visibility_treatment == "control")
 
+stop()
 
-    lhs = static_delta_v_star*mu_rep/params$dist_beta_v 
-    rhs = dist_renorm
+find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star) {
+
+    pre_fix_takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+    mu_rep_prefix = pre_fix_takeup_list$mu_rep
+    params$static_delta_v_star = static_delta_v_star
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+
+    # mu_rep shouldn't matter as delta_v_star_deriv is 0
+    takeup_list$mu_rep = -1000
+    takeup_list$mu_rep_deriv = 0
+    takeup_list$delta_v_star = 0
+    takeup_list$delta_v_star_deriv = 0
+
+    delta = takeup_list$delta
+    mu_rep_deriv = takeup_list$mu_rep_deriv
+    delta_v_star = takeup_list$delta_v_star
+    mu_rep = takeup_list$mu_rep
+    delta_v_star_deriv = takeup_list$delta_v_star_deriv
+    v_star = takeup_list$v_star
+    net_b = takeup_list$b # b is net benefit so add back
+    dist_norm = distance / sd_of_dist
+    # fn find_pred_takeup adds mu_rep Delta_v_star_static to b so we need to remove it
+    b = net_b + delta * dist_norm  - mu_rep_prefix * static_delta_v_star
+    total_error_sd = takeup_list$total_error_sd
+
+    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
+
+    externality_val = externality*abs(params$beta_b_control)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+
+    rhs = lambda * delta / hazard
 
     diff = abs(lhs - rhs)
     return(diff)
 }
+
 
 
 if (script_options$static_signal_pm) {
@@ -287,10 +318,14 @@ if (script_options$static_signal_pm) {
         mutate(
             fun_treatments = pmap(
                 list(params, static_delta_v_star),
-                ~function(x) find_optimal_static_delta_vstar_incentive(
+                ~function(x) find_optimal_incentive_static(
                     distance = x, 
                     params = ..1, 
-                    static_delta_v_star = ..2
+                    static_delta_v_star = ..2,
+                    b_add = 0,
+                    mu_add = 0,
+                    lambda = script_options$lambda,
+                    externality = as.numeric(script_options$externality)
                     )
             )
             )
@@ -320,6 +355,7 @@ full_posterior_df = full_posterior_df %>%
             .progress = TRUE
         )
     )
+
 # extract results
 full_posterior_df = full_posterior_df %>%
     mutate(
@@ -335,7 +371,6 @@ full_posterior_df %>%
     )
     )
 } # End posterior estimation
-
 # Estimate Optimal Distance holding visibility fixed, only vary private incentive
 b_df = expand.grid(
     draw = 1,
@@ -404,7 +439,13 @@ b_df = b_df %>%
                 params_vis,
                 b_add
             ),
-            ~function(x) find_optimal_incentive(distance = x, lambda = ..1, params = ..2, b_add = ..3)
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = ..1, 
+                params = ..2, 
+                b_add = ..3,
+                externality = externality
+                )
         ),
         funs_control_vis = pmap(
             list(
@@ -412,7 +453,13 @@ b_df = b_df %>%
                 params_control_vis,
                 b_add
             ),
-            ~function(x) find_optimal_incentive(distance = x, lambda = ..1, params = ..2, b_add = ..3)
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = ..1, 
+                params = ..2, 
+                b_add = ..3,
+                externality = externality
+                )
         )
     ) %>%
     ungroup()
@@ -678,7 +725,14 @@ b_mu_df = b_mu_df %>%
                 b_add,
                 mu_add
             ),
-            ~function(x) { find_optimal_incentive(distance = x*1000, lambda = ..1, params = ..2, b_add = ..3, mu_add = ..4) }
+            ~function(x) { find_optimal_incentive(
+                distance = x*1000, 
+                lambda = ..1, 
+                params = ..2, 
+                b_add = ..3, 
+                mu_add = ..4,
+                externality = externality
+                ) }
         ),
         funs_vary_externality = pmap(
             list(
@@ -790,56 +844,13 @@ ggsave(
     height = 6
 )
 
-p_ext_contour = b_mu_df %>%
-    select(
-        draw,
-        lambda,
-        b_add,
-        ext_pr_obs,
-        res_vary_ext
-    ) %>%
-    ggplot(aes(
-        x = b_add,
-        y = ext_pr_obs,
-        # have to compress fill scale since changes so skewed at higher values
-        z = res_vary_ext
-    )) +
-    metR::geom_contour_fill() +
-    theme_minimal() +
-    scale_fill_viridis_c(
-        option = "inferno",
-         trans = "identity",
-        labels = function(x) round(sinh(sinh(x)), 1)
-    )  +
-    labs(
-        x = "Shift in Norms/Additional Private Incentive",
-        y = "Visibility (%)",
-        fill = "Optimal Distance (km)"
-    ) +
-    scale_y_continuous(labels = scales::percent) +
-    theme(
-        legend.position = "bottom",
-        legend.text = element_text(angle = -45)
-
-    )
-
-ggsave(
-    p_ext_contour,
-    filename = file.path(
-        script_options$output_path,
-        str_glue("{script_options$output_name}-externality-contour-plot.pdf")
-    ),
-    width = 10,
-    height = 10
-)
-
 
 ## Varying Lambda
 if (script_options$robust_lambda) {
 lambda_df = expand.grid(
     draw = 1,
     lambda = seq(from = 0, to = 0.15, length.out = seq_size),
-    b_add = seq(from = -2, to = 2, length.out = seq_size),
+    b_add = seq(from = -1.5, to = 1.5, length.out = seq_size),
     mu_add = 0
 ) %>% as_tibble() %>%
     group_by(draw) %>%
@@ -881,7 +892,13 @@ lambda_df = lambda_df %>%
                 b_add,
                 mu_add
             ),
-            ~function(x) { find_optimal_incentive(distance = x*1000, lambda = ..1, params = ..2, b_add = ..3, mu_add = ..4) }
+            ~function(x) { find_optimal_incentive(
+                distance = x*1000, 
+                lambda = ..1, 
+                params = ..2, 
+                b_add = ..3, 
+                mu_add = ..4, 
+                externality = externality) }
         )
         )
 
@@ -910,6 +927,15 @@ lambda_df = lambda_df %>%
         res_vis = map_dbl(fit_vis, "par")
         )
 
+lambda_df %>%
+    filter(b_add == 0) %>%
+    filter(lambda == 0.15)  %>%
+    select(contains("res"))
+stop()
+lambda_df %>%
+    filter(b_add == 0) %>%
+    filter(lambda == 0)  %>%
+    select(contains("res"))
 
 p_lambda = lambda_df %>%
     select(draw, lambda, b_add, contains("res")) %>%
@@ -933,7 +959,7 @@ p_lambda = lambda_df %>%
         y = "Optimal Distance (km)",
         colour = latex2exp::TeX("\\lambda")
     )
-
+p_lambda
 
 ggsave(
     plot = p_lambda,

@@ -3844,10 +3844,10 @@ struct_robustness_kbl_df %>%
 
 
 ```{r}
-# pigou-output
+# ramsey-output
 
-dynamic_optim_post_name = "posterior-optimal-distance-dynamic_vstar-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
-static_optim_post_name = "posterior-optimal-distance-static_vstar-lambda_0-externality_0-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+dynamic_optim_post_name = "posterior-optimal-distance-dynamic_vstar-lambda_0.15-externality_0.15-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
+static_optim_post_name = "posterior-optimal-distance-static_vstar-lambda_0.15-externality_0.15-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
 
 optim_post_df = imap_dfr(
   lst(
@@ -3867,13 +3867,21 @@ optim_post_df  %>%
   select(-contains('static')) %>%
   pivot_wider(
     names_from = vstar_type, values_from = optimal_distance
-  )  %>%
+  )   %>%
+  group_by(treatment) %>%
+  summarise(
+    across(c(dynamic, static), median)
+  ) %>%
+  mutate(diff = static - dynamic) %>%
+  mutate(pct_diff = 100*diff/dynamic)
+  
+  %>%
   mutate(
     difference = static - dynamic
   ) %>%
   group_by(treatment) %>%
   summarise(
-    diff_pct = 100*mean(difference/dynamic, na.rm = TRUE),
+    mean_
     mean_difference = mean(difference, na.rm = TRUE)
   )
 
@@ -3925,7 +3933,7 @@ optim_te_tbl = optim_post_df %>%
 
 
 
-pigou_optim_te_tbl_tex = optim_te_tbl %>%
+ramsey_optim_te_tbl_tex = optim_te_tbl %>%
   select(-vstar_type) %>%
   kbl(
     col.names = c(
@@ -3960,11 +3968,11 @@ pigou_optim_te_tbl_tex = optim_te_tbl %>%
 
 
 
-pigou_optim_te_tbl_tex
+ramsey_optim_te_tbl_tex
 
-pigou_optim_te_tbl_tex %>%
+ramsey_optim_te_tbl_tex %>%
   custom_save_latex_table(
-    "pigou-optim-te-table"
+    "ramsey-optim-te-table"
   )
 
 
@@ -3972,8 +3980,8 @@ pigou_optim_te_tbl_tex %>%
 
 
 ```{r}
-#wide-pigou
-wide_pigou_optim_te_tbl_tex = optim_te_tbl %>%
+#wide-ramsey
+wide_ramsey_optim_te_tbl_tex = optim_te_tbl %>%
   pivot_wider(
     names_from = vstar_type, values_from = estim_value
   )  %>%
@@ -4003,11 +4011,11 @@ wide_pigou_optim_te_tbl_tex = optim_te_tbl %>%
   ) 
 
 
-wide_pigou_optim_te_tbl_tex
+wide_ramsey_optim_te_tbl_tex
 
-wide_pigou_optim_te_tbl_tex %>%
+wide_ramsey_optim_te_tbl_tex %>%
   custom_save_latex_table(
-    "wide-pigou-optim-te-table"
+    "wide-ramsey-optim-te-table"
   )
 
 
