@@ -49,12 +49,9 @@ script_options = docopt::docopt(
                             --externality=0.15
                             --lambda=0.15
                             
-                            --posterior
 
                             --robust-lambda
-
-                            --static-signal-pm
-                            --static-signal-distance=500
+                            --robust-externality
 
                               " 
            else commandArgs(trailingOnly = TRUE)
@@ -272,7 +269,6 @@ full_posterior_df = full_posterior_df %>%
     )
 
 
-stop()
 
 find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star) {
 
@@ -931,11 +927,12 @@ lambda_df %>%
     filter(b_add == 0) %>%
     filter(lambda == 0.15)  %>%
     select(contains("res"))
-stop()
+
 lambda_df %>%
     filter(b_add == 0) %>%
     filter(lambda == 0)  %>%
     select(contains("res"))
+
 
 p_lambda = lambda_df %>%
     select(draw, lambda, b_add, contains("res")) %>%
@@ -1073,9 +1070,6 @@ p_externality = externality_df %>%
         contains('res')
     ) %>%
     mutate(externality_pct = 100*externality/abs(params_check$beta_b_control)) %>%
-    # this seems to be doing v weird stuff:
-    # maybe the multiple equilibria thing?
-    # filter(value > 1) %>%
     ggplot(aes(
         x = b_add,
         y = value,
