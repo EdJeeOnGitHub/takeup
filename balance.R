@@ -109,8 +109,19 @@ clean_worm_covariates = function(data) {
           ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
       )
       ), 
+      adults_can_get_worms = map2_lgl(
+        who_worms,
+        who_worms_other,
+        ~any(
+          "everyone" %in% .x |
+          str_detect(str_to_lower(.y), "any") |
+          "adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")
+        )
+      ),
       correct_when_treat = when_treat %in% c("every 3 months",
-                                     "every 6 months"), 
+                                             "every 6 months",
+                                             "every year"
+                                             ), 
       know_how_stop_worms = map2_lgl(
         stop_worms, 
         stop_worms_other,
@@ -119,8 +130,26 @@ clean_worm_covariates = function(data) {
           "wearing shoes", 
           "using toilets", 
           "wash hands") | str_detect(.y, "cooked|prepar|cook"))),
-      adult_in_family_treated = who_treated %in% c("adult", "both")
+      adult_in_family_treated = who_treated %in% c("adult", "both"),
+      know_medicine_stops_worms = map_lgl(
+        stop_worms,
+        ~any("medicine" %in% .x,
+         na.rm = TRUE)
+      ),
+      know_children_get_worms = map2_lgl(
+        who_worms,
+        who_worms_other,
+        ~any(c("child", "everyone") %in% .x | str_detect(.y, "child"), na.rm = TRUE)
+      ),
+      sick_worms_only = map_lgl(
+        who_worms,
+        ~any(
+          .x == "sick",
+          na.rm = TRUE
+        )
+      ) 
     )
+
 
   cov_data = cov_data %>%
     mutate(
@@ -129,7 +158,8 @@ clean_worm_covariates = function(data) {
         is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
         TRUE ~ FALSE
       ),
-      know_worms_infectious = spread_worms == "yes"
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious
     )
   
     treated_past_present = "treated" %in% colnames(data) 
@@ -141,7 +171,8 @@ clean_worm_covariates = function(data) {
             treated == "no" ~ FALSE, 
             TRUE ~ NA
           ),
-      family_treated_lgl = family_treated == "yes"
+      family_treated_lgl = family_treated == "yes",
+      treated_past_year = treated_when %in% c("1-2 mon", "3-5 mon", "6-7 mon", "8-9 mon", "10-11 mon", "1 year")
         )
     }
     return(cov_data)
@@ -344,11 +375,16 @@ worm_vars = c(
   "treated_lgl", 
   "know_how_stop_worms",
   "all_can_get_worms",
+  "adults_can_get_worms",
   "correct_when_treat",
   "fully_aware_externalities",
-  "know_worms_infectious"
+  "know_worms_infectious",
+  "externality_omnibus",
+  "know_medicine_stops_worms",
+  "know_children_get_worms",
+  "sick_worms_only",
+  "treated_past_year"
 )
-
 
 pretreat_vars = c(
   "completed_primary", 
@@ -458,9 +494,6 @@ social_perception_baseline = baseline.data %>%
   ) %>%
   mutate(response_yes = response == "yes") 
 
-baseline.data %>% 
-  select(assigned.treatment, dist.pot.group, cluster.id, county, matches("^(praise|stigma)_[^_]+$")) %>%
-  select(praise_immunizeA, praise_immunizeB)
 
 praise_df = social_perception_baseline %>%
   filter(topic %in% c("immuniz", "dewor")) %>%
@@ -524,6 +557,7 @@ endline_vars = c(
   "correct_when_treat", 
   "know_worms_infectious"
   )
+
 
 ## If at cluster level, aggregate
 if (script_options$community_level) {
@@ -636,7 +670,9 @@ census_fit = feols(
 
 misc_fit = feols(
     data = analysis_data %>%
-      select(any_of(takeup_vars), treat_dist, county, cluster.id), 
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      # convert to Km for this table
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ), 
     .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
@@ -665,11 +701,17 @@ create_balance_comparisons = function(fit) {
 
   comp_df = comp_df %>%
     mutate(
-      lhs_treatment = str_extract(contrast, "(?<=^treat: )\\w+"), 
-      rhs_treatment = str_extract(contrast, "(?<=- treat: )\\w+"), 
+      lhs_treatment = str_extract(contrast, "treat: \\w+") %>% str_remove("treat: "),
+      # remove first treat word and search after it for next treat word
+      sub_str = str_extract(contrast, "(?<=treat).*"),
+      rhs_treatment = str_extract(sub_str, "treat: \\w+") %>% str_remove("treat: "),
+
       lhs_dist = str_extract(contrast, "(?<=dist: )\\w+"),
-      rhs_dist = str_extract(contrast, "(?<=, dist: )\\w+$")
-    ) 
+      sub_str_dist = str_extract(contrast, "(?<=dist: ).*"),
+      rhs_dist = str_extract(sub_str_dist, "(?<=dist: )\\w+")
+    )  %>%
+    select(-sub_str, -sub_str_dist)
+
 
 
   same_dist_subset_comp_df = comp_df  %>%
@@ -734,15 +776,22 @@ create_balance_comparisons = function(fit) {
       select(
         -term
       )
+    sample_mean_df = tibble(
+      lhs_treatment = "control",
+      rhs_treatment = NA,
+      lhs_dist = "combined",
+      rhs_dist = "combined",
+      estimate = fitstat(fit, type = "my", verbose = FALSE)$my
+    )
 
   rearranged_comp_df = rearranged_comp_df %>%
     bind_rows(
-      control_mean_df
+      control_mean_df,
+      sample_mean_df
     ) %>%
     mutate(comp_type = "treatment")
 
     ## Now within treatment across distances
-
     dist_control_mean_df = fit %>%
       tidy(conf.int = TRUE) %>%
       filter(str_detect(term, "close")) %>%
@@ -773,20 +822,19 @@ create_balance_comparisons = function(fit) {
     return(final_clean_comp_df)
 }
 
-
-
 comp_balance_tidy_df = balance_fits %>%
   map_dfr(
     create_balance_comparisons, 
     .id = "lhs"
   ) 
 
-
 balance_tidy_df = balance_fits %>%
     map_dfr(tidy, .id = "lhs") %>%
     select(
         lhs, term, estimate, std.error, p.value
     )  
+
+
 
 comp_balance_tidy_df %>%
     write_csv(
@@ -803,6 +851,35 @@ balance_tidy_df %>%
             "balance_tidy_df.csv"
         )
     )
+
+
+
+#### Overall Means for Intro ####
+baseline_worm %>%
+  summarise(
+    across(
+      c(
+        "know_medicine_stops_worms",
+        "correct_when_treat",
+        "know_children_get_worms",
+        "all_can_get_worms",
+        "sick_worms_only"
+      ),
+      mean, na.rm = TRUE
+    )
+  ) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "mean"
+  ) %>%
+  mutate(across(where(is.numeric), round, 3)) %>%
+  write_csv(
+    file.path(
+      script_options$output_path,
+      "baseline_worm_means.csv"
+    )
+  )
 
 construct_joint_test_m = function(object) {
   n_coef = length(coef(object))
@@ -1167,16 +1244,48 @@ census_dist_fit = feols(
     cluster = ~cluster.id
     ) 
 
+takeup_dist_fit = feols(
+  data = analysis_data %>%
+    select(any_of(takeup_vars), treat_dist, county, cluster.id), 
+  .[takeup_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
+  ~cluster.id
+)
+
+
+
+resample_cluster_dists = function(data, seed) {
+  set.seed(seed)
+  clust_dist_df = data %>%
+    select(cluster.id, cluster.dist.to.pot) %>%
+    unique()
+  perm_clust_dist_df = clust_dist_df %>%
+    mutate(
+      perm_dist = sample(cluster.dist.to.pot, size = n())
+    ) %>%
+    select(-cluster.dist.to.pot)
+
+    data = data %>%
+      left_join(
+        perm_clust_dist_df,
+        by = "cluster.id"
+      )
+    return(data)
+}
+
+
 ri_fun = function(draw) {
   set.seed(draw)
   perm_baseline_worm_data = baseline_worm_data %>%
-    mutate(
-      perm_dist = sample(cluster.dist.to.pot, size = n())
-    )
+    resample_cluster_dists(draw)
   perm_census_data = clean_census_data %>%
-    mutate(perm_dist = sample(cluster.dist.to.pot, size = n()))
+    resample_cluster_dists(draw)
+
   perm_pretreat_data = pretreat_data %>%
-    mutate(perm_dist = sample(cluster.dist.to.pot, size = n())) 
+    resample_cluster_dists(draw)
+
+  perm_takeup_data = analysis_data %>%
+    select(any_of(takeup_vars), cluster.dist.to.pot, county, cluster.id) %>%
+    resample_cluster_dists(draw)
 
   perm_baseline_worm_dist_fit = feols(
     data = perm_baseline_worm_data,
@@ -1194,6 +1303,12 @@ ri_fun = function(draw) {
     ~cluster.id
   )
 
+  perm_takeup_dist_fit = feols(
+    data = perm_takeup_data, 
+    .[takeup_vars] ~ 0 + perm_dist + i(county, ref = "Busia"),
+    cluster = ~cluster.id
+  )
+
   
   perm_coef_df =  
     bind_rows(
@@ -1202,7 +1317,14 @@ ri_fun = function(draw) {
       map_dfr(perm_census_dist_fit, tidy, .id = "lhs") %>%
         filter(term == "perm_dist"),
       map_dfr(perm_pretreat_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist")
+        filter(term == "perm_dist"),
+      map_dfr(
+        perm_takeup_dist_fit, 
+        tidy, 
+        .id = "lhs"
+      ) %>%
+        filter(term == "perm_dist"
+      )
     ) %>% 
       mutate(draw = draw)
 
@@ -1211,10 +1333,11 @@ ri_fun = function(draw) {
   )
 }
 
+
 if (script_options$fit_ri) {
   plan(multisession, workers = 12)
   perm_fit_df = future_map_dfr(
-    1:100, 
+    1:500, 
     ri_fun, 
     .progress = TRUE, 
     .options = furrr_options(
@@ -1227,34 +1350,76 @@ if (script_options$fit_ri) {
   perm_fit_df = read_rds("temp-data/balance-cts-dist-ri.rds")
 }
 
+
 lhs_translation_df = tribble(
-  ~lhs, ~clean_name,
-  "lhs: age", "Age",
-  "lhs: all_can_get_worms", "Know everyone can be infected",
-  "lhs: treated_lgl", "Dewormed in the past",
-  "lhs: floor_tile_cement", "Floor made of tile/cement",
-  "lhs: completed_primary", "Completed primary schooling",
-  "lhs: correct_when_treat", "Know bi-yearly treatment recommended",
-  "lhs: fully_aware_externalities", "Understands externalities",
-  "lhs: female", "Female",
-  "lhs: phone_owner", "Phone owner",
-  "lhs: know_deworming_stops_worms", "Knows deworming stops worms"
-)
+  ~lhs, ~clean_name, ~sample,
+  "lhs: age.census", "Age", "takeup_sample",
+  # "lhs: all_can_get_worms", "Know everyone can be infected", "baseline_worm",
+  "lhs: adults_can_get_worms", "Know adults get worms", "baseline_worm",
+  "lhs: know_children_get_worms", "Know children get worms", "baseline_worm",
+  "lhs: sick_worms_only", "Believe deworming is for the sick", "baseline_worm",
+  "lhs: know_medicine_stops_worms", "Know medication treats worms", "baseline_worm",
+
+
+
+  "lhs: treated_lgl", "Dewormed in the past", "baseline_worm",
+  "lhs: treated_past_year", "Dewormed in the past year", "baseline_worm",
+
+  "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
+  "lhs: completed_primary", "Completed primary schooling", "pretreat",
+  "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
+  "lhs: externality_omnibus", "Know worms impose externality", "baseline_worm",
+  # "lhs: fully_aware_externalities", "Fully understand worms impose externality", "baseline_worm",
+  "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
+  "lhs: female", "Female", "takeup_sample",
+  "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
+  # "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
+  "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
+  "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
+  "lhs: years_schooling", "Years schooling", "pretreat",
+  "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
+  "lhs: religion_christianity", "Christian", "pretreat",
+  "lhs: family_treated_lgl", "$\\geq 1$ Family member dewormed", "baseline_worm",
+  "lhs: adult_in_family_treated", "Adults in family dewormed", "baseline_worm",
+  # "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm",
+  "lhs: know_deworm", "Know about community-based MDA?", "implementation",
+  "lhs: treat_begin", "Know when MDA starts?", "implementation",
+  "lhs: treat_end", "Know about MDA ends?", "implementation",
+  "lhs: days_available", "Know length of MDA?", "implementation",
+  "lhs: chv_visit", "Did a CHV visit you?", "implementation",
+
+  "lhs: stigma_dewor", "Would you judge: Not deworming?", "social_image_concerns",
+  "lhs: stigma_immuniz", "Would you judge: Not immunizing a child?", "social_image_concerns",
+  "lhs: praise_dewor", "Would you praise: Deworming?", "social_image_concerns",
+  "lhs: praise_immuniz", "Would you praise: Immunizing a child?", "social_image_concerns",
+
+  "lhs: pct_announce", "Announcement about MDA in your community?", "implementation",
+  "lhs: pct_knowledge_message", "CHV share deworming practices?", "implementation",
+  "lhs: pct_avail_message", "CHV share where to get dewormed?", "implementation"
+) 
+
+
 realised_fit_df = bind_rows(
   map_dfr(baseline_worm_dist_fit, tidy, .id = "lhs"),
   map_dfr(census_dist_fit, tidy, .id = "lhs"),
-  map_dfr(pretreat_dist_fit, tidy, .id = "lhs")
+  map_dfr(pretreat_dist_fit, tidy, .id = "lhs"),
+  map_dfr(takeup_dist_fit, tidy, .id = "lhs")
 ) %>%
   filter(term == "cluster.dist.to.pot")
 
+
+
+
+
+
+
 realised_fit_df = realised_fit_df %>%
-  left_join(
+  inner_join(
     lhs_translation_df,
     by = "lhs"
-  )
+  ) 
 
-realised_fit_df %>%
-  select(lhs, statistic)
+
 
 plot_perm_fit_df = perm_fit_df %>%
   left_join(
@@ -1264,15 +1429,17 @@ plot_perm_fit_df = perm_fit_df %>%
   left_join(
     lhs_translation_df,
     by = "lhs"
-  )
+  ) 
+
 
 
 ri_p_val_df = plot_perm_fit_df %>%
-  group_by(clean_name) %>%
+  group_by(lhs) %>%
   summarise(
     p_val = paste0("p = ", round(mean(statistic > realised_statistic), 3)),
     realised_statistic = unique(realised_statistic),
-    x = quantile(statistic, 0.95, na.rm = TRUE)
+    x = quantile(statistic, 0.95, na.rm = TRUE),
+    clean_name = unique(clean_name)
   ) 
 
 
@@ -1289,7 +1456,8 @@ balance_data = lst(
   pretreat_vars,
   census_vars,
   plot_perm_fit_df,
-  ri_p_val_df
+  ri_p_val_df,
+  realised_fit_df
 )
 
 
@@ -1438,3 +1606,20 @@ saveRDS(
 #     )
 #   )
 
+baseline.data %>%
+  unnest(when_treat)  %>%
+  count(when_treat) %>%
+  mutate(
+    prop = 100*n/sum(n)
+  ) %>%
+  mutate(ed = cumsum(prop))
+
+baseline.data %>%
+  colnames()
+
+baseline.data %>%
+  count(treated_when) %>%
+  mutate(
+    prop = 100*n/sum(n)
+  ) %>%
+  mutate(ed = cumsum(prop))
