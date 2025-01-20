@@ -3515,15 +3515,53 @@ pref_gift_fit_not_dewormed = analysis_data %>%
       want_bracelet = gift_choice == "bracelet"
     )  %>%
     group_by(assigned.treatment, dist.pot.group)  %>%
+    mutate(treatment = assigned.treatment) %>%
     fixest::feols(
-      want_bracelet ~  assigned.treatment*dist.pot.group | county,
+      want_bracelet ~  treatment*dist.pot.group | county,
       cluster = ~cluster.id
     )
 
+tex_postprocessing = function(tex) {
+    tex %>%
+        str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
+        str_remove("\\\\end\\{table\\}") 
+}
 
 etable(
-  pref_gift_fit_not_dewormed
+  pref_gift_fit_not_dewormed,
+    dict = c(
+      treatmentink = "Ink",
+      treatmentcalendar = "Calendar",
+      treatmentbracelet = "Bracelet",
+      "treatment = ink" = "Ink",
+      "treatment = calendar" = "Calendar",
+      "treatment = bracelet" = "Bracelet",
+
+      "bracelet" = "Bracelet",
+      "calendar" = "Calendar",
+      "ink" = "Ink",
+      "cluster.id" = "Community",
+      "dist.pot.groupfar" = "Distance group: Far"
+    ),
+    fitstat = c("my", "n"),
+    headers = list(
+      "Bracelet  Preference" = 1
+    ),
+    depvar = FALSE,
+    file = file.path(
+      params$table_output_path, "bracelet-wtp-across-dist.tex"
+    ),
+    drop.section = "fixef",
+    tex = TRUE, 
+    postprocess.tex = tex_postprocessing,
+    replace = TRUE,
+    style.df = style.df(
+      depvar.title = "", 
+      fixef.title = "")
 )
+
+
+
 
 pref_gift_fit_dewormed = analysis_data %>%
     filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 

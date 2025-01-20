@@ -1190,7 +1190,7 @@ ri_fun = function(draw) {
       ) 
   perm_pretreat_dist_fit = feols(
     data = perm_pretreat_data,
-    .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
+    .[pretreat_vars] ~ 0 + perm_dist + i(county, ref = "Busia"), 
     ~cluster.id
   )
 
