@@ -49,8 +49,16 @@ matrix[num_clusters, num_treatments] centered_cluster_dist_beta_2ord;
     obs_dist_beta_2ord = beliefs_use_obs_level ? obs_dist_beta_2ord_raw .* rep_matrix(obs_dist_beta_2ord_sd, num_beliefs_obs) : rep_matrix(0, num_beliefs_obs, num_treatments);
   } 
   
-  centered_cluster_beta_1ord = rep_matrix(hyper_beta_1ord, num_clusters) + stratum_beta_1ord[cluster_county_id] + cluster_beta_1ord;
-  centered_obs_beta_1ord = centered_cluster_beta_1ord[beliefs_cluster_index] + obs_beta_1ord + rep_matrix(obs_beta_common, num_treatments); 
+
+  if (beliefs_use_homo) {
+    // no cluster level effect
+    centered_cluster_beta_1ord = rep_matrix(0, num_clusters, num_treatments);
+  } else {
+    // cluster level effect
+    centered_cluster_beta_1ord = rep_matrix(hyper_beta_1ord, num_clusters) + stratum_beta_1ord[cluster_county_id] + cluster_beta_1ord;
+  }
+    centered_obs_beta_1ord = centered_cluster_beta_1ord[beliefs_cluster_index] + obs_beta_1ord + rep_matrix(obs_beta_common, num_treatments); 
+
  
   if (beliefs_use_dist) { 
     centered_cluster_dist_beta_1ord = rep_matrix(hyper_dist_beta_1ord, num_clusters) + stratum_dist_beta_1ord[cluster_county_id] + cluster_dist_beta_1ord;
@@ -59,9 +67,16 @@ matrix[num_clusters, num_treatments] centered_cluster_dist_beta_2ord;
     centered_cluster_dist_beta_1ord = rep_matrix(0, num_clusters, num_treatments); 
     centered_obs_dist_beta_1ord = rep_matrix(0, num_beliefs_obs, num_treatments);
   }
-  
-  centered_cluster_beta_2ord = rep_matrix(hyper_beta_2ord, num_clusters) + stratum_beta_2ord[cluster_county_id] + cluster_beta_2ord;
-  centered_obs_beta_2ord = centered_cluster_beta_2ord[beliefs_cluster_index] + obs_beta_2ord + rep_matrix(obs_beta_common, num_treatments); 
+
+  if (beliefs_use_homo) {
+    // no cluster level effect
+    centered_cluster_beta_2ord = rep_matrix(0, num_clusters, num_treatments);
+  }  else {
+    //  cluster level effect
+    centered_cluster_beta_2ord = rep_matrix(hyper_beta_2ord, num_clusters) + stratum_beta_2ord[cluster_county_id] + cluster_beta_2ord;
+  }
+
+    centered_obs_beta_2ord = centered_cluster_beta_2ord[beliefs_cluster_index] + obs_beta_2ord + rep_matrix(obs_beta_common, num_treatments); 
   
   if (beliefs_use_dist) { 
     centered_cluster_dist_beta_2ord = rep_matrix(hyper_dist_beta_2ord, num_clusters) + stratum_dist_beta_2ord[cluster_county_id] + cluster_dist_beta_2ord;
