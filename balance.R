@@ -263,17 +263,6 @@ cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rd
   ) %>%
   select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
   unique()
-# # creating a single treat x distance variable for balance testing
-# cluster_treat_df = analysis_data %>%
-#   mutate(
-#       treat_dist = paste0(
-#       "treat: ", 
-#       assigned.treatment,
-#       ", dist: ", dist.pot.group
-#       ) %>% factor()
-#   ) %>%
-#   select(cluster.id, treat_dist, cluster.dist.to.pot) %>%
-#   unique()
 
 
 pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
@@ -371,6 +360,52 @@ clean_implementation_vars = function(data)  {
 }
 
 
+lhs_translation_df = tribble(
+  ~lhs, ~clean_name, ~sample,
+  "lhs: age.census", "Age", "takeup_sample",
+  # "lhs: all_can_get_worms", "Know everyone can be infected", "baseline_worm",
+  "lhs: adults_can_get_worms", "Know adults get worms", "baseline_worm",
+  "lhs: know_children_get_worms", "Know children get worms", "baseline_worm",
+  "lhs: sick_worms_only", "Believe deworming is for the sick", "baseline_worm",
+  "lhs: know_medicine_stops_worms", "Know medication treats worms", "baseline_worm",
+
+
+
+  "lhs: treated_lgl", "Dewormed in the past", "baseline_worm",
+  "lhs: treated_past_year", "Dewormed in the past year", "baseline_worm",
+
+  "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
+  "lhs: completed_primary", "Completed primary schooling", "pretreat",
+  "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
+  "lhs: externality_omnibus", "Know worms impose externality", "baseline_worm",
+  # "lhs: fully_aware_externalities", "Fully understand worms impose externality", "baseline_worm",
+  "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
+  "lhs: female", "Female", "takeup_sample",
+  "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
+  # "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
+  "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
+  "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
+  "lhs: years_schooling", "Years schooling", "pretreat",
+  "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
+  "lhs: religion_christianity", "Christian", "pretreat",
+  "lhs: family_treated_lgl", "$\\geq 1$ Family member dewormed", "baseline_worm",
+  "lhs: adult_in_family_treated", "Adults in family dewormed", "baseline_worm",
+  # "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm",
+  "lhs: know_deworm", "Know about community-based MDA?", "implementation",
+  "lhs: treat_begin", "Know when MDA starts?", "implementation",
+  "lhs: treat_end", "Know about MDA ends?", "implementation",
+  "lhs: days_available", "Know length of MDA?", "implementation",
+  "lhs: chv_visit", "Did a CHV visit you?", "implementation",
+
+  "lhs: stigma_dewor", "Would you judge: Not deworming?", "social_image_concerns",
+  "lhs: stigma_immuniz", "Would you judge: Not immunizing a child?", "social_image_concerns",
+  "lhs: praise_dewor", "Would you praise: Deworming?", "social_image_concerns",
+  "lhs: praise_immuniz", "Would you praise: Immunizing a child?", "social_image_concerns",
+
+  "lhs: pct_announce", "Announcement about MDA in your community?", "implementation",
+  "lhs: pct_knowledge_message", "CHV share deworming practices?", "implementation",
+  "lhs: pct_avail_message", "CHV share where to get dewormed?", "implementation"
+) 
 worm_vars = c(
   "treated_lgl", 
   "know_how_stop_worms",
@@ -689,6 +724,91 @@ balance_fits = c(
   praise_fit,
   stigma_fit
 )
+
+
+#### Save data so we can use in PDS estimates ----------------------------------
+# takeup_vars
+clust_n_df = n_indiv_df %>%
+  select(cluster.id, n_per_cluster)
+# pretreatment vars - pretreat_vars
+clust_pretreat_df = pretreat_data %>%
+  select(cluster.id, all_of(pretreat_vars)) %>%
+  group_by(cluster.id) %>%
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
+# baseline knowledge  - worm_vars
+clust_baseline_worm_df = baseline_worm_data %>%
+  select(cluster.id, all_of(worm_vars)) %>%
+  group_by(cluster.id) %>%
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
+# social image concerns  - praise_vars & stigma_vars
+clust_praise_df = praise_df %>%
+  select(cluster.id, all_of(praise_vars)) %>%
+  group_by(cluster.id) %>%
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
+clust_stigma_df = stigma_df %>%
+  select(cluster.id, all_of(stigma_vars)) %>%
+  group_by(cluster.id) %>%
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
+
+cov_vars = c(
+  "n_per_cluster",
+  pretreat_vars,
+  worm_vars,
+  praise_vars,
+  stigma_vars,
+  takeup_vars
+)
+
+covariates_we_want = 
+lhs_translation_df %>%
+  mutate(
+    lhs = str_remove(lhs, "lhs: ")
+  ) %>%
+  pull(lhs)
+
+cov_vars = intersect(cov_vars, covariates_we_want)
+covariate_df = analysis_data %>%
+  select(cluster.id, all_of(takeup_vars), KEY.individ) %>%
+  select(-n_per_cluster) %>%
+  left_join(
+    clust_n_df,
+    by = "cluster.id"
+  ) %>%
+  left_join(
+    clust_pretreat_df,
+    by = "cluster.id"
+  ) %>%
+  left_join(
+    clust_baseline_worm_df,
+    by = "cluster.id"
+  ) %>%
+  left_join(
+    clust_praise_df,
+    by = "cluster.id"
+  ) %>%
+  left_join(
+    clust_stigma_df,
+    by = "cluster.id"
+  ) %>%
+  select(
+    cluster.id, KEY.individ, all_of(cov_vars)
+  )
+
+
+analysis_cov_df = analysis_data %>%
+  select(-all_of(takeup_vars)) %>%
+  left_join(
+    covariate_df,
+    by = "KEY.individ"
+  ) 
+
+
+analysis_cov_df %>%
+  write_csv(
+    "temp-data/analysis-cluster-covariate-data.csv"
+  )
+
+stop()
 
 
 create_balance_comparisons = function(fit) {
@@ -1351,52 +1471,6 @@ if (script_options$fit_ri) {
 }
 
 
-lhs_translation_df = tribble(
-  ~lhs, ~clean_name, ~sample,
-  "lhs: age.census", "Age", "takeup_sample",
-  # "lhs: all_can_get_worms", "Know everyone can be infected", "baseline_worm",
-  "lhs: adults_can_get_worms", "Know adults get worms", "baseline_worm",
-  "lhs: know_children_get_worms", "Know children get worms", "baseline_worm",
-  "lhs: sick_worms_only", "Believe deworming is for the sick", "baseline_worm",
-  "lhs: know_medicine_stops_worms", "Know medication treats worms", "baseline_worm",
-
-
-
-  "lhs: treated_lgl", "Dewormed in the past", "baseline_worm",
-  "lhs: treated_past_year", "Dewormed in the past year", "baseline_worm",
-
-  "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
-  "lhs: completed_primary", "Completed primary schooling", "pretreat",
-  "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
-  "lhs: externality_omnibus", "Know worms impose externality", "baseline_worm",
-  # "lhs: fully_aware_externalities", "Fully understand worms impose externality", "baseline_worm",
-  "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
-  "lhs: female", "Female", "takeup_sample",
-  "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
-  # "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
-  "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
-  "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
-  "lhs: years_schooling", "Years schooling", "pretreat",
-  "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
-  "lhs: religion_christianity", "Christian", "pretreat",
-  "lhs: family_treated_lgl", "$\\geq 1$ Family member dewormed", "baseline_worm",
-  "lhs: adult_in_family_treated", "Adults in family dewormed", "baseline_worm",
-  # "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm",
-  "lhs: know_deworm", "Know about community-based MDA?", "implementation",
-  "lhs: treat_begin", "Know when MDA starts?", "implementation",
-  "lhs: treat_end", "Know about MDA ends?", "implementation",
-  "lhs: days_available", "Know length of MDA?", "implementation",
-  "lhs: chv_visit", "Did a CHV visit you?", "implementation",
-
-  "lhs: stigma_dewor", "Would you judge: Not deworming?", "social_image_concerns",
-  "lhs: stigma_immuniz", "Would you judge: Not immunizing a child?", "social_image_concerns",
-  "lhs: praise_dewor", "Would you praise: Deworming?", "social_image_concerns",
-  "lhs: praise_immuniz", "Would you praise: Immunizing a child?", "social_image_concerns",
-
-  "lhs: pct_announce", "Announcement about MDA in your community?", "implementation",
-  "lhs: pct_knowledge_message", "CHV share deworming practices?", "implementation",
-  "lhs: pct_avail_message", "CHV share where to get dewormed?", "implementation"
-) 
 
 
 realised_fit_df = bind_rows(
