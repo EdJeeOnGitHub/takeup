@@ -1569,6 +1569,42 @@ no_outlier_community_control_spec_output$different_order_tbl %>%
   )
 #### Beliefs -------------------------------------------------------------------
 
+endline.know.table.data %>% 
+      filter(fct_match(know.table.type, "table.A")) %>%
+      select(KEY.individ)
+
+analysis_data %>%
+  summarise(n_distinct(KEY.individ))
+
+
+belief_ana_df = analysis_data %>%
+  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
+  nest_join(
+    endline.know.table.data %>% 
+      filter(fct_match(know.table.type, "table.A")),
+    by = "KEY.individ", 
+    name = "knowledge_data"
+  ) %>% 
+  mutate(
+    map_dfr(knowledge_data, ~ {
+      tibble(
+        obs_know_person = sum(.x$num.recognized),
+        obs_know_person_prop = mean(.x$num.recognized),
+        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
+        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
+        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
+        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
+        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
+        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
+      )
+    }
+  )) %>%
+    filter(obs_know_person > 0)
+
+belief_ana_df %>%
+  summarise(n_distinct(KEY.individ))
+
+
 disagg_base_belief_data = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
@@ -1602,7 +1638,8 @@ disagg_base_belief_data = analysis_data %>%
       cluster.dist.to.pot,
       standard_cluster.dist.to.pot,
       dist.to.pot,
-      county
+      county,
+      dewormed
       ) %>%
     mutate(
         doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed, 
@@ -1622,7 +1659,8 @@ disagg_base_belief_data = analysis_data %>%
            cluster.dist.to.pot,
            standard_cluster.dist.to.pot,
            dist.to.pot,
-           county
+           county,
+           dewormed
            ) %>%
     gather(variable, value, 
         knows_other_dewormed_yes:doesnt_think_other_knows)   %>%
@@ -1649,9 +1687,106 @@ know_df = disagg_base_belief_data %>%
       signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
       signal = factor(signal, levels = c("no signal", "signal"))
   ) 
-  
+
+know_df %>%
+  summarise(dewormed = mean(dewormed))
 
 
+analysis_data %>%
+  summarise(dewormed = mean(dewormed))
+
+know_df %>%
+  group_by(assigned_dist_group, assigned.treatment, dewormed) %>%
+  summarise(n = n())
+
+know_df %>%
+  filter(belief_type == "1ord") %>%
+  group_by(
+    assigned_treatment,
+    dewormed
+  ) %>%
+  summarise(
+    prop = mean(prop_knows)
+  ) %>%
+  pivot_wider(names_from = dewormed, values_from = prop)  
+
+know_df %>%
+  filter(belief_type == "2ord") %>%
+  group_by(
+    assigned_treatment,
+    dewormed
+  ) %>%
+  summarise(
+    prop = mean(prop_knows)
+  ) %>%
+  pivot_wider(names_from = dewormed, values_from = prop)  
+
+know_1_df = know_df  %>%
+  filter(belief_type == "1ord") 
+know_2_df = know_df  %>%
+  filter(belief_type == "2ord")
+
+know_2_df$know1_hat = know_1_df %>%
+  feols(
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control"),
+    data = .
+  ) %>%
+  predict()
+
+
+know_1_df$know1_hat = know_1_df %>%
+  feols(
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control"),
+    data = .
+  ) %>%
+  predict()
+
+
+know_1_df %>%
+  group_by(
+    assigned_dist_group,
+    assigned_treatment,
+    dewormed
+  ) %>%
+  summarise(
+    prop = mean(prop_knows),
+    know1_hat = mean(know1_hat)
+  ) %>%
+  ggplot(aes(
+    x = prop,
+    y = know1_hat
+  ))+
+  geom_point() +
+  geom_abline() +
+  labs(
+    x = "Observed Proportion - First-order",
+    y = "Predicted Proportion - Mu(d z)"
+  ) +
+  theme_bw()
+
+know_2_df %>%
+  group_by(
+    assigned_dist_group,
+    assigned_treatment,
+    dewormed
+  ) %>%
+  summarise(
+    prop = mean(prop_knows),
+    know1_hat = mean(know1_hat)
+  ) %>%
+  ungroup() %>%
+  mutate(prop = prop - mean(prop), know1_hat = know1_hat - mean(know1_hat)) %>%
+  ggplot(aes(
+    x = prop,
+    y = know1_hat
+  ))+
+  geom_point() +
+  geom_abline() +
+  labs(
+    x = "Observed Proportion - Second-order - Rescaled",
+    y = "Predicted Proportion - Mu(d z) - Rescaled"
+  ) +
+  theme_bw()
 
 
 f_know = function(data, weights) {
@@ -1778,6 +1913,9 @@ realised_know_te_fit = realised_know_fit %>%
     clean_te_draws() %>%
     rename(realised_pred = estimate) %>%
     select(assigned_dist_group, assigned_treatment, realised_pred)
+
+
+
 
 
 clean_know_signal_tes = add_summ_stats(know_bs_signal_draws, realised_know_signal_fit)
@@ -2279,10 +2417,9 @@ overall_judgement_score_df = clean_perception_data %>%
 
 age_het_fit = analysis_data %>%
   feols(
-    dewormed ~ 0 + 
+    dewormed ~  
       treatment + 
       standard_cluster.dist.to.pot + 
-      i(treatment, standard_cluster.dist.to.pot, "control") +
       age_gt_40 +
       i(treatment, age_gt_40, "control")  
       | county,
@@ -2297,10 +2434,9 @@ judge_het_fit = analysis_data %>%
       by = "cluster.id"
   ) %>%
   feols(
-    dewormed ~ 0 + 
+    dewormed ~  
       treatment + 
       standard_cluster.dist.to.pot + 
-      i(treatment, standard_cluster.dist.to.pot, "control") +
       judge_score_gt_mean +
       i(treatment, judge_score_gt_mean, "control")  
       | county,
@@ -2309,10 +2445,9 @@ judge_het_fit = analysis_data %>%
 
 phone_het_fit = analysis_data %>%
   feols(
-    dewormed ~ 0 + 
+    dewormed ~  
       treatment + 
       standard_cluster.dist.to.pot + 
-      i(treatment, standard_cluster.dist.to.pot, "control") +
       have_phone_lgl +
       i(treatment, have_phone_lgl, "control")  
       | county,
@@ -2323,10 +2458,9 @@ phone_het_fit = analysis_data %>%
 
 prevdeworm_het_fit = analysis_data %>%
   feols(
-    dewormed ~ 0 + 
+    dewormed ~  
       treatment + 
       standard_cluster.dist.to.pot + 
-      i(treatment, standard_cluster.dist.to.pot, "control") +
       frac_prev_dewormed_gt_mean +
       i(treatment, frac_prev_dewormed_gt_mean, "control")  
       | county,
@@ -2335,10 +2469,9 @@ prevdeworm_het_fit = analysis_data %>%
   
 externality_het_fit = analysis_data %>%
   feols(
-    dewormed ~ 0 + 
+    dewormed ~  
       treatment + 
       standard_cluster.dist.to.pot + 
-      i(treatment, standard_cluster.dist.to.pot, "control") +
       frac_externality_gt_mean +
       i(treatment, frac_externality_gt_mean, "control")  
       | county,
@@ -2349,10 +2482,9 @@ externality_het_fit = analysis_data %>%
 gender_het_fit = analysis_data %>%
   mutate(female = gender == "female") %>%
   feols(
-    dewormed ~ 0 + 
+    dewormed ~  
       treatment + 
       standard_cluster.dist.to.pot + 
-      i(treatment, standard_cluster.dist.to.pot, "control") +
       female +
       i(treatment, female, "control")  
       | county,
@@ -2435,6 +2567,12 @@ tex_postprocessing = function(tex) {
       depvar.title = "", 
       fixef.title = "")
   )
+
+feols(
+  data = analysis_data,
+  dewormed ~ treatment*standard_cluster.dist.to.pot  + age_gt_40 | county,
+  cluster = ~cluster.id
+)
 
 ##### fits
 
