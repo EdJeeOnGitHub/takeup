@@ -175,15 +175,6 @@ hyp_tests 4.a_treat
 * P3, Positive Coef on Far x Bracelet
 hyp_tests 4.a_treat#1.dpf
 
-* treat x dist group, controls + county fe & clustered
-reg dewormed_num i.a_treat##i.dpf $cov_vars i.county_fac, cluster(clusteridx)
-* P1, Negative Effect of Distance
-hyp_tests 1.dpf
-* P2, Positive Effect Bracelets
-hyp_tests 4.a_treat
-* P3, Positive Coef on Far x Bracelet
-hyp_tests 4.a_treat#1.dpf
-
 
 reg dewormed_num i.a_treat##dpf $lasso_cov_vars i.county_fac, cluster(clusteridx)
 * P1, Negative Effect of Distance
@@ -198,15 +189,6 @@ hyp_tests 4.a_treat#1.dpf
 
 * Main Spec - Dist CTS
 reg dewormed_num i.a_treat##c.standard_clusterdisttopot  i.county_fac, cluster(clusteridx)
-* P1, Negative Effect of Distance
-hyp_tests standard_clusterdisttopot
-* P2, Positive Effect Bracelets
-hyp_tests 4.a_treat
-* P3, Positive Coef on Far x Bracelet
-hyp_tests 4.a_treat#c.standard_clusterdisttopot
-
-
-reg dewormed_num i.a_treat##c.standard_clusterdisttopot $cov_vars  i.county_fac, cluster(clusteridx)
 * P1, Negative Effect of Distance
 hyp_tests standard_clusterdisttopot
 * P2, Positive Effect Bracelets
