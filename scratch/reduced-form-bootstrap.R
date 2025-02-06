@@ -1699,6 +1699,53 @@ know_df %>%
   group_by(assigned_dist_group, assigned.treatment, dewormed) %>%
   summarise(n = n())
 
+
+
+know_df %>%
+  filter(belief_type == "1ord") %>%
+  filter(assigned_treatment == "control") %>%
+  bind_rows(
+    .,
+    mutate(., assigned_dist_group = "combined")
+  ) %>%
+  mutate(assigned_dist_group = factor(assigned_dist_group, c("close", "far", "combined"))) %>%
+  group_by(
+    assigned_dist_group,
+    dewormed
+  ) %>%
+  summarise(
+    prop = mean(prop_knows)
+  ) %>%
+  pivot_wider(names_from = dewormed, values_from = prop, names_prefix = "dewormed_") 
+
+
+
+know_df %>%
+  filter(belief_type == "1ord") %>%
+  filter(assigned_treatment == "control") %>%
+  mutate(dewormed = as.character(dewormed)) %>%
+  bind_rows(
+    mutate(., dewormed = "combined")
+  ) %>%
+  mutate(dewormed = factor(dewormed, c("TRUE", "FALSE", "combined"))) %>%
+  group_by(
+    assigned_dist_group,
+    dewormed
+  ) %>%
+  summarise(
+    prop = mean(prop_knows)
+  )  %>%
+  pivot_wider(
+    names_from = assigned_dist_group,
+    values_from = prop,
+    names_prefix = "dist_"
+  )
+  
+  
+  %>%
+  pivot_wider(names_from = dewormed, values_from = prop, names_prefix = "dewormed_") 
+
+
 know_df %>%
   filter(belief_type == "1ord") %>%
   group_by(
