@@ -101,11 +101,20 @@ village_data %>%
         theme_bw() +
         theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
         labs(
-            title = "Optimal PoT Allocation Problem",
+            # title = "Optimal PoT Allocation Problem",
             subtitle = "Black dots indicate communities. Triangles indicate potential clinic locations."
         )  +
         labs(x = "", y = "") + 
         NULL
+ggsave(
+    file.path(
+        # script_options$pdf_output_path,
+        "temp-data",
+        "pot-map.pdf"
+    ),
+    width = 8,
+    height = 6
+)
 
 optimal_data = pot_data %>%
     filter(cluster.id %in% village_data$cluster.id)

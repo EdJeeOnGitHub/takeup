@@ -766,147 +766,7 @@ villages %>%
 
 
 
-plot_ord_beliefs_est = function(beliefs_results, 
-                             top_title = NULL, 
-                             width = 0.3, 
-                             crossbar_width = 0.2, 
-                             order = 1) {
-  pos_dodge <- position_dodge(width = width)
-
-  first_plot = beliefs_results %>%
-    filter(param == "belief_probs") %>%
-    select(tidy_draws) %>%
-    unnest(tidy_draws) %>%
-    filter(str_detect(variable, as.character(order))) %>%
-    filter(dist_group %in% c("Close", "Far")) %>%
-    ggplot(aes(
-      y = treatment,
-      group = dist_group,
-      xmin = conf.low,
-      xmax = conf.high,
-      x = value
-    )) +
-      geom_linerange(aes(
-        color = dist_group), 
-        position = pos_dodge, 
-        size = 0.4,
-        data = . %>% filter(.width == 0.95)
-        ) +
-      geom_crossbar(aes(
-        color = dist_group), 
-        position = pos_dodge, 
-        fatten = 2, 
-        size = 0.4, 
-        width = crossbar_width,
-        data = . %>% filter(.width == 0.8)
-        ) +
-      geom_linerange(aes(
-        color = dist_group), 
-        position = pos_dodge, 
-        alpha = 0.4, 
-        size = 2.5,
-        data = . %>% filter(.width == 0.5)
-        ) +
-      geom_point(aes(color = dist_group), position = pos_dodge, size = 1.8) +
-      geom_point(position = pos_dodge, color = "white", size = 0.6) +
-      scale_color_canva("", labels = str_to_title, palette = canva_palette_vibrant) + 
-      scale_y_discrete("", labels = str_to_title) +
-      labs(
-        title = "",
-        subtitle = "Panel A: Levels",
-        x = "") +
-      labs(x = "Proportion (%)") +
-      scale_x_continuous(
-        labels = scales::label_percent(suffix = "")
-      )  +
-      theme_minimal() +
-      theme(legend.position = "top") +
-      panel_border(remove = TRUE) +
-      NULL
-
-
-
-
-
-  cowplot::plot_grid(
-    if (!is_null(top_title)) { 
-      cowplot::ggdraw() +
-        cowplot::draw_label(top_title, size = 20, fontface = "italic")
-    },
-    
-    cowplot::plot_grid(
-      first_plot +
-        theme(
-          legend.position = "none"
-        ) +
-        NULL,
-
-
-
-      second_plot = beliefs_results %>%
-        filter(param == "belief_ates") %>%
-        select(tidy_draws) %>%
-        unnest(tidy_draws) %>%
-        filter(str_detect(variable, as.character(order))) %>%
-        filter(dist_group %in% c("Close", "Far")) %>%
-        ggplot(aes(
-          y = treatment,
-          group = dist_group,
-          xmin = conf.low,
-          xmax = conf.high,
-          x = value
-          )) +
-        geom_vline(xintercept = 0, linetype = "dotted") +
-        geom_linerange(aes(
-          color = dist_group), 
-          position = pos_dodge, 
-          size = 0.3,
-          data = . %>% filter(.width == 0.95)
-          ) +
-        geom_crossbar(aes(
-          color = dist_group), 
-          position = pos_dodge, 
-          fatten = 2, 
-          size = 0.4, 
-          width = crossbar_width,
-          data = . %>% filter(.width == 0.8)
-          ) +
-        geom_linerange(aes(
-          color = dist_group), 
-          position = pos_dodge, 
-          alpha = 0.4, 
-          size = 2.25,
-          data = . %>% filter(.width == 0.5)
-          ) +
-        geom_point(aes(
-          color = dist_group), position = pos_dodge, size = 1.8) +
-        geom_point(position = pos_dodge, color = "white", size = 0.6) +
-        scale_y_discrete(drop = FALSE) +
-        scale_color_canva("", labels = str_to_title, palette = canva_palette_vibrant) + 
-        labs(
-          title = "",
-          subtitle = "Panel B: Treatment Effects",
-          x = "", y = "") +
-    labs(x = "Percentage Points") +
-    default_plot_caption +
-    scale_x_continuous(
-      labels = scales::label_percent(suffix = "")
-    )  +
-    theme_minimal() +
-    panel_border(remove = TRUE) +
-        theme(
-          axis.text.y = element_blank(),
-          axis.ticks.y = element_blank(),
-          legend.position = "none"
-        ) +
-        NULL,
-        ncol = 2, axis = "b", align = "h" 
-    ),
-    
-    cowplot::get_legend(first_plot),
-    ncol = 1, rel_heights = c(if (!is_null(top_title)) 0.1 else 0, 1, 0.08)
-  )
-}
+source(here("presentations/plot-fn.R"))
 
 tidy_param_df %>%
   filter(
@@ -1169,6 +1029,222 @@ belief_2ord_prop_p +
 ggsave(
   plot = belief_2ord_prop_p,
   here(output_basepath, str_glue("belief-prop-2ord-plots.png")), width = 7.5, height = 5.0, dpi = 500)
+```
+
+
+## RF Belief Model
+```{r}
+
+belief_data = analysis_data %>%
+  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
+  nest_join(
+    endline.know.table.data %>% 
+      filter(fct_match(know.table.type, "table.A")),
+    by = "KEY.individ", 
+    name = "knowledge_data"
+  ) %>% 
+  mutate(
+    map_dfr(knowledge_data, ~ {
+      tibble(
+        obs_know_person = sum(.x$num.recognized),
+        obs_know_person_prop = mean(.x$num.recognized),
+        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
+        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
+        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
+        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
+        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
+        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
+      )
+    }
+  )) %>%
+    filter(obs_know_person > 0)  %>%
+    select(KEY.individ, contains("know"), assigned.treatment, dist.pot.group, assigned_dist_group, cluster.id, county) %>%
+    mutate(
+        doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed, 
+        doesnt_think_other_knows = obs_know_person - thinks_other_knows
+    ) %>% 
+    select(KEY.individ, 
+           assigned.treatment,
+           assigned_dist_group,
+           obs_know_person,
+           knows_other_dewormed_yes,
+           knows_other_dewormed_no,
+           doesnt_know_other_dewormed, 
+           thinks_other_knows_yes, 
+           thinks_other_knows_no, 
+           doesnt_think_other_knows,
+           cluster.id,
+           county
+           ) %>%
+    gather(variable, value, 
+        knows_other_dewormed_yes:doesnt_think_other_knows)   %>%
+    mutate(knowledge_type = case_when(
+        str_detect(variable, "_yes") ~ "yes",
+        str_detect(variable, "_no") ~ "no",
+        str_detect(variable, "doesnt") ~ "doesn't know"
+    ),
+      belief_knows = case_when(
+        knowledge_type == "yes" ~ "knows",
+        knowledge_type == "no" ~ "knows",
+        knowledge_type == "doesn't know" ~ "doesn't know",
+        TRUE ~ NA
+      )
+    ) %>%
+    mutate(belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord")) 
+    
+
+clean_belief_data = belief_data %>%
+  filter(knowledge_type == "doesn't know")  %>%
+  mutate(
+    prop = 1 - value/obs_know_person
+  )
+
+
+
+
+
+library(fixest)
+library(marginaleffects)
+
+fit_and_tidy_belief_rf = function(data) {
+  fit = feols(
+    prop ~ 0 + assigned.treatment*assigned_dist_group,
+    data = data
+  )
+  te_df = map_dfr(
+    c(0.95, 0.8, 0.5),
+    ~avg_comparisons(
+      fit,
+      variables = "assigned.treatment",
+      by = "assigned_dist_group",
+      conf.level = .x
+    ) %>%
+    tidy() %>%
+    mutate(
+      assigned.treatment = str_extract(contrast, "(?<=mean\\()\\w+") ,
+      .width = .x
+    ) %>%
+    select(
+      assigned.treatment,
+      assigned_dist_group,
+      estimate,
+      conf.low,
+      conf.high,
+      .width
+    )
+  )
+
+  prob_df = map_dfr(
+    c(0.95, 0.8, 0.5),
+    ~avg_predictions(
+      fit,
+      by = c("assigned_dist_group", "assigned.treatment"),
+      conf_level = .x
+    ) %>%
+      tidy() %>%
+      mutate(.width = .x) %>%
+      select(
+        assigned_dist_group,
+        assigned.treatment,
+        estimate,
+        conf.low,
+        conf.high,
+        .width
+      )
+
+  )
+
+  df = bind_rows(
+    te_df %>% 
+      mutate(
+        fit_type = "ate"
+      ),
+    prob_df %>%
+      mutate(
+        fit_type = "prob"
+      )
+  )
+  return(df)
+}
+
+clean_rf_beliefs = function(df) {
+  df %>%
+    mutate(
+      treatment = str_to_title(assigned.treatment) %>% factor(levels = c("Control", "Ink", "Calendar", "Bracelet")),
+      dist_group = str_to_title(assigned_dist_group) %>% factor(levels = c("Close", "Far")),
+      variable = paste0(fit_type, "_", belief_type)
+    ) %>%
+    select(-assigned.treatment, -assigned_dist_group, -belief_type) %>%
+    rename(value = estimate)
+}
+
+
+fob_fit = clean_belief_data %>%
+  filter(belief_type == "1ord") %>%
+  fit_and_tidy_belief_rf() %>%
+  mutate(belief_type = "1ord") %>%
+  clean_rf_beliefs() %>%
+  group_by(fit_type) %>%
+  group_nest() %>%
+  rename(
+    tidy_draws = data
+  ) %>%
+  mutate(
+    param = case_when(
+      fit_type == "ate" ~ "belief_ates",
+      fit_type == "prob" ~ "belief_probs"
+    )
+  )
+
+sob_fit = clean_belief_data %>%
+  filter(belief_type == "2ord") %>%
+  fit_and_tidy_belief_rf() %>%
+  mutate(belief_type = "2ord") %>%
+  clean_rf_beliefs() %>%
+  group_by(fit_type) %>%
+  group_nest() %>%
+  rename(
+    tidy_draws = data
+  ) %>%
+  mutate(
+    param = case_when(
+      fit_type == "ate" ~ "belief_ates",
+      fit_type == "prob" ~ "belief_probs"
+    )
+  )
+
+source(here("presentations/plot-fn.R"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+```{r}
+#| fob-beliefs-line-plot-rf,
+#|  fig.cap="First order belief levels and average treatment effects",
+#|  fig.note="This plot shows estimates using the first order beliefs 
+#|   linear probability model. Total sample size: 999 observations at the individual level."
+plot_ord_beliefs_est(fob_fit, order = 1, caption = freq_plot_caption) 
+```
+
+```{r}
+#| sob-beliefs-line-plot-rf,
+#|  fig.cap="Second order belief levels and average treatment effects",
+#|  fig.note="This plot shows estimates using the second order beliefs 
+#|   linear probability model. Total sample size: 999 observations at the individual level."
+
+plot_ord_beliefs_est(sob_fit, order = 2, caption = freq_plot_caption)
+
 ```
 
 #### disagg beliefs ####
@@ -2876,7 +2952,8 @@ villages %>%
 #|   from regressing distance to the closest point of 
 #|  treatment on baseline covariates. the realised test statistic is depicted by 
 #|  the vertical line. the t-stat is the test statistic used. 
-#|  plot labels show exact$p$-values.", fig.width = 10, fig.height = 10
+#|  plot labels show exact$p$-values.", fig.width = 10, fig.height = 10,
+#| eval = FALSE
 
 balance_data = read_rds(
   file.path(
@@ -3216,6 +3293,183 @@ freq_rf_levels %>%
 ```
 
 
+```{r}
+#| freq-rf-levels-discrete-dist,
+#| fig.cap="Incentive Takeup Levels, Reduced Form Model - Discrete Distance",
+#| fig.width = 8, fig.height = 6
+
+
+fit_and_clean_discrete_rf = function(data) {
+  data = data %>%
+    mutate(assigned_dist_group = dist.pot.group)
+
+  fit = feols(
+    dewormed ~ 0 + assigned.treatment*assigned_dist_group,
+    data = data,
+    vcov = ~cluster.id
+  )
+  te_df = map_dfr(
+    c(0.95, 0.8, 0.5),
+    ~avg_comparisons(
+      fit,
+      variables = "assigned.treatment",
+      by = "assigned_dist_group",
+      conf.level = .x
+    ) %>%
+    tidy() %>%
+    mutate(
+      assigned.treatment = str_extract(contrast, "(?<=mean\\()\\w+") ,
+      .width = .x
+    ) %>%
+    select(
+      assigned.treatment,
+      assigned_dist_group,
+      estimate,
+      conf.low,
+      conf.high,
+      .width
+    )
+  )
+
+  prob_df = map_dfr(
+    c(0.95, 0.8, 0.5),
+    ~avg_predictions(
+      fit,
+      by = c("assigned_dist_group", "assigned.treatment"),
+      conf_level = .x
+    ) %>%
+      tidy() %>%
+      mutate(.width = .x) %>%
+      select(
+        assigned_dist_group,
+        assigned.treatment,
+        estimate,
+        conf.low,
+        conf.high,
+        .width
+      )
+
+  )
+
+  df = bind_rows(
+    te_df %>% 
+      mutate(
+        fit_type = "ate"
+      ),
+    prob_df %>%
+      mutate(
+        fit_type = "prob"
+      )
+  )
+
+}
+
+
+discrete_rf_fit = fit_and_clean_discrete_rf(analysis_data) %>%
+  rename(assigned_treatment = assigned.treatment) 
+
+discrete_rf_fit %>%
+  filter(fit_type == "ate")
+
+discrete_rf_fit %>%
+  munge_freq_results()
+
+discrete_rf_fit %>%
+  munge_freq_results()  %>%
+  filter(fit_type == "prob") %>%
+  filter(.width == 0.95) %>%
+  filter(!is.na(assigned_treatment)) %>%
+  mutate(
+    alpha = case_when(
+      assigned_treatment == "Control" ~ 1,
+      TRUE ~ 0.15
+    )
+  ) %>%
+  ggplot(aes(
+    y = assigned_treatment,
+    alpha = alpha
+  )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      colour = colors
+    ),
+    linewidth = 1.75
+  ) +
+  geom_point(aes(x = estimate, colour = colors), size = 3.5) +
+  geom_point(aes(x = estimate), color = "white", size = 0.6) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  scale_color_identity() +
+  scale_alpha_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals using clustered standard errors."
+  ) +
+  scale_x_continuous(breaks = seq(0.15, 0.55, 0.1), limits = c(0.15, 0.55)) 
+
+
+
+
+
+```
+
+
+
+```{r}
+#| freq-rf-tes-discrete-plot,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Discrete Distance",
+#| fig.width = 8, fig.height = 6
+
+
+
+discrete_rf_fit %>%
+  munge_freq_results()  %>%
+  filter(fit_type == "ate") %>%
+  filter(
+    assigned_dist_group != "far - close",
+    # assigned_dist_group != "combined",
+    assigned_treatment != "signal"
+  ) %>%
+  # mutate(assigned_treatment = str_to_lower(assigned_treatment)) %>%
+  filter(
+    assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  ggplot(aes(
+    y = assigned_treatment
+  )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      x = estimate,
+      color = colors
+    ),
+    linewidth = 0.75
+  ) +
+  geom_point(
+    aes(x = estimate, colour = colors), 
+    size = 3.5) +
+  geom_point(aes(x = estimate), color = "white", 
+  size = 0.8) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  scale_color_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals shown clustered standard errors."
+  )
+
+```
 ```{r}
 #| freq-rf-levels-bar-plot,
 #| fig.cap="Incentive Takeup Levels, Reduced Form Model",

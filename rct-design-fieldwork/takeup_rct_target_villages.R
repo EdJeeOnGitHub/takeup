@@ -1,6 +1,5 @@
 
 # Identify valid target villages and clusters -----------------------------
-
 rct.cluster.selection <- read_rds("rct_cluster_selection_2.0.rds")
 rct.targetable.schools <- read_rds("rct_targetable_schools_2.0.rds")
 

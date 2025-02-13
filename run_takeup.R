@@ -31,16 +31,15 @@ Options:
   args = if (interactive()) "
     takeup fit \
     --cmdstanr \
-    --outputname=dist_fit102 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS \
+    --outputname=dist_fit001 \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 200 \
-    --chains=2 \
+    --chains=3 \
     --num-mix-groups=1 \
     --sequential  
     " else commandArgs(trailingOnly = TRUE)
-  # args = if (interactive()) "takeup cv --models=REDUCED_FORM_NO_RESTRICT --cmdstanr --include-paths=stan_models --update --output-path=data/stan_analysis_data --outputname=test --folds=2 --sequential" else commandArgs(trailingOnly = TRUE)
 ) 
 
 library(magrittr)
@@ -105,7 +104,6 @@ monitored_nosms_data <- analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
-
 nosms_data <- analysis.data %>% 
   filter(sms.treatment.2 == "sms.control") %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
@@ -160,7 +158,6 @@ if (str_detect(script_options$models, "NO_OUTLIERS")) {
     ungroup()
 }
 
-
 # Models ------------------------------------------------------------------
 
 num_treatments <- n_distinct(analysis_data$assigned.treatment)
@@ -212,7 +209,7 @@ models <- lst(
     BELIEFS_ORDER = 1,
 
     # Priors
-    mu_rep_sd = 0.25,
+    mu_rep_sd = 1,
     # mu_beliefs_effects_sd = 1.5,
     mu_beliefs_effects_lambda = 1,
    
@@ -452,6 +449,11 @@ models <- lst(
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
         mu_rep_type = 4
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
+      list_modify(
+        mu_rep_type = 4,
+        beliefs_use_dist = FALSE
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
@@ -1042,4 +1044,154 @@ if (script_options$takeup) {
 
 
 cat(str_glue("All done. Saved results to output ID '{output_name}'\n\n"))
+stop()
 
+bmr_df = dist_fit_obj$STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT$summary(
+  variables = c(
+    "base_mu_rep"
+    )
+)
+
+bmr_df
+
+ed = dist_fit_obj$STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT$summary(
+  variables = c(
+    "cluster_social_multiplier",
+    "cluster_mu_rep",
+    "cluster_mu_rep_deriv",
+    "cluster_delta",
+    "cluster_delta_deriv",
+    "cluster_w_cutoff"
+    )
+)
+
+
+clean_ijk = function(data) {
+  data %>%
+    mutate(
+      ijk = str_extract(variable, "\\[.*\\]")
+    )  %>%
+    mutate(
+      ijk = str_remove_all(ijk, "\\[|\\]"),
+    ) %>%
+    separate(ijk, c("i", "j", "k"), sep = ",")  %>%
+    mutate(across(c(i, j, k), as.integer))  
+} 
+
+k_map_df = tibble(
+  k = 1:4,
+  treatment = c("control", "ink", "calendar", "bracelet")
+)
+
+clean_cluster_mu_rep = ed %>%
+  filter(str_detect(variable, "cluster_mu_rep")) %>%
+  filter(!str_detect(variable, "deriv")) %>%
+  clean_ijk() %>%
+  left_join(k_map_df, by = "k")
+
+
+clean_cluster_social_multiplier = ed %>%
+  filter(str_detect(variable, "cluster_social_multiplier")) %>%
+  clean_ijk() %>%
+  left_join(k_map_df, by = "k")
+
+delta_df = ed %>%
+  filter(str_detect(variable, "cluster_delta")) %>%
+  filter(!str_detect(variable, "deriv")) %>%
+  clean_ijk() %>%
+  left_join(k_map_df, by = "k")
+
+
+delta_deriv = ed %>%
+  filter(str_detect(variable, "cluster_delta")) %>%
+  filter(str_detect(variable, "deriv")) %>%
+  clean_ijk() %>%
+  left_join(k_map_df, by = "k")
+
+
+cluster_w_cutoff_df = ed %>%
+  filter(str_detect(variable, "cluster_w_cutoff")) %>%
+  clean_ijk() %>%
+  left_join(k_map_df, by = "k")
+
+
+cluster_w_cutoff_df %>%
+  filter(j == 1) %>%
+  ggplot(aes(
+    x = i, 
+    y = mean,
+    colour = treatment
+  ))  +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  labs(title = "cluster_w_cutoff")
+
+delta_deriv %>%
+  filter(j == 1) %>%
+  ggplot(aes(
+    x = i, 
+    y = mean,
+    colour = treatment
+  ))  +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  labs(title = "delta_deriv")
+
+
+delta_df %>%
+  filter(j == 1) %>%
+  ggplot(aes(
+    x = i, 
+    y = mean,
+    colour = treatment
+  ))  +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+cluster_w_cutoff_df %>%
+  filter(j == 1) %>%
+  ggplot(aes(
+    x = i, 
+    y = mean,
+    colour = treatment
+  ))  +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+clean_cluster_social_multiplier %>%
+  filter(j == 20) %>%
+  ggplot(aes(
+    x = i, 
+    y = mean,
+    colour = treatment
+  ))  +
+  geom_point()
+
+
+
+clean_cluster_mu_rep %>%
+  filter(j  == 1) %>%
+  ggplot(aes(
+    x = i, 
+    y = mean,
+    colour = treatment
+  ))  +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+clean_cluster_mu_rep %>%
+  filter(j == 1) %>%
+  filter(i == 1)

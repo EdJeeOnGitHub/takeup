@@ -17,9 +17,9 @@ Options:
   
   "), 
   args = if (interactive()) "
-  95
+  001
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL
   --sm
   1
   " else commandArgs(trailingOnly = TRUE)
@@ -360,3 +360,26 @@ if (script_options$sm) {
       )
 
 }
+
+
+summ_sm_draws %>%
+filter(str_detect(variable, "sm")) %>%
+filter(variable == "sm_rescaled") %>%
+  ggplot(aes(
+    x = roc_distance,
+    y = value,
+    colour = treatment
+  )) +
+  geom_point()  +
+  geom_line()
+
+summ_sm_draws %>%
+filter(str_detect(variable, "sm_mu")) %>%
+  ggplot(aes(
+    x = roc_distance,
+    y = value,
+    colour = variable
+  )) +
+  geom_point()  +
+  geom_line() +
+  facet_wrap(~treatment)

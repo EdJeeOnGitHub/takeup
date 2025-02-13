@@ -1703,13 +1703,14 @@ know_df %>%
 
 know_df %>%
   filter(belief_type == "1ord") %>%
-  filter(assigned_treatment == "control") %>%
+  # filter(assigned_treatment == "control") %>%
   bind_rows(
     .,
     mutate(., assigned_dist_group = "combined")
   ) %>%
   mutate(assigned_dist_group = factor(assigned_dist_group, c("close", "far", "combined"))) %>%
   group_by(
+    assigned_treatment,
     assigned_dist_group,
     dewormed
   ) %>%
@@ -1722,13 +1723,13 @@ know_df %>%
 
 know_df %>%
   filter(belief_type == "1ord") %>%
-  filter(assigned_treatment == "control") %>%
   mutate(dewormed = as.character(dewormed)) %>%
   bind_rows(
     mutate(., dewormed = "combined")
   ) %>%
   mutate(dewormed = factor(dewormed, c("TRUE", "FALSE", "combined"))) %>%
   group_by(
+    assigned_treatment,
     assigned_dist_group,
     dewormed
   ) %>%

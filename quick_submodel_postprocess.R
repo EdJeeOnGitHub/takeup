@@ -12,10 +12,10 @@ Options:
   
   "), 
   args = if (interactive()) "
-  95
+  001
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
-  1 2 
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL
+  1 2 3 4 
   " else commandArgs(trailingOnly = TRUE)
 )
 
@@ -186,3 +186,15 @@ wtp_draws_raw %>%
 
 
 
+
+cl_mu_rep = load_param_draws(
+    fit_version = script_options$fit_version,
+    model = script_options$model,
+    chain = script_options$chain,
+    prior_predictive = script_options$prior,
+    input_path = script_options$input_path,
+    curr_cluster_mu_rep[i]
+) 
+
+
+cl_mu_rep

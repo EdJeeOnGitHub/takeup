@@ -13,10 +13,9 @@ Options:
 
   "), 
   args = if (interactive()) "
-  104
+  001
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP
-  --save-error-draws
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT
   1 2 
   " else commandArgs(trailingOnly = TRUE)
 )
@@ -379,11 +378,18 @@ all_tes = bind_rows(
 ) %>%
   ungroup()
 
+
+options(width = 120)
+all_tes %>%
+  select(
+    estimand, treatment, dist_group, pr_takeup, mu_treatment
+  ) %>%
+  print(n = 30)
+
+
 all_rvar_cols = all_tes %>%
   select(where(is_rvar)) %>%
   colnames()
-
-
 
 all_tes %>%
   pivot_longer(all_of(all_rvar_cols), names_to = "variable") %>%

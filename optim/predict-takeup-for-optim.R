@@ -74,7 +74,6 @@ library(rstan)
 library(sf)
 library(nleqslv)
 library(cmdstanr)
-library(econometr)
 library(furrr)
 
 source(file.path("optim", "optim-functions.R"))
