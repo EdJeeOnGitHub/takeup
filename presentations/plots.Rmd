@@ -193,6 +193,63 @@ sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 ```
 
 
+```{r}
+#| nonparametric-takeup-plot,
+#| fig.cap="Nonparametric Take-up Probability",
+#| fig.width=8, fig.height=6
+
+
+summ_analysis_data = analysis_data %>%
+  group_by(cluster.id, assigned.treatment) %>%
+  summarise(
+    mean_dist = mean(cluster.dist.to.pot),
+    mean_dewormed = mean(dewormed)
+  ) %>%
+  ungroup()
+
+summ_analysis_data %>%
+  filter(
+    assigned.treatment %in% c("control", "bracelet")
+  ) %>%
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = fct_relevel(assigned.treatment, "Control", "Bracelet")
+  ) %>%
+  ggplot(
+    aes(
+      x = mean_dist/1000,
+      y = mean_dewormed,
+      colour = assigned.treatment,
+      fill = assigned.treatment
+    )
+  ) +
+  geom_smooth(method = loess, level = 0.9) +
+  geom_point(alpha = 0.3, show.legend = FALSE) +
+  labs(
+    y = "Take-up Probability",
+    x = "Distance to Treatment (km)"
+  )  +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  # xlim(0, 2.5) +
+  ggthemes::scale_fill_canva(
+    "",
+    palette = "Primary colors with a vibrant twist"
+  ) +
+  ggthemes::scale_color_canva(
+    "",
+    palette = "Primary colors with a vibrant twist"
+  )  +
+  geom_rug(
+    inherit.aes = FALSE,
+    aes(
+      x = mean_dist/1000,
+      colour = assigned.treatment
+    )
+  ) 
+
+```
+
 
 ```{r}
 #| takeup-dynamics-plot,
@@ -3299,15 +3356,18 @@ freq_rf_levels %>%
 #| fig.width = 8, fig.height = 6
 
 
-fit_and_clean_discrete_rf = function(data) {
+
+
+fit_and_clean_discrete_rf = function(data, fit = NULL) {
   data = data %>%
     mutate(assigned_dist_group = dist.pot.group)
-
-  fit = feols(
-    dewormed ~ 0 + assigned.treatment*assigned_dist_group,
-    data = data,
-    vcov = ~cluster.id
-  )
+  if (is.null(fit)) {
+    fit = feols(
+      dewormed ~ 0 + assigned.treatment*assigned_dist_group,
+      data = data,
+      vcov = ~cluster.id
+    )
+  }
   te_df = map_dfr(
     c(0.95, 0.8, 0.5),
     ~avg_comparisons(
@@ -3365,17 +3425,49 @@ fit_and_clean_discrete_rf = function(data) {
 }
 
 
+cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>%
+  mutate(assigned_dist_group = dist.pot.group) %>%
+  mutate(
+    cluster.id = cluster_id
+  ) %>%
+  mutate(assigned.treatment = factor(assigned.treatment, levels = c("control", "ink", "calendar", "bracelet")))
+
+lasso_cov_vars = c(
+  "floor_tile_cement",
+  "female",
+  "have_phone_lgl",
+  "age.census"
+)
+library(fixest)
+library(marginaleffects)
+
+double_lasso_fit = feols(
+  data = cov_analysis_data,
+  dewormed ~ 0 + assigned.treatment*assigned_dist_group + .[lasso_cov_vars] | county,
+  vcov = ~cluster.id
+)
+
+
+double_lasso_fit %>%
+  tidy() %>%
+  filter(
+    term %in% lasso_cov_vars | str_detect(term, "TRUE")
+  )
+
+discrete_dl_fit = fit_and_clean_discrete_rf(cov_analysis_data, double_lasso_fit) %>%
+  rename(assigned_treatment = assigned.treatment)
+
+discrete_dl_fit %>%
+  filter(
+    fit_type == "ate"
+  ) %>%
+  filter(.width == 0.95)
+
 discrete_rf_fit = fit_and_clean_discrete_rf(analysis_data) %>%
   rename(assigned_treatment = assigned.treatment) 
 
-discrete_rf_fit %>%
-  filter(fit_type == "ate")
-
-discrete_rf_fit %>%
-  munge_freq_results()
-
-discrete_rf_fit %>%
-  munge_freq_results()  %>%
+plot_freq_rf_levels = function(data) {
+  data %>%
   filter(fit_type == "prob") %>%
   filter(.width == 0.95) %>%
   filter(!is.na(assigned_treatment)) %>%
@@ -3413,6 +3505,13 @@ discrete_rf_fit %>%
   ) +
   scale_x_continuous(breaks = seq(0.15, 0.55, 0.1), limits = c(0.15, 0.55)) 
 
+}
+
+
+discrete_rf_fit %>%
+  munge_freq_results()  %>%
+  plot_freq_rf_levels
+
 
 
 
@@ -3420,6 +3519,16 @@ discrete_rf_fit %>%
 ```
 
 
+```{r}
+#| freq-rf-levels-discrete-dist-lasso,
+#| fig.cap="Incentive Takeup Levels, Reduced Form Model - Discrete Distance w/ LASSO Covs",
+#| fig.width = 8, fig.height = 6
+discrete_dl_fit %>%
+  munge_freq_results()  %>%
+  plot_freq_rf_levels
+
+
+```
 
 ```{r}
 #| freq-rf-tes-discrete-plot,
@@ -3427,16 +3536,114 @@ discrete_rf_fit %>%
 #| fig.width = 8, fig.height = 6
 
 
+discrete_dist_tidy_te = read_csv(
+  "temp-data/reducedform-robustness-discrete-dist-tidy-tes.csv"
+)
 
-discrete_rf_fit %>%
-  munge_freq_results()  %>%
+plot_freq_rf_ates = function(data) {
+  data %>%
   filter(fit_type == "ate") %>%
   filter(
     assigned_dist_group != "far - close",
-    # assigned_dist_group != "combined",
     assigned_treatment != "signal"
   ) %>%
-  # mutate(assigned_treatment = str_to_lower(assigned_treatment)) %>%
+  filter(
+    assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  ggplot(aes(
+    y = assigned_treatment
+  )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      x = estimate,
+      color = colors
+    ),
+    linewidth = 0.75
+  ) +
+  geom_point(
+    aes(x = estimate, colour = colors), 
+    size = 3.5) +
+  geom_point(aes(x = estimate), color = "white", 
+  size = 0.8) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  scale_color_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals shown clustered standard errors."
+  )
+
+}
+
+discrete_dist_tidy_te %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results()  %>%
+  filter(
+    assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  ggplot(aes(
+    y = assigned_treatment
+  )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      x = estimate,
+      color = colors
+    ),
+    linewidth = 0.75
+  ) +
+  geom_point(
+    aes(x = estimate, colour = colors), 
+    size = 3.5) +
+  geom_point(aes(x = estimate), color = "white", 
+  size = 0.8) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  scale_color_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals shown clustered standard errors."
+  )
+
+# discrete_rf_fit %>%
+#   munge_freq_results()  %>%
+#   plot_freq_rf_ates()
+
+```
+
+```{r}
+#| freq-rf-tes-discrete-lasso-plot,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Discrete Distance, LASSO Covs",
+#| fig.width = 8, fig.height = 6
+
+# discrete_dl_fit %>%
+#   munge_freq_results()  %>%
+#   plot_freq_rf_ates()
+
+
+discrete_dist_lasso_te = read_csv(
+  "temp-data/reducedform-robustness-discrete-dist-covs-tidy-tes.csv"
+)
+discrete_dist_lasso_te %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results()  %>%
   filter(
     assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
   ) %>%
@@ -3470,6 +3677,22 @@ discrete_rf_fit %>%
   )
 
 ```
+
+
+
+```{r}
+discrete_rf_fits = bind_rows(
+  discrete_rf_fit %>% mutate(fit_type = "no covs, discrete distance"),
+  discrete_dl_fit %>% mutate(fit_type = "double lasso + covs, discrete distance")
+)
+
+discrete_rf_fits %>%
+  write_csv(
+    "temp-data/discrete-rf-fits.csv"
+  )
+
+```
+
 ```{r}
 #| freq-rf-levels-bar-plot,
 #| fig.cap="Incentive Takeup Levels, Reduced Form Model",
