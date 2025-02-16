@@ -194,10 +194,18 @@ sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 
 
 ```{r}
-#| nonparametric-takeup-plot,
+#| nonparametric-takeup-plot-control-bracelet,
 #| fig.cap="Nonparametric Take-up Probability",
 #| fig.width=8, fig.height=6
 
+colour_tibble = tibble(
+  assigned_treatment = c("control", "ink", "calendar", "bracelet", "signal"),
+  colors = c(canva_pal(canva_palette_vibrant)(4), "#000000")
+) %>%
+  mutate(
+    assigned_treatment = str_to_title(assigned_treatment),
+    assigned_treatment = factor(assigned_treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
 
 summ_analysis_data = analysis_data %>%
   group_by(cluster.id, assigned.treatment) %>%
@@ -205,12 +213,115 @@ summ_analysis_data = analysis_data %>%
     mean_dist = mean(cluster.dist.to.pot),
     mean_dewormed = mean(dewormed)
   ) %>%
-  ungroup()
+  ungroup() %>%
+  left_join(colour_tibble, by = c("assigned.treatment" = "assigned_treatment")) %>%
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+
+
+plot_np = function(data, colour_df = colour_tibble) {
+  max_dist = data %>%
+    summarise(
+      max_dist = max(mean_dist/1000)
+    ) %>%
+    pull(max_dist)
+
+  data %>%
+    ggplot(
+      aes(
+        x = mean_dist/1000,
+        y = mean_dewormed,
+        colour = assigned.treatment,
+        fill = assigned.treatment
+      )
+    ) +
+    geom_smooth(method = loess, level = 0.9) +
+    geom_point(alpha = 0.3, show.legend = FALSE) +
+    labs(
+      y = "Take-up Probability",
+      x = "Distance to Treatment (km)"
+    )  +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    scale_colour_manual("", values = deframe(colour_df)) +
+    scale_fill_manual("", values = deframe(colour_df)) +
+    geom_rug(
+      inherit.aes = FALSE,
+      aes(
+        x = mean_dist/1000,
+        colour = assigned.treatment
+      )
+    ) +
+    # from 0 to 3km, in 0.5km increments
+    scale_x_continuous(
+      breaks = seq(0, 2.5, 0.5),
+      labels = scales::number_format(accuracy = 0.1),
+      limits = c(0, max(2.5, max_dist)) 
+    )
+}
+
 
 summ_analysis_data %>%
-  filter(
-    assigned.treatment %in% c("control", "bracelet")
-  ) %>%
+  filter(assigned.treatment %in% c("Control", "Bracelet")) %>%
+  plot_np()
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+#| nonparametric-takeup-plot-control-ink,
+#| fig.cap="Nonparametric Take-up Probability - Control and Ink",
+#| fig.width=8, fig.height=6
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Control", "Ink")) %>%
+  plot_np()
+
+```
+
+```{r}
+#| nonparametric-takeup-plot-control-calendar,
+#| fig.cap="Nonparametric Take-up Probability - Control and Calendar",
+#| fig.width=8, fig.height=6
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Control", "Calendar")) %>%
+  plot_np()
+
+
+```
+
+
+```{r}
+#| nonparametric-takeup-plot-bracelet-calendar,
+#| fig.cap="Nonparametric Take-up Probability - Bracelet and Calendar",
+#| fig.width=8, fig.height=6
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Bracelet", "Calendar")) %>%
+  plot_np()
+
+
+
+```
+
+
+```{r}
+#| nonparametric-takeup-plot-all,
+#| fig.cap="Nonparametric Take-up Probability - All",
+#| fig.width=8, fig.height=6
+
+
+summ_analysis_data %>%
   mutate(
     assigned.treatment = str_to_title(assigned.treatment),
     assigned.treatment = fct_relevel(assigned.treatment, "Control", "Bracelet")
@@ -3540,6 +3651,7 @@ discrete_dist_tidy_te = read_csv(
   "temp-data/reducedform-robustness-discrete-dist-tidy-tes.csv"
 )
 
+
 plot_freq_rf_ates = function(data) {
   data %>%
   filter(fit_type == "ate") %>%
@@ -3638,6 +3750,7 @@ discrete_dist_tidy_te %>%
 discrete_dist_lasso_te = read_csv(
   "temp-data/reducedform-robustness-discrete-dist-covs-tidy-tes.csv"
 )
+
 discrete_dist_lasso_te %>%
   filter(
     assigned_dist_group != "far - close",
@@ -3678,7 +3791,53 @@ discrete_dist_lasso_te %>%
 
 ```
 
+```{r}
+#| freq-rf-tes-cts-lasso-plot,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Continuous Distance, LASSO Covs",
+#| fig.width = 8, fig.height = 6
 
+cts_dist_covs = read_csv("temp-data/reducedform-robustness-cts-dist-covs-tidy-tes.csv")
+
+cts_dist_covs %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results()  %>%
+  filter(
+    assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  ggplot(aes(
+    y = assigned_treatment
+  )) +
+  geom_linerange(
+    aes(
+      xmin = conf.low,
+      xmax = conf.high,
+      x = estimate,
+      color = colors
+    ),
+    linewidth = 0.75
+  ) +
+  geom_point(
+    aes(x = estimate, colour = colors), 
+    size = 3.5) +
+  geom_point(aes(x = estimate), color = "white", 
+  size = 0.8) +
+  facet_wrap(~assigned_dist_group, ncol = 1) +
+  scale_color_identity() +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  )  +
+  labs(
+    x = "",
+    y = "",
+    caption = "95% confidence intervals shown clustered standard errors."
+  )
+
+
+```
 
 ```{r}
 discrete_rf_fits = bind_rows(

@@ -201,7 +201,7 @@ plot_optimal_allocation = function(village_data,
     )
 
     subtitle = str_glue(
-        "Average Distance: {round(mean_dist/1000, 2)}km, Policymaker's Utility: {round(sw, 2)}"
+        "Average Distance: {round(mean_dist/1000, 2)}km"
     )
     sub_str = str_glue("Assigned PoTs: {n_pots_used}")
 

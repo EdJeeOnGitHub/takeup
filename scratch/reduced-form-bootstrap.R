@@ -90,8 +90,16 @@ monitored_nosms_data <- analysis.data %>%
 
 analysis_data <- monitored_nosms_data
 
+analysis_data %>%
+  write_csv(
+    "temp-data/analysis-data.csv"
+  )
+
 sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 dist_sd = sd(analysis_data$cluster.dist.to.pot)
+
+
+
 
 ## Load Census Data
 census_data_env = new.env()
@@ -262,6 +270,86 @@ cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rd
 pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
   left_join(cluster_treat_df, by = "cluster.id") %>%
   filter(!is.na(treat_dist))
+
+
+colnames(endline.data)
+
+
+endline.data %>%
+  group_by(dist.pot.group) %>%
+  summarise(
+    mean_time_travel = mean(time_travel, na.rm = TRUE),
+    median_time_travel = median(time_travel, na.rm = TRUE)
+  )
+
+endline.data %>%
+  group_by(dist.pot.group) %>%
+  summarise(
+    frac_pay_0 = mean(travel_pay == 0, na.rm = TRUE),
+    mean_pay = mean(travel_pay, na.rm = TRUE)
+  )
+
+
+endline.data = endline.data %>%
+  mutate(
+    travel_clean = case_when(
+      travel == "1" ~ "walk",
+      travel == "2" ~ "motorbike",
+      travel == "3" ~ "car/taxi",
+      travel == "4" ~ "bus",
+      travel == "5" ~ "free ride"
+    )
+  )
+
+  endline.data %>%
+    write_csv("temp-data/endline-data.csv")
+
+endline.data %>%
+  count(travel_clean) %>%
+  mutate(
+    pct = 100*n/sum(n)
+  )
+
+endline.data %>%
+  summarise(
+    mean_time_travel = mean(time_travel, na.rm = TRUE),
+    median_time_travel = median(time_travel, na.rm = TRUE)
+  )
+
+
+endline.data %>%
+  summarise(
+    frac_pay_0 = mean(travel_pay == 0, na.rm = TRUE),
+    mean_pay = mean(travel_pay, na.rm = TRUE)
+  )
+
+endline.data %>%
+  mutate(
+    travel = case_when(
+      travel == "1" ~ "walk",
+      travel == "2" ~ "motorbike",
+      travel == "3" ~ "car/taxi",
+      travel == "4" ~ "bus",
+      travel == "5" ~ "free ride"
+    )
+  ) %>%
+  group_by(dist.pot.group) %>%
+  count(travel) %>%
+  arrange(-n) %>%
+  pivot_wider(
+    names_from = dist.pot.group,
+    values_from = n
+  ) %>%
+  mutate(
+    pct_close = 100*close / sum(close, na.rm = TRUE),
+    pct_far = 100*far / sum(far, na.rm = TRUE)
+  )
+
+
+
+
+
+
 
 ## Baseline Balance
 baseline_worm_data = baseline_worm %>%
@@ -862,8 +950,10 @@ create_regression_output = function(data, f,  B_draws = 500,
                                     stat = params$stat,
                                     caption = "Average Treatment Effects: Reduced Form",
                                     dependent_var = "Dependent variable: Take-up",
-                                    type = "APE"
+                                    type = "APE",
+                                    stars = TRUE
                                     ) {
+
   if (type == "APE") {
     bs_f = bayes_bs_f
     actual_f = actual_bayesian_bs_fit
@@ -879,17 +969,6 @@ create_regression_output = function(data, f,  B_draws = 500,
       data = data
     ),
     .progress = TRUE
-    )
-  browser()
-
-  data$wt = 1
-  f_signal(data, NULL)
-
-  bs_draws %>%
-    filter(!is.na(signal)) %>%
-    group_by(signal, assigned_dist_group) %>%
-    summarise(
-      pred = mean(mean_pred)
     )
 
 
@@ -919,7 +998,6 @@ create_regression_output = function(data, f,  B_draws = 500,
   signal_summ = add_summ_stats(clean_signal_draws_df, signal_fit)
   te_summ = add_summ_stats(clean_te_draws_df, te_fit)
 
-
   pval_only_terms = c("bracelet - calendar", "signal")
 
   overall_summ = bind_rows(
@@ -933,7 +1011,7 @@ create_regression_output = function(data, f,  B_draws = 500,
 
 
   default_tbl = overall_summ %>%
-    prep_tbl(stat = params$stat) %>%
+    prep_tbl(stat = stat, stars = stars) %>%
     nice_kbl_table(
       cap = caption,
       outcome_var = dependent_var
@@ -941,7 +1019,7 @@ create_regression_output = function(data, f,  B_draws = 500,
 
 
   different_order_tbl = overall_summ %>%
-    prep_tbl(stat = stat) %>%
+    prep_tbl(stat = stat, stars = stars) %>%
     mutate(
       assigned_treatment = fct_relevel(
         assigned_treatment, 
@@ -971,7 +1049,7 @@ create_regression_output = function(data, f,  B_draws = 500,
 
 
 ### Table/Kable functions ------------------------------------------------------
-prep_tbl = function(tes, stat = "ci") {
+prep_tbl = function(tes, stat = "ci", stars = FALSE) {
 
     tbl_dist_levels = c(
         "combined",
@@ -1007,11 +1085,11 @@ prep_tbl = function(tes, stat = "ci") {
             )
     } else if (stat == "std.error"){
         tes = tes %>%
-            mutate(val = paste0("{[", round(std_error, 3), "]}"))
+            mutate(val = paste0("{(", round(std_error, 3), ")}"))
     } else {
         tes = tes %>%
             mutate(
-                val = paste0("{[", round_pval(pval, 3), "]}")
+                val = paste0("{(", round_pval(pval, 3), ")}")
             )
     }
 
@@ -1020,12 +1098,22 @@ prep_tbl = function(tes, stat = "ci") {
 
     tbl =  tes %>%
         select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, pval, oneside_pval, show_pval_only)  %>%
+        mutate(
+          show_stars = 
+            ((assigned_treatment %in% c("bracelet", "calendar", "ink")) | assigned_dist_group == "far - close") & stars == TRUE,
+          stars = case_when(
+            pval < 0.001 ~ "***",
+            pval < 0.05 ~ "**",
+            pval < 0.1 ~ "*",
+            TRUE ~ ""
+          )
+        ) %>%
         mutate(across(where(is.numeric), ~round(.x, 3))) %>%
         mutate(
-            estim_std = if_else(
-                show_pval_only,
-                linebreak(paste0(oneside_pval), align = "c"),
-                linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
+            estim_std = case_when(
+              show_pval_only == TRUE ~ linebreak(paste0(pval), align = "c"),
+              show_stars == TRUE ~ linebreak(paste0(estimate, stars, "\n", str_glue("{val}")), align = "c"),
+              TRUE ~ linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c")
             )
         ) %>%
         bind_rows(
@@ -1230,18 +1318,14 @@ p_outlier = outlier_analysis_data %>%
 # )
 #### Distance Checks End -------------------------------------------------------
 main_spec_regression = function(data, weights) {
-  feglm(
+  feols(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
     data = data,
-    family = "probit",
     nthreads = 1,
     weights = ~wt
   )
 }
 
-
-main_spec_output$tidy_summary  %>%
-  print(n = 30)
 
 main_spec_output = create_regression_output(
   data = analysis_data,
@@ -1253,36 +1337,12 @@ main_spec_output$tidy_summary %>%
   print(n = 40) 
 
 
-PEA_main_spec_output = create_regression_output(
-  data = analysis_data,
-  f = main_spec_regression,
-  type = "PEA"
-)
-
-
-PEA_main_spec_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "PEA_rf_main_spec_tbl"
-  )
-
-PEA_main_spec_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "PEA_rf_main_spec_tbl_weird_order"
-  )
-
 
 main_spec_output$tidy_summary %>%
-  print(n = 30)
-
-PEA_main_spec_output$tidy_summary %>%
   print(n = 30)
 
 main_spec_output$tidy_summary %>%
   write_csv("temp-data/reducedform-tidy-tes.csv")  
-
-PEA_main_spec_output$tidy_summary %>%
-  write_csv("temp-data/PEA-reducedform-tidy-tes.csv")  
-
 main_spec_output$default_tbl %>%
   custom_save_latex_table(
     table_name = "rf_main_spec_tbl"
@@ -1326,11 +1386,11 @@ main_spec_ols_output = create_regression_output(
   f = main_spec_ols
 )
 
+
 # coefs on main specification interaction terms
-main_fit = feglm(
+main_fit = feols(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county, 
     data = analysis_data,
-    family = binomial(link = "probit"),
     nthreads = 1,
     cluster = ~cluster.id
 )
@@ -1386,7 +1446,7 @@ etable(
 
 # main specification levels
 main_spec_bs_draws = map_dfr(
-  1:(999*5),
+  1:500,
   ~bayes_bs_f(
     seed = .x,
     f = main_spec_regression,
@@ -1452,10 +1512,9 @@ nonlinear_distance_output$different_order_tbl %>%
 
 # discrete distance
 discrete_distance_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + assigned_treatment + assigned_dist_group  + i(assigned_treatment, assigned_dist_group, "control") + standard_cluster.dist.to.pot | county, 
+  feols(
+    dewormed ~ 0 + assigned_treatment + assigned_dist_group  + i(assigned_treatment, assigned_dist_group, "control") | county, 
     data = data,
-    family = binomial(link = "probit"),
     nthreads = 1,
     weights = ~wt
   )
@@ -1480,6 +1539,103 @@ discrete_distance_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_discrete_dist_tbl_weird_order"
   )
+
+cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>%
+  mutate(assigned_dist_group = dist.pot.group) %>%
+  mutate(
+    cluster.id = cluster_id
+  ) %>%
+  mutate(assigned.treatment = factor(assigned.treatment, levels = c("control", "ink", "calendar", "bracelet"))) %>%
+  mutate(assigned_treatment = assigned.treatment)  %>%
+  mutate(wt = 1) %>%
+  mutate(
+      county = factor(county),
+      cluster.id = factor(cluster.id),
+      assigned_treatment = assigned.treatment,
+      assigned_dist_group = dist.pot.group,
+      signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+      signal = factor(signal, levels = c("no signal", "signal"))
+  )
+
+
+l_cov_vars = c(
+  "floor_tile_cement",
+  "female",
+  "have_phone_lgl",
+  "age.census"
+)
+discrete_distance_covs = function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+
+
+
+discrete_distance_covs_output = create_regression_output(
+  data = cov_analysis_data,
+  f = discrete_distance_covs
+)
+
+
+discrete_distance_covs_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-discrete-dist-covs-tidy-tes.csv")  
+
+
+discrete_distance_covs_output$default_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_discrete_dist_covs_tbl"
+  )
+
+discrete_distance_covs_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_discrete_dist_covs_tbl_weird_order"
+  )
+
+discrete_distance_covs_output$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "bra")) %>%
+  select(
+    assigned_treatment, 
+    assigned_dist_group,
+    estimate,
+    pval
+  )
+
+
+## CTS Dist + Covars
+
+cts_distance_covs = function(data, weights) {
+  feols(
+    fml = dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+cts_distance_covs_output = create_regression_output(
+  data = cov_analysis_data,
+  f = cts_distance_covs
+)
+
+cts_distance_covs_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-robustness-cts-dist-covs-tidy-tes.csv")
+
+cts_distance_covs_output$default_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_cts_dist_covs_tbl"
+  )
+
+cts_distance_covs_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_cts_dist_covs_tbl_weird_order"
+  )
+
+
 
 ## HH Dist regression
 hh_spec_regression = function(data, weights) {
@@ -1743,8 +1899,6 @@ know_df %>%
   )
   
   
-  %>%
-  pivot_wider(names_from = dewormed, values_from = prop, names_prefix = "dewormed_") 
 
 
 know_df %>%
@@ -1878,6 +2032,9 @@ discrete_f_know = function(data, weights) {
   )
 }
 
+
+
+
 discrete_fob_output = create_regression_output(
   data = know_df %>%
     filter(belief_type == "1ord"),
@@ -1891,6 +2048,11 @@ discrete_fob_output$tidy_summary %>%
 discrete_fob_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_discrete_fob_spec_tbl_weird_order"
+  )
+
+discrete_fob_output$default_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_discrete_fob_spec_tbl"
   )
 
 ## SOB Main Spec ---------------------------------------------------------------
