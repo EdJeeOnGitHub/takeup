@@ -53,6 +53,10 @@ script_options = docopt::docopt(
                             --robust-lambda
                             --robust-externality
 
+                            --posterior
+                            --static-signal-pm
+                            --static-signal-distance=500
+
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
@@ -149,7 +153,7 @@ recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
 
 
 #' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0) {
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, return_takeup = FALSE) {
     takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     if (params$suppress_reputation) {
         takeup_list$mu_rep = 0
@@ -168,14 +172,19 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
     b = net_b + delta * dist_norm 
     total_error_sd = takeup_list$total_error_sd
 
+    w_bar = (1 - pnorm(v_star/total_error_sd)) * takeup_list$mplus + pnorm(v_star/total_error_sd) * takeup_list$mminus
+
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
     externality_val = externality*abs(params$beta_b_control)
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv) + mu_rep_deriv * w_bar
 
     rhs = lambda * delta / hazard
 
     diff = abs(lhs - rhs)
+    if (return_takeup) {
+        return(list(diff = diff, takeup_list = takeup_list))
+    }
     return(diff)
 }
 
@@ -270,7 +279,7 @@ full_posterior_df = full_posterior_df %>%
 
 
 
-find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star) {
+find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star, return_takeup = FALSE) {
 
     pre_fix_takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     mu_rep_prefix = pre_fix_takeup_list$mu_rep
@@ -297,12 +306,17 @@ find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu
 
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
+    w_bar = (1 - pnorm(v_star/total_error_sd)) * takeup_list$mplus + pnorm(v_star/total_error_sd) * takeup_list$mminus
+
     externality_val = externality*abs(params$beta_b_control)
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv) + mu_rep_deriv * w_bar
 
     rhs = lambda * delta / hazard
-
     diff = abs(lhs - rhs)
+
+    if (return_takeup) {
+        return(list(diff = diff, takeup_list = takeup_list))
+    }
     return(diff)
 }
 
@@ -357,9 +371,29 @@ full_posterior_df = full_posterior_df %>%
     mutate(
         optimal_distance = map_dbl(fit_funs, "par")
     )
+
+
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        opt_output = pmap(
+            list(params, optimal_distance),
+            ~find_optimal_incentive(
+                    distance = ..2, 
+                    lambda = script_options$lambda, 
+                    params = ..1, 
+                    b_add = 0,
+                    mu_add = 0,
+                    externality = as.numeric(script_options$externality),
+                    return_takeup = TRUE
+                )$takeup_list
+
+        ),
+        pred_takeup = map_dbl(opt_output, "pred_takeup")
+    )
+
 # save to csv
 full_posterior_df %>%
-    select(treatment, draw_id,  optimal_distance)  %>%
+    select(treatment, draw_id,  optimal_distance, pred_takeup)  %>%
     write_csv(
     file.path(
         script_options$output_path,
@@ -367,6 +401,16 @@ full_posterior_df %>%
     )
     )
 } # End posterior estimation
+
+
+full_posterior_df %>%
+    group_by(treatment) %>%
+    summarise(
+        mean_optimal_distance = mean(optimal_distance),
+        mean_takeup = mean(pred_takeup)
+    )
+
+stop()
 # Estimate Optimal Distance holding visibility fixed, only vary private incentive
 b_df = expand.grid(
     draw = 1,
