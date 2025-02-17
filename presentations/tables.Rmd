@@ -3900,18 +3900,25 @@ optim_post_df = imap_dfr(
     vstar_type = factor(str_extract(vstar_type, "^[^_]*"))
   )
 
+optim_post_df %>%
+  count(vstar_type)
 
 optim_post_df  %>%
-  select(-contains('static')) %>%
   pivot_wider(
-    names_from = vstar_type, values_from = optimal_distance
+    names_from = vstar_type, values_from = c(optimal_distance, pred_takeup)
   )   %>%
   group_by(treatment) %>%
   summarise(
-    across(c(dynamic, static), median)
+    across(c(contains("dynamic"), contains('static')), mean)
   ) %>%
-  mutate(diff = static - dynamic) %>%
-  mutate(pct_diff = 100*diff/dynamic)
+  mutate(
+    across(contains("distance"), ~round(.x/1000, 2))
+  ) %>%
+  select(treatment, contains("distance"), contains("pred")) %>%
+  mutate(treatment = fct_relevel(treatment, "control", "ink", "calendar", "bracelet"))  %>%
+  arrange(treatment)
+
+
   
   %>%
   mutate(

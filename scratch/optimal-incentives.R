@@ -34,6 +34,7 @@ script_options = docopt::docopt(
         --robust-externality  Estimate across externality grid for posterior median
         --robust-lambda  Estimate across lambda grid for posterior median
         --check-derivative-positive  Verify that dw/dc is positive for parameter values we see        
+        --plot-lhs-rhs   Plot LHS and RHS of a random posterior draw
 
 
     "),
@@ -54,6 +55,7 @@ script_options = docopt::docopt(
                             --robust-externality
 
                             --posterior
+
                             --static-signal-pm
                             --static-signal-distance=500
 
@@ -64,7 +66,6 @@ script_options = docopt::docopt(
 
                             # --static-signal-pm
                             # --static-signal-distance=500
-
 
 set.seed(19484)
 
@@ -183,7 +184,7 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
 
     diff = abs(lhs - rhs)
     if (return_takeup) {
-        return(list(diff = diff, takeup_list = takeup_list))
+        return(list(diff = diff, takeup_list = takeup_list, lhs = lhs, rhs = rhs))
     }
     return(diff)
 }
@@ -198,7 +199,7 @@ treatments = c(
     "bracelet"
 )
 
-if (script_options$posterior) {
+# if (script_options$posterior) {
 # generate grid of posterior draw IDs and treatments
 unique_post_draw_ids = unique(struct_param_draws$.draw) 
 full_posterior_df = expand.grid(
@@ -247,38 +248,6 @@ if (script_options$static_signal_pm == TRUE) {
     full_posterior_df$static_delta_v_star = NA
 }
 
-
-
-# extract params for each posterior draw
-full_posterior_df = full_posterior_df %>%
-    mutate(
-        params = pmap(
-            list(
-                draw_id,
-                treatment
-            ),
-            ~extract_params(
-                param_draws = struct_param_draws,
-                private_benefit_treatment = ..2,
-                visibility_treatment = ..2,
-                draw_id = ..1,
-                dist_sd = sd_of_dist,
-                j_id = 1,
-                rep_cutoff = Inf,
-                dist_cutoff = Inf,
-                bounds = c(-Inf, Inf),
-                mu_rep_type = mu_rep_type,
-                suppress_reputation = FALSE,
-                static_signal = NA,
-                fix_mu_at_1 = FALSE,
-                fix_mu_distance = NULL,
-                static_delta_v_star = NA
-            )
-        )
-    )
-
-
-
 find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star, return_takeup = FALSE) {
 
     pre_fix_takeup_list = recalc_takeup(distance, params, b_add, mu_add)
@@ -315,12 +284,240 @@ find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu
     diff = abs(lhs - rhs)
 
     if (return_takeup) {
-        return(list(diff = diff, takeup_list = takeup_list))
+        return(list(diff = diff, takeup_list = takeup_list, lhs = lhs, rhs = rhs))
     }
     return(diff)
 }
 
 
+if (script_options$plot_lhs_rhs == TRUE) {
+
+# extract params for each posterior draw
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        params = pmap(
+            list(
+                draw_id,
+                treatment
+            ),
+            ~extract_params(
+                param_draws = struct_param_draws,
+                private_benefit_treatment = ..2,
+                visibility_treatment = ..2,
+                draw_id = ..1,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf,
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE,
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+        )
+    )
+dists = seq(0, 3000, length.out = 100)
+
+random_draw_ids = sample(unique(struct_param_draws$.draw), 10) 
+
+post_check_df = full_posterior_df %>%
+    filter(draw_id %in% random_draw_ids) %>%
+    mutate(
+        fn = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                return_takeup = TRUE
+                )
+        ),
+        fn_static = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        fn_lambda_0 = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                return_takeup = TRUE
+                )
+        ),
+        fn_static_lambda_0 = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        fn_ext_0 = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                return_takeup = TRUE
+                )
+        ),
+        fn_static_ext_0 = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        fn_lambda_0_ext_0 = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                return_takeup = TRUE
+                )
+        ),
+        fn_static_lambda_0_ext_0 = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        distances = list(dists),
+        pred_dyn = map2(fn, distances, ~.x(.y)),
+        pred_static = map2(fn_static, distances, ~.x(.y)),
+        pred_lambda_0 = map2(fn_lambda_0, distances, ~.x(.y)),
+        pred_static_lambda_0 = map2(fn_static_lambda_0, distances, ~.x(.y)),
+        pred_ext_0 = map2(fn_ext_0, distances, ~.x(.y)),
+        pred_static_ext_0 = map2(fn_static_ext_0, distances, ~.x(.y)),
+        pred_lambda_0_ext_0 = map2(fn_lambda_0_ext_0, distances, ~.x(.y)),
+        pred_static_lambda_0_ext_0 = map2(fn_static_lambda_0_ext_0, distances, ~.x(.y))
+    )
+
+    
+long_post_check_df = post_check_df     %>%
+    select(draw_id, treatment, distances, contains("pred")) %>%
+    pivot_longer(
+        contains("pred"),
+        names_to = "pred_type",
+        values_to = "pred"
+    ) %>%
+    mutate(
+        pred_diff = map(pred, "diff"),
+        pred_takeup_list = map(pred, "takeup_list"),
+        pred_lhs = map(pred, "lhs"),
+        pred_rhs = map(pred, "rhs"),
+        pred_takeup = map(pred_takeup_list, "pred_takeup")
+    ) %>%
+    select(
+        draw_id, treatment, pred_type, distances, pred_diff, pred_lhs, pred_rhs, pred_takeup
+    ) %>%
+    unnest(c(distances, contains("pred"))) %>%
+    mutate(
+        externality_type = if_else(
+            str_detect(pred_type, "ext_"),
+            "externality zero",
+            "externality present"
+        ),
+        lambda_type = if_else(
+            str_detect(pred_type, "lambda_"),
+            "lambda zero",
+            "lambda present"
+        ),
+        static_type = if_else(
+            str_detect(pred_type, "static"),
+            "static delta v star",
+            "dynamic delta v star"
+        )
+    )  
+
+long_post_check_df %>%
+    filter(draw_id %in% random_draw_ids[[1]])  %>%
+    # filter(treatment == "control") %>%
+    select(
+        treatment, draw_id, pred_type, distances, pred_lhs, pred_rhs, static_type, externality_type, lambda_type
+    ) %>%
+    pivot_longer(
+        c(pred_lhs, pred_rhs),
+        names_to = "lhs_rhs",
+    ) %>%
+    filter(lambda_type == "lambda present") %>%
+    filter(externality_type == "externality present") %>%
+    mutate(
+        lhs_rhs = case_when(
+            lhs_rhs == "pred_lhs" ~ "Social Marginal Benefit",
+            lhs_rhs == "pred_rhs" ~ "Deadweight Loss to Inframarginal"
+        )
+    ) %>%
+    ggplot(aes(
+        x = distances,
+        y = value,
+        colour = lhs_rhs,
+        linetype = static_type
+    )) +
+    geom_line(linewidth = 2) +
+    theme_bw() +
+    facet_wrap(~treatment) +
+    theme(legend.position = "bottom")  +
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist")  +
+    guides(
+        linetype = guide_legend(nrow = 2)
+    ) +
+    labs(
+        linetype = "Delta V Star Type"
+    )
+
+ggsave(
+    "temp-data/Ramsey-LHS-RHS.pdf",
+    width = 10,
+    height = 10
+)
+
+
+}
 
 if (script_options$static_signal_pm) {
     # create anon functions for each param draw
@@ -409,8 +606,6 @@ full_posterior_df %>%
         mean_optimal_distance = mean(optimal_distance),
         mean_takeup = mean(pred_takeup)
     )
-
-stop()
 # Estimate Optimal Distance holding visibility fixed, only vary private incentive
 b_df = expand.grid(
     draw = 1,
