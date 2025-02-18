@@ -1605,7 +1605,43 @@ discrete_distance_covs_output$tidy_summary %>%
     pval
   )
 
+# Discrete Distance LASSO Covs
+discrete_distance_covs_bs_draws = map_dfr(
+  1:500,
+  ~bayes_bs_f(
+    seed = .x,
+    f = discrete_distance_covs,
+    data = cov_analysis_data
+  ),
+  .progress = TRUE
+  )
 
+discrete_distance_covs_levels = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = discrete_distance_covs,
+  data = cov_analysis_data
+) %>%
+  filter(!is.na(assigned_treatment)) 
+
+discrete_distance_covs_levels_ci = discrete_distance_covs_bs_draws %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    conf.low = quantile(mean_pred, 0.025),
+    conf.high = quantile(mean_pred, 0.975)
+  ) %>%
+  filter(!is.na(assigned_treatment))
+
+tidy_discrete_distance_cov_levels = left_join(
+  discrete_distance_covs_levels,
+  discrete_distance_covs_levels_ci,
+  by = c("assigned_treatment", "assigned_dist_group")
+) %>%
+  select(-signal, -seed) %>%
+  rename(estimate = mean_pred)
+tidy_discrete_distance_cov_levels %>%
+  write_csv("temp-data/reducedform-robustness-discrete-dist-covs-tidy-levels.csv")  
+
+stop()
 ## CTS Dist + Covars
 
 cts_distance_covs = function(data, weights) {
