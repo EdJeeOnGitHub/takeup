@@ -1230,8 +1230,13 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
 }
 
 #### Frequentist Estimates ####
-split_analysis_data = split(analysis_data, analysis_data$cluster.id)
-#| freq-estimates
+# load expected distances
+cell_expected_dist_df = read_csv(here::here("data", "cell_expected_dist_df.csv")) %>%
+  rename(cell_expected_dist = dist, assigned_treatment = random_treat, assigned_dist_group = village.dist.cat) 
+cluster_expected_dist_df = read_csv(here::here("data", "cluster_expected_dist.csv")) %>%
+  rename(clust_expected_dist = dist) %>%
+  mutate(cluster.id = factor(cluster.id))
+
 analysis_data = analysis_data %>%
     mutate(
         county = factor(county),
@@ -1240,6 +1245,18 @@ analysis_data = analysis_data %>%
         assigned_dist_group = dist.pot.group,
         signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
         signal = factor(signal, levels = c("no signal", "signal"))
+    ) %>%
+    left_join(
+        cluster_expected_dist_df,
+        by = "cluster.id"
+    ) %>%
+    left_join(
+        cell_expected_dist_df,
+        by = c("assigned_treatment", "assigned_dist_group")
+    ) %>%
+    mutate(
+      standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
+      standard_cell_expected_dist = cell_expected_dist/sd_of_dist
     )
 analysis_data %>%
   write_csv(
@@ -1317,7 +1334,7 @@ p_outlier = outlier_analysis_data %>%
 #   height = 10
 # )
 #### Distance Checks End -------------------------------------------------------
-main_spec_regression = function(data, weights) {
+dist_cts_regression = function(data, weights) {
   feols(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
     data = data,
@@ -1327,68 +1344,33 @@ main_spec_regression = function(data, weights) {
 }
 
 
-main_spec_output = create_regression_output(
+dist_cts_output = create_regression_output(
   data = analysis_data,
-  f = main_spec_regression
+  f = dist_cts_regression
 )
 
-main_spec_output$tidy_summary %>%
+dist_cts_output$tidy_summary %>%
   mutate(across(where(is.numeric), round, 3)) %>%
   print(n = 40) 
 
 
 
-main_spec_output$tidy_summary %>%
+dist_cts_output$tidy_summary %>%
   print(n = 30)
 
-main_spec_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-tidy-tes.csv")  
-main_spec_output$default_tbl %>%
+dist_cts_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-dist-cts-tidy-tes.csv")  
+dist_cts_output$default_tbl %>%
   custom_save_latex_table(
-    table_name = "rf_main_spec_tbl"
+    table_name = "rf_dist_cts_spec_tbl"
   )
 
-main_spec_output$different_order_tbl %>%
+dist_cts_output$different_order_tbl %>%
   custom_save_latex_table(
-    table_name = "rf_main_spec_tbl_weird_order"
+    table_name = "rf_dist_cts_spec_tbl_weird_order"
   )
-
-
-main_spec_ols = function(data, weights) {
-  feols(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-
-main_spec_ols_fit = feols(
-  dewormed ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + cluster.dist.to.pot | county, 
-  data = analysis_data %>%
-    mutate(cluster.dist.to.pot = cluster.dist.to.pot/1000),
-  nthreads = 1,
-  cluster = ~cluster.id
-)
-
-
-main_spec_fit = feglm(
-  dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
-  data = analysis_data,
-  family = "probit",
-  nthreads = 1,
-  cluster = ~cluster.id
-)
-
-main_spec_ols_output = create_regression_output(
-  data = analysis_data,
-  f = main_spec_ols
-)
-
-
-# coefs on main specification interaction terms
-main_fit = feols(
+# coefs on dist cts specification interaction terms
+dist_cts_fit = feols(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county, 
     data = analysis_data,
     nthreads = 1,
@@ -1396,7 +1378,7 @@ main_fit = feols(
 )
 
 etable(
-  main_fit,
+  dist_cts_fit,
   dict = c(
     "assigned_treatment = ink" = "Ink",
     "assigned_treatment = calendar" = "Calendar",
@@ -1415,7 +1397,7 @@ etable(
 
 
 etable(
-  main_fit,
+  dist_cts_fit,
   dict = c(
     "assigned\\_treatment $=$ ink" = "Ink",
     "assigned\\_treatment = calendar" = "Calendar",
@@ -1438,31 +1420,31 @@ etable(
     replace = TRUE,
     file = 
     file.path(
-      params$table_output_path, paste0("main_spec_regression_coefs", ".tex")
+      params$table_output_path, paste0("dist_cts_spec_regression_coefs", ".tex")
     )
   )
 
 
 
 # main specification levels
-main_spec_bs_draws = map_dfr(
+dist_cts_spec_bs_draws = map_dfr(
   1:500,
   ~bayes_bs_f(
     seed = .x,
-    f = main_spec_regression,
+    f = dist_cts_spec_regression,
     data = analysis_data
   ),
   .progress = TRUE
   )
 
-main_spec_levels = actual_bayesian_bs_fit(
+dist_cts_spec_levels = actual_bayesian_bs_fit(
   seed = "realised fit",
-  f = main_spec_regression,
+  f = dist_cts_spec_regression,
   data = analysis_data
 ) %>%
   filter(!is.na(assigned_treatment)) 
 
-main_spec_levels_ci = main_spec_bs_draws %>%
+dist_cts_spec_levels_ci = dist_cts_spec_bs_draws %>%
   group_by(assigned_treatment, assigned_dist_group) %>%
   summarise(
     conf.low = quantile(mean_pred, 0.025),
@@ -1470,15 +1452,49 @@ main_spec_levels_ci = main_spec_bs_draws %>%
   ) %>%
   filter(!is.na(assigned_treatment))
 
-tidy_main_spec_levels = left_join(
-  main_spec_levels,
-  main_spec_levels_ci,
+tidy_dist_cts_spec_levels = left_join(
+  dist_cts_spec_levels,
+  dist_cts_spec_levels_ci,
   by = c("assigned_treatment", "assigned_dist_group")
 ) %>%
   select(-signal, -seed) %>%
   rename(estimate = mean_pred)
-tidy_main_spec_levels %>%
-  write_csv("temp-data/reducedform-tidy-levels.csv")  
+tidy_dist_cts_spec_levels %>%
+  write_csv("temp-data/reducedform-dist-cts-tidy-levels.csv")  
+
+
+
+
+# Recentering using the expected distance
+dist_clust_recent_regression = function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + standard_clust_expected_dist | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+
+dist_clust_recent_output = create_regression_output(
+  data = analysis_data,
+  f = dist_clust_recent_regression
+)
+
+dist_clust_recent_output$tidy_summary %>%
+  write_csv("temp-data/reducedform-clust-recent-dist-tidy-tes.csv")  
+
+
+dist_clust_recent_output$default_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_clust_recent_dist_tbl"
+  )
+
+dist_clust_recent_output$different_order_tbl %>%
+  custom_save_latex_table(
+    table_name = "rf_clust_recent_dist_tbl_weird_order"
+  )
+
 
 # Distance entering with its square
 nonlinear_distance_regression = function(data, weights) {
@@ -1539,7 +1555,7 @@ discrete_distance_output$different_order_tbl %>%
   custom_save_latex_table(
     table_name = "rf_discrete_dist_tbl_weird_order"
   )
-
+## Covariates Added
 cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>%
   mutate(assigned_dist_group = dist.pot.group) %>%
   mutate(
@@ -1555,6 +1571,19 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
       assigned_dist_group = dist.pot.group,
       signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
       signal = factor(signal, levels = c("no signal", "signal"))
+  ) %>%
+  left_join(
+      cluster_expected_dist_df %>%
+        mutate(cluster.id = as.numeric(cluster.id)),
+      by = c("cluster_id" = "cluster.id")
+  ) %>%
+  left_join(
+      cell_expected_dist_df,
+      by = c("assigned_treatment", "assigned_dist_group")
+  ) %>%
+  mutate(
+    standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
+    standard_cell_expected_dist = cell_expected_dist/sd_of_dist
   )
 
 
@@ -1566,7 +1595,7 @@ l_cov_vars = c(
 )
 discrete_distance_covs = function(data, weights) {
   feols(
-    dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] | county,
+    dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars]  | county,
     data = data,
     nthreads = 1,
     weights = ~wt
@@ -1641,12 +1670,11 @@ tidy_discrete_distance_cov_levels = left_join(
 tidy_discrete_distance_cov_levels %>%
   write_csv("temp-data/reducedform-robustness-discrete-dist-covs-tidy-levels.csv")  
 
-stop()
 ## CTS Dist + Covars
 
 cts_distance_covs = function(data, weights) {
   feols(
-    fml = dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+    fml = dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + standard_clust_expected_dist | county, 
     data = data,
     nthreads = 1,
     weights = ~wt

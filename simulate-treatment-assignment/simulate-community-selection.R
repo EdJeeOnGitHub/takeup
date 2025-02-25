@@ -1,4 +1,3 @@
-
 library(here)
 library(tidyverse)
 library(sf)
@@ -14,42 +13,14 @@ rct.targetable.schools <- read_rds(here("data", "rct_targetable_schools_2.0.rds"
 cluster.survey.data <- read_rds(here("data", "takeup_cluster_survey.rds"))
 
 
+simmed_cluster_selection = read_rds(here("data", "simmed_rct_clusters.rds"))
+
+
 rct.schools.data = read_rds(here("data", "takeup_rct_schools.rds")) %>%
   st_as_sf(wgs.84) %>%
   mutate(lon = st_coordinates(.)[,1], lat = st_coordinates(.)[,2])
 
 
-
-clusters.to.drop <- c("99", "691", "892", "1293", "239") %>% # Problems with clusters at cluster survey stage; dropped from study
-  c("201", "853", "1402") # These are are study cluster that are no longer valid based on distance to other PoT
-
-rct.cluster.selection %<>% magrittr::extract(!.$cluster.id %in% clusters.to.drop, )
-
-rct.cluster.selection@data %<>% left_join(rct.schools.data %>% 
-                                            select(cluster.id, lon, lat)) %>% 
-  rename(pot.lon = lon, pot.lat = lat)
-
-rct.cluster.selection %<>% 
-  `@`(data) %>% 
-  left_join(cluster.survey.data %>% 
-              distinct(cluster.id, found, num.valid.villages, gpslatitude, gpslongitude, gps2latitude, gps2longitude) %>% 
-              filter(!duplicated(cluster.id)),
-            by = "cluster.id") %>% 
-  mutate(alt.pot.lat = gps2latitude,
-         alt.pot.lon = gps2longitude,
-         pot.lat = ifelse(!is.na(gpslatitude), #& found %in% c("Found", "Name Changed"), 
-                          gpslatitude, 
-                          ifelse(!is.na(gps2latitude), #& found %in% c("Closed", "Not Found"), 
-                                 alt.pot.lat, 
-                                 pot.lat)),
-         pot.lon = ifelse(!is.na(gpslongitude), #& found %in% c("Found", "Name Changed"), 
-                          gpslongitude, 
-                          ifelse(!is.na(gps2longitude), #& found %in% c("Closed", "Not Found"), 
-                                 alt.pot.lon, 
-                                 pot.lon))) %>%
-  as.data.frame %>%
-  st_as_sf(coords = c("pot.lon", "pot.lat"), crs = wgs.84) %>% 
-  st_transform(kenya.proj4)
 
 #' Create Village Dist Matrix
 #'
@@ -99,122 +70,6 @@ create_village_dist_mat = function(cluster_villages, rct_cluster_selection) {
 }
 
 
-cluster_survey_data_dm = cluster.survey.data %>%
-  filter(!is.na(target.lat), !is.na(target.lon))  %>%
-  arrange(cluster.id, target.village.id) %>%
-  group_by(cluster.id)  %>%
-  group_nest() %>%
-  mutate(
-    data = map2(data, cluster.id, ~mutate(.x, cluster.id = .y)),
-    dist_mat = map(data, ~ create_village_dist_mat(.x, rct.cluster.selection))
-  ) 
-
-clust_survey_matched_dm = cluster_survey_data_dm %>%
-  mutate(
-    output_data = map2(
-      data,
-      dist_mat,
-      ~ left_join(.x, .y, by = c("cluster.id", "target.village.id"))
-    )
-  ) %>%
-  select(-cluster.id) %>%
-  unnest(output_data) %>%
-  select(-data, -dist_mat) %>%
-  mutate(
-    dist.to.pot = dist.to.pot.x,
-    valid.target.village = valid.target.village.x
-    ) %>%
-  select(-dist.to.pot.x, -dist.to.pot.y, -valid.target.village.x, -valid.target.village.y) 
-
-
-clust_survey_matched_dm_school = clust_survey_matched_dm %>%
-  left_join(
-    .,
-    rct.targetable.schools %>%
-      filter(selected.targeted == TRUE) %>%
-      select(
-        selected.targeted,
-        pot.cluster.id,
-        cluster.dist.cat
-      ),
-      by = c("cluster.id" = "pot.cluster.id")
-  ) %>%
-  group_by(cluster.id)  %>%
-  {
-    if (first(.$village.dist.cat) == "far") arrange(., desc(dist.to.pot)) else arrange(., dist.to.pot)
-  } %>% 
-  filter(!duplicated(target.village_name))  %>%
-  ungroup() %>%
-  mutate(
-    target.actual.village.dist.cat = ifelse(dist.to.pot <= (2500/2), "close", "far"),
-    target.valid.dist.to.pot = target.actual.village.dist.cat == village.dist.cat,
-    target.in.range = dist.to.pot <= 2500,
-    dist.switchable = !target.valid.dist.to.pot & valid.target.village,
-    valid.target.village = valid.target.village & target.in.range, 
-    target.village.pop.size = ifelse(target.pop_households <= median(target.pop_households, na.rm = TRUE), "small", "big")
-    )  %>%
-  filter(!is.na(target.village.pop.size)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster.pop.size.strata = unique(target.village.pop.size) %>% { ifelse(length(.) == 2, "mixed", .) },
-         actual.cluster.dist.cat = unique(target.actual.village.dist.cat) %>% { ifelse(length(.) == 2, "mixed", .) }) %>% 
-  ungroup()
-
-
-rct_clean_clust = clust_survey_matched_dm_school %>%
-  select(-dist.switchable) %>%
-  left_join(
-    clust_survey_matched_dm_school %>% 
-      mutate(backup.cluster = FALSE) %>% # cluster.id %in% rct.backup.clusters$cluster.id) %>% 
-      group_by(cluster.id, backup.cluster, cluster.pop.size.strata, actual.cluster.dist.cat) %>% 
-      summarize(any.buffer.valid.village = any(valid.target.village),
-                dist.switchable = any(dist.switchable)) %>% 
-      ungroup,
-    by = "cluster.id"
-  ) %>%
-  left_join(
-    rct.targetable.schools %>%
-      filter(selected.targeted == TRUE) %>%
-      select(pot.cluster.id, village.dist.cat, cluster.dist.cat),
-    by = c("cluster.id" = "pot.cluster.id")
-  ) %>%
-  mutate(village.dist.cat = village.dist.cat.x) %>%
-  select(-village.dist.cat.x, -village.dist.cat.y)  %>%
-  mutate(
-    village.dist.cat = ifelse(dist.switchable & !backup.cluster, ifelse(village.dist.cat == "close", "far", "close"), village.dist.cat),
-    any.buffer.valid.village = (dist.switchable & !backup.cluster) | any.buffer.valid.village
-  ) 
-
-
-
-# Display RCT clusters ----------------------------------------------------
- 
-rct.cluster.selection %>%
-  filter(!any.buffer.valid.village) %>%
-  select(cluster.id, cluster.group) %>%
-  left_join(cluster.survey.data) %>%
-  select(cluster.id, matches("valid"), bracelet.airtime, control.ink, dist.to.pot, village.dist.cat, cluster.group, dist.switchable)
-
-# Village selection -------------------------------------------------------
-
-
-rct_clean_clust %>% 
-  filter(valid.target.village, cluster.id %in% rct.cluster.selection$cluster.id)  %>%
-  group_by(cluster.id) %>%
-  sample_n(1) %>%
-  ungroup() %>%
-  select(
-    cluster.id, target.village.id, dist.to.pot
-  )
-
-cluster.survey.data %>% 
-  filter(valid.target.village, cluster.id %in% rct.cluster.selection$cluster.id)  %>%
-  group_by(cluster.id) %>%
-  sample_n(1) %>%
-  ungroup() %>%
-  select(
-    cluster.id, target.village.id, dist.to.pot
-  )
-
 randomize_village_targeting = function(seed, cluster_survey_data, rct_cluster_selection) {
   set.seed(seed)
   cluster_survey_data %>%
@@ -242,33 +97,144 @@ randomize_village_targeting = function(seed, cluster_survey_data, rct_cluster_se
     )
 }
 
-seeds = 1:100
+randomize_village_targeting(2, cluster.survey.data, rct.cluster.selection)
+randomize_village_targeting(2, cluster.survey.data, simmed_cluster_selection[[2]])
 
-sim_df = map_dfr(
-  seeds,
-  ~ randomize_village_targeting(.x, rct_clean_clust, rct.cluster.selection),
-  .id = "seed"
+cluster_seeds = 1:100
+pot_seeds = 1:length(simmed_cluster_selection)
+
+seed_grid = expand.grid(cluster_seeds, pot_seeds) %>%
+    as_tibble()
+
+library(furrr)
+plan(multicore)
+sim_df = future_map2_dfr(
+    seed_grid$Var1,
+    seed_grid$Var2,
+    ~ randomize_village_targeting(.x, cluster.survey.data, simmed_cluster_selection[[.y]]) %>%
+        mutate(
+            cluster_seed = .x,
+            pot_seed = .y
+        ),
+    .options = furrr_options(seed = TRUE),
+    .progress = TRUE
 )
 
+cell_expected_dist_df = sim_df %>%
+    group_by(
+        random_treat,
+        village.dist.cat
+    ) %>%
+    summarise(
+        dist = mean(dist.to.pot)
+    )  %>%
+    ungroup() 
 
-sim_df %>%
-  ggplot(aes(
-    x = dist.to.pot,
-    fill = village.dist.cat
-  )) +
-  geom_density(alpha = 0.5) +
-  facet_wrap(~random_treat)
+cell_expected_dist_df %>%
+    write_csv(
+        here::here("data", "cell_expected_dist_df.csv")
+    )
 
-old_sim_df = map_dfr(
-  seeds,
-  ~ randomize_village_targeting(.x, cluster.survey.data, rct.cluster.selection),
-  .id = "seed"
-)
 
-sim_df
+cluster_expected_dist = sim_df %>%
+    group_by(
+        cluster.id
+    ) %>%
+    summarise(
+        dist = mean(dist.to.pot)
+    )  
 
-sim_df
-old_sim_df
+cluster_expected_dist %>%
+    write_csv(
+        here::here("data", "cluster_expected_dist.csv")
+    )
 
-rct_clean_clust %>%
-  select(contains('assign'))
+
+
+load(file.path("data", "analysis.RData"))
+
+standardize <- as_mapper(~ (.) / sd(.))
+unstandardize <- function(standardized, original) standardized * sd(original)
+
+
+
+
+monitored_nosms_data <- analysis.data %>% 
+  filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+analysis_data <- monitored_nosms_data
+
+summ_analysis_data = analysis_data %>%
+    group_by(
+        assigned.treatment,
+        dist.pot.group
+    ) %>%
+    summarise(
+        dist = mean(cluster.dist.to.pot)
+    ) %>%
+    rename(
+        village.dist.cat = dist.pot.group,
+        random_treat = assigned.treatment
+    ) %>% 
+    ungroup() %>%
+    mutate(
+        across(c(village.dist.cat, random_treat), str_to_title)
+    ) %>%
+    mutate(
+        village.dist.cat = factor(village.dist.cat, levels = c("Close", "Far")),
+        random_treat = factor(random_treat, levels = c("Control", "Ink", "Calendar", "Bracelet"))
+    )
+
+summ_sim_df = sim_df %>%
+    group_by(
+        cluster_seed,
+        pot_seed,
+        random_treat,
+        village.dist.cat
+    ) %>%
+    summarise(
+        dist = mean(dist.to.pot)
+    ) %>%
+    ungroup() %>%
+    mutate(
+        across(c(village.dist.cat, random_treat), str_to_title)
+    ) %>%
+    mutate(
+        village.dist.cat = factor(village.dist.cat, levels = c("Close", "Far")),
+        random_treat = factor(random_treat, levels = c("Control", "Ink", "Calendar", "Bracelet"))
+    )
+
+summ_sim_df %>%
+    ggplot(aes(
+        x = dist/1000,
+        fill = village.dist.cat
+    )) +
+    facet_wrap(~random_treat) +
+    geom_density(alpha = 0.5) +
+    geom_vline(
+        data = summ_analysis_data,
+        aes(xintercept = dist/1000),
+        linetype = "dashed"
+    ) +
+    theme_bw() +
+    theme(
+        legend.position = "bottom"
+    ) +
+    ggthemes::scale_fill_canva(
+        "",
+        palette = "Primary colors with a vibrant twist"
+    ) +
+    labs(
+        x = "Distribution of Average Distance to PoT (km)",
+        y = "Density",
+        caption = "Average distance in realised experimental sample shown by dashed line."
+    )
+ggsave("temp-plots/simulated-dist-to-pot.pdf", width = 8, height = 6)
