@@ -10,8 +10,24 @@ kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
 # Identify valid target villages and clusters -----------------------------
 rct.cluster.selection <- read_rds(here("data", "rct_cluster_selection_2.0.rds"))
 rct.targetable.schools <- read_rds(here("data", "rct_targetable_schools_2.0.rds"))
-cluster.survey.data <- read_rds(here("data", "takeup_cluster_survey.rds"))
+rct_village_df = read_rds(here("data", "rct_target_villages_2.0.rds"))
+# in rct_village_df, cluster.id and target.village.id tells us which were 
+# actually selected from cluster.survey.data
+rct_village_df = rct_village_df %>%
+  mutate(
+    ed_village_id = paste0(cluster.id, "_", target.village.id)
+  )
 
+rct_village_cw_df = rct_village_df %>%
+  select(cluster.id, ed_village_id) %>%
+  unique()
+
+
+cluster.survey.data <- read_rds(here("data", "takeup_cluster_survey.rds"))
+cluster.survey.data = cluster.survey.data %>%
+  mutate(
+    ed_village_id = paste0(cluster.id, "_", target.village.id)
+  )
 
 simmed_cluster_selection = read_rds(here("data", "simmed_rct_clusters.rds"))
 
@@ -37,38 +53,88 @@ create_village_dist_mat = function(cluster_villages, rct_cluster_selection) {
     villages_sf
   ) %>%
     units::drop_units()  %>%
-    set_colnames(cluster_villages$target.village.id) %>%
+    set_colnames(cluster_villages$ed_village_id) %>%
     as_tibble() %>%
     mutate(
       dist.from.cluster.id = rct_cluster_selection$cluster.id,
-      cluster.id = cluster_villages$cluster.id[1],
       cluster.group = rct_cluster_selection$cluster.group
     )
+
+
   long_dist_mat = dist_mat %>%
-    tidyr::gather(target.village.id, dist, -c(dist.from.cluster.id, cluster.id, cluster.group))
+    tidyr::gather(target.village.id, dist, -c(dist.from.cluster.id, cluster.group)) 
+    
+  sub_dist_mat = long_dist_mat %>%
+    filter(dist <= 2500) %>%
+    filter(dist != 0)
 
-  comb_long_dist_mat = left_join(
-    long_dist_mat,
-    long_dist_mat %>%
-      select(dist.from.cluster.id, target.village.id, dist),
-    by = c("cluster.id" = "dist.from.cluster.id", "target.village.id"),
-    suffix = c(".to.other.pot", ".to.pot")
-  ) %>%
-    filter(dist.from.cluster.id != cluster.id) %>% 
-    select(-dist.from.cluster.id) %>% 
-    group_by(target.village.id, cluster.group) %>% 
-    filter(row_number(dist.to.other.pot) == 1)  %>%
-    ungroup() 
-
-  wide_comb_dist_mat = comb_long_dist_mat %>%
-    spread(cluster.group, dist.to.other.pot) %>%
-    mutate(
-      valid.target.village = bracelet.airtime >= 3860 & control.ink >= 3000,
-      target.village.id = as.integer(target.village.id)
-    )
-  return(wide_comb_dist_mat)
+  return(sub_dist_mat)
 }
 
+rerandomize_village_targeting = function(seed, village_dist_mat, rct_cluster_selection) {
+  set.seed(seed)
+  rct_cluster_selection = rct_cluster_selection %>%
+    as_tibble() %>%
+    select(
+      cluster.id
+    ) %>%
+    left_join(
+      village_dist_mat,
+      by = c("cluster.id" = "dist.from.cluster.id")
+    )
+
+  rct_cluster_selection = rct_cluster_selection %>%
+    mutate(
+      vill_dist_cat = case_when(
+        dist <= 1250 ~ "close",
+        dist > 1250 ~ "far"
+      )
+    ) %>%
+    group_by(cluster.id) %>%
+    mutate(
+      random_dist_group = sample(c("close", "far"), 1),
+      random_treat = case_when(
+        cluster.group == "control.ink" ~ sample(c("control", "ink"), 1),
+        cluster.group == "bracelet.airtime" ~ sample(c("bracelet", "calendar"), 1)
+      ),
+      no_dist_group_match = all(vill_dist_cat != random_dist_group)
+    ) 
+
+    match_treat_df = rct_cluster_selection %>%
+      group_by(cluster.id) %>%
+      filter(no_dist_group_match == FALSE) %>%
+      filter(random_dist_group == vill_dist_cat) %>%
+      sample_n(1)
+
+    nonmatch_close_treat_df = rct_cluster_selection %>%
+      filter(no_dist_group_match == TRUE) %>%
+      filter(
+        random_dist_group == "close"
+      ) %>%
+      group_by(cluster.id) %>%
+      filter(
+        dist == min(dist)
+      )
+
+      nonmatch_far_treat_df = rct_cluster_selection %>%
+        filter(no_dist_group_match == TRUE) %>%
+        filter(
+          random_dist_group == "far"
+        ) %>%
+        group_by(cluster.id) %>%
+        filter(
+          dist == max(dist)
+        )
+    
+    treat_df = bind_rows(
+      match_treat_df,
+      nonmatch_close_treat_df,
+      nonmatch_far_treat_df
+    ) %>%
+    ungroup() %>%
+    select(-vill_dist_cat)
+    return(treat_df)
+} 
 
 randomize_village_targeting = function(seed, cluster_survey_data, rct_cluster_selection) {
   set.seed(seed)
@@ -97,36 +163,68 @@ randomize_village_targeting = function(seed, cluster_survey_data, rct_cluster_se
     )
 }
 
-randomize_village_targeting(2, cluster.survey.data, rct.cluster.selection)
-randomize_village_targeting(2, cluster.survey.data, simmed_cluster_selection[[2]])
 
-cluster_seeds = 1:100
+sim_int = 10
+rct_pots = rct.cluster.selection %>%
+  as_tibble() %>%
+  pull(cluster.id)
+
+sim_pots = simmed_cluster_selection[[sim_int]] %>%
+  as_tibble() %>%
+  pull(cluster.id)
+
+setdiff(sim_pots, rct_pots)
+
+sim_dist_mat = create_village_dist_mat(
+    cluster.survey.data,
+    simmed_cluster_selection[[sim_int]]
+)
+
+rerandomize_village_targeting(sim_int, sim_dist_mat, simmed_cluster_selection[[sim_int]])
+
+sim_dist_mats = map(simmed_cluster_selection, ~ create_village_dist_mat(cluster.survey.data, .x))
+
+
+
 pot_seeds = 1:length(simmed_cluster_selection)
+vill_seeds = 1:100
 
-seed_grid = expand.grid(cluster_seeds, pot_seeds) %>%
-    as_tibble()
+seed_grid = expand.grid(pot_seed = pot_seeds, vill_seed =  vill_seeds) %>%
+    as_tibble() 
 
 library(furrr)
 plan(multicore)
 sim_df = future_map2_dfr(
-    seed_grid$Var1,
-    seed_grid$Var2,
-    ~ randomize_village_targeting(.x, cluster.survey.data, simmed_cluster_selection[[.y]]) %>%
+    seed_grid$pot_seed,
+    seed_grid$vill_seed,
+    ~ rerandomize_village_targeting(.y, sim_dist_mats[[.x]], simmed_cluster_selection[[.x]]) %>%
         mutate(
-            cluster_seed = .x,
-            pot_seed = .y
+            pot_seed = .x,
+            vill_seed = .y
         ),
     .options = furrr_options(seed = TRUE),
     .progress = TRUE
 )
+sim_df = sim_df %>%
+  rename(
+    pot.cluster.id = cluster.id
+  )
 
-cell_expected_dist_df = sim_df %>%
+clean_sim_df = sim_df %>%
+  left_join(
+    rct_village_cw_df,
+    by = c("target.village.id" = "ed_village_id")
+  )
+
+clean_sim_df
+
+cell_expected_dist_df = clean_sim_df %>%
     group_by(
         random_treat,
-        village.dist.cat
+        random_dist_group
     ) %>%
     summarise(
-        dist = mean(dist.to.pot)
+        dist = mean(dist)
     )  %>%
     ungroup() 
 
@@ -136,13 +234,14 @@ cell_expected_dist_df %>%
     )
 
 
-cluster_expected_dist = sim_df %>%
+cluster_expected_dist = clean_sim_df %>%
     group_by(
         cluster.id
     ) %>%
     summarise(
-        dist = mean(dist.to.pot)
+        dist = mean(dist)
     )  
+
 
 cluster_expected_dist %>%
     write_csv(
@@ -150,6 +249,18 @@ cluster_expected_dist %>%
     )
 
 
+summ_cluster_expected_dist = clean_sim_df %>%
+  group_by(cluster.id, random_dist_group) %>%
+  summarise(
+    dist = mean(dist),
+    pct_no_match = mean(no_dist_group_match)
+  ) 
+
+
+summ_cluster_expected_dist %>%
+  write_csv(
+    here::here("data", "summ_cluster_expected_dist.csv")
+  )
 
 load(file.path("data", "analysis.RData"))
 
@@ -181,41 +292,41 @@ summ_analysis_data = analysis_data %>%
         dist = mean(cluster.dist.to.pot)
     ) %>%
     rename(
-        village.dist.cat = dist.pot.group,
+        random_dist_group = dist.pot.group,
         random_treat = assigned.treatment
     ) %>% 
     ungroup() %>%
     mutate(
-        across(c(village.dist.cat, random_treat), str_to_title)
+        across(c(random_dist_group, random_treat), str_to_title)
     ) %>%
     mutate(
-        village.dist.cat = factor(village.dist.cat, levels = c("Close", "Far")),
+        random_dist_group = factor(random_dist_group, levels = c("Close", "Far")),
         random_treat = factor(random_treat, levels = c("Control", "Ink", "Calendar", "Bracelet"))
     )
 
-summ_sim_df = sim_df %>%
+summ_sim_df = clean_sim_df %>%
     group_by(
-        cluster_seed,
+        vill_seed,
         pot_seed,
         random_treat,
-        village.dist.cat
+        random_dist_group
     ) %>%
     summarise(
-        dist = mean(dist.to.pot)
+        dist = mean(dist)
     ) %>%
     ungroup() %>%
     mutate(
-        across(c(village.dist.cat, random_treat), str_to_title)
+        across(c(random_dist_group, random_treat), str_to_title)
     ) %>%
     mutate(
-        village.dist.cat = factor(village.dist.cat, levels = c("Close", "Far")),
+        random_dist_group = factor(random_dist_group, levels = c("Close", "Far")),
         random_treat = factor(random_treat, levels = c("Control", "Ink", "Calendar", "Bracelet"))
     )
 
 summ_sim_df %>%
     ggplot(aes(
         x = dist/1000,
-        fill = village.dist.cat
+        fill = random_dist_group
     )) +
     facet_wrap(~random_treat) +
     geom_density(alpha = 0.5) +
