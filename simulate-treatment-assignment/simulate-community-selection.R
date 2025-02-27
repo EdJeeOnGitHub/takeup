@@ -210,13 +210,17 @@ sim_df = sim_df %>%
     pot.cluster.id = cluster.id
   )
 
+
 clean_sim_df = sim_df %>%
   left_join(
     rct_village_cw_df,
     by = c("target.village.id" = "ed_village_id")
   )
 
-clean_sim_df
+clean_sim_df %>%
+    write_csv(
+        here::here("data", "simulated-counterfactual-treatment-assignment.csv")
+    )
 
 cell_expected_dist_df = clean_sim_df %>%
     group_by(
@@ -349,3 +353,128 @@ summ_sim_df %>%
         caption = "Average distance in realised experimental sample shown by dashed line."
     )
 ggsave("temp-plots/simulated-dist-to-pot.pdf", width = 8, height = 6)
+
+library(tidyverse)
+
+cluster_expected_dist = read_csv(
+        here::here("data", "cluster_expected_dist.csv")
+    )
+
+
+cluster_ids_in_rct =  clean_sim_df %>%
+  filter(!is.na(cluster.id)) %>%
+  pull(cluster.id) %>%
+  unique()
+
+clean_sim_df %>%
+  group_by(cluster.id) %>%
+  filter(
+    cluster.id %in% cluster_ids_in_rct[1:5]
+  ) %>%
+  ggplot(aes(
+    x = dist/1000
+  )) +
+  geom_histogram(bins = 20)  +
+  facet_wrap(~cluster.id)
+
+analysis_data %>%
+  select(contains('dist')) %>%
+  colnames()
+
+clean_sim_df_treat = clean_sim_df %>%
+  left_join(
+    analysis_data %>%
+      select(
+        cluster.id,
+        assigned_dist_group = dist.pot.group
+      ) %>%
+      mutate(cluster.id = as.character(cluster.id)) %>%
+      unique(),
+    by = "cluster.id"
+  ) %>%
+  mutate(
+    assigned_dist_group = fct_na_value_to_level(assigned_dist_group, "Backup/Unassigned Cluster"),
+    assigned_dist_group = fct_recode(assigned_dist_group, "Assigned Close" = "close", "Assigned Far" = "far")
+  )
+
+library(ggridges)
+
+p_assignment_density = clean_sim_df_treat %>%
+  group_by(
+    assigned_dist_group
+  ) %>%
+  ggplot(aes(
+    x = dist/1000,
+    fill = assigned_dist_group,
+    y = assigned_dist_group
+  )) +
+  geom_density_ridges(alpha = 0.5)  +
+  theme_ridges() +
+  theme(
+    legend.position = "bottom"
+  )  +
+  labs(
+    x = "Distance to PoT (km)",
+    y = "Counterfactual Assignment Density",
+    fill = "Experimental Assignment"
+  )
+
+ggsave(
+  plot = p_assignment_density,
+  filename = here::here("temp-plots", "counterfactual-assignment-density.pdf"),
+  width = 8,
+  height = 6
+)
+
+p_assignment_density_all = clean_sim_df_treat %>%
+  filter(assigned_dist_group != "Backup/Unassigned Cluster") %>%
+  group_by(
+    assigned_dist_group
+  ) %>%
+  ggplot(aes(
+    x = dist/1000,
+    fill = assigned_dist_group,
+    y = assigned_dist_group
+  )) +
+  geom_density_ridges(alpha = 0.5)  +
+  theme_ridges() +
+  theme(
+    legend.position = "bottom"
+  )  +
+  labs(
+    x = "Distance to PoT (km)",
+    y = "Counterfactual Assignment Density",
+    fill = "Experimental Assignment"
+  )
+
+ggsave(
+  plot = p_assignment_density_all,
+  filename = here::here("temp-plots", "counterfactual-assignment-density-close-far.pdf"),
+  width = 8,
+  height = 6
+)
+
+
+summ_test_df = clean_sim_df_treat %>%
+  group_by(cluster.id, assigned_dist_group) %>%
+  summarise(
+    mean_dist = mean(dist)
+  ) %>%
+  ungroup()
+
+summ_ks_test = ks.test(
+  summ_test_df %>%
+    filter(assigned_dist_group == "Assigned Far") %>%
+    pull(mean_dist),
+  summ_test_df %>%
+    filter(assigned_dist_group == "Assigned Close") %>%
+    pull(mean_dist)
+)
+
+broom::tidy(summ_ks_test) %>%
+  mutate(
+    interpretation = "p-value < 0.05 would suggest that the two vectors are not the same (i.e. drawn from different distributions)"
+  ) %>%
+  write_csv(
+    here::here("data", "counterfactual-treatment-assignment-ks-test.csv")
+  )
