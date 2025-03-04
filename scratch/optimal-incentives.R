@@ -40,9 +40,9 @@ script_options = docopt::docopt(
     "),
     args = if (interactive()) "
                             86
-                            control
-                            control
-                            --output-name=ramsey-control-mu-control-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            bracelet
+                            bracelet
+                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
@@ -54,10 +54,6 @@ script_options = docopt::docopt(
                             --robust-lambda
                             --robust-externality
 
-                            --posterior
-
-                            --static-signal-pm
-                            --static-signal-distance=500
 
                               " 
            else commandArgs(trailingOnly = TRUE)
@@ -199,7 +195,7 @@ treatments = c(
     "bracelet"
 )
 
-# if (script_options$posterior) {
+if (script_options$posterior) {
 # generate grid of posterior draw IDs and treatments
 unique_post_draw_ids = unique(struct_param_draws$.draw) 
 full_posterior_df = expand.grid(
@@ -600,12 +596,97 @@ full_posterior_df %>%
 } # End posterior estimation
 
 
-full_posterior_df %>%
-    group_by(treatment) %>%
-    summarise(
-        mean_optimal_distance = mean(optimal_distance),
-        mean_takeup = mean(pred_takeup)
+range_df = expand.grid(
+    draw = 1,
+    lambda = script_options$lambda,
+    b_add = seq(from = -3, to = 3, length.out = 50)
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(lambda, b_add))
+
+range_df = range_df %>%
+    mutate(
+        params_vis = map(draw, ~extract_params(
+            param_draws = posterior_mean_draw,
+            private_benefit_treatment = script_options$private_benefit_z,
+            visibility_treatment = script_options$visibility_z,
+            draw_id = .x,
+            dist_sd = sd_of_dist,
+            j_id = 1,
+            rep_cutoff = Inf,
+            dist_cutoff = Inf, 
+            bounds = c(-Inf, Inf),
+            mu_rep_type = mu_rep_type,
+            suppress_reputation = FALSE, 
+            static_signal = NA,
+            fix_mu_at_1 = FALSE,
+            fix_mu_distance = NULL,
+            static_delta_v_star = NA
+        ))
+    ) %>%
+    unnest(data) %>%
+    mutate(
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add
+            ),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = ..1, 
+                params = ..2, 
+                b_add = ..3,
+                externality = externality
+                )
+        )
     )
+
+
+range_df = range_df %>%
+    mutate(
+        fit_vis = map(
+            funs_vis,
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000),
+            .progress = TRUE
+        ),
+    )
+
+range_df = range_df %>%
+    mutate(
+        res_vis = map_dbl(fit_vis, "par"),
+        takeup_list = pmap(
+            list(
+                res_vis,
+                params_vis,
+                b_add
+            ),
+            ~recalc_takeup(distance = ..1, params = ..2, b_add = ..3, mu_add = 0)
+        )
+        ) %>%
+    mutate(
+        pred_takeup = map_dbl(
+            takeup_list, 
+            "pred_takeup"
+            )
+    )
+
+range_df %>%
+    select(
+        lambda, b_add, params_vis, res_vis
+    ) %>%
+    mutate(
+        ed = map2_dbl(
+            b_add,
+            params_vis, 
+            ~analytical_delta(-.x, .y$total_error_sd)
+            )
+    )
+    
+    
+range_df %>% select(b_add, res_vis, pred_takeup) %>%
+    mutate(pred_takeup = pred_takeup * 100)
+
 # Estimate Optimal Distance holding visibility fixed, only vary private incentive
 b_df = expand.grid(
     draw = 1,
@@ -614,6 +695,7 @@ b_df = expand.grid(
 ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add))
+
 b_df = b_df %>%
     mutate(
         params_vis = map(
@@ -1068,7 +1150,7 @@ p_contour = b_mu_df %>%
     )
 
 p_contour
-
+stop()
 ggsave(
     p_contour,
     filename = file.path(

@@ -3519,7 +3519,7 @@ pref_fit_table_pp = fixest::etable(
     "pref_cal" = "Prefer calendar"
   ),
   tex = TRUE,
-  depvar = FALSE,
+  depvar = TRUE,
   # title = "Preference for Calendar Gift Across Distance",
   style.tex = fixest::style.tex("aer"),
   file = "presentations/tables/pref-cal-gift.tex",
@@ -3543,7 +3543,7 @@ pref_fit_table_no_pp = fixest::etable(
     "pref_cal" = "Prefer calendar"
   ),
   tex = TRUE,
-  depvar = FALSE,
+  depvar = TRUE,
   title = "Preference for Calendar Gift Across Distance",
   headers = header,
   style.tex = fixest::style.tex("aer")

@@ -3454,6 +3454,25 @@ discrete_dist_lasso_fit %>%
 
 ```
 
+```{r}
+#| freq-rf-ates-recent,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Recentered",
+#| fig.width = 8, fig.height = 6
+
+recent_rf_te = read_csv("temp-data/reducedform-clust-recent-dist-tidy-tes.csv")
+
+recent_rf_te %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results()  %>%
+  plot_freq_rf_ates()
+
+
+
+```
+
 
 ```{r}
 #| freq-rf-tes-discrete-plot,

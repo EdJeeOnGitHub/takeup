@@ -13,9 +13,9 @@ Options:
 
   "), 
   args = if (interactive()) "
-  001
+  95
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
   1 2 
   " else commandArgs(trailingOnly = TRUE)
 )

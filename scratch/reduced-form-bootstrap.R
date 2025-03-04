@@ -1232,10 +1232,11 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
 #### Frequentist Estimates ####
 # load expected distances
 cell_expected_dist_df = read_csv(here::here("data", "cell_expected_dist_df.csv")) %>%
-  rename(cell_expected_dist = dist, assigned_treatment = random_treat, assigned_dist_group = village.dist.cat) 
+  rename(cell_expected_dist = dist, assigned_treatment = random_treat, assigned_dist_group = random_dist_group) 
 cluster_expected_dist_df = read_csv(here::here("data", "cluster_expected_dist.csv")) %>%
   rename(clust_expected_dist = dist) %>%
   mutate(cluster.id = factor(cluster.id))
+
 
 analysis_data = analysis_data %>%
     mutate(
@@ -1498,14 +1499,20 @@ dist_clust_recent_output$different_order_tbl %>%
 
 # Distance entering with its square
 nonlinear_distance_regression = function(data, weights) {
-  feglm(
+  feols(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + standard_cluster.dist.to.pot^2 + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + i(assigned_treatment, standard_cluster.dist.to.pot^2, "control") | county, 
     data = data,
-    family = binomial(link = "probit"),
     nthreads = 1,
     weights = ~wt
   )
 }
+
+feols(
+    dewormed ~ 0 + i(assigned_treatment, "control") + standard_cluster.dist.to.pot + standard_cluster.dist.to.pot^2 + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + i(assigned_treatment, standard_cluster.dist.to.pot^2, "control")  | county, 
+    data = analysis_data,
+    cluster = ~cluster.id
+) %>%
+  tidy()
 
 nonlinear_distance_output = create_regression_output(
   data = analysis_data,
