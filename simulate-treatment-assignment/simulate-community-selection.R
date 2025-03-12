@@ -425,6 +425,9 @@ ggsave(
   width = 8,
   height = 6
 )
+stop()
+
+
 
 p_assignment_density_all = clean_sim_df_treat %>%
   filter(assigned_dist_group != "Backup/Unassigned Cluster") %>%
@@ -450,6 +453,31 @@ p_assignment_density_all = clean_sim_df_treat %>%
 ggsave(
   plot = p_assignment_density_all,
   filename = here::here("temp-plots", "counterfactual-assignment-density-close-far.pdf"),
+  width = 8,
+  height = 6
+)
+
+p_assignment_density_dens = clean_sim_df_treat %>%
+  filter(assigned_dist_group != "Backup/Unassigned Cluster") %>%
+  group_by(
+    assigned_dist_group
+  ) %>%
+  ggplot(aes(
+    x = dist/1000,
+    fill = assigned_dist_group,
+  )) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(
+    x = "Distance to PoT (km)",
+    y = "Density",
+    fill = "Experimental Assignment"
+  ) +
+  theme(legend.position = "bottom")
+
+ggsave(
+  plot = p_assignment_density_dens,
+  filename = here::here("temp-plots", "counterfactual-assignment-density-close-far-dens.pdf"),
   width = 8,
   height = 6
 )

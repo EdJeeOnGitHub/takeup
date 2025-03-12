@@ -1229,6 +1229,36 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
     return(table)
 }
 
+wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list()) {
+  default_table_options = list(
+    caption = "Average Treatment Effects: Reduced Form",
+    dependent_var = "Dependent variable: Take-up",
+    type = "APE",
+    stars = TRUE
+  )
+  table_options = modifyList(default_table_options, table_options)
+  output = create_regression_output(
+    data = data,
+    f = regression_spec,
+    caption = table_options$caption,
+    dependent_var = table_options$dependent_var,
+    type = table_options$type,
+    stars = table_options$stars
+
+  )
+  output$tidy_summary %>%
+    write_csv(tidy_summ_path)
+  output$default_tbl %>%
+    custom_save_latex_table(
+      table_name = table_name
+    )
+  output$different_order_tbl %>%
+    custom_save_latex_table(
+      table_name = paste0(table_name, "_weird_order")
+    )
+    return(output)
+}
+
 #### Frequentist Estimates ####
 # load expected distances
 cell_expected_dist_df = read_csv(here::here("data", "cell_expected_dist_df.csv")) %>%
@@ -1284,6 +1314,215 @@ no_outlier_analysis_data = outlier_analysis_data %>%
   group_by(cluster.id) %>%
   mutate(cluster_id = cur_group_id()) %>%
   ungroup()
+
+####  Endline Predicted Deworming Takeup
+
+endline_data = endline.data %>%
+  mutate(
+    assigned_treatment = as_factor(assigned.treatment), 
+    assigned_dist_group = as_factor(dist.pot.group),
+    cluster_id = as_factor(cluster.id),
+    # this isn't actually used
+    standard_cluster.dist.to.pot = dist.to.pot/sd_of_dist,
+    dworm_frac = dworm_rate / 10,
+    # different naming convention here
+    have_ink = ink_visible
+  )
+
+pred_dworm_fit = function(data, weights) {
+
+  feols(
+    dworm_frac ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+
+wrapper_function(
+  data = endline_data,
+  regression_spec = pred_dworm_fit,
+  tidy_summ_path = "temp-data/predicted-endline-deworm-takeup-tidy-tes.csv",
+  table_name = "predicted_endline_deworm_takeup_spec_tbl",
+  table_options = list(caption = "Average Treatment Effects: Reduced Form", dependent_var = "Dependent variable: Predicted Take-up", type = "APE", stars = TRUE)
+)
+
+#### Incentive Implementation --------------------------------------------------
+
+mean_deworm_string_f = function(string) {
+  str_detect(str_to_lower(string), "drug|medicine|tablet|deworm|Deworm|worm|treat")
+}
+
+endline_data = endline_data %>%
+  mutate(
+    meandeworm_bracelet = mean_deworm_string_f(bracelet_meaning),
+    meandeworm_ink = mean_deworm_string_f(ink_meaning),
+    meandeworm_cal = mean_deworm_string_f(cal_meaning)
+  )
+
+
+got_vars = c(
+  "got_bracelet", 
+  "got_ink", 
+  "got_cal"
+)
+have_vars = c(
+  "have_bracelet", 
+  "have_cal", 
+  "have_ink"
+)
+seen_vars = c(
+  "seen_bracelet", 
+  "seen_ink", 
+  "seen_cal"
+)
+mean_vars = c(
+  "meandeworm_bracelet", 
+  "meandeworm_ink", 
+  "meandeworm_cal"
+)
+
+long_incentive_check_df = endline_data %>%
+  select(all_of(c(got_vars, have_vars, seen_vars, mean_vars)), assigned_treatment, cluster_id, county)  %>%
+  pivot_longer(
+    cols = all_of(c(got_vars, have_vars, seen_vars, mean_vars))
+  ) %>%
+  mutate(
+    variable_type = str_extract(name, "(\\w+)(?=_)"),
+    name = str_extract(name, "(?<=_)\\w+"), 
+    name = if_else(name == "cal", "calendar", name)
+    )   %>%
+  filter(name == assigned_treatment)  %>%
+  mutate(
+    treat_type = paste0(assigned_treatment, "_", variable_type)
+  ) %>%
+  select(-name)
+
+tidy_incentive_check_df = long_incentive_check_df %>%
+  feols(
+    value ~ i(assigned_treatment, "ink") ,
+    split = ~variable_type,
+    cluster = ~cluster_id
+  ) %>%
+  map_dfr(
+    ~tidy(.x) %>%
+    mutate(n = nobs(.x)), 
+    .id = "lhs"
+  ) %>%
+  mutate(
+    treatment = str_extract(
+      term, "(?<=assigned_treatment::)\\w+"
+    ),
+    treatment = replace_na(treatment, "ink")
+  ) %>%
+  mutate(
+    variable_type = str_extract(
+      lhs, 
+      "(?<=sample: )\\w+$"
+    )
+    ) %>%
+  select(
+    -lhs,
+    -term
+  )
+
+
+wide_incentive_check_input_df = tidy_incentive_check_df %>%
+  mutate(across(c(estimate, std.error), round, 3)) %>%
+  mutate(
+    stars = case_when(
+      treatment != "ink" & p.value < 0.01 ~ "***",
+      treatment != "ink" & p.value < 0.05 ~ "**", 
+      treatment != "ink" & p.value < 0.1 ~ "*" , 
+      TRUE ~ ""
+    ),
+    estim_std = linebreak(paste0(estimate, stars, "\n", str_glue("({std.error})")), align = "c") 
+  ) %>%
+  mutate(treatment = str_replace(treatment, "ink", "ink (levels)")) %>%
+  select( 
+    treatment, 
+    variable_type, 
+    estim_std
+  ) %>%
+  mutate(treatment = str_to_title(treatment)) %>%
+  spread(
+    variable_type, 
+    estim_std
+  ) %>%
+  select(
+    treatment,
+    got, # "Did you receive X when you went for deworming?"
+    have, # "Do you still have X?"
+    seen, # "have you seen people wearing these "X"?"/ "have you seen people these calendars before"
+    meandeworm # "What does it mean if a person has a bracelet?" -> coded into deworm mentions
+  )
+
+
+incentive_check_tbl = wide_incentive_check_input_df %>%
+  knitr::kable(
+    format = "latex",
+      col.names = c(
+        "", 
+        "Received incentive when treated", 
+        "Have incentive currently", 
+        "Seen incentive", 
+        "Link incentive to deworming"),
+      escape = FALSE, 
+      booktabs = TRUE,
+      align = "lcccc", 
+      caption = "Endline Incentive Checks"
+  ) %>% 
+  row_spec(c(2), hline_after = TRUE) 
+
+incentive_check_tbl
+
+incentive_check_tbl %>%
+  custom_save_latex_table("incentive-check-tbl")
+
+#### Preference for Gift Fit Not Dewormed ---------------------------------------
+pref_gift_fit_not_dewormed = analysis_data %>%
+    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    # filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
+    filter(
+      dewormed == FALSE
+    )  %>%
+    ungroup() %>%
+    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    mutate(
+      assigned_treatment = factor(assigned.treatment),
+      assigned_dist_group = factor(dist.pot.group),
+      cluster_id = factor(cluster.id)
+      )
+
+
+
+
+pref_gift_fit = function(data, weights) {
+  feols(
+    want_bracelet ~  assigned_treatment*assigned_dist_group | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+} 
+
+
+wrapper_function(
+  data = pref_gift_fit_not_dewormed,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/preference-for-bracelet-tidy-tes.csv",
+  table_name = "preference_for_bracelet_spec_tbl",
+  table_options = list(caption = "Average Treatment Effects: Reduced Form", dependent_var = "Dependent variable: Prefer Bracelet", stars = TRUE, type = "APE")
+)
+
+
 
 #### Distance Checks -----------------------------------------------------------
 p_outlier = outlier_analysis_data %>%
@@ -1593,6 +1832,7 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
     standard_cell_expected_dist = cell_expected_dist/sd_of_dist
   )
 
+write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-data.csv")
 
 l_cov_vars = c(
   "floor_tile_cement",
@@ -1600,6 +1840,7 @@ l_cov_vars = c(
   "have_phone_lgl",
   "age.census"
 )
+
 discrete_distance_covs = function(data, weights) {
   feols(
     dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars]  | county,
@@ -2127,19 +2368,17 @@ discrete_fob_output$default_tbl %>%
   )
 
 ## SOB Main Spec ---------------------------------------------------------------
-sob_fit = create_regression_output(
+
+sob_fit = wrapper_function(
   data = know_df %>%
     filter(belief_type == "2ord"),
-  f = f_know,
-  dependent_var = "Dependent variable: Second-order beliefs"
+  regression_spec = f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Second-order beliefs"
+  ),
+    table_name = "rf_sob_spec_tbl",
+    tidy_summ_path = "temp-data/reducedform-sob-tidy-tes.csv"
 )
-
-sob_fit$tidy_summary %>%
-  write_csv("temp-data/reducedform-sob-tidy-tes.csv")  
-sob_fit$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_sob_spec_tbl_weird_order"
-  )
 
 
 ## robustness HH dist
@@ -2644,8 +2883,10 @@ ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
 #### Heterogeneity by Covariates
 library(marginaleffects)
 analysis_data = analysis_data %>%
+  mutate(cluster.id = as.character(cluster.id)) %>%
   left_join(
     baseline_worm %>%
+      mutate(cluster.id = as.character(cluster.id)) %>%
       group_by(cluster.id) %>%
       summarise(
         frac_externality = mean(fully_aware_externalities, na.rm = TRUE),
@@ -2837,6 +3078,8 @@ tex_postprocessing = function(tex) {
       "Externality Knowledge" = 1
     ),
     depvar = FALSE,
+    digits = 3,
+    digits.stats = 3,
     file = file.path(
       params$table_output_path, "het-tes.tex"
     ),
