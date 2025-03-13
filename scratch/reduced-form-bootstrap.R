@@ -1617,6 +1617,15 @@ dist_cts_fit = feols(
     cluster = ~cluster.id
 )
 
+dist_cts_spec_regression = function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
 etable(
   dist_cts_fit,
   dict = c(
@@ -1716,25 +1725,12 @@ dist_clust_recent_regression = function(data, weights) {
 }
 
 
-dist_clust_recent_output = create_regression_output(
+wrapper_function(
   data = analysis_data,
-  f = dist_clust_recent_regression
+  regression_spec = dist_clust_recent_regression,
+  tidy_summ_path = "temp-data/reducedform-clust-recent-dist-tidy-tes.csv",
+  table_name = "rf_clust_recent_dist_tbl"
 )
-
-dist_clust_recent_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-clust-recent-dist-tidy-tes.csv")  
-
-
-dist_clust_recent_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_clust_recent_dist_tbl"
-  )
-
-dist_clust_recent_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_clust_recent_dist_tbl_weird_order"
-  )
-
 
 # Distance entering with its square
 nonlinear_distance_regression = function(data, weights) {
