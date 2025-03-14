@@ -1197,9 +1197,6 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
       table_output_path, paste0(table_name, ".tex")
     )
   )
-  # Create space in latex due to rmd bug with \\ immediately followed by [
-  # table = table  %>%
-  #   str_replace_all(., "removeme12345", "  ")
 
   attr(table, "kable_meta")$contents = str_replace_all(attr(table, "kable_meta")$contents, "removeme12345", " ")
   table[1] = str_replace_all(table[1], "removeme12345", " ")
@@ -1315,488 +1312,6 @@ no_outlier_analysis_data = outlier_analysis_data %>%
   mutate(cluster_id = cur_group_id()) %>%
   ungroup()
 
-####  Endline Predicted Deworming Takeup
-
-endline_data = endline.data %>%
-  mutate(
-    assigned_treatment = as_factor(assigned.treatment), 
-    assigned_dist_group = as_factor(dist.pot.group),
-    cluster_id = as_factor(cluster.id),
-    # this isn't actually used
-    standard_cluster.dist.to.pot = dist.to.pot/sd_of_dist,
-    dworm_frac = dworm_rate / 10,
-    # different naming convention here
-    have_ink = ink_visible
-  )
-
-pred_dworm_fit = function(data, weights) {
-
-  feols(
-    dworm_frac ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-
-wrapper_function(
-  data = endline_data,
-  regression_spec = pred_dworm_fit,
-  tidy_summ_path = "temp-data/predicted-endline-deworm-takeup-tidy-tes.csv",
-  table_name = "predicted_endline_deworm_takeup_spec_tbl",
-  table_options = list(caption = "Average Treatment Effects: Reduced Form", dependent_var = "Dependent variable: Predicted Take-up", type = "APE", stars = TRUE)
-)
-
-#### Incentive Implementation --------------------------------------------------
-
-mean_deworm_string_f = function(string) {
-  str_detect(str_to_lower(string), "drug|medicine|tablet|deworm|Deworm|worm|treat")
-}
-
-endline_data = endline_data %>%
-  mutate(
-    meandeworm_bracelet = mean_deworm_string_f(bracelet_meaning),
-    meandeworm_ink = mean_deworm_string_f(ink_meaning),
-    meandeworm_cal = mean_deworm_string_f(cal_meaning)
-  )
-
-
-got_vars = c(
-  "got_bracelet", 
-  "got_ink", 
-  "got_cal"
-)
-have_vars = c(
-  "have_bracelet", 
-  "have_cal", 
-  "have_ink"
-)
-seen_vars = c(
-  "seen_bracelet", 
-  "seen_ink", 
-  "seen_cal"
-)
-mean_vars = c(
-  "meandeworm_bracelet", 
-  "meandeworm_ink", 
-  "meandeworm_cal"
-)
-
-long_incentive_check_df = endline_data %>%
-  select(all_of(c(got_vars, have_vars, seen_vars, mean_vars)), assigned_treatment, cluster_id, county)  %>%
-  pivot_longer(
-    cols = all_of(c(got_vars, have_vars, seen_vars, mean_vars))
-  ) %>%
-  mutate(
-    variable_type = str_extract(name, "(\\w+)(?=_)"),
-    name = str_extract(name, "(?<=_)\\w+"), 
-    name = if_else(name == "cal", "calendar", name)
-    )   %>%
-  filter(name == assigned_treatment)  %>%
-  mutate(
-    treat_type = paste0(assigned_treatment, "_", variable_type)
-  ) %>%
-  select(-name)
-
-tidy_incentive_check_df = long_incentive_check_df %>%
-  feols(
-    value ~ i(assigned_treatment, "ink") ,
-    split = ~variable_type,
-    cluster = ~cluster_id
-  ) %>%
-  map_dfr(
-    ~tidy(.x) %>%
-    mutate(n = nobs(.x)), 
-    .id = "lhs"
-  ) %>%
-  mutate(
-    treatment = str_extract(
-      term, "(?<=assigned_treatment::)\\w+"
-    ),
-    treatment = replace_na(treatment, "ink")
-  ) %>%
-  mutate(
-    variable_type = str_extract(
-      lhs, 
-      "(?<=sample: )\\w+$"
-    )
-    ) %>%
-  select(
-    -lhs,
-    -term
-  )
-
-
-wide_incentive_check_input_df = tidy_incentive_check_df %>%
-  mutate(across(c(estimate, std.error), round, 3)) %>%
-  mutate(
-    stars = case_when(
-      treatment != "ink" & p.value < 0.01 ~ "***",
-      treatment != "ink" & p.value < 0.05 ~ "**", 
-      treatment != "ink" & p.value < 0.1 ~ "*" , 
-      TRUE ~ ""
-    ),
-    estim_std = linebreak(paste0(estimate, stars, "\n", str_glue("({std.error})")), align = "c") 
-  ) %>%
-  mutate(treatment = str_replace(treatment, "ink", "ink (levels)")) %>%
-  select( 
-    treatment, 
-    variable_type, 
-    estim_std
-  ) %>%
-  mutate(treatment = str_to_title(treatment)) %>%
-  spread(
-    variable_type, 
-    estim_std
-  ) %>%
-  select(
-    treatment,
-    got, # "Did you receive X when you went for deworming?"
-    have, # "Do you still have X?"
-    seen, # "have you seen people wearing these "X"?"/ "have you seen people these calendars before"
-    meandeworm # "What does it mean if a person has a bracelet?" -> coded into deworm mentions
-  )
-
-
-incentive_check_tbl = wide_incentive_check_input_df %>%
-  knitr::kable(
-    format = "latex",
-      col.names = c(
-        "", 
-        "Received incentive when treated", 
-        "Have incentive currently", 
-        "Seen incentive", 
-        "Link incentive to deworming"),
-      escape = FALSE, 
-      booktabs = TRUE,
-      align = "lcccc", 
-      caption = "Endline Incentive Checks"
-  ) %>% 
-  row_spec(c(2), hline_after = TRUE) 
-
-incentive_check_tbl
-
-incentive_check_tbl %>%
-  custom_save_latex_table("incentive-check-tbl")
-
-#### Preference for Gift Fit Not Dewormed ---------------------------------------
-pref_gift_fit_not_dewormed = analysis_data %>%
-    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
-    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
-    mutate(arm.size = n()) %>% 
-    group_by(gift_choice, add = TRUE) %>%
-    # filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
-    filter(
-      dewormed == FALSE
-    )  %>%
-    ungroup() %>%
-    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
-    mutate(
-      want_bracelet = gift_choice == "bracelet"
-    )  %>%
-    mutate(
-      assigned_treatment = factor(assigned.treatment),
-      assigned_dist_group = factor(dist.pot.group),
-      cluster_id = factor(cluster.id)
-      )
-
-
-
-
-pref_gift_fit = function(data, weights) {
-  feols(
-    want_bracelet ~  assigned_treatment*assigned_dist_group | county,
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-} 
-
-
-wrapper_function(
-  data = pref_gift_fit_not_dewormed,
-  regression_spec = pref_gift_fit,
-  tidy_summ_path = "temp-data/preference-for-bracelet-tidy-tes.csv",
-  table_name = "preference_for_bracelet_spec_tbl",
-  table_options = list(caption = "Average Treatment Effects: Reduced Form", dependent_var = "Dependent variable: Prefer Bracelet", stars = TRUE, type = "APE")
-)
-
-
-
-#### Distance Checks -----------------------------------------------------------
-p_outlier = outlier_analysis_data %>%
-  filter(dispersed_community == TRUE) %>%
-  select(
-    cluster_id,
-    assigned_treatment,
-    cluster.dist.to.pot,
-    dist.to.pot
-  ) %>%
-  group_by(cluster_id) %>%
-  mutate(
-    mean_dist.to.pot = mean(dist.to.pot),
-    median_dist.to.pot = median(dist.to.pot)
-  ) %>%
-  ggplot() +
-  geom_histogram(
-    aes(x = dist.to.pot, fill = factor(cluster_id))
-  ) +
-  geom_vline(
-    aes(
-      xintercept = mean_dist.to.pot
-    ),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    aes(
-      xintercept = cluster.dist.to.pot
-    ),
-    linetype = "longdash"
-  ) +
-  geom_vline(
-    aes(
-      xintercept = median_dist.to.pot
-    ),
-    linetype = "dotdash"
-  ) +
-  facet_wrap(~assigned_treatment + cluster_id) +
-  labs(
-    x = "Distance to PoT (m)",
-    y = "Count",
-    fill = "Cluster",
-    title = "Distribution of Distances in Outlier Clusters",
-    caption = "Dashed line represents the cluster's centroid distance to the PoT. Dotted line the mean distance to the PoT."
-  )
-# ggsave(
-#   "temp-data/dist-distance-to-pot-outliers.png",
-#   width = 10,
-#   height = 10
-# )
-#### Distance Checks End -------------------------------------------------------
-dist_cts_regression = function(data, weights) {
-  feols(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-
-dist_cts_output = create_regression_output(
-  data = analysis_data,
-  f = dist_cts_regression
-)
-
-dist_cts_output$tidy_summary %>%
-  mutate(across(where(is.numeric), round, 3)) %>%
-  print(n = 40) 
-
-
-
-dist_cts_output$tidy_summary %>%
-  print(n = 30)
-
-dist_cts_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-dist-cts-tidy-tes.csv")  
-dist_cts_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_dist_cts_spec_tbl"
-  )
-
-dist_cts_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_dist_cts_spec_tbl_weird_order"
-  )
-# coefs on dist cts specification interaction terms
-dist_cts_fit = feols(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  | county, 
-    data = analysis_data,
-    nthreads = 1,
-    cluster = ~cluster.id
-)
-
-dist_cts_spec_regression = function(data, weights) {
-  feols(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county, 
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-etable(
-  dist_cts_fit,
-  dict = c(
-    "assigned_treatment = ink" = "Ink",
-    "assigned_treatment = calendar" = "Calendar",
-    "assigned_treatment = bracelet" = "Bracelet",
-    assigned_treatmentink = "Ink",
-    assigned_treatmentcalendar = "Calendar",
-    assigned_treatmentbracelet = "Bracelet",
-    "standard_cluster.dist.to.pot" = "Distance to PoT",
-    "county" = "County",
-    "cluster.id" = "Cluster",
-    dewormed = "Dewormed"
-    ),
-    headers = "",
-    replace = TRUE
-  )
-
-
-etable(
-  dist_cts_fit,
-  dict = c(
-    "assigned\\_treatment $=$ ink" = "Ink",
-    "assigned\\_treatment = calendar" = "Calendar",
-    "assigned\\_treatment = bracelet" = "Bracelet",
-    assigned_treatmentink = "Ink",
-    assigned_treatmentcalendar = "Calendar",
-    assigned_treatmentbracelet = "Bracelet",
-    "standard_cluster.dist.to.pot" = "Distance to PoT",
-    "county" = "County",
-    "cluster.id" = "Cluster",
-    dewormed = "Dewormed",
-    "assigned_treatment" = "Treatment",
-    "ink" = "Ink",
-    "calendar" = "Calendar",
-    "bracelet" = "Bracelet"
-    ),
-    headers = "",
-    tex = TRUE,
-    style.tex = style.tex("aer"),
-    replace = TRUE,
-    file = 
-    file.path(
-      params$table_output_path, paste0("dist_cts_spec_regression_coefs", ".tex")
-    )
-  )
-
-
-
-# main specification levels
-dist_cts_spec_bs_draws = map_dfr(
-  1:500,
-  ~bayes_bs_f(
-    seed = .x,
-    f = dist_cts_spec_regression,
-    data = analysis_data
-  ),
-  .progress = TRUE
-  )
-
-dist_cts_spec_levels = actual_bayesian_bs_fit(
-  seed = "realised fit",
-  f = dist_cts_spec_regression,
-  data = analysis_data
-) %>%
-  filter(!is.na(assigned_treatment)) 
-
-dist_cts_spec_levels_ci = dist_cts_spec_bs_draws %>%
-  group_by(assigned_treatment, assigned_dist_group) %>%
-  summarise(
-    conf.low = quantile(mean_pred, 0.025),
-    conf.high = quantile(mean_pred, 0.975)
-  ) %>%
-  filter(!is.na(assigned_treatment))
-
-tidy_dist_cts_spec_levels = left_join(
-  dist_cts_spec_levels,
-  dist_cts_spec_levels_ci,
-  by = c("assigned_treatment", "assigned_dist_group")
-) %>%
-  select(-signal, -seed) %>%
-  rename(estimate = mean_pred)
-tidy_dist_cts_spec_levels %>%
-  write_csv("temp-data/reducedform-dist-cts-tidy-levels.csv")  
-
-
-
-
-# Recentering using the expected distance
-dist_clust_recent_regression = function(data, weights) {
-  feols(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + standard_clust_expected_dist | county,
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-
-wrapper_function(
-  data = analysis_data,
-  regression_spec = dist_clust_recent_regression,
-  tidy_summ_path = "temp-data/reducedform-clust-recent-dist-tidy-tes.csv",
-  table_name = "rf_clust_recent_dist_tbl"
-)
-
-# Distance entering with its square
-nonlinear_distance_regression = function(data, weights) {
-  feols(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + standard_cluster.dist.to.pot^2 + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + i(assigned_treatment, standard_cluster.dist.to.pot^2, "control") | county, 
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-feols(
-    dewormed ~ 0 + i(assigned_treatment, "control") + standard_cluster.dist.to.pot + standard_cluster.dist.to.pot^2 + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + i(assigned_treatment, standard_cluster.dist.to.pot^2, "control")  | county, 
-    data = analysis_data,
-    cluster = ~cluster.id
-) %>%
-  tidy()
-
-nonlinear_distance_output = create_regression_output(
-  data = analysis_data,
-  f = nonlinear_distance_regression
-)
-
-nonlinear_distance_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-nonlinear-dist-tidy-tes.csv")  
-
-
-nonlinear_distance_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_nonlinear_dist_tbl"
-  )
-
-nonlinear_distance_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_nonlinear_dist_tbl_weird_order"
-  )
-
-# discrete distance
-discrete_distance_regression = function(data, weights) {
-  feols(
-    dewormed ~ 0 + assigned_treatment + assigned_dist_group  + i(assigned_treatment, assigned_dist_group, "control") | county, 
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-discrete_distance_output = create_regression_output(
-  data = analysis_data,
-  f = discrete_distance_regression
-)
-
-
-discrete_distance_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-discrete-dist-tidy-tes.csv")  
-
-
-discrete_distance_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_discrete_dist_tbl"
-  )
-
-discrete_distance_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_discrete_dist_tbl_weird_order"
-  )
 ## Covariates Added
 cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>%
   mutate(assigned_dist_group = dist.pot.group) %>%
@@ -1826,6 +1341,9 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
   mutate(
     standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
     standard_cell_expected_dist = cell_expected_dist/sd_of_dist
+  ) %>%
+  mutate(
+    mu_d = standard_clust_expected_dist
   )
 
 write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-data.csv")
@@ -1837,210 +1355,61 @@ l_cov_vars = c(
   "age.census"
 )
 
-discrete_distance_covs = function(data, weights) {
+
+#### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
+dist_cts_regression = function(data, weights) {
   feols(
-    dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars]  | county,
+    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  + .[l_cov_vars] + mu_d | county, 
     data = data,
     nthreads = 1,
     weights = ~wt
   )
 }
 
-
-
-
-discrete_distance_covs_output = create_regression_output(
+dist_cts_output = wrapper_function(
   data = cov_analysis_data,
-  f = discrete_distance_covs
+  regression_spec = dist_cts_regression,
+  tidy_summ_path = "temp-data/reducedform-dist-cts-tidy-tes.csv",
+  table_name = "rf_dist_cts_spec_tbl"
 )
 
-
-discrete_distance_covs_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-discrete-dist-covs-tidy-tes.csv")  
-
-
-discrete_distance_covs_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_discrete_dist_covs_tbl"
-  )
-
-discrete_distance_covs_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_discrete_dist_covs_tbl_weird_order"
-  )
-
-discrete_distance_covs_output$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "bra")) %>%
-  select(
-    assigned_treatment, 
-    assigned_dist_group,
-    estimate,
-    pval
-  )
-
-# Discrete Distance LASSO Covs
-discrete_distance_covs_bs_draws = map_dfr(
-  1:500,
-  ~bayes_bs_f(
-    seed = .x,
-    f = discrete_distance_covs,
-    data = cov_analysis_data
-  ),
-  .progress = TRUE
-  )
-
-discrete_distance_covs_levels = actual_bayesian_bs_fit(
-  seed = "realised fit",
-  f = discrete_distance_covs,
-  data = cov_analysis_data
-) %>%
-  filter(!is.na(assigned_treatment)) 
-
-discrete_distance_covs_levels_ci = discrete_distance_covs_bs_draws %>%
-  group_by(assigned_treatment, assigned_dist_group) %>%
-  summarise(
-    conf.low = quantile(mean_pred, 0.025),
-    conf.high = quantile(mean_pred, 0.975)
-  ) %>%
-  filter(!is.na(assigned_treatment))
-
-tidy_discrete_distance_cov_levels = left_join(
-  discrete_distance_covs_levels,
-  discrete_distance_covs_levels_ci,
-  by = c("assigned_treatment", "assigned_dist_group")
-) %>%
-  select(-signal, -seed) %>%
-  rename(estimate = mean_pred)
-tidy_discrete_distance_cov_levels %>%
-  write_csv("temp-data/reducedform-robustness-discrete-dist-covs-tidy-levels.csv")  
-
-## CTS Dist + Covars
-
-cts_distance_covs = function(data, weights) {
+#### Takeup Discrete Distance + LASSO Covs + Cluster Expected Distance
+discrete_distance_regression = function(data, weights) {
   feols(
-    fml = dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + standard_clust_expected_dist | county, 
+    dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d | county,
     data = data,
     nthreads = 1,
     weights = ~wt
   )
 }
 
-cts_distance_covs_output = create_regression_output(
+discrete_distance_covs_output = wrapper_function(
   data = cov_analysis_data,
-  f = cts_distance_covs
+  regression_spec = discrete_distance_regression,
+  tidy_summ_path = "temp-data/discrete-dist-covs-tidy-tes.csv",
+  table_name = "rf_discrete_dist_covs_tbl"
 )
 
-cts_distance_covs_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-cts-dist-covs-tidy-tes.csv")
 
-cts_distance_covs_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_cts_dist_covs_tbl"
-  )
-
-cts_distance_covs_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_cts_dist_covs_tbl_weird_order"
-  )
-
-
-
-## HH Dist regression
+#### Takeup HH Distance + LASSO Covs + Cluster Expected Distance
 hh_spec_regression = function(data, weights) {
-  feglm(
-    dewormed ~  0  + assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control") | county, 
+  feols(
+    dewormed ~  0  + assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control")  + mu_d | county, 
     data = data,
-    family = binomial(link = "probit"),
     nthreads = 1,
     weights = ~wt
   )
 }
 
-hh_spec_output = create_regression_output(
-  data = analysis_data,
-  f = hh_spec_regression
+hh_spec_output = wrapper_function(
+  data = cov_analysis_data,
+  regression_spec = hh_spec_regression,
+  tidy_summ_path = "temp-data/hh-dist-tidy-tes.csv",
+  table_name = "rf_hh_spec_tbl"
 )
 
 
-hh_spec_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-hhdist-tidy-tes.csv")  
-
-
-hh_spec_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_hh_spec_tbl"
-  )
-
-hh_spec_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_hh_spec_tbl_weird_order"
-  )
-
-
-# community dist + controlling for HH dist
-community_control_spec_regression = function(data, weights) {
-  feglm(
-    dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + dist.to.pot | county, 
-    data = data,
-    family = binomial(link = "probit"),
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-community_control_spec_output = create_regression_output(
-  data = analysis_data,
-  f = community_control_spec_regression
-)
-
-
-community_control_spec_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-communitycontrol-tidy-tes.csv")  
-
-
-
-community_control_spec_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_communitycontrol_spec_tbl_weird_order"
-  )
-
-#### Outliers-------------------------------------------------------------------
-
-no_outlier_spec = create_regression_output(
-  data = no_outlier_analysis_data,
-  f = main_spec_regression
-)
-
-no_outlier_spec$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-nooutlier-tidy-tes.csv")  
-
-
-no_outlier_spec$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_nooutlier_spec_tbl_weird_order"
-  )
-
-## Community dist + HH dist control with no outliers
-no_outlier_community_control_spec_output = create_regression_output(
-  data = no_outlier_analysis_data,
-  f = community_control_spec_regression
-)
-no_outlier_community_control_spec_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-nooutliercommunitycontrol-tidy-tes.csv")  
-no_outlier_community_control_spec_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_nooutliercommunitycontrol_spec_tbl_weird_order"
-  )
 #### Beliefs -------------------------------------------------------------------
-
-endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")) %>%
-      select(KEY.individ)
-
-analysis_data %>%
-  summarise(n_distinct(KEY.individ))
-
-
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
@@ -2064,9 +1433,6 @@ belief_ana_df = analysis_data %>%
     }
   )) %>%
     filter(obs_know_person > 0)
-
-belief_ana_df %>%
-  summarise(n_distinct(KEY.individ))
 
 
 disagg_base_belief_data = analysis_data %>%
@@ -2150,166 +1516,36 @@ know_df = disagg_base_belief_data %>%
       assigned_treatment = assigned.treatment,
       signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
       signal = factor(signal, levels = c("no signal", "signal"))
-  ) 
-
-know_df %>%
-  summarise(dewormed = mean(dewormed))
-
-
-analysis_data %>%
-  summarise(dewormed = mean(dewormed))
-
-know_df %>%
-  group_by(assigned_dist_group, assigned.treatment, dewormed) %>%
-  summarise(n = n())
-
-
-
-know_df %>%
-  filter(belief_type == "1ord") %>%
-  # filter(assigned_treatment == "control") %>%
-  bind_rows(
-    .,
-    mutate(., assigned_dist_group = "combined")
-  ) %>%
-  mutate(assigned_dist_group = factor(assigned_dist_group, c("close", "far", "combined"))) %>%
-  group_by(
-    assigned_treatment,
-    assigned_dist_group,
-    dewormed
-  ) %>%
-  summarise(
-    prop = mean(prop_knows)
-  ) %>%
-  pivot_wider(names_from = dewormed, values_from = prop, names_prefix = "dewormed_") 
-
-
-
-know_df %>%
-  filter(belief_type == "1ord") %>%
-  mutate(dewormed = as.character(dewormed)) %>%
-  bind_rows(
-    mutate(., dewormed = "combined")
-  ) %>%
-  mutate(dewormed = factor(dewormed, c("TRUE", "FALSE", "combined"))) %>%
-  group_by(
-    assigned_treatment,
-    assigned_dist_group,
-    dewormed
-  ) %>%
-  summarise(
-    prop = mean(prop_knows)
   )  %>%
-  pivot_wider(
-    names_from = assigned_dist_group,
-    values_from = prop,
-    names_prefix = "dist_"
-  )
-  
-  
-
-
-know_df %>%
-  filter(belief_type == "1ord") %>%
-  group_by(
-    assigned_treatment,
-    dewormed
+  left_join(
+      cluster_expected_dist_df %>%
+        mutate(cluster.id = as.numeric(cluster.id)),
+      by = c("cluster_id" = "cluster.id")
   ) %>%
-  summarise(
-    prop = mean(prop_knows)
-  ) %>%
-  pivot_wider(names_from = dewormed, values_from = prop)  
-
-know_df %>%
-  filter(belief_type == "2ord") %>%
-  group_by(
-    assigned_treatment,
-    dewormed
-  ) %>%
-  summarise(
-    prop = mean(prop_knows)
-  ) %>%
-  pivot_wider(names_from = dewormed, values_from = prop)  
+    mutate(
+      standard_clust_expected_dist = clust_expected_dist/sd_of_dist
+    )
 
 know_1_df = know_df  %>%
   filter(belief_type == "1ord") 
 know_2_df = know_df  %>%
   filter(belief_type == "2ord")
 
-know_2_df$know1_hat = know_1_df %>%
+
+
+
+
+discrete_f_know = function(data, weights) {
   feols(
-    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control"),
-    data = .
-  ) %>%
-  predict()
-
-
-know_1_df$know1_hat = know_1_df %>%
-  feols(
-    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control"),
-    data = .
-  ) %>%
-  predict()
-
-
-know_1_df %>%
-  group_by(
-    assigned_dist_group,
-    assigned_treatment,
-    dewormed
-  ) %>%
-  summarise(
-    prop = mean(prop_knows),
-    know1_hat = mean(know1_hat)
-  ) %>%
-  ggplot(aes(
-    x = prop,
-    y = know1_hat
-  ))+
-  geom_point() +
-  geom_abline() +
-  labs(
-    x = "Observed Proportion - First-order",
-    y = "Predicted Proportion - Mu(d z)"
-  ) +
-  theme_bw()
-
-know_2_df %>%
-  group_by(
-    assigned_dist_group,
-    assigned_treatment,
-    dewormed
-  ) %>%
-  summarise(
-    prop = mean(prop_knows),
-    know1_hat = mean(know1_hat)
-  ) %>%
-  ungroup() %>%
-  mutate(prop = prop - mean(prop), know1_hat = know1_hat - mean(know1_hat)) %>%
-  ggplot(aes(
-    x = prop,
-    y = know1_hat
-  ))+
-  geom_point() +
-  geom_abline() +
-  labs(
-    x = "Observed Proportion - Second-order - Rescaled",
-    y = "Predicted Proportion - Mu(d z) - Rescaled"
-  ) +
-  theme_bw()
-
-
-f_know = function(data, weights) {
-  feols(
-    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county,
+    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + .[l_cov_vars] +  mu_d | county,
     data = data,
     weights = weights
   )
 }
 
-f_know_signal = function(data, weights) {
+cts_f_know = function(data, weights) {
   feols(
-    prop_knows ~ signal + standard_cluster.dist.to.pot + i(signal, standard_cluster.dist.to.pot, "no signal") | county,
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + .[l_cov_vars] + mu_d | county,
     data = data,
     weights = weights
   )
@@ -2317,566 +1553,63 @@ f_know_signal = function(data, weights) {
 
 hh_f_know = function(data, weights) {
   feols(
-    prop_knows ~ assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control") | county,
+    prop_knows ~ assigned_treatment + dist.to.pot + i(assigned_treatment, dist.to.pot, "control")  + .[l_cov_vars] + mu_d | county,
     data = data,
     weights = weights
   )
 }
 
-hh_f_know_signal = function(data, weights) {
-  feols(
-    prop_knows ~ signal + dist.to.pot + i(signal, dist.to.pot, "no signal") | county,
-    data = data,
-    weights = weights
-  )
-}
-
-
-discrete_f_know = function(data, weights) {
-  feols(
-    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + standard_cluster.dist.to.pot | county,
-    data = data,
-    weights = weights
-  )
-}
-
-
-
-
-discrete_fob_output = create_regression_output(
+#### FOB Discrete Distance + LASSO Covs + Cluster Expected Distance
+discrete_fob_output = wrapper_function(
   data = know_df %>%
     filter(belief_type == "1ord"),
-  f = discrete_f_know,
-  dependent_var = "Dependent variable: First-order beliefs"
+  regression_spec = discrete_f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_discrete_fob_spec_tbl",
+  tidy_summ_path = "temp-data/reducedform-discrete-fob-tidy-tes.csv"
 )
 
-discrete_fob_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-discrete-fob-tidy-tes.csv")  
+#### FOB Continuous Distance + LASSO Covs + Cluster Expected Distance
+cts_fob_output = wrapper_function(
+  data = know_df %>%
+    filter(belief_type == "1ord"),
+  regression_spec = cts_f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_cts_fob_spec_tbl",
+  tidy_summ_path = "temp-data/reducedform-cts-fob-tidy-tes.csv"
+)
 
-discrete_fob_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_discrete_fob_spec_tbl_weird_order"
-  )
+#### FOB HH Distance + LASSO Covs + Cluster Expected Distance
+hh_fob_output = wrapper_function(
+  data = know_df %>%
+    filter(belief_type == "1ord"),
+  regression_spec = hh_f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_hh_fob_spec_tbl",
+  tidy_summ_path = "temp-data/reducedform-hh-fob-tidy-tes.csv"
+)
 
-discrete_fob_output$default_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_discrete_fob_spec_tbl"
-  )
-
-## SOB Main Spec ---------------------------------------------------------------
-
-sob_fit = wrapper_function(
+#### SOB Discrete Distance + LASSO Covs + Cluster Expected Distance
+discrete_sob_output = wrapper_function(
   data = know_df %>%
     filter(belief_type == "2ord"),
-  regression_spec = f_know,
+  regression_spec = discrete_f_know,
   table_options = list(
-    dependent_var = "Dependent variable: Second-order beliefs"
+    dependent_var = "Dependent variable: Observability Beliefs"
   ),
-    table_name = "rf_sob_spec_tbl",
-    tidy_summ_path = "temp-data/reducedform-sob-tidy-tes.csv"
+  table_name = "rf_discrete_sob_spec_tbl",
+  tidy_summ_path = "temp-data/reducedform-discrete-sob-tidy-tes.csv"
 )
 
 
-## robustness HH dist
-robust_hh_fob_output = create_regression_output(
-  data = know_df %>%
-    filter(belief_type == "1ord"),
-  f = hh_f_know,
-  dependent_var = "Dependent variable: First-order beliefs"
-)
-robust_hh_fob_output$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-hhdist-fob-tidy-tes.csv")  
-robust_hh_fob_output$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_hhdist_fob_spec_tbl_weird_order"
-  )
- 
 
-
-fob_know_bs_draws = map_dfr(
-    1:500,
-    ~bayes_bs_f(
-        seed = .x, 
-        f = f_know, 
-        data = know_df %>% 
-          filter(belief_type == "1ord")
-    ),
-    .progress = TRUE
-)
-
-
-know_bs_te_draws = fob_know_bs_draws %>%
-  clean_te_draws()
-
-know_bs_signal_draws = fob_know_bs_draws %>%
-  clean_signal_draws()
-
-
-
-realised_know_fit = actual_bayesian_bs_fit(
-  seed = "realised fit", 
-  f = f_know, 
-  data = know_df %>% 
-    filter(belief_type == "1ord"))
-
-realised_know_signal_fit = realised_know_fit %>%
-    clean_signal_draws() %>%
-    rename(realised_pred = estimate) %>%
-    select(assigned_dist_group, assigned_treatment, realised_pred)
-
-
-realised_know_te_fit = realised_know_fit %>%
-    clean_te_draws() %>%
-    rename(realised_pred = estimate) %>%
-    select(assigned_dist_group, assigned_treatment, realised_pred)
-
-
-
-
-
-clean_know_signal_tes = add_summ_stats(know_bs_signal_draws, realised_know_signal_fit)
-clean_know_tes = add_summ_stats(know_bs_te_draws, realised_know_te_fit)
-
-pval_only_terms = c("bracelet - calendar", "signal")
-clean_know_df = bind_rows(
-  clean_know_tes,
-  clean_know_signal_tes
-) %>%
-  mutate(
-    show_pval_only = assigned_treatment %in% pval_only_terms
-  ) %>%
-  filter(assigned_treatment != "no signal")
-
-
-clean_know_df %>%
-  prep_tbl(stat = params$stat) %>%
-  nice_kbl_table(
-    cap = "Average Treatment Effects: Knowledge",
-    outcome_var = "Dependent variable: First-order beliefs"
-  ) %>%
-  custom_save_latex_table(
-    table_name = "rf_know_spec_tbl"
-  )
-
-clean_know_df %>%
-  prep_tbl(stat = params$stat) %>%
-  mutate(
-    assigned_treatment = fct_relevel(
-      assigned_treatment, 
-      c(
-
-        "Control", 
-        "Bracelet - No Signal",
-        "$H0$: Any Signal > No Signal, $p$-value",
-        "$H0$: Any Signal $\\neq$ No Signal, $p$-value",
-        "$H0$: Bracelet > Calendar, $p$-value",
-        "$H0$: Bracelet $\\neq$ Calendar, $p$-value",
-        "Ink", "Calendar", "Bracelet"
-      ))) %>% 
-    arrange(assigned_treatment) %>%
-  nice_kbl_table(
-    cap = "Average Treatment Effects: Knowledge",
-    outcome_var = "Dependent variable: First-order beliefs"
-  ) %>%
-  custom_save_latex_table(
-    table_name = "rf_know_spec_tbl_weird_order"
-  )
-
-
-    
-
-clean_know_df %>%
-  write_csv("temp-data/knowledge-tidy-tes.csv")  
-
-#### FOB Main Spec + Controlling for HH Dist
-f_know_control_hh = function(data, weights) {
-  feols(
-    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") | county,
-    data = data,
-    weights = weights
-  )
-}
-
-f_know_control_hh_signal = function(data, weights) {
-  feols(
-    prop_knows ~ signal + standard_cluster.dist.to.pot + dist.to.pot + i(signal, standard_cluster.dist.to.pot, "no signal") | county,
-    data = data,
-    weights = weights
-  )
-}
-
-
-fob_control_hh = create_regression_output(
-  data = know_df %>%
-    filter(belief_type == "1ord"),
-  f = f_know_control_hh
-)
-
-
-fob_control_hh$tidy_summary %>%
-  write_csv("temp-data/reducedform-robustness-fob-controlhh-tidy-tes.csv")  
-
-
-
-fob_control_hh$different_order_tbl %>%
-  custom_save_latex_table(
-    table_name = "rf_fob_controlhh_spec_tbl_weird_order"
-  )
-
-## FOB Levels
-# main specification levels
-fob_bs_draws = map_dfr(
-  1:500,
-  ~bayes_bs_f(
-    seed = .x,
-    f = f_know,
-    data = know_df %>%
-      filter(belief_type == "1ord")
-  ),
-  .progress = TRUE
-  )
-
-fob_levels_point = actual_bayesian_bs_fit(
-  seed = "realised fit",
-  f = f_know,
-  data = know_df %>%
-    filter(belief_type == "1ord")
-) %>%
-  filter(!is.na(assigned_treatment)) 
-
-fob_levels_ci = fob_bs_draws %>%
-  group_by(assigned_treatment, assigned_dist_group) %>%
-  summarise(
-    conf.low = quantile(mean_pred, 0.025),
-    conf.high = quantile(mean_pred, 0.975)
-  ) %>%
-  filter(!is.na(assigned_treatment))
-
-fob_levels = left_join(
-  fob_levels_point,
-  fob_levels_ci,
-  by = c("assigned_treatment", "assigned_dist_group")
-) %>%
-  select(-signal, -seed) %>%
-  rename(estimate = mean_pred)
-
-fob_levels %>%
-  write_csv("temp-data/reducedformfob-tidy-levels.csv")  
-
-
-#### SMS -----------------------------------------------------------------------
-
-
-monitored_sms_data <- analysis.data %>% 
-  filter(mon_status == "monitored") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
-
-
-
-
-sms_analysis_data <- monitored_sms_data %>% 
-    mutate(
-    assigned_treatment = assigned.treatment, 
-    assigned_dist_group = dist.pot.group, 
-    sms_treatment = sms.treatment.2, 
-    phone_owner = if_else(phone_owner == TRUE, "phone", "nophone"), 
-    sms_treatment = str_replace_all(sms_treatment, "\\.", "")) %>%
-    # reminder.only only present in control condition
-    filter(phone_owner == "phone") %>%
-    mutate(sms_treatment = factor(sms_treatment)) %>%
-    mutate(
-        county = factor(county),
-        cluster.id = factor(cluster.id),
-        assigned_treatment = assigned.treatment,
-        assigned_dist_group = dist.pot.group,
-        signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
-        signal = factor(signal, levels = c("no signal", "signal"))
-    )
-
-
-
-
-
-f_sms = function(data, weights) {
-  feglm(
-    dewormed ~ 0  + 
-      assigned_treatment + 
-      standard_cluster.dist.to.pot + 
-      sms_treatment + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
-      i(assigned_treatment, sms_treatment, "control") +
-      i(sms_treatment, standard_cluster.dist.to.pot) +
-      sms_treatment:assigned_treatment:standard_cluster.dist.to.pot 
-      | county,
-    data = data,
-    weights = weights,
-    family = binomial(link = "probit")
-  )
-}
-
-f_sms_signal = function(data, weights) {
-  feglm(
-    dewormed ~ 0 +
-      signal + 
-      standard_cluster.dist.to.pot + 
-      sms_treatment + 
-      i(signal, standard_cluster.dist.to.pot, "no signal") +
-      i(signal, sms_treatment, "no signal") +
-      i(sms_treatment, standard_cluster.dist.to.pot) +
-      sms_treatment:signal:standard_cluster.dist.to.pot 
-      | county,
-    data = data,
-    weights = weights,
-    family = binomial(link = "probit")
-  )
-}
-
-
-sms_bs_draws = map_dfr(
-    1:500,
-    ~bayes_bs_f(
-        seed = .x, 
-        f = f_sms, 
-        data = sms_analysis_data,
-        sms_treatment
-    ),
-    .progress = TRUE
-)
-
-
-clean_bs_sms_signal_draws = sms_bs_draws %>%
-  clean_signal_draws(sms_treatment)
-
-clean_bs_sms_te_draws = sms_bs_draws %>%
-  clean_te_draws(sms_treatment)
-
-
-create_sms_te = function(draws) {
-  draws %>%
-    group_by(seed, assigned_dist_group, sms_treatment) %>%
-    mutate(
-      te = if_else(assigned_treatment == "control", mean_pred, mean_pred - mean_pred[assigned_treatment == "control"])
-    )  %>%
-    ungroup() %>%
-    group_by(seed, assigned_dist_group, assigned_treatment) %>%
-    mutate(
-      diff_te = te - te[sms_treatment == "smscontrol"]
-    ) 
-}
-
-sms_bs_tes = sms_bs_draws %>%
-  filter(!is.na(assigned_treatment)) %>%
-  select(-signal) %>%
-  add_predictions(sms_treatment)  %>%
-  create_sms_te() %>%
-  rename(estimate = diff_te)
-
-sms_signal_bs_tes = sms_bs_draws %>%
-  filter(!is.na(signal)) %>%
-  select(-assigned_treatment) %>%
-  add_signal_predictions(sms_treatment) %>%
-  group_by(seed, assigned_dist_group, sms_treatment) %>%
-    mutate(
-      te = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
-    )  %>%
-    ungroup() %>%
-    group_by(seed, assigned_dist_group, signal) %>%
-    mutate(
-      diff_te = te - te[sms_treatment == "smscontrol"]
-   )  %>%
-  rename(estimate = diff_te)  %>%
-  rename(assigned_treatment = signal)
-
-
-realised_sms_fit = actual_bayesian_bs_fit(
-  seed = "realised fit",
-  f = f_sms,
-  data = sms_analysis_data,
-  sms_treatment
-)
-
-
-realised_sms_tes = realised_sms_fit %>%
-  filter(!is.na(assigned_treatment)) %>%
-  select(-signal) %>%
-  add_predictions(sms_treatment)  %>%
-  create_sms_te() %>%
-  ungroup() %>%
-  rename(realised_pred = diff_te) %>%
-  select(assigned_dist_group, assigned_treatment, sms_treatment, realised_pred)
-
-realised_sms_signal_fit = realised_sms_fit %>%
-  filter(!is.na(signal)) %>%
-  select(-assigned_treatment) %>%
-  add_signal_predictions(sms_treatment) %>%
-  group_by(seed, assigned_dist_group, sms_treatment) %>%
-    mutate(
-      te = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
-    )  %>%
-    ungroup() %>%
-    group_by(seed, assigned_dist_group, signal) %>%
-    mutate(
-      diff_te = te - te[sms_treatment == "smscontrol"]
-   )  %>%
-  rename(realised_pred = diff_te) %>%
-  ungroup() %>%
-  select(assigned_dist_group, assigned_treatment = signal, sms_treatment, realised_pred)
-
-
-realised_sms_tes
-realised_sms_signal_fit
-
-both_sms_fits = bind_rows(
-  sms_bs_tes,
-  sms_signal_bs_tes
-) %>%
-  mutate(
-    show_pval_only = assigned_treatment %in% pval_only_terms
-  ) %>%
-  filter(assigned_treatment != "no signal") 
-
-realised_sms_both = bind_rows(
-  realised_sms_signal_fit,
-  realised_sms_tes
-) 
-
-
-
-    clean_sms_tes = both_sms_fits %>%
-      group_by(
-          assigned_treatment,
-          assigned_dist_group,
-          sms_treatment
-      ) %>%
-      summarise(
-          std_error = sd(estimate),
-          conf.low = quantile(estimate, (1 - ci_width)/2),
-          conf.high = quantile(estimate, 1 - (1 - ci_width)/2)
-      ) %>%
-      left_join(
-          realised_sms_both,
-          by = c("assigned_dist_group", "assigned_treatment", "sms_treatment")
-      ) %>%
-      mutate(
-          pval = 2*pnorm(-abs(realised_pred)/std_error),
-          oneside_pval = pnorm(-realised_pred/std_error)
-      ) %>%
-      mutate(
-          pval = round(pval, 4),
-          oneside_pval = round(oneside_pval, 4)
-      ) %>%
-      select(
-          assigned_treatment, 
-          assigned_dist_group, 
-          sms_treatment,
-          realised_pred, 
-          std_error, 
-          conf.low,
-          conf.high,
-          pval, 
-          oneside_pval) %>%
-      rename(estimate = realised_pred)  %>%
-      filter(sms_treatment != "smscontrol")
-
-clean_sms_tes %>%
-  write_csv("temp-data/differential-tes-by-sms.csv")
-
-clean_sms_tes %>%
-  filter(assigned_treatment != "control") %>%
-  select(assigned_treatment, assigned_dist_group, sms_treatment, pval, oneside_pval)
-
-
-clean_sms_tes %>%
-  filter(sms_treatment != "smscontrol")  %>%
-  mutate(show_pval_only = FALSE) %>%
-  filter(sms_treatment != "reminderonly") %>%
-  mutate(
-    show_pval_only = assigned_treatment %in% pval_only_terms
-  ) %>%
-  prep_tbl(stat = params$stat) %>%
-  nice_kbl_table(
-    cap = "Heterogeneous SMS Average Treatment Effects",
-    outcome_var = "Dependent variable: Take-up"
-  ) %>%
-  custom_save_latex_table(
-    table_name = "sms_diff_tes_tbl"
-  )
-
-library(ggthemes)
-
-
-p_sms_tes = clean_sms_tes %>%
-  filter(sms_treatment != "smscontrol")  %>%
-  mutate(show_pval_only = FALSE)  %>%
-  filter(assigned_treatment != "signal") %>%
-  select(
-    assigned_treatment,
-    assigned_dist_group,
-    sms_treatment,
-    estimate,
-    conf.low,
-    conf.high
-  ) %>%
-  mutate(
-    assigned_treatment = case_when(
-      assigned_treatment == "bracelet - calendar" ~ "Bracelet - Calendar",
-      assigned_treatment == "bracelet" ~ "Bracelet",
-      assigned_treatment == "calendar" ~ "Calendar",
-      assigned_treatment == "ink" ~ "Ink",
-      assigned_treatment == "control" ~ "Control Mean",
-    ),
-    assigned_treatment = factor(
-      assigned_treatment,
-      levels = c(
-        "Control Mean",
-        "Bracelet - Calendar",
-        "Ink",
-        "Calendar",
-        "Bracelet"
-      )
-    ),
-    assigned_dist_group = str_to_title(assigned_dist_group),
-    sms_treatment = case_when(
-      sms_treatment == "smscontrol" ~ "SMS Control",
-      sms_treatment == "reminderonly" ~ "Reminder Only",
-      sms_treatment == "socialinfo" ~ "Social Info"
-    )
-  ) %>%
-  ggplot(aes(
-    x = estimate,
-    xmin = conf.low,
-    xmax = conf.high,
-    y = assigned_treatment,
-    colour = sms_treatment
-  )) +
-  geom_pointrange(
-    position = position_dodge(width = 0.5)
-  ) +
-  facet_wrap(~assigned_dist_group) +
-  geom_vline(
-    xintercept = 0,
-    linetype = "longdash"
-  ) +
-  labs(
-    x = "Estimate",
-    y = "",
-    colour = ""
-  ) +
-  scale_colour_canva(
-    "",
-    palette = "Primary colors with a vibrant twist"
-  )
-
-ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
-
-
-#### Heterogeneity by Covariates
+#### Heterogeneity -------------------------------------------------------------
 library(marginaleffects)
 analysis_data = analysis_data %>%
   mutate(cluster.id = as.character(cluster.id)) %>%
@@ -3093,9 +1826,6 @@ feols(
   dewormed ~ treatment*standard_cluster.dist.to.pot  + age_gt_40 | county,
   cluster = ~cluster.id
 )
-
-##### fits
-
 
 
 age_het_preds =  bind_rows(
@@ -3509,23 +2239,6 @@ het_tbl %>%
     table_name = "het-tes-tbl"
   )
 
-analysis_data %>%
-  count(have_phone_lgl)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 het_tbl = het_fits %>%
   mutate(
     term = str_extract(
@@ -3570,3 +2283,623 @@ het_tbl = het_fits %>%
   custom_save_latex_table(
     table_name = "het-tes-tbl"
   )
+
+#### Levels --------------------------------------------------------------------
+
+#### Takeup LEVELS Continuous Distance + LASSO Covs + Expected Distance
+# For plotting
+dist_cts_spec_bs_draws = map_dfr(
+  1:500,
+  ~bayes_bs_f(
+    seed = .x,
+    f = dist_cts_regression,
+    data = cov_analysis_data
+  ),
+  .progress = TRUE
+  )
+
+dist_cts_spec_levels = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = dist_cts_regression,
+  data = cov_analysis_data
+) %>%
+  filter(!is.na(assigned_treatment)) 
+
+dist_cts_spec_levels_ci = dist_cts_spec_bs_draws %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    conf.low = quantile(mean_pred, 0.025),
+    conf.high = quantile(mean_pred, 0.975)
+  ) %>%
+  filter(!is.na(assigned_treatment))
+
+tidy_dist_cts_spec_levels = left_join(
+  dist_cts_spec_levels,
+  dist_cts_spec_levels_ci,
+  by = c("assigned_treatment", "assigned_dist_group")
+) %>%
+  select(-signal, -seed) %>%
+  rename(estimate = mean_pred)
+tidy_dist_cts_spec_levels %>%
+  write_csv("temp-data/reducedform-dist-cts-tidy-levels.csv")  
+
+
+#### Takeup LEVELS Discrete Distance + LASSO Covs + Expected Distance
+discrete_distance_covs_bs_draws = map_dfr(
+  1:500,
+  ~bayes_bs_f(
+    seed = .x,
+    f = discrete_distance_covs,
+    data = cov_analysis_data
+  ),
+  .progress = TRUE
+  )
+
+discrete_distance_covs_levels = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = discrete_distance_covs,
+  data = cov_analysis_data
+) %>%
+  filter(!is.na(assigned_treatment)) 
+
+discrete_distance_covs_levels_ci = discrete_distance_covs_bs_draws %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    conf.low = quantile(mean_pred, 0.025),
+    conf.high = quantile(mean_pred, 0.975)
+  ) %>%
+  filter(!is.na(assigned_treatment))
+
+tidy_discrete_distance_cov_levels = left_join(
+  discrete_distance_covs_levels,
+  discrete_distance_covs_levels_ci,
+  by = c("assigned_treatment", "assigned_dist_group")
+) %>%
+  select(-signal, -seed) %>%
+  rename(estimate = mean_pred)
+tidy_discrete_distance_cov_levels %>%
+  write_csv("temp-data/discrete-dist-covs-tidy-levels.csv")  
+
+
+
+#### FOB Levels Discrete Distance + LASSO Covs + Expected Distance
+fob_bs_draws = map_dfr(
+  1:500,
+  ~bayes_bs_f(
+    seed = .x,
+    f = discrete_f_know,
+    data = know_df %>%
+      filter(belief_type == "1ord")
+  ),
+  .progress = TRUE
+  )
+
+fob_levels_point = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = discrete_f_know,
+  data = know_df %>%
+    filter(belief_type == "1ord")
+) %>%
+  filter(!is.na(assigned_treatment)) 
+
+fob_levels_ci = fob_bs_draws %>%
+  group_by(assigned_treatment, assigned_dist_group) %>%
+  summarise(
+    conf.low = quantile(mean_pred, 0.025),
+    conf.high = quantile(mean_pred, 0.975)
+  ) %>%
+  filter(!is.na(assigned_treatment))
+
+fob_levels = left_join(
+  fob_levels_point,
+  fob_levels_ci,
+  by = c("assigned_treatment", "assigned_dist_group")
+) %>%
+  select(-signal, -seed) %>%
+  rename(estimate = mean_pred)
+
+fob_levels %>%
+  write_csv("temp-data/reducedformfob-tidy-levels.csv")  
+
+
+
+#### Alternative Regressions ---------------------------------------------------
+
+####  Endline Predicted Deworming Takeup
+endline_data = endline.data %>%
+  mutate(
+    assigned_treatment = as_factor(assigned.treatment), 
+    assigned_dist_group = as_factor(dist.pot.group),
+    cluster_id = as_factor(cluster.id),
+    # this isn't actually used
+    standard_cluster.dist.to.pot = dist.to.pot/sd_of_dist,
+    dworm_frac = dworm_rate / 10,
+    # different naming convention here
+    have_ink = ink_visible
+  )
+
+pred_dworm_fit = function(data, weights) {
+
+  feols(
+    dworm_frac ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+
+wrapper_function(
+  data = endline_data,
+  regression_spec = pred_dworm_fit,
+  tidy_summ_path = "temp-data/predicted-endline-deworm-takeup-tidy-tes.csv",
+  table_name = "predicted_endline_deworm_takeup_spec_tbl",
+  table_options = list(caption = "Average Treatment Effects: Reduced Form", dependent_var = "Dependent variable: Predicted Take-up", type = "APE", stars = TRUE)
+)
+
+#### Incentive Implementation --------------------------------------------------
+
+mean_deworm_string_f = function(string) {
+  str_detect(str_to_lower(string), "drug|medicine|tablet|deworm|Deworm|worm|treat")
+}
+
+endline_data = endline_data %>%
+  mutate(
+    meandeworm_bracelet = mean_deworm_string_f(bracelet_meaning),
+    meandeworm_ink = mean_deworm_string_f(ink_meaning),
+    meandeworm_cal = mean_deworm_string_f(cal_meaning)
+  )
+
+
+got_vars = c(
+  "got_bracelet", 
+  "got_ink", 
+  "got_cal"
+)
+have_vars = c(
+  "have_bracelet", 
+  "have_cal", 
+  "have_ink"
+)
+seen_vars = c(
+  "seen_bracelet", 
+  "seen_ink", 
+  "seen_cal"
+)
+mean_vars = c(
+  "meandeworm_bracelet", 
+  "meandeworm_ink", 
+  "meandeworm_cal"
+)
+
+long_incentive_check_df = endline_data %>%
+  select(all_of(c(got_vars, have_vars, seen_vars, mean_vars)), assigned_treatment, cluster_id, county)  %>%
+  pivot_longer(
+    cols = all_of(c(got_vars, have_vars, seen_vars, mean_vars))
+  ) %>%
+  mutate(
+    variable_type = str_extract(name, "(\\w+)(?=_)"),
+    name = str_extract(name, "(?<=_)\\w+"), 
+    name = if_else(name == "cal", "calendar", name)
+    )   %>%
+  filter(name == assigned_treatment)  %>%
+  mutate(
+    treat_type = paste0(assigned_treatment, "_", variable_type)
+  ) %>%
+  select(-name)
+
+tidy_incentive_check_df = long_incentive_check_df %>%
+  feols(
+    value ~ i(assigned_treatment, "ink") ,
+    split = ~variable_type,
+    cluster = ~cluster_id
+  ) %>%
+  map_dfr(
+    ~tidy(.x) %>%
+    mutate(n = nobs(.x)), 
+    .id = "lhs"
+  ) %>%
+  mutate(
+    treatment = str_extract(
+      term, "(?<=assigned_treatment::)\\w+"
+    ),
+    treatment = replace_na(treatment, "ink")
+  ) %>%
+  mutate(
+    variable_type = str_extract(
+      lhs, 
+      "(?<=sample: )\\w+$"
+    )
+    ) %>%
+  select(
+    -lhs,
+    -term
+  )
+
+
+wide_incentive_check_input_df = tidy_incentive_check_df %>%
+  mutate(across(c(estimate, std.error), round, 3)) %>%
+  mutate(
+    stars = case_when(
+      treatment != "ink" & p.value < 0.01 ~ "***",
+      treatment != "ink" & p.value < 0.05 ~ "**", 
+      treatment != "ink" & p.value < 0.1 ~ "*" , 
+      TRUE ~ ""
+    ),
+    estim_std = linebreak(paste0(estimate, stars, "\n", str_glue("({std.error})")), align = "c") 
+  ) %>%
+  mutate(treatment = str_replace(treatment, "ink", "ink (levels)")) %>%
+  select( 
+    treatment, 
+    variable_type, 
+    estim_std
+  ) %>%
+  mutate(treatment = str_to_title(treatment)) %>%
+  spread(
+    variable_type, 
+    estim_std
+  ) %>%
+  select(
+    treatment,
+    got, # "Did you receive X when you went for deworming?"
+    have, # "Do you still have X?"
+    seen, # "have you seen people wearing these "X"?"/ "have you seen people these calendars before"
+    meandeworm # "What does it mean if a person has a bracelet?" -> coded into deworm mentions
+  )
+
+
+incentive_check_tbl = wide_incentive_check_input_df %>%
+  knitr::kable(
+    format = "latex",
+      col.names = c(
+        "", 
+        "Received incentive when treated", 
+        "Have incentive currently", 
+        "Seen incentive", 
+        "Link incentive to deworming"),
+      escape = FALSE, 
+      booktabs = TRUE,
+      align = "lcccc", 
+      caption = "Endline Incentive Checks"
+  ) %>% 
+  row_spec(c(2), hline_after = TRUE) 
+
+incentive_check_tbl
+
+incentive_check_tbl %>%
+  custom_save_latex_table("incentive-check-tbl")
+
+#### Preference for Gift Fit Not Dewormed ---------------------------------------
+pref_gift_fit_not_dewormed = analysis_data %>%
+    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    # filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
+    filter(
+      dewormed == FALSE
+    )  %>%
+    ungroup() %>%
+    select(cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    mutate(
+      assigned_treatment = factor(assigned.treatment),
+      assigned_dist_group = factor(dist.pot.group),
+      cluster_id = factor(cluster.id)
+      )
+
+
+
+
+pref_gift_fit = function(data, weights) {
+  feols(
+    want_bracelet ~  assigned_treatment*assigned_dist_group | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+} 
+
+
+wrapper_function(
+  data = pref_gift_fit_not_dewormed,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/preference-for-bracelet-tidy-tes.csv",
+  table_name = "preference_for_bracelet_spec_tbl",
+  table_options = list(caption = "Average Treatment Effects: Reduced Form", dependent_var = "Dependent variable: Prefer Bracelet", stars = TRUE, type = "APE")
+)
+
+
+
+#### SMS -----------------------------------------------------------------------
+monitored_sms_data <- analysis.data %>% 
+  filter(mon_status == "monitored") %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+
+
+
+sms_analysis_data <- monitored_sms_data %>% 
+    mutate(
+    assigned_treatment = assigned.treatment, 
+    assigned_dist_group = dist.pot.group, 
+    sms_treatment = sms.treatment.2, 
+    phone_owner = if_else(phone_owner == TRUE, "phone", "nophone"), 
+    sms_treatment = str_replace_all(sms_treatment, "\\.", "")) %>%
+    # reminder.only only present in control condition
+    filter(phone_owner == "phone") %>%
+    mutate(sms_treatment = factor(sms_treatment)) %>%
+    mutate(
+        county = factor(county),
+        cluster.id = factor(cluster.id),
+        assigned_treatment = assigned.treatment,
+        assigned_dist_group = dist.pot.group,
+        signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+        signal = factor(signal, levels = c("no signal", "signal"))
+    )
+
+
+
+
+
+f_sms = function(data, weights) {
+  feols(
+    dewormed ~ 0  + 
+      assigned_treatment + 
+      standard_cluster.dist.to.pot + 
+      sms_treatment + 
+      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
+      i(assigned_treatment, sms_treatment, "control") +
+      i(sms_treatment, standard_cluster.dist.to.pot) +
+      sms_treatment:assigned_treatment:standard_cluster.dist.to.pot 
+      | county,
+    data = data,
+    weights = weights
+  )
+}
+
+
+sms_bs_draws = map_dfr(
+    1:500,
+    ~bayes_bs_f(
+        seed = .x, 
+        f = f_sms, 
+        data = sms_analysis_data,
+        sms_treatment
+    ),
+    .progress = TRUE
+)
+
+
+clean_bs_sms_signal_draws = sms_bs_draws %>%
+  clean_signal_draws(sms_treatment)
+
+clean_bs_sms_te_draws = sms_bs_draws %>%
+  clean_te_draws(sms_treatment)
+
+
+create_sms_te = function(draws) {
+  draws %>%
+    group_by(seed, assigned_dist_group, sms_treatment) %>%
+    mutate(
+      te = if_else(assigned_treatment == "control", mean_pred, mean_pred - mean_pred[assigned_treatment == "control"])
+    )  %>%
+    ungroup() %>%
+    group_by(seed, assigned_dist_group, assigned_treatment) %>%
+    mutate(
+      diff_te = te - te[sms_treatment == "smscontrol"]
+    ) 
+}
+
+sms_bs_tes = sms_bs_draws %>%
+  filter(!is.na(assigned_treatment)) %>%
+  select(-signal) %>%
+  add_predictions(sms_treatment)  %>%
+  create_sms_te() %>%
+  rename(estimate = diff_te)
+
+sms_signal_bs_tes = sms_bs_draws %>%
+  filter(!is.na(signal)) %>%
+  select(-assigned_treatment) %>%
+  add_signal_predictions(sms_treatment) %>%
+  group_by(seed, assigned_dist_group, sms_treatment) %>%
+    mutate(
+      te = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
+    )  %>%
+    ungroup() %>%
+    group_by(seed, assigned_dist_group, signal) %>%
+    mutate(
+      diff_te = te - te[sms_treatment == "smscontrol"]
+   )  %>%
+  rename(estimate = diff_te)  %>%
+  rename(assigned_treatment = signal)
+
+
+realised_sms_fit = actual_bayesian_bs_fit(
+  seed = "realised fit",
+  f = f_sms,
+  data = sms_analysis_data,
+  sms_treatment
+)
+
+
+realised_sms_tes = realised_sms_fit %>%
+  filter(!is.na(assigned_treatment)) %>%
+  select(-signal) %>%
+  add_predictions(sms_treatment)  %>%
+  create_sms_te() %>%
+  ungroup() %>%
+  rename(realised_pred = diff_te) %>%
+  select(assigned_dist_group, assigned_treatment, sms_treatment, realised_pred)
+
+realised_sms_signal_fit = realised_sms_fit %>%
+  filter(!is.na(signal)) %>%
+  select(-assigned_treatment) %>%
+  add_signal_predictions(sms_treatment) %>%
+  group_by(seed, assigned_dist_group, sms_treatment) %>%
+    mutate(
+      te = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
+    )  %>%
+    ungroup() %>%
+    group_by(seed, assigned_dist_group, signal) %>%
+    mutate(
+      diff_te = te - te[sms_treatment == "smscontrol"]
+   )  %>%
+  rename(realised_pred = diff_te) %>%
+  ungroup() %>%
+  select(assigned_dist_group, assigned_treatment = signal, sms_treatment, realised_pred)
+
+
+realised_sms_tes
+realised_sms_signal_fit
+
+both_sms_fits = bind_rows(
+  sms_bs_tes,
+  sms_signal_bs_tes
+) %>%
+  mutate(
+    show_pval_only = assigned_treatment %in% pval_only_terms
+  ) %>%
+  filter(assigned_treatment != "no signal") 
+
+realised_sms_both = bind_rows(
+  realised_sms_signal_fit,
+  realised_sms_tes
+) 
+
+
+
+    clean_sms_tes = both_sms_fits %>%
+      group_by(
+          assigned_treatment,
+          assigned_dist_group,
+          sms_treatment
+      ) %>%
+      summarise(
+          std_error = sd(estimate),
+          conf.low = quantile(estimate, (1 - ci_width)/2),
+          conf.high = quantile(estimate, 1 - (1 - ci_width)/2)
+      ) %>%
+      left_join(
+          realised_sms_both,
+          by = c("assigned_dist_group", "assigned_treatment", "sms_treatment")
+      ) %>%
+      mutate(
+          pval = 2*pnorm(-abs(realised_pred)/std_error),
+          oneside_pval = pnorm(-realised_pred/std_error)
+      ) %>%
+      mutate(
+          pval = round(pval, 4),
+          oneside_pval = round(oneside_pval, 4)
+      ) %>%
+      select(
+          assigned_treatment, 
+          assigned_dist_group, 
+          sms_treatment,
+          realised_pred, 
+          std_error, 
+          conf.low,
+          conf.high,
+          pval, 
+          oneside_pval) %>%
+      rename(estimate = realised_pred)  %>%
+      filter(sms_treatment != "smscontrol")
+
+clean_sms_tes %>%
+  write_csv("temp-data/differential-tes-by-sms.csv")
+
+clean_sms_tes %>%
+  filter(assigned_treatment != "control") %>%
+  select(assigned_treatment, assigned_dist_group, sms_treatment, pval, oneside_pval)
+
+
+clean_sms_tes %>%
+  filter(sms_treatment != "smscontrol")  %>%
+  mutate(show_pval_only = FALSE) %>%
+  filter(sms_treatment != "reminderonly") %>%
+  mutate(
+    show_pval_only = assigned_treatment %in% pval_only_terms
+  ) %>%
+  prep_tbl(stat = params$stat) %>%
+  nice_kbl_table(
+    cap = "Heterogeneous SMS Average Treatment Effects",
+    outcome_var = "Dependent variable: Take-up"
+  ) %>%
+  custom_save_latex_table(
+    table_name = "sms_diff_tes_tbl"
+  )
+
+library(ggthemes)
+
+
+p_sms_tes = clean_sms_tes %>%
+  filter(sms_treatment != "smscontrol")  %>%
+  mutate(show_pval_only = FALSE)  %>%
+  filter(assigned_treatment != "signal") %>%
+  select(
+    assigned_treatment,
+    assigned_dist_group,
+    sms_treatment,
+    estimate,
+    conf.low,
+    conf.high
+  ) %>%
+  mutate(
+    assigned_treatment = case_when(
+      assigned_treatment == "bracelet - calendar" ~ "Bracelet - Calendar",
+      assigned_treatment == "bracelet" ~ "Bracelet",
+      assigned_treatment == "calendar" ~ "Calendar",
+      assigned_treatment == "ink" ~ "Ink",
+      assigned_treatment == "control" ~ "Control Mean",
+    ),
+    assigned_treatment = factor(
+      assigned_treatment,
+      levels = c(
+        "Control Mean",
+        "Bracelet - Calendar",
+        "Ink",
+        "Calendar",
+        "Bracelet"
+      )
+    ),
+    assigned_dist_group = str_to_title(assigned_dist_group),
+    sms_treatment = case_when(
+      sms_treatment == "smscontrol" ~ "SMS Control",
+      sms_treatment == "reminderonly" ~ "Reminder Only",
+      sms_treatment == "socialinfo" ~ "Social Info"
+    )
+  ) %>%
+  ggplot(aes(
+    x = estimate,
+    xmin = conf.low,
+    xmax = conf.high,
+    y = assigned_treatment,
+    colour = sms_treatment
+  )) +
+  geom_pointrange(
+    position = position_dodge(width = 0.5)
+  ) +
+  facet_wrap(~assigned_dist_group) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "longdash"
+  ) +
+  labs(
+    x = "Estimate",
+    y = "",
+    colour = ""
+  ) +
+  scale_colour_canva(
+    "",
+    palette = "Primary colors with a vibrant twist"
+  )
+
+ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
