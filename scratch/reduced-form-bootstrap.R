@@ -1680,7 +1680,7 @@ dist_cts_spec_levels = actual_bayesian_bs_fit(
   seed = "realised fit",
   f = dist_cts_regression,
   data = cov_analysis_data
-) %>%
+)$bs_fit %>%
   filter(!is.na(assigned_treatment)) 
 
 dist_cts_spec_levels_ci = dist_cts_spec_bs_draws %>%
@@ -1707,7 +1707,7 @@ discrete_distance_covs_bs_draws = map_dfr(
   1:500,
   ~bayes_bs_f(
     seed = .x,
-    f = discrete_distance_covs,
+    f = discrete_distance_regression,
     data = cov_analysis_data
   ),
   .progress = TRUE
@@ -1715,9 +1715,9 @@ discrete_distance_covs_bs_draws = map_dfr(
 
 discrete_distance_covs_levels = actual_bayesian_bs_fit(
   seed = "realised fit",
-  f = discrete_distance_covs,
+  f = discrete_distance_regression,
   data = cov_analysis_data
-) %>%
+)$bs_fit %>%
   filter(!is.na(assigned_treatment)) 
 
 discrete_distance_covs_levels_ci = discrete_distance_covs_bs_draws %>%
@@ -1757,7 +1757,7 @@ fob_levels_point = actual_bayesian_bs_fit(
   f = discrete_f_know,
   data = know_df %>%
     filter(belief_type == "1ord")
-) %>%
+)$bs_fit %>%
   filter(!is.na(assigned_treatment)) 
 
 fob_levels_ci = fob_bs_draws %>%
@@ -2339,7 +2339,7 @@ realised_sms_fit = actual_bayesian_bs_fit(
   f = f_sms,
   data = sms_analysis_data,
   sms_treatment
-)
+)$bs_fit
 
 
 realised_sms_tes = realised_sms_fit %>%
