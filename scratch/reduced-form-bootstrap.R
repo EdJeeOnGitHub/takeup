@@ -1373,10 +1373,14 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
 
 write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-data.csv")
 
+# From running:
+# pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
+# where mu_d is the expected distance to the cluster
+# get the same result using actual distance.
+# using treatment dummies and putting them in the amelioration set includes everything 
+# which seems wrong
 l_cov_vars = c(
-  "floor_tile_cement",
   "female",
-  "have_phone_lgl",
   "age.census"
 )
 
@@ -1433,7 +1437,6 @@ discrete_distance_covs_output = wrapper_function(
   tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-covs-tidy-tes.csv",
   table_name = "rf_discrete_dist_covs_tbl"
 )
-
 
 #### Takeup HH Distance + LASSO Covs + Cluster Expected Distance
 hh_spec_regression = function(data, weights) {
