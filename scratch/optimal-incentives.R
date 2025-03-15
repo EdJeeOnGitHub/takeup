@@ -596,12 +596,14 @@ full_posterior_df %>%
 } # End posterior estimation
 
 ## Delta V Star Plot
+end_points = c(-10000, 10000) * (rnorm(50, 0, 0.1)  + 1) 
+
 vstar_df = expand.grid(
     draw = 1,
     lambda = script_options$lambda,
     b_add = 0,
-    distance = seq(from = -10000, to = 10000, length.out = 100),
-    sigma_u = seq(0.1, 2.0, 0.15)
+    distance = c(seq(from = -10000, to = 10000, length.out = 100), end_points),
+    sigma_u = seq(0.1, 2.0, 0.05)
     ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add))
@@ -647,7 +649,6 @@ vstar_df = vstar_df %>%
         )
 
 
-
 vstar_df %>%
     ungroup() %>%
     unnest_wider(takeup_list) %>%
@@ -664,7 +665,6 @@ vstar_df %>%
         c(-v_star, -sigma_u)
     ) %>%  
     write_csv("temp-data/delta-vstar-endog-mu.csv")
-
 
 
 
