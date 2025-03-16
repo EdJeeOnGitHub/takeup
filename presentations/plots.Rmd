@@ -3320,43 +3320,56 @@ gpt_endline_know_notknow_table_data = read_csv(
     "temp-data/second-order-know-notknow-gpt-reason-full-data.csv"
 )
 
+gpt_endline_know_notknow_table_data %>%
+  filter(second.order == "don't know" | !is.na(category_sob_reason_short)) %>%
+  summarise(
+    n_distinct(KEY.individ)
+  )
+
+gpt_endline_know_notknow_table_data = gpt_endline_know_notknow_table_data %>%
+  mutate(
+    category_sob_reason_short = case_when(
+    str_detect(second.order.reason, "see") ~ "campaign",
+    # ~ 7 of these cases and all miscoded
+    assigned.treatment == "control" & category_sob_reason_short == "signal" ~ "other",
+      TRUE ~ category_sob_reason_short
+    ),
+  ) 
+
 gpt_translation_df = tribble(
     ~gpt_name, ~clean_name,
-    "campaign", "General Visibility",
+    "campaign", "Direct Observation",
     "communication", "Communication",
     "relationship", "Social Proximity", 
     "signal", "Incentive",
-    "type", "Type",
-    "circumstances", "Circumstances",
+    "type", "Personal Characteristics",
+    "circumstances", "Personal Characteristics",
     "other", "Other",
     "Don't Know", "Don't Know"
-) 
+)  
 
-gpt_translation_df = gpt_translation_df %>%
-    mutate(
-        clean_name = factor(clean_name, levels = clean_name)
-    )
+gpt_df = gpt_endline_know_notknow_table_data %>%
+  mutate(
+    gpt_name = if_else(second.order == "don't know", "Don't Know", category_sob_reason_short)
+  ) %>%
+    left_join(
+        gpt_translation_df,
+        by = c("gpt_name" = "gpt_name")
+    ) %>%
+    mutate(clean_name = factor(clean_name, levels = c("Direct Observation", "Communication", "Social Proximity", "Incentive", "Personal Characteristics", "Other", "Don't Know")))
 
-gpt_endline_know_notknow_table_data %>%
-    filter(!is.na(second.order)) %>%
-    filter(!is.na(second.order.reason)) %>%
+gpt_df %>%
+  count(gpt_name, clean_name)
+
+
+gpt_df %>%
     select(
         knowledge,
         dist.pot.group,
         assigned.treatment,
-        category_sob_reason_short
+        category_sob_reason_short,
+        clean_name
     ) %>%
-    mutate(
-        category_sob_reason_short = if_else(
-            knowledge == FALSE,
-            "Don't Know",
-            category_sob_reason_short
-        )
-    ) %>%
-    left_join(
-        gpt_translation_df,
-        by = c("category_sob_reason_short" = "gpt_name")
-    )  %>%
     mutate(
         assigned.treatment = str_to_title(assigned.treatment),
         dist.pot.group = str_to_title(dist.pot.group)
@@ -3381,6 +3394,7 @@ gpt_endline_know_notknow_table_data %>%
     theme(
       panel.grid.major.x = element_blank() 
     )
+
 
 ```
 
