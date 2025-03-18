@@ -83,13 +83,12 @@ l_cov_vars = c(
 
 analysis_data %>%
     group_by(
-        assigned_treatment, 
         sms_treatment
     ) %>%
     summarise(
         n = n()
     )
-
+stop()
 
 
 library(fixest)
