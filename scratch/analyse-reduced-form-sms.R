@@ -42,39 +42,18 @@ load(file.path("data", "analysis.RData"))
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
-# stick to monitored sms.treatment group
-# remove sms.treatment.2
-monitored_nosms_data <- analysis.data %>% 
-  filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
 monitored_sms_data <- analysis.data %>% 
   filter(mon_status == "monitored") %>% 
+  filter(have_phone == "Yes") %>%
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
             by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   group_by(cluster.id) %>% 
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
-
-
-
-nosms_data <- analysis.data %>% 
-  filter(sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
 
 analysis_data <- monitored_sms_data %>% 
+    filter(have_phone == "Yes") %>%
     mutate(
     assigned_treatment = assigned.treatment, 
     assigned_dist_group = dist.pot.group, 
@@ -102,10 +81,16 @@ l_cov_vars = c(
   "age.census"
 )
 
+analysis_data %>%
+    group_by(
+        assigned_treatment, 
+        sms_treatment
+    ) %>%
+    summarise(
+        n = n()
+    )
 
-   analysis_data %>%
-    select(female, age.census, clust_expected_dist) %>%
-    skimr::skim()
+
 
 library(fixest)
 rf_fit = feols(
@@ -114,6 +99,14 @@ rf_fit = feols(
     cluster =  ~cluster.id
     )
 
+
+
+nobs(rf_fit)
+
+analysis_data %>%
+    count(
+        sms_treatment
+    )
 
 
 breakdown_sms_comp = comparisons(

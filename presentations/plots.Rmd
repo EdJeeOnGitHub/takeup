@@ -2857,6 +2857,8 @@ sm_df %>%
 
 ```{r}
 #| sm-decomp,
+#| fig.width=8,
+#| fig.height=6,
 #| fig.cap="Estimated Social Multiplier Over Distance - Components",
 #| fig.note = "This plot shows the social multiplier components estimated using the structural 
 #|  model. The plot decomposes how much of the social multiplier is driven by the 
@@ -2866,39 +2868,128 @@ sm_df %>%
 #|  lines is driven by changes in $\\mu$ visibility.
 #|  Line: median."
 
+
+col_df = tibble(
+  variable = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive"),
+  colour = c(canva_pal(canva_palette_vibrant)(2)[1], canva_pal(canva_palette_vibrant)(2)[2], "grey")
+)
+
 tidy_param_df %>%
   filter(param == "sm_draws") %>%
   unnest(tidy_draws) %>%
   filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
+  mutate(
+    variable_label = case_when(
+      variable == "sm_rescaled" & fit_type == "prior-predict" ~ "Prior Predictive",
+      variable == "sm_rescaled" ~ "Social Multiplier",
+      variable == "sm_delta_part_rescaled" ~ "Social Multiplier - Type Inference Only"
+    ),
+    variable_label = factor(variable_label, levels = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive")),
+    variable = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
+  ) %>%
   filter(roc_distance <= 2500) %>%
-  filter(fit_type == "fit") %>%
+  filter(fit_type == "fit" | variable_label == "Prior Predictive")  %>%
   mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
   ggplot(aes(
     x = roc_distance/1000,
     y = value,
     linetype = variable,
-    colour = variable
+    colour = variable_label
   )) +
-  geom_line() +
-  facet_wrap(~treatment) +
+  geom_line(
+    linewidth = 1.5
+  ) +
+  facet_wrap(~treatment)  +
   geom_hline(
     yintercept = 1,
     linetype = "longdash"
   ) +
+  scale_color_manual(
+    "",
+    values = col_df$colour,
+    labels = col_df$variable
+  )  +
+  guides(linetype = "none") +
   labs(
     x = "Distance [km]",
-    y = "Rescaled Social Multiplier"
-  ) +
-  scale_linetype(
-    "",
-    labels = c(TeX("Rescaled Social Multiplier"), TeX("$\\delta$ Component"))
-  ) +
-  scale_color_canva(
-    "",
-    palette = canva_palette_vibrant,
-    labels = c(TeX("Rescaled Social Multiplier"), TeX("$\\delta$ Component"))
-  )
+    y = "Social Multiplier"
+  ) 
 
+
+
+```
+
+
+```{r}
+#| sm-decomp-annotated,
+#| fig.width=8,
+#| fig.height=6,
+#| fig.cap="Estimated Social Multiplier Over Distance - Components",
+#| fig.note = "This plot shows the social multiplier components estimated using the structural 
+#|  model. The plot decomposes how much of the social multiplier is driven by the 
+#|  $\\Delta$ component versus how much is driven by changes in visibility 
+#|  across distance. The full line shows the entire social multiplier whilst the 
+#|  dashed line shows the $\\Delta$ component - the difference between the two 
+#|  lines is driven by changes in $\\mu$ visibility.
+#|  Line: median."
+
+
+tidy_param_df %>%
+  filter(param == "sm_draws") %>%
+  unnest(tidy_draws) %>%
+  filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
+  mutate(
+    variable_label = case_when(
+      variable == "sm_rescaled" & fit_type == "prior-predict" ~ "Prior Predictive",
+      variable == "sm_rescaled" ~ "Social Multiplier",
+      variable == "sm_delta_part_rescaled" ~ "Social Multiplier - Type Inference Only"
+    ),
+    variable_label = factor(variable_label, levels = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive")),
+    variable = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
+  ) %>%
+  filter(roc_distance <= 2500) %>%
+  filter(fit_type == "fit" | variable_label == "Prior Predictive")  %>%
+  mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
+  ggplot(aes(
+    x = roc_distance/1000,
+    y = value,
+    linetype = variable,
+    colour = variable_label
+  )) +
+  geom_line(
+    linewidth = 1.5
+  ) +
+  facet_wrap(~treatment)  +
+  geom_hline(
+    yintercept = 1,
+    linetype = "longdash"
+  ) +
+  scale_color_manual(
+    "",
+    values = col_df$colour,
+    labels = col_df$variable
+  )  +
+  guides(linetype = "none") +
+  labs(
+    x = "Distance [km]",
+    y = "Social Multiplier"
+  )  +
+  annotate(
+    "text", 
+    x = 0.0 + 0.3, 
+    y = 1 + 0.05,
+    label = "Amplification", 
+    size = 3, 
+    alpha = 0.7
+  ) +
+  annotate(
+    "text", 
+    x = 2.25 , 
+    y = 1 - 0.05,
+    label = "Mitigation", 
+    size = 3,
+    alpha = 0.7
+  )
 
 ```
 
@@ -3361,6 +3452,23 @@ gpt_df = gpt_endline_know_notknow_table_data %>%
 gpt_df %>%
   count(gpt_name, clean_name)
 
+# Extract colors from the "Accent" palette
+accent_colors <- RColorBrewer::brewer.pal(n = 8, name = "Accent")
+print(accent_colors)
+
+col_gpt_df = gpt_translation_df %>%
+  select(clean_name) %>%
+  unique()
+
+col_gpt_df$colors = accent_colors[1:nrow(col_gpt_df)]
+gray_hex_code = "#AEAEAE"
+col_gpt_df = col_gpt_df %>%
+  mutate(
+    colors = if_else(clean_name == "Don't Know", gray_hex_code, colors)
+  )
+
+
+
 
 gpt_df %>%
     select(
@@ -3384,7 +3492,12 @@ gpt_df %>%
         colour = "black"
     ) +
     facet_grid(~dist.pot.group) +
-    scale_fill_brewer("", palette = "Accent") +
+    # scale_fill_brewer("", palette = "Accent") +
+    scale_fill_manual(
+      "",
+        values = col_gpt_df$colors,
+        labels = col_gpt_df$clean_name
+    ) +
     theme_minimal() +
     theme(legend.position = "bottom") +
     labs(
