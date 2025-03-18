@@ -389,7 +389,38 @@ create_ate_table = function(.data, .estimand, group_var = treatment) {
           names_from = dist_group,
           values_from = bracelet_minus_calendar
         ) %>%
-        mutate("{{ group_var }}" := "bracelet_minus_calendar")
+        mutate("{{ group_var }}" := "bracelet_minus_calendar"),
+
+
+      # signal - no signal row
+      .data %>%
+        filter(estimand == .estimand) %>%
+          pivot_wider(
+            names_from = dist_group,
+            values_from = value
+          ) %>%
+          select(model, treatment, any_of(c("combined", "close", "far"))) %>%
+          mutate(
+            signal = case_when(
+              treatment %in% c("Bracelet", "Ink") ~ "Signal",
+              treatment %in% c("Calendar") ~ "No Signal",
+              TRUE ~ NA
+            )
+          ) %>%
+          filter(!is.na(signal)) %>%
+          group_by(model, signal) %>%
+          summarise(
+            across(where(is_rvar), rvar_mean)
+          ) %>%
+          group_by(
+            model
+          )  %>%
+          summarise(
+            across(where(is_rvar), ~.x[signal == "Signal"] - .x[signal == "No Signal"])
+          )  %>%
+          mutate(
+            "{{ group_var }}" := "signal_minus_no_signal"
+          )
     )
 }
 
@@ -398,8 +429,6 @@ incentive_ate_df =  ate_rvar_df %>%
     .estimand = "overall",
     group_var = treatment
   )
-
-
 
 
 
@@ -423,14 +452,15 @@ ate_tbl_levels = c(
     "Bracelet",
     "Calendar",
     "Ink",
-    "bracelet_minus_calendar",
-    "Control"
+    "Control",
+    "signal_minus_no_signal",
+    "bracelet_minus_calendar"
 )
 
 recode_control_mean = function(data) {
   data %>%
     mutate(
-      treatment = fct_recode(treatment, "Control mean" = "Control", "Bracelet - Calendar" = "bracelet_minus_calendar")
+      treatment = fct_recode(treatment, "Control mean" = "Control", "Bracelet - Calendar" = "bracelet_minus_calendar", "Signal - No Signal" = "signal_minus_no_signal")
     )
 }
 
@@ -469,7 +499,8 @@ private_ate_tbl = private_ate_df %>%
   create_cis(.width = params$width) %>%
   recode_control_mean() %>%
   spread_rf() %>%
-  mutate(estimand = "private")
+  mutate(estimand = "private") %>%
+  filter(!(treatment %in% c("Signal - No Signal", "Control mean", "Bracelet - Calendar")))
 
 signal_ate_tbl = signal_ate_df %>%
   rename(treatment = mu_treatment) %>%
@@ -481,7 +512,8 @@ signal_ate_tbl = signal_ate_df %>%
   create_cis(.width = params$width) %>%
   recode_control_mean() %>%
   spread_rf() %>%
-  mutate(estimand = "signal")
+  mutate(estimand = "signal") %>%
+  filter(!(treatment %in% c("Signal - No Signal", "Control mean", "Bracelet - Calendar")))
 
 
 
@@ -505,6 +537,8 @@ latex_group_gap_space = "2em"
 
 ```{r, results="asis"}
 1+3
+
+
 
 te_kbl_df = all_ate_tbl %>% 
   arrange(estimand, treatment) %>%
@@ -548,9 +582,9 @@ te_kbl_df = all_ate_tbl %>%
   ) %>%
   pack_rows(
     index = c(
-      "Panel A: Overall" = 5, 
-      "Panel B: Signalling" = 5, 
-      "Panel C: Private" = 5
+      "Panel A: Overall" = 6, 
+      "Panel B: Signalling" = 3, 
+      "Panel C: Private" = 3
     ), 
     italic = TRUE,
     escape = FALSE,
@@ -558,9 +592,10 @@ te_kbl_df = all_ate_tbl %>%
     hline_after = TRUE, 
     hline_before = TRUE,
     bold = TRUE
-  )  %>%
-  row_spec(c(3, 8, 13), hline_after = TRUE) 
+  )  
+  # row_spec(c(3, 8, 13), hline_after = TRUE) 
 
+te_kbl_df
 
 te_kbl_df %>%
   custom_save_latex_table(
@@ -612,19 +647,9 @@ overall_te_kbl_df = all_ate_tbl %>%
       "Structural" = 4
       )
   ) %>%
-  pack_rows(
-    index = c(
-      "Panel A: Overall" = 5
-    ), 
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space, 
-    hline_after = TRUE, 
-    hline_before = TRUE,
-    bold = TRUE
-  )  %>%
   row_spec(c(3), hline_after = TRUE) 
 
+overall_te_kbl_df
 
 overall_te_kbl_df %>%
   custom_save_latex_table(
@@ -670,17 +695,17 @@ struct_overall_tbl = all_ate_tbl %>%
       "Structural" = 4
       )
   ) %>%
-  pack_rows(
-    index = c(
-      "Panel A: Overall" = 5
-    ), 
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space, 
-    hline_after = TRUE, 
-    hline_before = TRUE,
-    bold = TRUE
-  )  %>%
+  # pack_rows(
+  #   index = c(
+  #     "Panel A: Overall" = 5
+  #   ), 
+  #   italic = TRUE,
+  #   escape = FALSE,
+  #   # latex_gap_space = latex_group_gap_space, 
+  #   hline_after = TRUE, 
+  #   hline_before = TRUE,
+  #   bold = TRUE
+  # )  %>%
   row_spec(c(3), hline_after = TRUE) 
 
 
@@ -764,7 +789,7 @@ decomposed_te_kbl_df = all_ate_tbl %>%
       "Dependent variable: Take-up",
       paste0("(", 1:4, ")")
     ), 
-    # format = "latex", 
+    format = "latex", 
     linesep = "\\addlinespace \\addlinespace \\addlinespace",
     booktabs = TRUE, 
     escape = FALSE, 
@@ -787,11 +812,11 @@ decomposed_te_kbl_df = all_ate_tbl %>%
       " " = 1,
       "Structural" = 4
       )
-  ) %>%
+  )  %>%
   pack_rows(
     index = c(
-      "Panel A: Signal" = 5,
-      "Panel B: Private" = 5
+      "Panel A: Signal" = 3,
+      "Panel B: Private" = 3
     ), 
     italic = TRUE,
     escape = FALSE,
@@ -799,8 +824,10 @@ decomposed_te_kbl_df = all_ate_tbl %>%
     hline_after = TRUE, 
     hline_before = TRUE,
     bold = TRUE
-  )  %>%
-  row_spec(c(3, 8), hline_after = TRUE) 
+  )  
+  # row_spec(c(3, 8), hline_after = TRUE) 
+
+decomposed_te_kbl_df 
 
 # Q for Anne:
 # do we want control mean signal/private value or overall control mean at bottom
@@ -937,6 +964,55 @@ wide_belief_tbl %>%
 ```
 
 
+```{r}
+#| fob-table
+fob_wide_belief_tbl = wide_belief_df %>%
+  select(treatment, contains("_1")) %>%
+  kbl(
+    col.names = c(
+      # "Estimand", 
+      # "Treatment", 
+      "",
+      paste0("(", 1:3, ")")
+    ), 
+    format = "latex", 
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lccc", 
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    caption = "Observability Results"
+  ) %>%
+  kable_styling(
+    # latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined",
+      "Close", 
+      "Far"
+      ), 
+    line = FALSE
+  )  %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Observability" = 3
+      )
+  ) %>%
+  footnote(
+    escape = FALSE,
+    threeparttable = TRUE
+  ) %>%
+  row_spec(c(3), hline_after = TRUE)
+
+fob_wide_belief_tbl %>%
+  custom_save_latex_table(
+    "fob-beliefs-table"
+  )
+
+
+
+```
 
 ```{r}
 #| disagg-beliefs
@@ -1373,7 +1449,7 @@ wtp_summ_tbl %>%
 
 ```{r}
 #| optim-table-main,
-#| eval=TRUE
+#| eval=FALSE
 x = 1+1
 all_optim_df = read_csv(
   file.path(
@@ -1603,6 +1679,7 @@ optim_summ_tbl %>%
 ```
 
 ```{r}
+#| optim-tbl, eval=FALSE
 
 
 optim_summ_tbl_diff_order =  optim_summ_input_df %>%
@@ -1654,7 +1731,7 @@ optim_summ_tbl_diff_order %>%
 ```
 
 ```{r}
-#| fixing-optim-table
+#| fixing-optim-table, eval=FALSE
 
   fix_optim_tbl = wide_summ_df_rep %>% 
     mutate(rep_type = "rep") %>%
@@ -1700,51 +1777,51 @@ fix_optim_tbl %>%
 
 ```
 
-```{r, eval=TRUE}
+```{r}
 #|optim-summ-table-robust,
 #| dependson = c("optim-summ-table"), eval=FALSE
-optim_summ_robust_tbl = optim_summ_input_df %>%
-  arrange(allocation_type, distance_constraint, rep_type, mu_z, B_z) %>%
-  select(B_z, mu_z, distance_constraint, n_pot, mean_demand, mean_dist) %>%
-  mutate(distance_constraint = distance_constraint/1000) %>%
-  knitr::kable(
-    col.names = c(
-      "Private benefit", 
-      "Visibility",
-      "\\makecell{Maximum \\\\ distance constraint (km)}",
-      "Assigned PoTs", 
-      "Mean take-up", 
-      "Mean distance (km)"
-    ),
-    align = "llcccc",
-    booktabs = TRUE,
-    escape = FALSE,
-    format = "latex"
-    ) %>%
-  kableExtra::kable_styling(
-    # latex_options =  c("scale_down")
-  ) %>%
-  pack_rows(
-    index = c(
-      "Panel A: Random allocation" = 1, 
-      "Panel B: Policymaker allocation, 2.5km" = 4,
-      "Panel C: Policymaker allocation, 3.5km" = 4,
-      "Panel D: Policymaker allocation, 4.5km" = 4,
-      "Panel E: Policymaker allocation, 5.5km" = 4,
-      "Panel F: Policymaker allocation, 10km" = 4
-    ), 
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space, 
-    hline_after = TRUE, 
-    hline_before = TRUE,
-    bold = TRUE
-  ) 
+# optim_summ_robust_tbl = optim_summ_input_df %>%
+#   arrange(allocation_type, distance_constraint, rep_type, mu_z, B_z) %>%
+#   select(B_z, mu_z, distance_constraint, n_pot, mean_demand, mean_dist) %>%
+#   mutate(distance_constraint = distance_constraint/1000) %>%
+#   knitr::kable(
+#     col.names = c(
+#       "Private benefit", 
+#       "Visibility",
+#       "\\makecell{Maximum \\\\ distance constraint (km)}",
+#       "Assigned PoTs", 
+#       "Mean take-up", 
+#       "Mean distance (km)"
+#     ),
+#     align = "llcccc",
+#     booktabs = TRUE,
+#     escape = FALSE,
+#     format = "latex"
+#     ) %>%
+#   kableExtra::kable_styling(
+#     # latex_options =  c("scale_down")
+#   ) %>%
+#   pack_rows(
+#     index = c(
+#       "Panel A: Random allocation" = 1, 
+#       "Panel B: Policymaker allocation, 2.5km" = 4,
+#       "Panel C: Policymaker allocation, 3.5km" = 4,
+#       "Panel D: Policymaker allocation, 4.5km" = 4,
+#       "Panel E: Policymaker allocation, 5.5km" = 4,
+#       "Panel F: Policymaker allocation, 10km" = 4
+#     ), 
+#     italic = TRUE,
+#     escape = FALSE,
+#     # latex_gap_space = latex_group_gap_space, 
+#     hline_after = TRUE, 
+#     hline_before = TRUE,
+#     bold = TRUE
+#   ) 
 
 
 
-optim_summ_robust_tbl %>%
-  custom_save_latex_table("optim-summ-robust-table")
+# optim_summ_robust_tbl %>%
+#   custom_save_latex_table("optim-summ-robust-table")
 
 ```
 
@@ -2158,237 +2235,6 @@ sob_reason_df %>%
 
 
 
-```{r}
-#| endline-results-indiv, results="asis"
-
-endline_data = endline_data %>%
-  mutate(
-    assigned_treatment = as_factor(assigned_treatment), 
-    dist_pot_group = as_factor(dist_pot_group)
-  )
-
-
-
-dworm_endline_fit = endline_data %>%
-  mutate(dworm_rate = dworm_rate/10) %>%
-  feols(
-    dworm_rate ~ 0 + assigned_treatment:dist_pot_group + dist_to_pot | county,
-    cluster = ~cluster_id
-  ) 
-
-
-
-endline_close_far_preds = predictions(
-  dworm_endline_fit,
-  newdata = datagrid(
-    assigned_treatment = endline_data$assigned_treatment %>% unique(),
-    dist_to_pot = endline_data %>%
-      group_by(dist_pot_group) %>%
-      summarise(dist = mean(dist_to_pot)) %>%
-      pull(dist),
-    dist_pot_group = c("close", "far")
-  )
-  )
-
-endline_close_far_hyps = c(
-    "ink" = "b1 = b4",
-    "calendar" = "b5 = b8",
-    "bracelet" = "b9 = b12",
-    "control" = "b13 = b16"
-  )
-
-endline_close_far_df = map_dfr(
-  endline_close_far_hyps,
-  ~hypotheses(
-    endline_close_far_preds,
-    .x
-  ) %>%
-  tidy(),
-  .id = "treatment"
-)
-
-
-d_bar = endline_data %>%
-  group_by(dist_pot_group) %>%
-  summarise(dist = mean(dist_to_pot)) %>%
-  pull(dist) %>%
-  sort()
-
-control_mean_close_far_pred = map_dfr(
-      c("close", "far"),
-    ~avg_predictions(
-      dworm_endline_fit, 
-      newdata = datagrid(
-        assigned_treatment = "control",
-        dist_pot_group = .x, 
-        dist_to_pot = d_bar
-        ),
-        by = "dist_to_pot"
-    ) %>%
-    tidy() %>%
-    mutate(term = .x) ) %>%
-    filter(
-      (term == "close" & dist_to_pot == d_bar[1]) |
-      (term == "far" & dist_to_pot == d_bar[2])
-    )
-
-
-dworm_endline_comp_df = map_dfr(
-  c("close", "far"), 
-  ~avg_comparisons(
-    model = dworm_endline_fit, 
-    variables = list("assigned_treatment" = "all"), 
-    newdata = datagrid(
-      dist_pot_group = .x
-    )
-  ) %>% tidy() %>%
-  mutate(term = .x)
-) %>%
-bind_rows(
-  avg_comparisons(
-    model = dworm_endline_fit, 
-    variables = list("assigned_treatment" = "all")
-  ) %>%
-  tidy() %>%
-  mutate(term = "Combined")
-) %>%
-  mutate(
-    treatment = str_extract(contrast, "^\\w+")
-  ) %>%
-  bind_rows(
-    tidy(dworm_endline_fit) %>%
-    filter(str_detect(term, "control")) %>% 
-    mutate(treatment = "control",
-    term = if_else(
-      str_detect(term, "close"), 
-      "close", 
-      "far"
-    ))
-  ) %>%
-  filter(treatment != "control") %>%
-  bind_rows(
-    avg_predictions(
-      dworm_endline_fit, 
-      variables = "assigned_treatment"
-    ) %>%
-    tidy() %>%
-    mutate(term = "Combined")  %>%
-    rename(treatment = assigned_treatment) %>%
-    filter(treatment == "control")
-  )  %>%
-  bind_rows(
-    control_mean_close_far_pred %>%
-      mutate(treatment = "control")
-  ) 
-
-
-
-
-
-subset_dworm_endline_comp_df = dworm_endline_comp_df %>%
-  mutate(
-    lhs = str_extract(contrast, "^\\w+"),
-    rhs = str_extract(contrast, "\\w+$")
-  ) %>%
-  filter(
-    is.na(contrast) | rhs == "control" | (str_detect(contrast, "brac") & str_detect(contrast, "cal") )
-  ) %>%
-  filter(lhs != "control" | is.na(contrast)) %>%
-  mutate(
-    bra_cal = if_else(
-      rhs != "control" & str_detect(lhs, "bra|cal"),
-      TRUE,
-      FALSE
-    ),
-    bra_cal = replace_na(bra_cal, FALSE)
-  ) %>%
-  filter(
-    bra_cal == FALSE | (bra_cal == TRUE & treatment == "bracelet")
-  ) 
-
-
-
-dworm_endline_comp_tbl = subset_dworm_endline_comp_df  %>%
-  filter(bra_cal == FALSE) %>%
-  mutate(
-    across(c(estimate, std.error), round, 3),
-    stars = case_when(
-      treatment != "control" & p.value < 0.01 ~ "***",
-      treatment != "control" & p.value < 0.05 ~ "**", 
-      treatment != "control" & p.value < 0.1 ~ "*" , 
-      TRUE ~ ""
-    )
-  ) %>%
-  mutate(
-    estim_std = linebreak(paste0(estimate, stars, "\n", str_glue("({std.error})")), align = "c") 
-  ) %>%
-  bind_rows(
-    subset_dworm_endline_comp_df %>%
-      filter(bra_cal == TRUE) %>%
-      mutate(estim_std = round(p.value, 4) %>% as.character(), treatment = "H0: Bracelet = Calendar, $p$-value")
-  ) %>%
-  select(term, treatment, estim_std) %>%
-  mutate(treatment = if_else(!str_detect(treatment, "value"), str_to_title(treatment), treatment)) %>%
-  mutate(treatment = if_else(treatment == "Control", "Control mean", treatment)) %>%
-  mutate(
-    treatment = factor(
-      treatment, 
-      levels = c("Control mean", 
-      "H0: Bracelet = Calendar, $p$-value",
-      "Ink",
-      "Calendar",
-      "Bracelet")) %>% fct_rev()) %>%
-  spread(
-    term, 
-    estim_std
-  )  %>%
-  select(treatment, Combined, close, far) 
-
-
-
-dworm_endline_comp_tbl = left_join(
- dworm_endline_comp_tbl,
-  endline_close_far_df %>%
-    select(treatment, p.value) %>%
-    mutate(
-      treatment = case_when(
-        treatment == "bracelet" ~ "Bracelet",
-        treatment == "calendar" ~ "Calendar",
-        treatment == "ink" ~ "Ink",
-        treatment == "control" ~ "Control mean"
-      )
-    )  %>%
-    mutate(p.value = round(p.value, 5) %>% as.character)
-)
-  
-
-
-
-dworm_endline_comp_tbl_knitr = dworm_endline_comp_tbl %>%
-  knitr::kable(
-      # format = "latex",
-      col.names = c(
-        "", 
-        "Combined",
-        "Close", 
-        "Far",
-        "H0: Close = Far, $p$-value"
-        ),
-      escape = FALSE, 
-      booktabs = TRUE,
-      align = "lcccc", 
-      caption = "Surveyed individuals' predicted deworming rates"
-  )  %>%
-  row_spec(4, hline_after = TRUE)
-
-dworm_endline_comp_tbl_knitr
-
-dworm_endline_comp_tbl_knitr %>%
-  custom_save_latex_table("endline-dworm-indiv-pred-tbl")
-
-
-```
-
 
 ```{r}
 #| balance-reading
@@ -2750,7 +2596,7 @@ lhs_translation_df = tribble(
 ```
 
 ```{r}
-#| balance-creation, dependson="balance-setup"
+#| balance-creation, dependson="balance-setup", eval=FALSE
 
 
 
@@ -2787,7 +2633,7 @@ comp_wide_indiv_bal_df = create_balance_input(
 
 ```{r, results="asis"}
 #| comp-balance-table,
-#| dependson=c("balance-setup", "balance-creation")
+#| dependson=c("balance-setup", "balance-creation"), eval=FALSE
 
 colnames(comp_wide_indiv_bal_df) = colnames(comp_wide_indiv_bal_df) %>%
   str_replace(., "_close", "") %>%
@@ -2862,6 +2708,7 @@ comp_bal_table %>%
 
 
 ```{r}
+#| eval=FALSE
 
 
 dist_comp_df = inner_join(
@@ -2965,7 +2812,7 @@ dist_comp_bal_tbl %>%
 ```
 
 ```{r}
-#| endline-table, eval=TRUE
+#| endline-table, eval=FALSE
 
 
 endline_balance_df = create_balance_input(
@@ -3698,7 +3545,7 @@ struct_robustness_kbl_df %>%
 
 
 ```{r}
-# ramsey-output
+#| ramsey-output, eval=FALSE
 
 dynamic_optim_post_name = "posterior-optimal-distance-dynamic_vstar-lambda_0.15-externality_0.15-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
 static_optim_post_name = "posterior-optimal-distance-static_vstar-lambda_0.15-externality_0.15-model_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fit-version_86.csv"
@@ -3714,36 +3561,6 @@ optim_post_df = imap_dfr(
   mutate(
     # regex to match very first word and stop before underscore
     vstar_type = factor(str_extract(vstar_type, "^[^_]*"))
-  )
-
-optim_post_df %>%
-  count(vstar_type)
-
-optim_post_df  %>%
-  pivot_wider(
-    names_from = vstar_type, values_from = c(optimal_distance, pred_takeup)
-  )   %>%
-  group_by(treatment) %>%
-  summarise(
-    across(c(contains("dynamic"), contains('static')), mean)
-  ) %>%
-  mutate(
-    across(contains("distance"), ~round(.x/1000, 2))
-  ) %>%
-  select(treatment, contains("distance"), contains("pred")) %>%
-  mutate(treatment = fct_relevel(treatment, "control", "ink", "calendar", "bracelet"))  %>%
-  arrange(treatment)
-
-
-  
-  %>%
-  mutate(
-    difference = static - dynamic
-  ) %>%
-  group_by(treatment) %>%
-  summarise(
-    mean_
-    mean_difference = mean(difference, na.rm = TRUE)
   )
 
 
@@ -3841,43 +3658,43 @@ ramsey_optim_te_tbl_tex %>%
 
 
 ```{r}
-#wide-ramsey
-wide_ramsey_optim_te_tbl_tex = optim_te_tbl %>%
-  pivot_wider(
-    names_from = vstar_type, values_from = estim_value
-  )  %>%
-  kbl(
-    col.names = c(
-      "Treatment",
-      "Dynamic $\\Delta(w^*)$",
-      "Fixed $\\Delta(w^*)|_{d=0.5km}$",
-      "Fixed - Dynamic"
-    ), 
-    format = "latex", 
-    linesep = "",
-    booktabs = TRUE, 
-    escape = FALSE, 
-    align = "lccc", 
-    caption = "Welfare Maximising Distance - Results"
-  )  %>%
-  kable_styling(
-    # latex_options = c("scale_down")
-  ) %>%
-  row_spec(c(3), hline_after = TRUE)  %>%
-  add_header_above(
-    c(
-      " " = 1,
-      "Welfare Maximising Distance" = 3
-      )
-  ) 
+#wide-ramsey, eval=FALSE
+# wide_ramsey_optim_te_tbl_tex = optim_te_tbl %>%
+#   pivot_wider(
+#     names_from = vstar_type, values_from = estim_value
+#   )  %>%
+#   kbl(
+#     col.names = c(
+#       "Treatment",
+#       "Dynamic $\\Delta(w^*)$",
+#       "Fixed $\\Delta(w^*)|_{d=0.5km}$",
+#       "Fixed - Dynamic"
+#     ), 
+#     format = "latex", 
+#     linesep = "",
+#     booktabs = TRUE, 
+#     escape = FALSE, 
+#     align = "lccc", 
+#     caption = "Welfare Maximising Distance - Results"
+#   )  %>%
+#   kable_styling(
+#     # latex_options = c("scale_down")
+#   ) %>%
+#   row_spec(c(3), hline_after = TRUE)  %>%
+#   add_header_above(
+#     c(
+#       " " = 1,
+#       "Welfare Maximising Distance" = 3
+#       )
+#   ) 
 
 
-wide_ramsey_optim_te_tbl_tex
+# wide_ramsey_optim_te_tbl_tex
 
-wide_ramsey_optim_te_tbl_tex %>%
-  custom_save_latex_table(
-    "wide-ramsey-optim-te-table"
-  )
+# wide_ramsey_optim_te_tbl_tex %>%
+#   custom_save_latex_table(
+#     "wide-ramsey-optim-te-table"
+#   )
 
 
 
@@ -3921,15 +3738,6 @@ private_ate_robust_df = ate_rvar_struct_robust %>%
     .estimand = "private",
     group_var = treatment
   )
-
-
-ate_tbl_levels = c(
-    "Bracelet",
-    "Calendar",
-    "Ink",
-    "bracelet_minus_calendar",
-    "Control"
-)
 
 robust_incentive_ate_tbl = struct_ate_robust_df %>%
   mutate(treatment = factor(treatment, levels = 
@@ -4082,17 +3890,6 @@ robust_overall_te_kbl_df = robust_all_ate_tbl %>%
       "Structural" = 4
       )
   ) %>%
-  pack_rows(
-    index = c(
-      "Panel A: Overall" = 5
-    ), 
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space, 
-    hline_after = TRUE, 
-    hline_before = TRUE,
-    bold = TRUE
-  )  %>%
   row_spec(c(3), hline_after = TRUE) 
 
 robust_overall_te_kbl_df %>%
@@ -4105,6 +3902,7 @@ robust_overall_te_kbl_df %>%
 
 
 ```{r}
+1+1
 
 ate_rvar_struct_indiv_dist_community_fp = read_rds(
     file.path(
@@ -4113,22 +3911,28 @@ ate_rvar_struct_indiv_dist_community_fp = read_rds(
     )
   )
 
-ate_tbl_indiv_dist_community_fp = ate_rvar_struct_indiv_dist_community_fp %>%
-  create_cis(.width = params$width) %>%
-  select(
-    treatment, variable, value
-  ) %>%
-  mutate(variable = factor(variable, levels = c("combined", "close", "far", "far_minus_close"))) %>%
-  arrange(variable) %>%
-  pivot_wider(
-    names_from = variable,
-    values_from = value
-  ) %>%
-  recode_control_mean() %>%
-  mutate(
-    treatment = factor(treatment, levels = c("Bracelet", "Calendar", "Ink", "Bracelet - Calendar", "Control mean"))
+prep_robustness = function(data){
+  data %>%
+  filter(variable != "far_minus_close")  %>%
+  filter(treatment != "bracelet_minus_calendar") %>%
+  rename(dist_group = variable) %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
   )  %>%
-  arrange(treatment)
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  mutate(estimand = "overall") %>%
+  select(-model, -estimand) 
+
+}
+
+
 
 
 create_robustness_tbl = function(data) {
@@ -4161,23 +3965,15 @@ data %>%
       "Structural" = 4
       )
   ) %>%
-  pack_rows(
-    index = c(
-      "Panel A: Overall" = 5
-    ), 
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space, 
-    hline_after = TRUE, 
-    hline_before = TRUE,
-    bold = TRUE
-  )  %>%
   row_spec(c(3), hline_after = TRUE) 
 }
 
 
+ate_tbl_indiv_dist_community_fp = ate_rvar_struct_indiv_dist_community_fp %>%
+  prep_robustness() 
+
 ate_tbl_indiv_dist_community_fp %>%
-  create_robustness_tbl()  %>%
+  create_robustness_tbl() %>%
   custom_save_latex_table("indiv-dist-community-fp-robust-struct-overall-te-table")
 
 
@@ -4197,35 +3993,18 @@ ate_rvar_struct_indiv_dist_indiv_fp = read_rds(
   )
 
 ate_tbl_indiv_dist_indiv_fp = ate_rvar_struct_indiv_dist_indiv_fp %>%
-  create_cis(.width = params$width) %>%
-  select(
-    treatment, variable, value
-  ) %>%
-  mutate(variable = factor(variable, levels = c("combined", "close", "far", "far_minus_close"))) %>%
-  arrange(variable) %>%
-  pivot_wider(
-    names_from = variable,
-    values_from = value
-  ) %>%
-  recode_control_mean() %>%
-  mutate(
-    treatment = factor(treatment, levels = c("Bracelet", "Calendar", "Ink", "Bracelet - Calendar", "Control mean"))
-  )  %>%
-  arrange(treatment)
-
-
+  prep_robustness() 
 
 ate_tbl_indiv_dist_indiv_fp %>%
-  create_robustness_tbl()  %>%
+  create_robustness_tbl() %>%
   custom_save_latex_table("indiv-dist-indiv-fp-robust-struct-overall-te-table")
-
 
 
 ```
 
 # Robustness Structural Model Individual Distance Cost, Community FP, Indiv Vis
 
-```{r}
+```{r}1+1
 
 ate_rvar_struct_indiv_dist_community_fp_indiv_vis = read_rds(
     file.path(
@@ -4234,26 +4013,13 @@ ate_rvar_struct_indiv_dist_community_fp_indiv_vis = read_rds(
     )
   )
 
-ate_tbl_indiv_dist_community_fp_indiv_vis = ate_rvar_struct_indiv_dist_community_fp_indiv_vis %>%
-  create_cis(.width = params$width) %>%
-  select(
-    treatment, variable, value
-  ) %>%
-  mutate(variable = factor(variable, levels = c("combined", "close", "far", "far_minus_close"))) %>%
-  arrange(variable) %>%
-  pivot_wider(
-    names_from = variable,
-    values_from = value
-  ) %>%
-  recode_control_mean() %>%
-  mutate(
-    treatment = factor(treatment, levels = c("Bracelet", "Calendar", "Ink", "Bracelet - Calendar", "Control mean"))
-  )  %>%
-  arrange(treatment)
+
+ate_tbl_indiv_dist_indiv_fp_indiv_vis = ate_rvar_struct_indiv_dist_community_fp_indiv_vis %>%
+  prep_robustness() 
 
 
 
-ate_tbl_indiv_dist_community_fp_indiv_vis %>%
+ate_tbl_indiv_dist_indiv_fp_indiv_vis %>%
   create_robustness_tbl()  %>%
   custom_save_latex_table("indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table")
 
@@ -4265,6 +4031,7 @@ ate_tbl_indiv_dist_community_fp_indiv_vis %>%
 
 ```{r}
 
+1+1
 ate_rvar_struct_no_outliers = read_rds(
     file.path(
       "temp-data",
@@ -4319,17 +4086,6 @@ incentive_ate_no_outliers_kbl = incentive_ate_df_no_outliers %>%
       "Structural" = 4
       )
   ) %>%
-  pack_rows(
-    index = c(
-      "Panel A: Overall" = 5
-    ), 
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space, 
-    hline_after = TRUE, 
-    hline_before = TRUE,
-    bold = TRUE
-  )  %>%
   row_spec(c(3), hline_after = TRUE) 
 
 
