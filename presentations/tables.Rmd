@@ -325,12 +325,16 @@ ate_rvar_struct = read_rds(
         str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{params$struct_models}_1-4.rds")
       ) 
   )
+
 ate_rvar_rf = read_rds(
       file.path(
         "temp-data",
         str_glue("rvar_processed_dist_fit{params$rf_fit_version}_ates_{params$rf_models}_1-4.rds")
       ) 
   )
+
+
+
 # weird bind_rows() bug with rvar cols
 ate_rvar_df = bind_rows(
     ate_rvar_struct %>% 
@@ -717,6 +721,106 @@ struct_overall_tbl %>%
 
 ```
 
+
+```{r}
+#| fob-ates
+
+obs_rvar_struct = read_rds(
+  file.path(
+    "temp-data",
+    str_glue(
+      "rvar_processed_dist_fit{params$fit_version}_belief_ates_{params$struct_models}_1-4.rds"
+    )
+  )
+)
+
+lvl_obs_rvar_struct = read_rds(
+  file.path(
+    "temp-data",
+    str_glue(
+      "rvar_processed_dist_fit{params$fit_version}_belief_probs_{params$struct_models}_1-4.rds"
+    )
+  )
+) %>%
+as.data.frame() %>%
+  filter(treatment == "Control") %>%
+  filter(variable == "prob_1ord") %>%
+  as_tibble() %>%
+  select(-dist_treat_idx)
+
+
+
+obs_rvar_struct = bind_rows(
+  obs_rvar_struct %>% as.data.frame(),
+  lvl_obs_rvar_struct %>% as.data.frame()
+) %>%
+as_tibble()
+
+create_ate_kbl = function(data, y_var_name = "Dependent variable: Observability") {
+data %>%
+  kbl(
+    col.names = c(
+      y_var_name,
+      paste0("(", 1:4, ")")
+    ), 
+    format = "latex", 
+    booktabs = TRUE, 
+    escape = FALSE, 
+    align = "lcccc", 
+    caption = "Overall Results") %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(
+    c(" ", 
+      "Combined", 
+      "Close", 
+      "Far", 
+      "Far - Close"
+      ), 
+    line = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Structural" = 4
+      )
+  ) %>%
+  row_spec(c(3), hline_after = TRUE) 
+}
+
+
+obs_rvar_df = obs_rvar_struct %>%
+  as.data.frame() %>%
+  filter(variable == "ate_1ord" | variable == "prob_1ord") %>%
+  as_tibble() %>%
+  mutate(estimand = "overall") %>%
+  create_ate_table(
+    .estimand = "overall",
+    group_var = treatment
+  )
+
+obs_rvar_tbl =   obs_rvar_df %>%
+  mutate(treatment = factor(treatment, levels = 
+    ate_tbl_levels
+  )) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment)   %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean()    %>%
+  select(-model)  %>%
+  create_ate_kbl()  
+
+
+obs_rvar_tbl %>%
+  custom_save_latex_table(
+    "fob-beliefs-table"
+  )
+
+
+```
+
+
 ```{r}
 #| rf-table-only
 rf_overall_tbl = all_ate_tbl %>% 
@@ -965,50 +1069,53 @@ wide_belief_tbl %>%
 
 
 ```{r}
-#| fob-table
-fob_wide_belief_tbl = wide_belief_df %>%
-  select(treatment, contains("_1")) %>%
-  kbl(
-    col.names = c(
-      # "Estimand", 
-      # "Treatment", 
-      "",
-      paste0("(", 1:3, ")")
-    ), 
-    format = "latex", 
-    booktabs = TRUE, 
-    escape = FALSE, 
-    align = "lccc", 
-    linesep = "\\addlinespace \\addlinespace \\addlinespace",
-    caption = "Observability Results"
-  ) %>%
-  kable_styling(
-    # latex_options = c("scale_down")
-  ) %>%
-  add_header_above(
-    c(" ", 
-      "Combined",
-      "Close", 
-      "Far"
-      ), 
-    line = FALSE
-  )  %>%
-  add_header_above(
-    c(
-      " " = 1,
-      "Observability" = 3
-      )
-  ) %>%
-  footnote(
-    escape = FALSE,
-    threeparttable = TRUE
-  ) %>%
-  row_spec(c(3), hline_after = TRUE)
+# #| fob-table, eval=FALSE
 
-fob_wide_belief_tbl %>%
-  custom_save_latex_table(
-    "fob-beliefs-table"
-  )
+# I calculate this using rvars above now
+
+# fob_wide_belief_tbl = wide_belief_df %>%
+#   select(treatment, contains("_1")) %>%
+#   kbl(
+#     col.names = c(
+#       # "Estimand", 
+#       # "Treatment", 
+#       "",
+#       paste0("(", 1:3, ")")
+#     ), 
+#     format = "latex", 
+#     booktabs = TRUE, 
+#     escape = FALSE, 
+#     align = "lccc", 
+#     linesep = "\\addlinespace \\addlinespace \\addlinespace",
+#     caption = "Observability Results"
+#   ) %>%
+#   kable_styling(
+#     # latex_options = c("scale_down")
+#   ) %>%
+#   add_header_above(
+#     c(" ", 
+#       "Combined",
+#       "Close", 
+#       "Far"
+#       ), 
+#     line = FALSE
+#   )  %>%
+#   add_header_above(
+#     c(
+#       " " = 1,
+#       "Observability" = 3
+#       )
+#   ) %>%
+#   footnote(
+#     escape = FALSE,
+#     threeparttable = TRUE
+#   ) %>%
+#   row_spec(c(3), hline_after = TRUE)
+
+# fob_wide_belief_tbl %>%
+#   custom_save_latex_table(
+#     "fob-beliefs-table"
+#   )
 
 
 
