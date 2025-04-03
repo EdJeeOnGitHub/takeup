@@ -40,9 +40,9 @@ script_options = docopt::docopt(
     "),
     args = if (interactive()) "
                             86
-                            ink
-                            ink
-                            --output-name=TEST-mu-fix-0-cutoff-b-ink-mu-ink-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            control
+                            control
+                            --output-name=static-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --from-csv
                             --num-post-draws=200
                             --rep-cutoff=Inf
@@ -54,9 +54,10 @@ script_options = docopt::docopt(
                             --data-input-name=full-many-pots-experiment.rds
                             --single-chain
 
+                            --static-signal-pm
+                            --static-signal-distance=500
+
                             --run-estimation
-                            --static-signal-distance=Inf
-                            --fix-delta-distance=0
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
@@ -74,7 +75,6 @@ library(rstan)
 library(sf)
 library(nleqslv)
 library(cmdstanr)
-library(econometr)
 library(furrr)
 
 source(file.path("optim", "optim-functions.R"))
@@ -363,7 +363,6 @@ subset_long_distance_mat = long_distance_mat %>%
 
 
 print(str_glue("Running {length(pred_functions)} pred functions"))
-
 tictoc::tic()
 plan(multicore, workers = script_options$num_cores)
 pred_df = future_imap_dfr(
@@ -460,7 +459,6 @@ structural_demand_df$visibility_z = script_options$visibility_z
 
 
 
-
 structural_demand_df %>%
     write_csv(
         file.path(
@@ -541,3 +539,5 @@ sm_df %>%
 
 
  }
+
+sm_df

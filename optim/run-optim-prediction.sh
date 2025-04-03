@@ -6,7 +6,7 @@ MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 NUM_POST_DRAWS=200
 # RUN_ESTIMATION="--run-estimation"
 SINGLE_CHAIN="--single-chain"
-FIT_TYPE="prior" # prior/fit
+FIT_TYPE="fit" # prior/fit
 VERSION=86
 
 
@@ -30,9 +30,9 @@ run_model_components () {
                                 ${PRED_DISTANCE} \
                                 --data-input-name=full-experiment.rds \
                                 --single-chain \
-                                --fit-type=${FIT_TYPE}
-                                # --static-signal-pm \
-                                # --static-signal-distance=0 \
+                                --fit-type=${FIT_TYPE} \
+                                --static-signal-pm \
+                                --static-signal-distance=500 
 }
 
 
@@ -41,6 +41,6 @@ run_model_components "control" "control"
 # run_model_components "control" "ink"
 # run_model_components "control" "calendar"
 
-run_model_components "bracelet" "bracelet"
-run_model_components "calendar" "calendar"
-run_model_components "ink" "ink"
+#run_model_components "bracelet" "bracelet"
+#run_model_components "calendar" "calendar"
+#run_model_components "ink" "ink"
