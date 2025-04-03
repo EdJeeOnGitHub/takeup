@@ -34,14 +34,15 @@ script_options = docopt::docopt(
         --robust-externality  Estimate across externality grid for posterior median
         --robust-lambda  Estimate across lambda grid for posterior median
         --check-derivative-positive  Verify that dw/dc is positive for parameter values we see        
+        --plot-lhs-rhs   Plot LHS and RHS of a random posterior draw
 
 
     "),
     args = if (interactive()) "
                             86
-                            control
-                            control
-                            --output-name=ramsey-control-mu-control-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            bracelet
+                            bracelet
+                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
@@ -53,6 +54,7 @@ script_options = docopt::docopt(
                             --robust-lambda
                             --robust-externality
 
+
                               " 
            else commandArgs(trailingOnly = TRUE)
 )
@@ -60,7 +62,6 @@ script_options = docopt::docopt(
 
                             # --static-signal-pm
                             # --static-signal-distance=500
-
 
 set.seed(19484)
 
@@ -149,7 +150,7 @@ recalc_takeup = function(distance, params, b_add = 0, mu_add = 0) {
 
 
 #' distance in meters
-find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0) {
+find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, return_takeup = FALSE) {
     takeup_list = recalc_takeup(distance, params, b_add, mu_add)
     if (params$suppress_reputation) {
         takeup_list$mu_rep = 0
@@ -168,14 +169,19 @@ find_optimal_incentive = function(distance, lambda, params, b_add = 0, mu_add = 
     b = net_b + delta * dist_norm 
     total_error_sd = takeup_list$total_error_sd
 
+    w_bar = (1 - pnorm(v_star/total_error_sd)) * takeup_list$mplus + pnorm(v_star/total_error_sd) * takeup_list$mminus
+
     hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
 
     externality_val = externality*abs(params$beta_b_control)
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv) + mu_rep_deriv * w_bar
 
     rhs = lambda * delta / hazard
 
     diff = abs(lhs - rhs)
+    if (return_takeup) {
+        return(list(diff = diff, takeup_list = takeup_list, lhs = lhs, rhs = rhs))
+    }
     return(diff)
 }
 
@@ -238,7 +244,49 @@ if (script_options$static_signal_pm == TRUE) {
     full_posterior_df$static_delta_v_star = NA
 }
 
+find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star, return_takeup = FALSE) {
 
+    pre_fix_takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+    mu_rep_prefix = pre_fix_takeup_list$mu_rep
+    params$static_delta_v_star = static_delta_v_star
+    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
+
+    # mu_rep shouldn't matter as delta_v_star_deriv is 0
+    takeup_list$mu_rep = -1000
+    takeup_list$mu_rep_deriv = 0
+    takeup_list$delta_v_star = 0
+    takeup_list$delta_v_star_deriv = 0
+
+    delta = takeup_list$delta
+    mu_rep_deriv = takeup_list$mu_rep_deriv
+    delta_v_star = takeup_list$delta_v_star
+    mu_rep = takeup_list$mu_rep
+    delta_v_star_deriv = takeup_list$delta_v_star_deriv
+    v_star = takeup_list$v_star
+    net_b = takeup_list$b # b is net benefit so add back
+    dist_norm = distance / sd_of_dist
+    # fn find_pred_takeup adds mu_rep Delta_v_star_static to b so we need to remove it
+    b = net_b + delta * dist_norm  - mu_rep_prefix * static_delta_v_star
+    total_error_sd = takeup_list$total_error_sd
+
+    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
+
+    w_bar = (1 - pnorm(v_star/total_error_sd)) * takeup_list$mplus + pnorm(v_star/total_error_sd) * takeup_list$mminus
+
+    externality_val = externality*abs(params$beta_b_control)
+    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv) + mu_rep_deriv * w_bar
+
+    rhs = lambda * delta / hazard
+    diff = abs(lhs - rhs)
+
+    if (return_takeup) {
+        return(list(diff = diff, takeup_list = takeup_list, lhs = lhs, rhs = rhs))
+    }
+    return(diff)
+}
+
+
+if (script_options$plot_lhs_rhs == TRUE) {
 
 # extract params for each posterior draw
 full_posterior_df = full_posterior_df %>%
@@ -267,46 +315,205 @@ full_posterior_df = full_posterior_df %>%
             )
         )
     )
+dists = seq(0, 3000, length.out = 100)
+
+random_draw_ids = sample(unique(struct_param_draws$.draw), 10) 
+
+post_check_df = full_posterior_df %>%
+    filter(draw_id %in% random_draw_ids) %>%
+    mutate(
+        fn = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                return_takeup = TRUE
+                )
+        ),
+        fn_static = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        fn_lambda_0 = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                return_takeup = TRUE
+                )
+        ),
+        fn_static_lambda_0 = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = as.numeric(script_options$externality),
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        fn_ext_0 = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                return_takeup = TRUE
+                )
+        ),
+        fn_static_ext_0 = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = script_options$lambda, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        fn_lambda_0_ext_0 = pmap(
+            list(params, 0),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                return_takeup = TRUE
+                )
+        ),
+        fn_static_lambda_0_ext_0 = pmap(
+            list(params, 0, static_delta_v_star),
+            ~function(x) find_optimal_incentive_static(
+                distance = x, 
+                lambda = 0, 
+                params = ..1, 
+                b_add = 0,
+                mu_add = 0,
+                externality = 0,
+                static_delta_v_star = ..3,
+                return_takeup = TRUE
+                )
+        ),
+        distances = list(dists),
+        pred_dyn = map2(fn, distances, ~.x(.y)),
+        pred_static = map2(fn_static, distances, ~.x(.y)),
+        pred_lambda_0 = map2(fn_lambda_0, distances, ~.x(.y)),
+        pred_static_lambda_0 = map2(fn_static_lambda_0, distances, ~.x(.y)),
+        pred_ext_0 = map2(fn_ext_0, distances, ~.x(.y)),
+        pred_static_ext_0 = map2(fn_static_ext_0, distances, ~.x(.y)),
+        pred_lambda_0_ext_0 = map2(fn_lambda_0_ext_0, distances, ~.x(.y)),
+        pred_static_lambda_0_ext_0 = map2(fn_static_lambda_0_ext_0, distances, ~.x(.y))
+    )
+
+    
+long_post_check_df = post_check_df     %>%
+    select(draw_id, treatment, distances, contains("pred")) %>%
+    pivot_longer(
+        contains("pred"),
+        names_to = "pred_type",
+        values_to = "pred"
+    ) %>%
+    mutate(
+        pred_diff = map(pred, "diff"),
+        pred_takeup_list = map(pred, "takeup_list"),
+        pred_lhs = map(pred, "lhs"),
+        pred_rhs = map(pred, "rhs"),
+        pred_takeup = map(pred_takeup_list, "pred_takeup")
+    ) %>%
+    select(
+        draw_id, treatment, pred_type, distances, pred_diff, pred_lhs, pred_rhs, pred_takeup
+    ) %>%
+    unnest(c(distances, contains("pred"))) %>%
+    mutate(
+        externality_type = if_else(
+            str_detect(pred_type, "ext_"),
+            "externality zero",
+            "externality present"
+        ),
+        lambda_type = if_else(
+            str_detect(pred_type, "lambda_"),
+            "lambda zero",
+            "lambda present"
+        ),
+        static_type = if_else(
+            str_detect(pred_type, "static"),
+            "static delta v star",
+            "dynamic delta v star"
+        )
+    )  
+
+long_post_check_df %>%
+    filter(draw_id %in% random_draw_ids[[1]])  %>%
+    # filter(treatment == "control") %>%
+    select(
+        treatment, draw_id, pred_type, distances, pred_lhs, pred_rhs, static_type, externality_type, lambda_type
+    ) %>%
+    pivot_longer(
+        c(pred_lhs, pred_rhs),
+        names_to = "lhs_rhs",
+    ) %>%
+    filter(lambda_type == "lambda present") %>%
+    filter(externality_type == "externality present") %>%
+    mutate(
+        lhs_rhs = case_when(
+            lhs_rhs == "pred_lhs" ~ "Social Marginal Benefit",
+            lhs_rhs == "pred_rhs" ~ "Deadweight Loss to Inframarginal"
+        )
+    ) %>%
+    ggplot(aes(
+        x = distances,
+        y = value,
+        colour = lhs_rhs,
+        linetype = static_type
+    )) +
+    geom_line(linewidth = 2) +
+    theme_bw() +
+    facet_wrap(~treatment) +
+    theme(legend.position = "bottom")  +
+    ggthemes::scale_color_canva("", palette = "Primary colors with a vibrant twist")  +
+    guides(
+        linetype = guide_legend(nrow = 2)
+    ) +
+    labs(
+        linetype = "Delta V Star Type"
+    )
+
+ggsave(
+    "temp-data/Ramsey-LHS-RHS.pdf",
+    width = 10,
+    height = 10
+)
 
 
-
-find_optimal_incentive_static = function(distance, lambda, params, b_add = 0, mu_add = 0, externality = 0, static_delta_v_star) {
-
-    pre_fix_takeup_list = recalc_takeup(distance, params, b_add, mu_add)
-    mu_rep_prefix = pre_fix_takeup_list$mu_rep
-    params$static_delta_v_star = static_delta_v_star
-    takeup_list = recalc_takeup(distance, params, b_add, mu_add)
-
-    # mu_rep shouldn't matter as delta_v_star_deriv is 0
-    takeup_list$mu_rep = -1000
-    takeup_list$mu_rep_deriv = 0
-    takeup_list$delta_v_star = 0
-    takeup_list$delta_v_star_deriv = 0
-
-    delta = takeup_list$delta
-    mu_rep_deriv = takeup_list$mu_rep_deriv
-    delta_v_star = takeup_list$delta_v_star
-    mu_rep = takeup_list$mu_rep
-    delta_v_star_deriv = takeup_list$delta_v_star_deriv
-    v_star = takeup_list$v_star
-    net_b = takeup_list$b # b is net benefit so add back
-    dist_norm = distance / sd_of_dist
-    # fn find_pred_takeup adds mu_rep Delta_v_star_static to b so we need to remove it
-    b = net_b + delta * dist_norm  - mu_rep_prefix * static_delta_v_star
-    total_error_sd = takeup_list$total_error_sd
-
-    hazard = dnorm(v_star/total_error_sd) / (1 - pnorm(v_star/total_error_sd))
-
-    externality_val = externality*abs(params$beta_b_control)
-    lhs = (-1) * (delta - mu_rep_deriv * delta_v_star) * (v_star + b + externality_val - lambda * delta * dist_norm) / (1 + mu_rep * delta_v_star_deriv)
-
-    rhs = lambda * delta / hazard
-
-    diff = abs(lhs - rhs)
-    return(diff)
 }
-
-
 
 if (script_options$static_signal_pm) {
     # create anon functions for each param draw
@@ -357,9 +564,29 @@ full_posterior_df = full_posterior_df %>%
     mutate(
         optimal_distance = map_dbl(fit_funs, "par")
     )
+
+
+full_posterior_df = full_posterior_df %>%
+    mutate(
+        opt_output = pmap(
+            list(params, optimal_distance),
+            ~find_optimal_incentive(
+                    distance = ..2, 
+                    lambda = script_options$lambda, 
+                    params = ..1, 
+                    b_add = 0,
+                    mu_add = 0,
+                    externality = as.numeric(script_options$externality),
+                    return_takeup = TRUE
+                )$takeup_list
+
+        ),
+        pred_takeup = map_dbl(opt_output, "pred_takeup")
+    )
+
 # save to csv
 full_posterior_df %>%
-    select(treatment, draw_id,  optimal_distance)  %>%
+    select(treatment, draw_id,  optimal_distance, pred_takeup)  %>%
     write_csv(
     file.path(
         script_options$output_path,
@@ -367,6 +594,99 @@ full_posterior_df %>%
     )
     )
 } # End posterior estimation
+
+
+range_df = expand.grid(
+    draw = 1,
+    lambda = script_options$lambda,
+    b_add = seq(from = -3, to = 3, length.out = 50)
+) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(lambda, b_add))
+
+range_df = range_df %>%
+    mutate(
+        params_vis = map(draw, ~extract_params(
+            param_draws = posterior_mean_draw,
+            private_benefit_treatment = script_options$private_benefit_z,
+            visibility_treatment = script_options$visibility_z,
+            draw_id = .x,
+            dist_sd = sd_of_dist,
+            j_id = 1,
+            rep_cutoff = Inf,
+            dist_cutoff = Inf, 
+            bounds = c(-Inf, Inf),
+            mu_rep_type = mu_rep_type,
+            suppress_reputation = FALSE, 
+            static_signal = NA,
+            fix_mu_at_1 = FALSE,
+            fix_mu_distance = NULL,
+            static_delta_v_star = NA
+        ))
+    ) %>%
+    unnest(data) %>%
+    mutate(
+        funs_vis = pmap(
+            list(
+                lambda,
+                params_vis,
+                b_add
+            ),
+            ~function(x) find_optimal_incentive(
+                distance = x, 
+                lambda = ..1, 
+                params = ..2, 
+                b_add = ..3,
+                externality = externality
+                )
+        )
+    )
+
+
+range_df = range_df %>%
+    mutate(
+        fit_vis = map(
+            funs_vis,
+            ~optim(2500, .x, method = "Brent", lower = 0, upper = 20000),
+            .progress = TRUE
+        ),
+    )
+
+range_df = range_df %>%
+    mutate(
+        res_vis = map_dbl(fit_vis, "par"),
+        takeup_list = pmap(
+            list(
+                res_vis,
+                params_vis,
+                b_add
+            ),
+            ~recalc_takeup(distance = ..1, params = ..2, b_add = ..3, mu_add = 0)
+        )
+        ) %>%
+    mutate(
+        pred_takeup = map_dbl(
+            takeup_list, 
+            "pred_takeup"
+            )
+    )
+
+range_df %>%
+    select(
+        lambda, b_add, params_vis, res_vis
+    ) %>%
+    mutate(
+        ed = map2_dbl(
+            b_add,
+            params_vis, 
+            ~analytical_delta(-.x, .y$total_error_sd)
+            )
+    )
+    
+    
+range_df %>% select(b_add, res_vis, pred_takeup) %>%
+    mutate(pred_takeup = pred_takeup * 100)
+
 # Estimate Optimal Distance holding visibility fixed, only vary private incentive
 b_df = expand.grid(
     draw = 1,
@@ -375,6 +695,7 @@ b_df = expand.grid(
 ) %>% as_tibble() %>%
     group_by(draw) %>%
     nest(data = c(lambda, b_add))
+
 b_df = b_df %>%
     mutate(
         params_vis = map(
@@ -829,7 +1150,7 @@ p_contour = b_mu_df %>%
     )
 
 p_contour
-
+stop()
 ggsave(
     p_contour,
     filename = file.path(
