@@ -3,6 +3,18 @@
 # Functions ####################################################################
 ################################################################################
 
+Mplus_mean = function(w, w_mean, u_sd) {
+    total_error_sd = sqrt(u_sd^2 + 1)
+    Mplus_mean = w_mean + (1/total_error_sd) * dnorm((w-w_mean)/total_error_sd)/(1 - pnorm((w - w_mean)/total_error_sd))
+    return(Mplus_mean)
+}
+
+Mminus_mean = function(w, w_mean, u_sd) {
+    total_error_sd = sqrt(u_sd^2 + 1)
+    Mminus_mean = w_mean - (1/total_error_sd) * dnorm((w-w_mean)/total_error_sd)/pnorm((w - w_mean)/total_error_sd)
+    return(Mminus_mean)
+}
+
 
 
 ################################################################################
@@ -311,6 +323,8 @@ find_v_star = function(distance, b, mu_rep, total_error_sd, u_sd, bounds){
         }
         
         pred_takeup = 1 - pnorm(v_star/(total_error_sd))
+        mplus = Mplus_mean(v_star, 0, u_sd)
+        mminus = Mminus_mean(v_star, 0, u_sd)
         return(lst(
           pred_takeup, 
           linear_pred, 
@@ -322,7 +336,9 @@ find_v_star = function(distance, b, mu_rep, total_error_sd, u_sd, bounds){
           delta_v_star_deriv, 
           v_star, 
           total_error_sd, 
-          pr_obs = mu_rep/base_mu_rep
+          pr_obs = mu_rep/base_mu_rep,
+          mplus = mplus,
+          mminus = mminus
           ))
     }
 }

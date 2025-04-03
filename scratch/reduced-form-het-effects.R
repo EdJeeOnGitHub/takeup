@@ -753,57 +753,51 @@ ggsave(
 
 
 #### Regressions ####
-probit_fit = analysis_data %>%
-    feglm(
+main_fit = analysis_data %>%
+    feols(
         dewormed ~ 0 + assigned_treatment:assigned_dist_group + i(county, ref = "Busia"), 
         data = ., 
-        family = binomial(link = "probit"), 
         cluster = ~cluster.id
     ) 
 
 externality_fit = clean_externality_df %>%
-    feglm(
+    feols(
         dewormed ~  0 + frac_externality_knowledge + assigned_treatment:assigned_dist_group | county,
-        family = binomial(link = "probit"),
         cluster = ~cluster.id
     )
 
 judgement_fit = judge_analysis_data %>%
-    feglm(
+    feols(
         dewormed ~  0 + judge_score_dewor + assigned_treatment:assigned_dist_group + i(county, ref = "Busia"),
-        family = binomial(link = "probit"),
         cluster = ~cluster.id
     )
 
 indiv_knowledge_fit = analysis_data %>%
-    feglm(
+    feols(
         dewormed ~ 
             0 + 
             log(census_cluster_pop) + 
             obs_know_person  + 
             assigned_treatment:assigned_dist_group + i(county, ref = "Busia"),
-        family = binomial(link = "probit"),
         cluster = ~cluster.id
     )
 
-cluster_knowledge_fit = feglm(
+cluster_knowledge_fit = feols(
         data = analysis_data,
         dewormed ~ 
             0 + 
             log(census_cluster_pop) + 
             cluster_obs_know_person  + 
             assigned_treatment:assigned_dist_group | county,
-        family = binomial(link = "probit"),
         cluster = ~cluster.id
     )
 
 
 ethnicity_fit =  analysis_data %>%
-    feglm(
+    feols(
         dewormed ~ 
         0 + fractionalisation +
         assigned_treatment:assigned_dist_group | county,
-        family = binomial(link = "probit"), 
         cluster = ~cluster.id
     )
     
@@ -829,6 +823,8 @@ etable(
     cluster = ~cluster.id, 
     replace = TRUE, 
     depvar = FALSE,
+    digits = 3,
+    digits.stats = 3,
     dict = term_dict,
     # style.tex = style.tex(var.title = "", fixef.title = "", stats.title = " ") 
     tex = TRUE, 
@@ -839,7 +835,6 @@ etable(
 stop()
 
 
-etable(probit_fit, probit_dist_fit)
 
 
 

@@ -31,7 +31,7 @@ script_options = docopt::docopt(
         --externality=<externality>  Externality to use across all treats [default: 0]
         --num-post-draws=<num-post-draws>  Number of posterior draws to use [default: 200]
         --posterior  Estimate across entire posterior across all treatments.
-        --robust-externality  Estimate across externality grid for posterior median
+        --robust-externality  | mu == 1Estimate across externality grid for posterior median
         --robust-lambda  Estimate across lambda grid for posterior median
         --check-derivative-positive  Verify that dw/dc is positive for parameter values we see        
         --plot-lhs-rhs   Plot LHS and RHS of a random posterior draw
@@ -595,6 +595,79 @@ full_posterior_df %>%
     )
 } # End posterior estimation
 
+## Delta V Star Plot
+end_points = c(-10000, 10000) * (rnorm(50, 0, 0.1)  + 1) 
+
+vstar_df = expand.grid(
+    draw = 1,
+    lambda = script_options$lambda,
+    b_add = 0,
+    distance = c(seq(from = -10000, to = 10000, length.out = 100), end_points),
+    sigma_u = seq(0.1, 2.0, 0.05)
+    ) %>% as_tibble() %>%
+    group_by(draw) %>%
+    nest(data = c(lambda, b_add))
+
+
+vstar_df = vstar_df %>%
+    mutate(
+        params_vis = map(
+            draw,
+            ~extract_params(
+                param_draws = posterior_mean_draw,
+                private_benefit_treatment = "control",
+                visibility_treatment = "control",
+                draw_id = .x,
+                dist_sd = sd_of_dist,
+                j_id = 1,
+                rep_cutoff = Inf,
+                dist_cutoff = Inf, 
+                bounds = c(-Inf, Inf),
+                mu_rep_type = mu_rep_type,
+                suppress_reputation = FALSE, 
+                static_signal = NA,
+                fix_mu_at_1 = FALSE,
+                fix_mu_distance = NULL,
+                static_delta_v_star = NA
+            )
+            ),
+        params_vis = map2(
+            params_vis,
+            sigma_u,
+            ~list_modify(.x, u_sd = .y, total_error_sd = sqrt(.y^2 + 1))
+        ),
+            takeup_list = map2(
+                params_vis,
+                distance,
+                ~recalc_takeup(
+                    distance = .y, 
+                    params = .x, 
+                    b_add = 0, 
+                    mu_add = 1.5
+                )
+                )
+        )
+
+
+vstar_df %>%
+    ungroup() %>%
+    unnest_wider(takeup_list) %>%
+    select(
+        distance, mu_rep, delta_v_star, v_star, sigma_u
+    ) %>%
+    mutate(
+        net_sir = mu_rep * delta_v_star
+    ) %>%
+    select(
+        distance, v_star, delta_v_star, net_sir, mu_rep, sigma_u
+    ) %>%
+    pivot_longer(
+        c(-v_star, -sigma_u)
+    ) %>%  
+    write_csv("temp-data/delta-vstar-endog-mu.csv")
+
+
+
 
 range_df = expand.grid(
     draw = 1,
@@ -682,7 +755,17 @@ range_df %>%
             ~analytical_delta(-.x, .y$total_error_sd)
             )
     )
-    
+range_df %>%
+    select(
+        lambda, b_add, params_vis, res_vis 
+    ) %>%
+    mutate(
+        delta_vstar = map2_dbl(
+            b_add,
+            params_vis, 
+            ~analytical_delta(-.x, .y$total_error_sd)
+            )
+    )
     
 range_df %>% select(b_add, res_vis, pred_takeup) %>%
     mutate(pred_takeup = pred_takeup * 100)

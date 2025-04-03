@@ -101,11 +101,20 @@ village_data %>%
         theme_bw() +
         theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
         labs(
-            title = "Optimal PoT Allocation Problem",
+            # title = "Optimal PoT Allocation Problem",
             subtitle = "Black dots indicate communities. Triangles indicate potential clinic locations."
         )  +
         labs(x = "", y = "") + 
         NULL
+ggsave(
+    file.path(
+        # script_options$pdf_output_path,
+        "temp-data",
+        "pot-map.pdf"
+    ),
+    width = 8,
+    height = 6
+)
 
 optimal_data = pot_data %>%
     filter(cluster.id %in% village_data$cluster.id)
@@ -192,7 +201,7 @@ plot_optimal_allocation = function(village_data,
     )
 
     subtitle = str_glue(
-        "Average Distance: {round(mean_dist/1000, 2)}km, Policymaker's Utility: {round(sw, 2)}"
+        "Average Distance: {round(mean_dist/1000, 2)}km"
     )
     sub_str = str_glue("Assigned PoTs: {n_pots_used}")
 

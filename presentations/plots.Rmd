@@ -193,6 +193,174 @@ sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 ```
 
 
+```{r}
+#| nonparametric-takeup-plot-control-bracelet,
+#| fig.cap="Nonparametric Take-up Probability",
+#| fig.width=8, fig.height=6
+
+colour_tibble = tibble(
+  assigned_treatment = c("control", "ink", "calendar", "bracelet", "signal"),
+  colors = c(canva_pal(canva_palette_vibrant)(4), "#000000")
+) %>%
+  mutate(
+    assigned_treatment = str_to_title(assigned_treatment),
+    assigned_treatment = factor(assigned_treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+
+summ_analysis_data = analysis_data %>%
+  group_by(cluster.id, assigned.treatment) %>%
+  summarise(
+    mean_dist = mean(cluster.dist.to.pot),
+    mean_dewormed = mean(dewormed)
+  ) %>%
+  ungroup() %>%
+  left_join(colour_tibble, by = c("assigned.treatment" = "assigned_treatment")) %>%
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+
+
+plot_np = function(data, colour_df = colour_tibble) {
+  max_dist = data %>%
+    summarise(
+      max_dist = max(mean_dist/1000)
+    ) %>%
+    pull(max_dist)
+
+  data %>%
+    ggplot(
+      aes(
+        x = mean_dist/1000,
+        y = mean_dewormed,
+        colour = assigned.treatment,
+        fill = assigned.treatment
+      )
+    ) +
+    geom_smooth(method = loess, level = 0.9) +
+    geom_point(alpha = 0.3, show.legend = FALSE) +
+    labs(
+      y = "Take-up Probability",
+      x = "Distance to Treatment (km)"
+    )  +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    scale_colour_manual("", values = deframe(colour_df)) +
+    scale_fill_manual("", values = deframe(colour_df)) +
+    geom_rug(
+      inherit.aes = FALSE,
+      aes(
+        x = mean_dist/1000,
+        colour = assigned.treatment
+      )
+    ) +
+    # from 0 to 3km, in 0.5km increments
+    scale_x_continuous(
+      breaks = seq(0, 2.5, 0.5),
+      labels = scales::number_format(accuracy = 0.1),
+      limits = c(0, max(2.5, max_dist)) 
+    )
+}
+
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Control", "Bracelet")) %>%
+  plot_np()
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+#| nonparametric-takeup-plot-control-ink,
+#| fig.cap="Nonparametric Take-up Probability - Control and Ink",
+#| fig.width=8, fig.height=6
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Control", "Ink")) %>%
+  plot_np()
+
+```
+
+```{r}
+#| nonparametric-takeup-plot-control-calendar,
+#| fig.cap="Nonparametric Take-up Probability - Control and Calendar",
+#| fig.width=8, fig.height=6
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Control", "Calendar")) %>%
+  plot_np()
+
+
+```
+
+
+```{r}
+#| nonparametric-takeup-plot-bracelet-calendar,
+#| fig.cap="Nonparametric Take-up Probability - Bracelet and Calendar",
+#| fig.width=8, fig.height=6
+
+summ_analysis_data %>%
+  filter(assigned.treatment %in% c("Bracelet", "Calendar")) %>%
+  plot_np()
+
+
+
+```
+
+
+```{r}
+#| nonparametric-takeup-plot-all,
+#| fig.cap="Nonparametric Take-up Probability - All",
+#| fig.width=8, fig.height=6
+
+
+summ_analysis_data %>%
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = fct_relevel(assigned.treatment, "Control", "Bracelet")
+  ) %>%
+  ggplot(
+    aes(
+      x = mean_dist/1000,
+      y = mean_dewormed,
+      colour = assigned.treatment,
+      fill = assigned.treatment
+    )
+  ) +
+  geom_smooth(method = loess, level = 0.9) +
+  geom_point(alpha = 0.3, show.legend = FALSE) +
+  labs(
+    y = "Take-up Probability",
+    x = "Distance to Treatment (km)"
+  )  +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  # xlim(0, 2.5) +
+  ggthemes::scale_fill_canva(
+    "",
+    palette = "Primary colors with a vibrant twist"
+  ) +
+  ggthemes::scale_color_canva(
+    "",
+    palette = "Primary colors with a vibrant twist"
+  )  +
+  geom_rug(
+    inherit.aes = FALSE,
+    aes(
+      x = mean_dist/1000,
+      colour = assigned.treatment
+    )
+  ) 
+
+```
+
 
 ```{r}
 #| takeup-dynamics-plot,
@@ -603,6 +771,117 @@ sim_int %>%
 1+3
 ```
 
+
+```{r}
+#| delta-with-u-mu-change-example,
+#| fig.cap="Net reputational return, $\\mu\\Delta[w^*]$, as a function of cutoff type, $w^*$",
+
+vstar_df = read_csv(here("temp-data", "delta-vstar-endog-mu.csv"))
+vstar_df = vstar_df %>%
+  filter(name == "net_sir") %>%
+  group_by(sigma_u) %>%
+  mutate(id = cur_group_id()) %>%
+  ungroup() %>%
+  group_by(v_star) %>%
+  mutate(
+    v_star_id = cur_group_id()
+  ) %>%
+  ungroup()
+
+
+endog_mu_sigmas = vstar_df %>%
+  pull(sigma_u) %>%
+  unique()
+
+
+
+ed_sigmas = c(
+  which.min(abs(endog_mu_sigmas - 0.5)),
+  which.min(abs(endog_mu_sigmas - 1)),
+  which.min(abs(endog_mu_sigmas - 1.5))
+)
+
+tmp_v_df = vstar_df %>%
+  filter(sigma_u == 1)
+
+ed_ws = c(
+  which.min(abs(tmp_v_df$v_star - -1.5)),
+  which.min(abs(tmp_v_df$v_star - 0)),
+  which.min(abs(tmp_v_df$v_star - 1.5))
+)
+
+ed_ys = tmp_v_df[ed_ws, ]
+
+# get closest values
+
+text_df = tibble(
+  w = ed_ys$v_star,
+  text = c("Respectable Acts", "Modal Acts", "Admirable Acts"),
+  value = ed_ys$value
+) 
+
+
+sigma_text_df = vstar_df %>%
+  filter(
+    id %in% ed_sigmas
+  ) %>%
+  mutate(v_star = v_star * 0.9) %>%
+  filter(abs(v_star) < 2) %>%
+  group_by(id) %>%
+  filter(
+    v_star == min(v_star)
+  ) %>%
+  mutate(
+    value = value + 0.8
+  ) 
+
+
+vstar_df %>%
+  # filter(abs(v_star) < 2.5) %>%
+  mutate(v_star = v_star * 0.9) %>%
+  filter(abs(v_star) < 2) %>%
+  mutate(
+    alpha = case_when(
+      sigma_u  == 1 ~ 1, 
+      id %in% ed_sigmas ~ 0.3, 
+      TRUE ~ 0 
+      )
+    ) %>%
+  ggplot(aes(v_star, value + 0.75, alpha = alpha)) +
+  geom_line(
+    aes(group = sigma_u)
+   ) +  
+  geom_text(
+    inherit.aes = FALSE,
+    data = text_df, 
+    aes(
+      x = w, 
+      y = value + 0.9, 
+      label = text)
+  ) + 
+  annotate(
+    "text", 
+    x = sigma_text_df$v_star, 
+    y = sigma_text_df$value*0.95, 
+    label = c(
+      TeX("$\\sigma_u = 0.5$"),
+      TeX("$\\sigma_u = 1$"),
+      TeX("$\\sigma_u = 1.5$")
+    ),
+    alpha = 0.6,
+  hjust=0.5, size = 4, parse = TRUE,
+  vjust = 1
+  ) +
+  labs(
+    x = latex2exp::TeX("$w^*$"),
+    y = latex2exp::TeX(r"{$\mu\Delta\[w^*\]$}")
+  ) +
+  guides(alpha = "none") +
+  theme_minimal() 
+
+
+1+3
+```
 
 #### Reported Social Perception ####
 ```{r}
@@ -2578,6 +2857,8 @@ sm_df %>%
 
 ```{r}
 #| sm-decomp,
+#| fig.width=8,
+#| fig.height=6,
 #| fig.cap="Estimated Social Multiplier Over Distance - Components",
 #| fig.note = "This plot shows the social multiplier components estimated using the structural 
 #|  model. The plot decomposes how much of the social multiplier is driven by the 
@@ -2587,39 +2868,128 @@ sm_df %>%
 #|  lines is driven by changes in $\\mu$ visibility.
 #|  Line: median."
 
+
+col_df = tibble(
+  variable = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive"),
+  colour = c(canva_pal(canva_palette_vibrant)(2)[1], canva_pal(canva_palette_vibrant)(2)[2], "grey")
+)
+
 tidy_param_df %>%
   filter(param == "sm_draws") %>%
   unnest(tidy_draws) %>%
   filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
+  mutate(
+    variable_label = case_when(
+      variable == "sm_rescaled" & fit_type == "prior-predict" ~ "Prior Predictive",
+      variable == "sm_rescaled" ~ "Social Multiplier",
+      variable == "sm_delta_part_rescaled" ~ "Social Multiplier - Type Inference Only"
+    ),
+    variable_label = factor(variable_label, levels = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive")),
+    variable = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
+  ) %>%
   filter(roc_distance <= 2500) %>%
-  filter(fit_type == "fit") %>%
+  filter(fit_type == "fit" | variable_label == "Prior Predictive")  %>%
   mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
   ggplot(aes(
     x = roc_distance/1000,
     y = value,
     linetype = variable,
-    colour = variable
+    colour = variable_label
   )) +
-  geom_line() +
-  facet_wrap(~treatment) +
+  geom_line(
+    linewidth = 1.5
+  ) +
+  facet_wrap(~treatment)  +
   geom_hline(
     yintercept = 1,
     linetype = "longdash"
   ) +
+  scale_color_manual(
+    "",
+    values = col_df$colour,
+    labels = col_df$variable
+  )  +
+  guides(linetype = "none") +
   labs(
     x = "Distance [km]",
-    y = "Rescaled Social Multiplier"
-  ) +
-  scale_linetype(
-    "",
-    labels = c(TeX("Rescaled Social Multiplier"), TeX("$\\delta$ Component"))
-  ) +
-  scale_color_canva(
-    "",
-    palette = canva_palette_vibrant,
-    labels = c(TeX("Rescaled Social Multiplier"), TeX("$\\delta$ Component"))
-  )
+    y = "Social Multiplier"
+  ) 
 
+
+
+```
+
+
+```{r}
+#| sm-decomp-annotated,
+#| fig.width=8,
+#| fig.height=6,
+#| fig.cap="Estimated Social Multiplier Over Distance - Components",
+#| fig.note = "This plot shows the social multiplier components estimated using the structural 
+#|  model. The plot decomposes how much of the social multiplier is driven by the 
+#|  $\\Delta$ component versus how much is driven by changes in visibility 
+#|  across distance. The full line shows the entire social multiplier whilst the 
+#|  dashed line shows the $\\Delta$ component - the difference between the two 
+#|  lines is driven by changes in $\\mu$ visibility.
+#|  Line: median."
+
+
+tidy_param_df %>%
+  filter(param == "sm_draws") %>%
+  unnest(tidy_draws) %>%
+  filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
+  mutate(
+    variable_label = case_when(
+      variable == "sm_rescaled" & fit_type == "prior-predict" ~ "Prior Predictive",
+      variable == "sm_rescaled" ~ "Social Multiplier",
+      variable == "sm_delta_part_rescaled" ~ "Social Multiplier - Type Inference Only"
+    ),
+    variable_label = factor(variable_label, levels = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive")),
+    variable = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
+  ) %>%
+  filter(roc_distance <= 2500) %>%
+  filter(fit_type == "fit" | variable_label == "Prior Predictive")  %>%
+  mutate(across(c(value, conf.low, conf.high), multiply_by, -1)) %>%
+  ggplot(aes(
+    x = roc_distance/1000,
+    y = value,
+    linetype = variable,
+    colour = variable_label
+  )) +
+  geom_line(
+    linewidth = 1.5
+  ) +
+  facet_wrap(~treatment)  +
+  geom_hline(
+    yintercept = 1,
+    linetype = "longdash"
+  ) +
+  scale_color_manual(
+    "",
+    values = col_df$colour,
+    labels = col_df$variable
+  )  +
+  guides(linetype = "none") +
+  labs(
+    x = "Distance [km]",
+    y = "Social Multiplier"
+  )  +
+  annotate(
+    "text", 
+    x = 0.0 + 0.3, 
+    y = 1 + 0.05,
+    label = "Amplification", 
+    size = 3, 
+    alpha = 0.7
+  ) +
+  annotate(
+    "text", 
+    x = 2.25 , 
+    y = 1 - 0.05,
+    label = "Mitigation", 
+    size = 3,
+    alpha = 0.7
+  )
 
 ```
 
@@ -3041,43 +3411,73 @@ gpt_endline_know_notknow_table_data = read_csv(
     "temp-data/second-order-know-notknow-gpt-reason-full-data.csv"
 )
 
+gpt_endline_know_notknow_table_data %>%
+  filter(second.order == "don't know" | !is.na(category_sob_reason_short)) %>%
+  summarise(
+    n_distinct(KEY.individ)
+  )
+
+gpt_endline_know_notknow_table_data = gpt_endline_know_notknow_table_data %>%
+  mutate(
+    category_sob_reason_short = case_when(
+    str_detect(second.order.reason, "see") ~ "campaign",
+    # ~ 7 of these cases and all miscoded
+    assigned.treatment == "control" & category_sob_reason_short == "signal" ~ "other",
+      TRUE ~ category_sob_reason_short
+    ),
+  ) 
+
 gpt_translation_df = tribble(
     ~gpt_name, ~clean_name,
-    "campaign", "General Visibility",
+    "campaign", "Direct Observation",
     "communication", "Communication",
     "relationship", "Social Proximity", 
     "signal", "Incentive",
-    "type", "Type",
-    "circumstances", "Circumstances",
+    "type", "Personal Characteristics",
+    "circumstances", "Personal Characteristics",
     "other", "Other",
     "Don't Know", "Don't Know"
-) 
+)  
 
-gpt_translation_df = gpt_translation_df %>%
-    mutate(
-        clean_name = factor(clean_name, levels = clean_name)
-    )
+gpt_df = gpt_endline_know_notknow_table_data %>%
+  mutate(
+    gpt_name = if_else(second.order == "don't know", "Don't Know", category_sob_reason_short)
+  ) %>%
+    left_join(
+        gpt_translation_df,
+        by = c("gpt_name" = "gpt_name")
+    ) %>%
+    mutate(clean_name = factor(clean_name, levels = c("Direct Observation", "Communication", "Social Proximity", "Incentive", "Personal Characteristics", "Other", "Don't Know")))
 
-gpt_endline_know_notknow_table_data %>%
-    filter(!is.na(second.order)) %>%
-    filter(!is.na(second.order.reason)) %>%
+gpt_df %>%
+  count(gpt_name, clean_name)
+
+# Extract colors from the "Accent" palette
+accent_colors <- RColorBrewer::brewer.pal(n = 8, name = "Accent")
+print(accent_colors)
+
+col_gpt_df = gpt_translation_df %>%
+  select(clean_name) %>%
+  unique()
+
+col_gpt_df$colors = accent_colors[1:nrow(col_gpt_df)]
+gray_hex_code = "#AEAEAE"
+col_gpt_df = col_gpt_df %>%
+  mutate(
+    colors = if_else(clean_name == "Don't Know", gray_hex_code, colors)
+  )
+
+
+
+
+gpt_df %>%
     select(
         knowledge,
         dist.pot.group,
         assigned.treatment,
-        category_sob_reason_short
+        category_sob_reason_short,
+        clean_name
     ) %>%
-    mutate(
-        category_sob_reason_short = if_else(
-            knowledge == FALSE,
-            "Don't Know",
-            category_sob_reason_short
-        )
-    ) %>%
-    left_join(
-        gpt_translation_df,
-        by = c("category_sob_reason_short" = "gpt_name")
-    )  %>%
     mutate(
         assigned.treatment = str_to_title(assigned.treatment),
         dist.pot.group = str_to_title(dist.pot.group)
@@ -3092,7 +3492,12 @@ gpt_endline_know_notknow_table_data %>%
         colour = "black"
     ) +
     facet_grid(~dist.pot.group) +
-    scale_fill_brewer("", palette = "Accent") +
+    # scale_fill_brewer("", palette = "Accent") +
+    scale_fill_manual(
+      "",
+        values = col_gpt_df$colors,
+        labels = col_gpt_df$clean_name
+    ) +
     theme_minimal() +
     theme(legend.position = "bottom") +
     labs(
@@ -3102,6 +3507,7 @@ gpt_endline_know_notknow_table_data %>%
     theme(
       panel.grid.major.x = element_blank() 
     )
+
 
 ```
 
@@ -3135,17 +3541,12 @@ munge_freq_results = function(data, colour_df = colour_tibble) {
     arrange(assigned_treatment)  
 }
 
-freq_rf_results
-
-
-
-freq_rf_results %>%
+plot_freq_rf_ates = function(data) {
+  data %>%
   filter(
     assigned_dist_group != "far - close",
-    # assigned_dist_group != "combined",
     assigned_treatment != "signal"
   ) %>%
-  munge_freq_results() %>%
   filter(
     assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
   ) %>%
@@ -3175,86 +3576,13 @@ freq_rf_results %>%
   labs(
     x = "",
     y = "",
-    caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
+    caption = "95% confidence intervals shown clustered standard errors."
   )
 
-1+1
-```
+}
 
-
-```{r}
-#| freq-rf-te-bar-plot,
-#| fig.cap="Incentive Takeup ATEs, Reduced Form Model",
-#| fig.width = 8, fig.height = 6
-1+1
-
-freq_rf_results %>%
-  filter(
-    assigned_dist_group != "far - close",
-    # assigned_dist_group != "combined",
-    assigned_treatment != "signal"
-  ) %>%
-  munge_freq_results() %>%
-  filter(
-    assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
-  ) %>%
-  ggplot(aes(
-    y = assigned_treatment
-  )) +
-  geom_errorbar(
-    aes(
-      xmax = conf.high,
-      xmin = estimate,
-      x = estimate
-    ),
-    alpha = 0.25
-  ) +
-  geom_col(
-    aes(
-      # xmin = conf.low,
-      # xmax = conf.high,
-      x = estimate,
-      fill = colors
-    ),
-    colour = "black",
-    linewidth = 0.75
-  ) +
-  geom_point(
-    aes(x = estimate, colour = colors), 
-    size = 3.5) +
-  geom_point(aes(x = estimate), color = "white", 
-  size = 0.8) +
-  facet_wrap(~assigned_dist_group, ncol = 1) +
-  scale_color_identity() +
-  scale_fill_identity() +
-  geom_vline(
-    xintercept = 0,
-    linetype = "longdash"
-  )  +
-  labs(
-    x = "",
-    y = "",
-    caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
-  )  
-
-```
-
-```{r}
-#| freq-rf-levels-plot,
-#| fig.cap="Incentive Takeup Levels, Reduced Form Model",
-#| fig.width = 8, fig.height = 6
-
-1+1
-freq_rf_levels = read_csv("temp-data/reducedform-tidy-levels.csv")  
-
-freq_rf_levels
-
-freq_rf_levels %>%
-  filter(
-    assigned_dist_group != "far - close",
-    assigned_dist_group != "combined"
-  ) %>%
-  munge_freq_results() %>%
+plot_freq_rf_levels = function(data) {
+  data %>%
   filter(!is.na(assigned_treatment)) %>%
   mutate(
     alpha = case_when(
@@ -3286,74 +3614,140 @@ freq_rf_levels %>%
   labs(
     x = "",
     y = "",
-    caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
+    caption = "95% confidence intervals using clustered standard errors."
   ) +
   scale_x_continuous(breaks = seq(0.15, 0.55, 0.1), limits = c(0.15, 0.55)) 
+
+}
+
+
+freq_rf_results %>%
+  filter(
+    assigned_dist_group != "far - close",
+    # assigned_dist_group != "combined",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results() %>%
+  filter(
+    assigned_treatment %in% c("Any Signal", "Ink", "Calendar", "Bracelet"),
+  ) %>%
+  plot_freq_rf_ates()
+
+1+1
+```
+
+```{r}
+#| freq-rf-levels-plot,
+#| fig.cap="Incentive Takeup Levels, Reduced Form Model",
+#| fig.width = 8, fig.height = 6
+
+freq_rf_levels = read_csv("temp-data/reducedform-tidy-levels.csv")  
+
+freq_rf_levels %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_dist_group != "combined"
+  ) %>%
+  munge_freq_results() %>%
+  filter(!is.na(assigned_treatment)) %>%
+  plot_freq_rf_levels()
 
 ```
 
 
 ```{r}
-#| freq-rf-levels-bar-plot,
-#| fig.cap="Incentive Takeup Levels, Reduced Form Model",
+#| freq-rf-levels-discrete-dist-lasso,
+#| fig.cap="Incentive Takeup Levels, Reduced Form Model - Discrete Distance w/ LASSO Covs",
 #| fig.width = 8, fig.height = 6
+discrete_dist_lasso_levels = read_csv("temp-data/reducedform-robustness-discrete-dist-covs-tidy-levels.csv")
 
-1+1
-freq_rf_levels %>%
+discrete_dist_lasso_levels %>%
   filter(
-    assigned_dist_group != "far - close"
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal",
+    assigned_dist_group != "combined"
   ) %>%
   munge_freq_results() %>%
-  filter(!is.na(assigned_treatment)) %>%
-  mutate(
-    alpha = case_when(
-      assigned_treatment == "Control" ~ 1,
-      TRUE ~ 0.25
-    )
+  plot_freq_rf_levels()
+
+```
+
+
+```{r}
+#| freq-rf-ates-discrete-dist-lasso,
+#| fig.cap="Incentive Takeup Levels, Reduced Form Model - Discrete Distance w/ LASSO Covs",
+#| fig.width = 8, fig.height = 6
+discrete_dist_lasso_fit = read_csv(
+  "temp-data/reducedform-robustness-discrete-dist-covs-tidy-tes.csv"
+)
+
+discrete_dist_lasso_fit %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
   ) %>%
-  filter(assigned_dist_group != "Combined") %>%
-  mutate(
-    alpha = case_when(
-      assigned_treatment == "Control" ~ 1,
-      TRUE ~ 0.15
-    )
+  munge_freq_results()  %>%
+  plot_freq_rf_ates()
+
+
+```
+
+```{r}
+#| freq-rf-ates-recent,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Recentered",
+#| fig.width = 8, fig.height = 6
+
+recent_rf_te = read_csv("temp-data/reducedform-clust-recent-dist-tidy-tes.csv")
+
+recent_rf_te %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
   ) %>%
-  ggplot(aes(
-    y = assigned_treatment,
-    alpha = alpha
-  )) +
-  geom_errorbar(
-    aes(
-      xmax = conf.high,
-      xmin = estimate,
-      x = estimate
-    ),
-    alpha = 0.25
-  ) +
-  geom_col(
-    aes(
-      # xmin = conf.low,
-      # xmax = conf.high,
-      x = estimate,
-      fill = colors
-    ),
-    linewidth = 0.75
-  ) +
-  geom_point(aes(x = estimate, colour = colors), size = 3.5) +
-  geom_point(aes(x = estimate), color = "white", size = 0.6) +
-  facet_wrap(~assigned_dist_group, ncol = 1) +
-  scale_color_identity() +
-  scale_fill_identity() +
-  scale_alpha_identity() +
-  labs(
-    x = "",
-    y = "",
-    caption = "95% confidence intervals shown calculated using wild cluster bootstrap."
-  ) +
-  guides(
-    alpha = "none"
-  ) +
-  scale_x_continuous(breaks = seq(0.0, 0.6, 0.1), limits = c(0.0, 0.6)) 
+  munge_freq_results()  %>%
+  plot_freq_rf_ates()
+
+
+
+```
+
+
+```{r}
+#| freq-rf-tes-discrete-plot,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Discrete Distance",
+#| fig.width = 8, fig.height = 6
+
+
+discrete_dist_tidy_te = read_csv(
+  "temp-data/reducedform-robustness-discrete-dist-tidy-tes.csv"
+)
+
+discrete_dist_tidy_te %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results()  %>%
+  plot_freq_rf_ates()
+
+
+```
+
+```{r}
+#| freq-rf-tes-cts-lasso-plot,
+#| fig.cap="Incentive Takeup ATEs, Reduced Form Model - Continuous Distance, LASSO Covs",
+#| fig.width = 8, fig.height = 6
+
+cts_dist_covs = read_csv("temp-data/reducedform-robustness-cts-dist-covs-tidy-tes.csv")
+
+cts_dist_covs %>%
+  filter(
+    assigned_dist_group != "far - close",
+    assigned_treatment != "signal"
+  ) %>%
+  munge_freq_results()  %>%
+  plot_freq_rf_ates()
+
 
 ```
 
