@@ -83,7 +83,7 @@ subset_demand_df = subset_demand_df %>%
 
 subset_demand_df = subset_demand_df %>%
     mutate(
-        demand_data = map(demand_data, ~filter(.x, dist_km <= 2.5))
+        demand_data = map(demand_data, ~filter(.x, dist_km <= 3.5))
     )
 
 summ_subset_demand_df = subset_demand_df %>%
@@ -105,7 +105,6 @@ summ_subset_demand_df = summ_subset_demand_df %>%
     mutate(
         v_star_type = if_else(v_star_type == "static", "Fixed", "W*")
     ) 
-
 
 plot_amp_mit_fun = function(data) {
     data %>%
@@ -158,8 +157,56 @@ plot_amp_mit_fun = function(data) {
 
 }
 
+plot_summ_subset_demand_df = summ_subset_demand_df %>%
+    mutate(mu_type = str_to_title(mu_type)) %>%
+    mutate(
+        type = paste0(v_star_type, ": ", mu_type)
+    ) 
 
 p_scaled = 
+    plot_summ_subset_demand_df %>%
+        filter(
+            type != "Fixed: Bracelet"
+        ) %>%
+        mutate(type = case_when(
+            type == "Static: Control" ~ "Fixed: Control",
+            TRUE ~ type
+        )) %>%
+        ggplot(aes(
+            x = dist_km, 
+            y = demand
+        )) +
+        geom_line(aes(
+            colour = type, 
+            group = type, 
+            linetype = v_star_type
+        ), linewidth = 1.5)  +
+        theme_minimal() +
+        theme( 
+            legend.position = "bottom",
+            legend.title = element_blank()
+        )  +
+        labs(
+            x = "Distance (km)", 
+            y = "Estimated Takeup", 
+            colour = ""
+        ) +
+        guides(
+            fill = "none", 
+            linetype = "none"
+        ) +
+        ggthemes::scale_color_canva( 
+            palette = "Primary colors with a vibrant twist"
+        ) +
+        ggthemes::scale_fill_canva( 
+            palette = "Primary colors with a vibrant twist"
+        ) +
+        scale_linetype_manual(
+            values = c("longdash", "solid")
+        )
+p_scaled
+
+p_scaled_all = 
     plot_summ_subset_demand_df %>%
         mutate(type = case_when(
             type == "Static: Control" ~ "Fixed: Control",
@@ -198,6 +245,22 @@ p_scaled =
             values = c("longdash", "solid")
         )
 
+p_scaled_all
+
+ggsave(
+    plot = p_scaled_all,
+    file.path(
+        script_options$output_path,
+        str_glue(
+            "plot-scaled-{script_options$model}-agg-{script_options$welfare_function}-full-many-pots-pred-demand-vstar-comp-all.pdf"
+        )
+    ),
+    width = 8, 
+    height = 6
+)
+
+p_scaled
+
 ggsave(
     plot = p_scaled,
     file.path(
@@ -211,11 +274,6 @@ ggsave(
 )
 
 
-plot_summ_subset_demand_df = summ_subset_demand_df %>%
-    mutate(mu_type = str_to_title(mu_type)) %>%
-    mutate(
-        type = paste0(v_star_type, ": ", mu_type)
-    ) 
 
 full_p_amp_mit = plot_summ_subset_demand_df %>%
     plot_amp_mit_fun() 
