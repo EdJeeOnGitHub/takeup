@@ -30,9 +30,9 @@ run_model_components () {
                                 ${PRED_DISTANCE} \
                                 --data-input-name=full-experiment.rds \
                                 --single-chain \
-                                --fit-type=${FIT_TYPE}
-                                # --static-signal-pm \
-                                # --static-signal-distance=0 \
+                                --fit-type=${FIT_TYPE} \
+                                --static-signal-pm \
+                                --static-signal-distance=500 
 }
 
 

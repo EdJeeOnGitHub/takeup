@@ -40,9 +40,9 @@ script_options = docopt::docopt(
     "),
     args = if (interactive()) "
                             86
-                            control
-                            control
-                            --output-name=ramsey-control-mu-control-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+                            bracelet
+                            bracelet
+                            --output-name=ramsey-bracelet-mu-bracelet-lambda-0.15-externality-0.15-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
                             --num-post-draws=500
                             --num-cores=12
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
@@ -716,7 +716,6 @@ range_df = range_df %>%
     )
 
 
-
 range_df = range_df %>%
     mutate(
         fit_vis = map(
@@ -745,9 +744,6 @@ range_df = range_df %>%
             )
     )
 
-
-
-
 range_df %>%
     select(
         lambda, b_add, params_vis, res_vis
@@ -759,7 +755,6 @@ range_df %>%
             ~analytical_delta(-.x, .y$total_error_sd)
             )
     )
-
 range_df %>%
     select(
         lambda, b_add, params_vis, res_vis 

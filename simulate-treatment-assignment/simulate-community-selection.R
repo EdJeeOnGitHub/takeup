@@ -22,6 +22,58 @@ rct_village_cw_df = rct_village_df %>%
   select(cluster.id, ed_village_id) %>%
   unique()
 
+rct_village_df %>%
+  colnames()
+
+
+rct_cluster_selection = st_as_sf(rct.cluster.selection,
+  coords = c("target.lon", "target.lat"),
+  crs = wgs.84
+) %>%
+  st_transform(kenya.proj4) %>%
+  inner_join(
+    rct_village_df %>%
+      as.data.frame() %>%
+      select(
+        cluster.id,
+        target.village.id,
+        target.pop_individuals,
+        target.pop_households
+      ),
+      by = "cluster.id"
+  ) 
+
+
+p_pop_size = rct_cluster_selection %>%
+  filter(target.pop_individuals > 0) %>%
+ st_centroid() %>%
+  ggplot() +
+  geom_sf(aes(
+    size = target.pop_individuals
+  ), color = "blue", alpha = 0.6) +
+  scale_size_continuous(
+    name = "Total Community Population"
+  ) +
+  theme_minimal()  +
+  theme(legend.position = "bottom") 
+
+ggsave(
+  plot = p_pop_size,
+  filename = here::here("temp-plots", "community-pop-size-map.pdf"),
+  width = 8,
+  height = 6
+)
+
+quantile(
+  rct_cluster_selection$target.pop_households,
+  probs = c(0.25, 0.75)
+)
+
+quantile(
+  rct_cluster_selection$target.pop_individuals,
+  probs = c(0.25, 0.75)
+)
+
 
 cluster.survey.data <- read_rds(here("data", "takeup_cluster_survey.rds"))
 cluster.survey.data = cluster.survey.data %>%
