@@ -1,5 +1,267 @@
 library(tidyverse)
+
+source("analysis_util.R")
+source(file.path("multilvlr", "multilvlr_util.R"))
+source("dist_structural_util.R")
+
+# Data --------------------------------------------------------------------
+
+load(file.path("data", "analysis.RData"))
+
+standardize <- as_mapper(~ (.) / sd(.))
+unstandardize <- function(standardized, original) standardized * sd(original)
+# stick to monitored sms.treatment group
+# remove sms.treatment.2
+
+monitored_nosms_data <- analysis.data %>% 
+  filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+monitored_sms_data = analysis.data %>% 
+  filter(mon_status == "monitored") %>% 
+  filter(have_phone == "Yes") %>%
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+#### SMS Stuff
+monitored_nosms_data
+
+monitored_sms_data %>%
+    count(sms.treatment)
+
+monitored_data = analysis.data %>%
+    filter(mon_status == "monitored") 
+
+monitored_data %>%
+    select(contains("consent")) %>%
+    skimr::skim()
+
+    summarise(
+        n_distinct(KEY.individ)
+    )
+
+nosms_data <- analysis.data %>% 
+  filter(sms.treatment.2 == "sms.control") %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+analysis_data <- monitored_nosms_data %>% 
+  ungroup() %>%
+  mutate(
+    assigned_treatment = assigned.treatment, 
+    assigned_dist_group = dist.pot.group,
+    standard_hh.dist.to.pot = standardize(dist.to.pot),
+    indiv_id = row_number()
+    )
+
+
+
+# Endline ------------------------------------------------------------------
+
+
+total = 9935
+baseline = 2250
+endline = 3750
+sms = 3935
+
+all.endline.data %>%
+  count(consent)
+
+
+
+baseline + endline
+
+
+
+baseline + endline + sms
+
+
+baseline.data
+
+endline.know.table.data %>%
+    filter(fct_match(know.table.type, "table.A"))  %>%
+    group_by(KEY.individ) %>%
+    mutate(num.recognized = sum(num.recognized))  %>%
+    filter(num.recognized > 0) %>%
+    ungroup() %>%
+    summarise(
+      n_indiv = n_distinct(KEY.individ)
+    )
+
+
+know_a_table = endline.know.table.data %>%
+  filter(fct_match(know.table.type, "table.A")) 
+
+sms_treat = monitored_sms_data %>%
+  filter(sms.treatment %in% c("social.info", "reminder.only")) 
+
+# out of total endline sample, we randomly sampled 1627 people to implement beliefs.
+# Amongst them, XYZ didn't recognize anyone, and remaining ABC in the SMS sample, 
+# who are not used in the main analysis.o
+
+
+# out of endline sample, we randomly sampled 1627 people to implement beliefs.
+# In the non-SMS sample this leads to ABC total beliefs observations, of which 
+# XYZ didn't recognize anyone.
+
+
+know_a_clusters = know_a_table %>%
+  pull(cluster.id)
+
+ana_clusters = analysis_data %>%
+  pull(cluster.id)
+
+setdiff(ana_clusters, know_a_clusters)
+
+
+know_a_ids = know_a_table %>%
+  pull(KEY.individ)
+
+ana_ids = analysis_data %>%
+  pull(KEY.individ)
+
+setdiff( know_a_ids, ana_ids)
+
+not_in_monitored = setdiff(know_a_ids, monitored_data$KEY.individ)
+
+all.endline.data %>%
+    filter(across(c(present, interview, consent), ~ !is.na(.x) & .x == 1)) 
+
+# interviewied 3817, of which 3716 consented
+all.endline.data %>%
+    filter(present == TRUE) %>%
+    count(consent) 
+
+
+# of which 3700 finished interview
+all.endline.data %>%
+    filter(present == TRUE & consent == TRUE) %>%
+    count(interview)
+
+# of which 3678 weren't duplicate people?!
+all.endline.data %>% 
+    filter(present == TRUE & consent == TRUE & interview == TRUE) %>%
+    group_by(KEY.individ) %>%
+    filter(row_number() == 1)  %>%
+    nrow()
+
+
+all.endline.data %>%
+    filter(across(c(present, interview, consent), ~ !is.na(.x) & .x == 1)) %>% 
+    arrange(KEY.individ, SubmissionDate) %>% 
+    group_by(KEY.individ) %>% 
+    filter(row_number() == 1)  # If more than one entry for an individual, take first one (there are 22 such individuals)
+
+stop()
+
+all.endline.data %>%
+  count(consent)
+
+  colnames(all.endline.data)
+
+
+all.endline.data %>%
+  select(present, return, consent, reconsent)
+
+all.endline.data %>%
+  count(reconsent)
+
+
+endline.data
+
+know_a_table = know_a_table %>%
+  group_by(KEY.individ) %>%
+  mutate(num.recognized = sum(num.recognized)) %>%
+  mutate(any_recognized = num.recognized > 0) %>%
+  ungroup() %>%
+  mutate(
+    id_in_analysis = if_else(KEY.individ %in% analysis_data$KEY.individ, 1, 0),
+    id_in_sms = if_else(KEY.individ %in% sms_treat$KEY.individ, 1, 0),
+    id_in_either = if_else(KEY.individ %in% analysis_data$KEY.individ | KEY.individ %in% sms_treat$KEY.individ, 1, 0),
+    id_in_mon = if_else(KEY.individ %in% monitored_data$KEY.individ, 1, 0)
+  )
+
+know_a_table %>%
+  summarise(
+    pr_in_ana = mean(id_in_analysis, na.rm = TRUE),
+    pr_in_sms = mean(id_in_sms, na.rm = TRUE),
+    pr_in_either = mean(id_in_either, na.rm = TRUE)
+  )
+
+know_a_table %>%
+  group_by(id_in_analysis, id_in_sms, id_in_mon) %>%
+  summarise(
+    n_indiv = n_distinct(KEY.individ)
+  )
+
+in_know_not_in_mon = know_a_table %>%
+  filter(id_in_mon == 0) %>%
+  pull(KEY.individ)
+
+endline.data %>%
+  filter(
+    KEY.individ %in% in_know_not_in_mon
+  ) 
+endline.data %>%
+  filter(
+    KEY.individ %in% in_know_not_in_mon
+  ) %>%
+  group_by(assigned.treatment) %>%
+  summarise(n = n()) %>%
+  count()
+
+all.endline.data %>%
+  filter(
+    KEY.individ %in% in_know_not_in_mon
+  )
+
+
+
+know_a_table %>%
+  filter(id_in_mon == 0)  %>%
+  count(dewormed)
+
+
+know_a_table %>%
+  filter(id_in_mon == 1)  %>%
+  count(dewormed)
+
+know_a_table %>%
+  filter(id_in_analysis == 1) %>%
+  group_by(KEY.individ) %>%
+  summarise(
+    n_recognized = sum(num.recognized)
+  ) %>%
+  count(n_recognized) 
+
+know_a_table %>%
+  group_by(id_in_analysis, id_in_sms, any_recognized) %>%
+  summarise(
+    n_indiv = n_distinct(KEY.individ)
+  )
+
+
+
+#### Baseline Data 
+
+library(tidyverse)
 library(here)
+library(sp)
 
 baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
 
@@ -10,54 +272,11 @@ baseline_data = read_rds(file.path("data", "takeup_baseline_data.rds"))
 
 all_endline_data = read_rds(file.path("data", "all_endline.rds"))
 
-baseline_data
-
-
-
-all_endline_data %>%  
-  select(religion, ethnicity)
-
-all_endline_data %>%
-  count(ethnicity) %>%
-  arrange(-n)
-
-endline_data %>%
-  select(contains("clan"))
-
-baseline_data %>%
-  select(religion, ethnicity) %>%
-  unique()
-
-all_endline_data
-
-# Baseline + Endline
-# merge endline:
-  # - phone
-  # - primary
-  # - floor
-
-  # top two from each
-  # - ethnicity: proportion majority ethnicity
-  # - religion: proportion majority religion
 
 
 
 # Clean up know everyone can be infected
 # knowledge variables + add more sample
-
-all_endline_data %>%
-  select(contains('floor'))
-
-all_endline_data %>%
-  select(contains('phone'))
-
-all_endline_data %>%
-  select(contains('school')) %>%
-  count(school) %>%
-  arrange(-n)
-
-
-
 
 # 9,935 adults of which 2,250 adults are surveyed at baseline, 
 # 3,750 adults surveyed at endline and 
@@ -66,7 +285,6 @@ all_endline_data %>%
 
 print(str_glue("Endline data: {nrow(all_endline_data)}"))
 print(str_glue("Baseline data: {nrow(baseline_data)}"))
-
 nrow(baseline.data)
 
 census_data_env = new.env()
@@ -89,13 +307,6 @@ n_hh_df = census_data %>%
         n = sum(num.individuals)
     )
 
-census_data %>%
-  colnames()
-
-    census_data %>%
-      summarise(mean(have_phone == "Yes", na.rm = TRUE))
-
-stop()
 rct.counties <- c("Busia", "Siaya", "Kakamega")
 busia.subcounties <- c("butula", "nambale", "teso south", "teso north") 
 siaya.subcounties <- c("gem", "ugenya", "ugunja")
@@ -137,7 +348,6 @@ census.data = read_rds("data/takeup_census.rds")
 
 raw_baseline_data <- tu.data.reader(raw.data.path("Baseline Survey.csv")) 
 
-stop()
 
 raw_baseline_data = raw_baseline_data %>%
   mutate(
@@ -145,40 +355,43 @@ raw_baseline_data = raw_baseline_data %>%
     present_filter = present == 1 | !is.na(age),
     consent_filter = !is.na(consent) & consent == 1
   ) 
-  %>%
+
+raw_baseline_data = raw_baseline_data %>%
+  mutate(
+    date = sub_date_filter,
+    date_and_present = sub_date_filter & present_filter,
+    date_and_present_and_consent = date_and_present & consent_filter
+  )
+
+
+# Baseline breakdown
+# Actually talk to 3001 people - some of these seem to be too early - pilot?
+raw_baseline_data %>%
+  group_by(date) %>%
   summarise(
-    across(contains('filter'), mean, na.rm = TRUE)
+    n = n()
+  )
+# of which, only 2151 (goal was 2160) are present
+raw_baseline_data %>%
+  group_by(date_and_present) %>%
+  summarise(
+    n = n()
+  )
+# of which, only 2069 consent
+raw_baseline_data %>%
+  group_by(date_and_present_and_consent) %>%
+  summarise(
+    n = n()
   )
 
+census.data %>%
+  count(monitored, true.monitored)
 
-raw_baseline_data %>%
-  count(sub_date_filter)
-# GOAL 2160
-# HAVE 2056
+census.data %>%
+  count(true.monitored)
 
-raw_baseline_data %>%
-  filter(sub_date_filter == TRUE) %>%
-  count(present_filter) 
 
-raw_baseline_data %>%
-  filter(sub_date_filter == TRUE) %>%
-  filter(present_filter == TRUE) %>%
-  count(consent_filter)
-
-  filter(
-    sub_date_filter
-  )
-
-  filter(SubmissionDate >= "2016-09-05",
-         present == 1 | !is.na(age), 
-         !is.na(consent) & consent == 1) 
-
-reclean_baseline_data = tu.data.reader(raw.data.path("Baseline Survey.csv")) %>% 
-  filter(SubmissionDate >= "2016-09-05", 
-         present == 1 | !is.na(age), 
-         !is.na(consent) & consent == 1) %>% 
-  select(-county)  %>%
-  left_join(filter(., !invalid.coord) %>% identify.closest.cluster, "KEY") %>%
-  left_join(cluster.wave.county.data, "cluster.id") 
-
+census.data %>%
+  filter(true.monitored == 1) %>%
+  count(recruit)
 
