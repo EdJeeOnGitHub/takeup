@@ -5,9 +5,9 @@ library(tidyverse)
 library(lubridate)
 library(sf)
 library(sp)
-library(rgeos)
+# library(rgeos)
 
-library(econometr)
+# library(econometr)
 
 source("analysis_util.R")
 
@@ -117,9 +117,18 @@ village.centers %<>%
 baseline.data %<>% 
   prepare.baseline.data(cluster.strat.data) 
 
+
+# These prepare functions no longer run as they depend on rgeos which has been 
+# deprecated. I'm trying to cut out the parts not needed but haven't got there 
+# yet 2025/04/23
+ed_baseline.data = baseline.data %>%
+  ed_edits_prepare.baseline.data(cluster.strat.data)
+ed_endline.data <- ed_edits_prepare.endline.data(all.endline.data, census.data, cluster.strat.data)
+
 endline.data <- prepare.endline.data(all.endline.data, census.data, cluster.strat.data)
 consent.dewormed.reports <- prepare.consent.dewormed.data(all.endline.data, reconsent.data)
 analysis.data <- prepare.analysis.data(census.data, takeup.data, endline.data, baseline.data, consent.dewormed.reports, cluster.strat.data, max.name.match.cost = 1)
+
 
 # Outliers ----------------------------------------------------------------
 
