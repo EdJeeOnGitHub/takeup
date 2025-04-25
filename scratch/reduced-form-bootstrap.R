@@ -244,6 +244,7 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
 baseline_worm = baseline.data %>%
   clean_worm_covariates()
 
+
 clean_takeup_variables = function(data) {
   data %>%
     mutate(
@@ -1384,7 +1385,6 @@ l_cov_vars = c(
   "age.census"
 )
 
-
 #### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
 dist_cts_regression = function(data, weights) {
   feols(
@@ -1623,6 +1623,107 @@ discrete_fob_output = wrapper_function(
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
 )
+
+#### Checking weird 150 individuals don't cause issues
+
+not_in_monitored = readRDS("temp-data/not_in_monitored.rds")
+
+clean_endline_extra_df =  endline.know.table.data %>% 
+    filter(fct_match(know.table.type, "table.A")) %>%
+    filter(KEY.individ %in% not_in_monitored)  %>%
+    group_by(KEY.individ) %>%
+    summarise(
+      obs_know_person = sum(num.recognized),
+      obs_know_person_prop = mean(num.recognized),
+      knows_other_dewormed = sum(fct_match(dewormed, c("yes", "no")), na.rm = TRUE),
+      knows_other_dewormed_yes = sum(fct_match(dewormed, "yes"), na.rm = TRUE),
+      knows_other_dewormed_no = sum(fct_match(dewormed, "no"), na.rm = TRUE),
+      thinks_other_knows = sum(fct_match(second.order, c("yes", "no")), na.rm = TRUE),
+      thinks_other_knows_yes = sum(fct_match(second.order, "yes"), na.rm = TRUE),
+      thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE),
+      assigned.treatment = first(assigned.treatment),
+      dist.pot.group = first(dist.pot.group),
+      cluster.id = first(cluster.id)
+    ) %>%
+    left_join(
+      cluster_expected_dist_df %>%
+        mutate(cluster.id = as.numeric(cluster.id)),
+      by = c("cluster.id" = "cluster.id")
+    ) %>%
+    # convert to same format as know_df
+    mutate(
+      standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
+      mu_d = standard_clust_expected_dist,
+    ) %>%
+    mutate(
+      assigned_treatment = assigned.treatment,
+      assigned_dist_group = dist.pot.group,
+      signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+      signal = factor(signal, levels = c("no signal", "signal"))
+    ) %>%
+    mutate(
+      prop_knows = obs_know_person_prop,
+      cluster.id = factor(cluster.id)
+    ) %>%
+    left_join(
+      analysis_data %>%
+        select(cluster.id, county, standard_cluster.dist.to.pot) %>%
+        unique(), 
+        by = "cluster.id"
+    )
+
+
+
+extra_know_df = bind_rows(
+  know_df %>% 
+    filter(belief_type == "1ord"),
+  clean_endline_extra_df %>%
+    mutate(cluster.id = factor(cluster.id))
+)
+
+
+extra_fit = extra_know_df %>%
+  feols(
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  ,
+    cluster = ~cluster.id
+  )
+single_fit = know_df %>%
+  filter(belief_type == "1ord") %>%
+  feols(
+    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") ,
+    cluster = ~cluster.id
+  )
+
+
+tidy_comp_extra_df = bind_rows(
+  extra_fit %>%
+    tidy(conf.int = TRUE) %>%
+    mutate(type = "extra 150 people"),
+    single_fit %>%
+    tidy(conf.int = TRUE) %>% 
+    mutate(type = "current analysis")
+)
+
+tidy_comp_extra_df %>%
+  ggplot(aes(
+    x = estimate,
+    xmin = conf.low,
+    xmax = conf.high,
+    y = term,
+    colour = type
+  )) +
+  geom_pointrange(
+    position = position_dodge(width = 0.5),
+    size = 1
+  )  +
+  theme_bw()
+ggsave(
+  "temp-data/extra_fit_comp.pdf",
+  width = 10,
+  height = 5
+)
+
+
 
 #### FOB Continuous Distance + LASSO Covs + Cluster Expected Distance
 cts_fob_output = wrapper_function(
