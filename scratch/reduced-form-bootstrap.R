@@ -1457,6 +1457,10 @@ hh_spec_output = wrapper_function(
 
 
 #### Beliefs -------------------------------------------------------------------
+
+
+
+
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
@@ -1480,6 +1484,87 @@ belief_ana_df = analysis_data %>%
     }
   )) %>%
     filter(obs_know_person > 0)
+
+nosms_data
+
+all_data = analysis.data %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+
+belief_all_df = all_data %>%
+  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
+  nest_join(
+    endline.know.table.data %>% 
+      filter(fct_match(know.table.type, "table.A")),
+    by = "KEY.individ", 
+    name = "knowledge_data"
+  ) %>% 
+  mutate(
+    map_dfr(knowledge_data, ~ {
+      tibble(
+        obs_know_person = sum(.x$num.recognized),
+        obs_know_person_prop = mean(.x$num.recognized),
+        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
+        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
+        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
+        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
+        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
+        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
+      )
+    }
+  )) %>%
+    filter(obs_know_person > 0)
+
+know_all_df = belief_all_df %>%
+  mutate(
+    doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed, 
+    doesnt_think_other_knows = obs_know_person - thinks_other_knows
+  ) %>%
+    select(KEY.individ, 
+           assigned.treatment,
+           assigned_dist_group,
+           obs_know_person,
+           knows_other_dewormed_yes,
+           knows_other_dewormed_no,
+           doesnt_know_other_dewormed, 
+           thinks_other_knows_yes, 
+           thinks_other_knows_no, 
+           doesnt_think_other_knows,
+           cluster.id,
+           cluster.dist.to.pot,
+           standard_cluster.dist.to.pot,
+           dist.to.pot,
+           county,
+           dewormed
+           ) %>%
+    gather(variable, value, 
+        knows_other_dewormed_yes:doesnt_think_other_knows)   %>%
+    mutate(knowledge_type = case_when(
+        str_detect(variable, "_yes") ~ "yes",
+        str_detect(variable, "_no") ~ "no",
+        str_detect(variable, "doesnt") ~ "doesn't know"
+    )) %>%
+    mutate(belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord")) %>%
+    mutate(prop = value/obs_know_person) 
+
+know_all_df %>%
+  filter(knowledge_type == "doesn't know") %>%
+  mutate(
+    prop_knows = 1 - prop
+  ) %>%
+  feols(
+    fml = prop_knows ~ assigned.treatment + assigned_dist_group + i(assigned.treatment, assigned_dist_group, "control")  | county,
+    data = .
+  ) %>%
+  tidy()
+
 
 
 disagg_base_belief_data = cov_analysis_data %>%
