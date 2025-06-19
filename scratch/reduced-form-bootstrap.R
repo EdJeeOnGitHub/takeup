@@ -1455,6 +1455,81 @@ hh_spec_output = wrapper_function(
 
 
 #### Beliefs -------------------------------------------------------------------
+
+endline.know.table.data %>%
+  count(relationship)
+
+
+endline.know.table.data %>%
+  filter(fct_match(know.table.type, "table.A"))  %>%
+  filter(num.recognized > 0) %>%
+  group_by(
+    relationship,
+    dewormed
+  ) %>%
+  count() %>%
+  pivot_wider(
+    names_from = dewormed,
+    values_from = n,
+    values_fill = 0
+  )
+
+endline.know.table.data %>%
+  filter(fct_match(know.table.type, "table.A"))  %>%
+  filter(num.recognized > 0) %>%
+  group_by(
+    relationship,
+    dewormed
+  ) %>%
+  count() %>%
+  pivot_wider(
+    names_from = dewormed,
+    values_from = n,
+    values_fill = 0
+  ) %>%
+  rename(dont_know = `don't know`) %>%
+  mutate(
+    total = no + yes + dont_know
+  ) %>%
+  mutate(across(
+    c(no, yes, dont_know),
+    ~round(100*.x/total, 1)
+  )) %>%
+  arrange(dont_know) %>%
+  mutate(
+    relationship = case_when(
+      relationship == "hh member" ~ "Household member",
+      relationship == "extended family" ~ "Extended family",
+      relationship == "friend" ~ "Friend",
+      relationship == "neighbor" ~ "Neighbor",
+      relationship == "church" ~ "Church member",
+      relationship == "village member" ~ "Village member",
+      relationship == "other" ~ "Other"
+    )
+  ) %>%
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    escape = FALSE,
+    linesep = "",
+    col.names = c(
+      "Relationship",
+      "No (\\%)",
+      "Yes (\\%)",
+      "Don't Know (\\%)",
+      "Total"
+    ),
+    align = "lcccc"
+  ) %>% 
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+    custom_save_latex_table(
+      table_name = "beliefs_relationships_tbl"
+    )
+
+
+
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
