@@ -1706,6 +1706,9 @@ know_1_all_df = know_all_df  %>%
   filter(belief_type == "1ord") %>%
   mutate(cluster_id = as.numeric(cluster.id)) 
 
+know_1_all_df %>%
+  select(cluster_id)
+
 discrete_f_know = function(data, weights) {
   feols(
     prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + .[l_cov_vars] +  mu_d | county,
@@ -1746,7 +1749,7 @@ discrete_fob_output = wrapper_function(
 #### Checking using full sample (SMS + non-monitored) doesn't change results
 
 discrete_fob_full_output = wrapper_function(
-  data = know_all_1_df,
+  data = know_1_all_df,
   regression_spec = discrete_f_know,
   table_options = list(
     dependent_var = "Dependent variable: Observability"
