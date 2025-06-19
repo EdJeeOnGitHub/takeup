@@ -1,6 +1,4 @@
 library(tidyverse)
-library(posterior)
-library(tidybayes)
 library(broom)
 library(data.table)
 library(kableExtra)
@@ -1457,10 +1455,6 @@ hh_spec_output = wrapper_function(
 
 
 #### Beliefs -------------------------------------------------------------------
-
-
-
-
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
@@ -1485,7 +1479,6 @@ belief_ana_df = analysis_data %>%
   )) %>%
     filter(obs_know_person > 0)
 
-nosms_data
 
 all_data = analysis.data %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
@@ -1497,8 +1490,17 @@ all_data = analysis.data %>%
   ungroup()
 
 
-
-belief_all_df = all_data %>%
+disagg_belief_all_df = all_data %>%
+  mutate(
+    female = gender == "female"
+  ) %>%
+  left_join(
+    cov_analysis_data %>%
+      select(cluster.id,  mu_d, standard_clust_expected_dist) %>%
+      mutate(cluster.id = as.numeric(cluster.id)) %>%
+      unique(),
+    by = "cluster.id"
+  ) %>% 
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
     endline.know.table.data %>% 
@@ -1520,13 +1522,26 @@ belief_all_df = all_data %>%
       )
     }
   )) %>%
-    filter(obs_know_person > 0)
-
-know_all_df = belief_all_df %>%
-  mutate(
-    doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed, 
-    doesnt_think_other_knows = obs_know_person - thinks_other_knows
-  ) %>%
+    filter(obs_know_person > 0)  %>%
+    select(
+      KEY.individ, 
+      contains("know"), 
+      assigned.treatment, 
+      dist.pot.group, 
+      assigned_dist_group,
+      cluster.id,
+      cluster.dist.to.pot,
+      standard_cluster.dist.to.pot,
+      dist.to.pot,
+      county,
+      dewormed,
+      all_of(l_cov_vars),
+      standard_clust_expected_dist
+      ) %>%
+    mutate(
+        doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed, 
+        doesnt_think_other_knows = obs_know_person - thinks_other_knows
+    ) %>% 
     select(KEY.individ, 
            assigned.treatment,
            assigned_dist_group,
@@ -1542,7 +1557,9 @@ know_all_df = belief_all_df %>%
            standard_cluster.dist.to.pot,
            dist.to.pot,
            county,
-           dewormed
+           dewormed,
+           all_of(l_cov_vars),
+           standard_clust_expected_dist
            ) %>%
     gather(variable, value, 
         knows_other_dewormed_yes:doesnt_think_other_knows)   %>%
@@ -1553,18 +1570,7 @@ know_all_df = belief_all_df %>%
     )) %>%
     mutate(belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord")) %>%
     mutate(prop = value/obs_know_person) 
-
-know_all_df %>%
-  filter(knowledge_type == "doesn't know") %>%
-  mutate(
-    prop_knows = 1 - prop
-  ) %>%
-  feols(
-    fml = prop_knows ~ assigned.treatment + assigned_dist_group + i(assigned.treatment, assigned_dist_group, "control")  | county,
-    data = .
-  ) %>%
-  tidy()
-
+    
 
 
 disagg_base_belief_data = cov_analysis_data %>%
@@ -1663,14 +1669,42 @@ know_df = disagg_base_belief_data %>%
       mu_d = standard_clust_expected_dist
     )
 
+
+know_all_df = disagg_belief_all_df %>%
+  filter(knowledge_type == "doesn't know") %>%
+  mutate(
+    prop_knows = 1 - prop
+  ) %>%
+  group_by(cluster.id) %>%
+  mutate(cluster_id = cur_group_id()) %>%
+  ungroup() %>%
+  mutate(
+      county = factor(county),
+      cluster.id = factor(cluster.id),
+      assigned_treatment = assigned.treatment,
+      signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+      signal = factor(signal, levels = c("no signal", "signal"))
+  )  %>%
+  left_join(
+      cluster_expected_dist_df %>%
+        mutate(cluster.id = as.numeric(cluster.id)),
+      by = c("cluster_id" = "cluster.id")
+  ) %>%
+    mutate(
+      standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
+      mu_d = standard_clust_expected_dist
+    )
+
+
 know_1_df = know_df  %>%
   filter(belief_type == "1ord") 
 know_2_df = know_df  %>%
   filter(belief_type == "2ord")
 
 
-
-
+know_1_all_df = know_all_df  %>%
+  filter(belief_type == "1ord") %>%
+  mutate(cluster_id = as.numeric(cluster.id)) 
 
 discrete_f_know = function(data, weights) {
   feols(
@@ -1707,6 +1741,18 @@ discrete_fob_output = wrapper_function(
   ),
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
+)
+
+#### Checking using full sample (SMS + non-monitored) doesn't change results
+
+discrete_fob_full_output = wrapper_function(
+  data = know_all_1_df,
+  regression_spec = discrete_f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_discrete_fob_fullsample_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-fullsample-tidy-tes.csv"
 )
 
 #### Checking weird 150 individuals don't cause issues
