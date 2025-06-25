@@ -73,6 +73,20 @@ analysis_data <- monitored_nosms_data %>%
 
 # Endline ------------------------------------------------------------------
 
+# total monitored
+analysis.data %>%
+  filter(mon_status == "monitored")
+
+# total monitored w/ SMS Control
+analysis.data %>%
+  filter(mon_status == "monitored")  %>%
+  filter(sms.treatment.2 == "sms.control")
+# total monitored in SMS
+analysis.data %>%
+  filter(mon_status == "monitored")  %>%
+  filter(sms.treatment.2 != "sms.control")
+
+
 
 total = 9935
 baseline = 2250
@@ -138,6 +152,10 @@ ana_ids = analysis_data %>%
 setdiff( know_a_ids, ana_ids)
 
 not_in_monitored = setdiff(know_a_ids, monitored_data$KEY.individ)
+
+not_in_monitored %>%
+  saveRDS("temp-data/not_in_monitored.rds")
+
 
 all.endline.data %>%
     filter(across(c(present, interview, consent), ~ !is.na(.x) & .x == 1)) 
@@ -264,12 +282,7 @@ library(here)
 library(sp)
 
 baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
-
-
-
-
 baseline_data = read_rds(file.path("data", "takeup_baseline_data.rds"))
-
 all_endline_data = read_rds(file.path("data", "all_endline.rds"))
 
 
