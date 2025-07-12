@@ -1565,6 +1565,7 @@ all_data = analysis.data %>%
   ungroup()
 
 
+
 disagg_belief_all_df = all_data %>%
   mutate(
     female = gender == "female"
@@ -1579,7 +1580,8 @@ disagg_belief_all_df = all_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
     endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")),
+      filter(fct_match(know.table.type, "table.A")) %>%
+      mutate(ed_in_endline_flag = TRUE),
     by = "KEY.individ", 
     name = "knowledge_data"
   ) %>% 
@@ -1594,14 +1596,17 @@ disagg_belief_all_df = all_data %>%
         thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
         thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
         thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
+        ed_in_endline_flag = any(.x$ed_in_endline_flag, na.rm = TRUE)
       )
     }
   )) %>%
-    filter(obs_know_person > 0)  %>%
+    # filter(obs_know_person > 0)  %>%
     select(
       KEY.individ, 
       contains("know"), 
       assigned.treatment, 
+      sms.treatment,
+      ed_in_endline_flag,
       dist.pot.group, 
       assigned_dist_group,
       cluster.id,
@@ -1620,7 +1625,9 @@ disagg_belief_all_df = all_data %>%
     select(KEY.individ, 
            assigned.treatment,
            assigned_dist_group,
+           sms.treatment,
            obs_know_person,
+           ed_in_endline_flag,
            knows_other_dewormed_yes,
            knows_other_dewormed_no,
            doesnt_know_other_dewormed, 
@@ -1645,7 +1652,39 @@ disagg_belief_all_df = all_data %>%
     )) %>%
     mutate(belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord")) %>%
     mutate(prop = value/obs_know_person) 
-    
+
+
+# Calculating how many people recognize at least one person
+# per sub-sample in our full belief data
+disagg_belief_all_df %>%
+  filter(ed_in_endline_flag == TRUE) %>%
+  group_by(
+    not_mon = is.na(dewormed), 
+    sms.treatment,
+    obs_at_least_1 = obs_know_person > 0
+    ) %>%
+  summarise(
+    n = n_distinct(KEY.individ)
+  ) %>%
+  filter(
+    (not_mon == FALSE & sms.treatment == "reminder.only") |
+    (not_mon == FALSE & sms.treatment == "sms.control") |
+    (not_mon == FALSE & sms.treatment == "social.info") |
+    (not_mon == TRUE & sms.treatment == "sms.control")
+  ) %>%
+  pivot_wider(
+    names_from = obs_at_least_1,
+    names_prefix = "obs_at_least_1_",
+    values_from = n
+  ) %>%
+  rename(
+    recognize_0 = obs_at_least_1_FALSE,
+    recognize_someone = obs_at_least_1_TRUE
+  ) 
+
+ disagg_belief_all_df = disagg_belief_all_df %>%
+  filter(obs_know_person > 0) 
+
 
 
 disagg_base_belief_data = cov_analysis_data %>%
@@ -1780,6 +1819,7 @@ know_2_df = know_df  %>%
 know_1_all_df = know_all_df  %>%
   filter(belief_type == "1ord") %>%
   mutate(cluster_id = as.numeric(cluster.id)) 
+
 
 know_1_all_df %>%
   select(cluster_id)
