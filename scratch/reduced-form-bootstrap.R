@@ -26,7 +26,6 @@ if (interactive()) {
 }
 
 source(file.path("scratch", "reduced-form-setup.R"))
-
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
 # where mu_d is the expected distance to the cluster
@@ -787,7 +786,7 @@ fob_levels %>%
 
 
 #### Alternative Regressions ---------------------------------------------------
-
+endline.data
 ####  Endline Predicted Deworming Takeup
 endline_data = endline.data %>%
   mutate(
@@ -802,7 +801,7 @@ endline_data = endline.data %>%
   )  %>%
   left_join(
     cov_analysis_data %>%
-      select(KEY.individ, mu_d, all_of(l_cov_vars)),
+      select(KEY.individ, mu_d, all_of(l_cov_vars), mon_status),
       by = "KEY.individ"
   )
 
@@ -817,6 +816,16 @@ pred_dworm_fit = function(data, weights) {
   )
 }
 
+
+# Verifying that endline prediction sample is drawn from main analysis sample --
+# i.e. monitored and SMS control only used.
+endline_data %>%
+  filter(mon_status == "monitored", sms.treatment == "sms.control") %>% 
+  select(
+    dworm_frac, assigned_treatment, assigned_dist_group, all_of(l_cov_vars), mu_d
+  ) %>%
+  na.omit() %>%
+  nrow()
 
 pred_dworm_output = wrapper_function(
   data = endline_data,
@@ -1043,9 +1052,7 @@ wrapper_function(
   table_options = list(
     caption = "Average Treatment Effects: Reduced Form", 
     dependent_var = "Dependent variable: Prefer Bracelet", 
-    stars = TRUE, 
-    type = "APE",
-    drop_H0s = TRUE
+    stars = TRUE
     )
 )
 

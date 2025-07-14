@@ -1221,7 +1221,7 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
     return(table)
 }
 
-wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list()) {
+wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat) {
   default_table_options = list(
     caption = "Average Treatment Effects: Reduced Form",
     dependent_var = "Dependent variable: Take-up",
@@ -1237,7 +1237,8 @@ wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, t
     dependent_var = table_options$dependent_var,
     type = table_options$type,
     stars = table_options$stars,
-    drop_H0s = table_options$drop_H0s
+    drop_H0s = table_options$drop_H0s,
+    stat = stat
 
   )
   output$tidy_summary %>%

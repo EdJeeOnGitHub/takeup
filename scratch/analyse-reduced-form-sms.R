@@ -102,6 +102,15 @@ reminder_fit = feols(
     dewormed ~ sms_treatment + .[l_cov_vars] + clust_expected_dist | county, 
     cluster =  ~cluster.id
 )
+# Generating control mean and sd
+analysis_data %>%
+    filter(assigned_treatment == "control") %>%
+    filter(sms_treatment == "smscontrol") %>%
+    summarise(
+        mean = mean(dewormed, na.rm = TRUE),
+        sd = sd(dewormed, na.rm = TRUE)
+    )
+
 
 reminder_fit %>%
     etable(
