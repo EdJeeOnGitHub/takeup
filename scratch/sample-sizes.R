@@ -69,9 +69,28 @@ analysis_data <- monitored_nosms_data %>%
     indiv_id = row_number()
     )
 
+### WTP Stan Data
+stop()
+wtp_stan_data <- analysis.data %>% 
+  mutate(stratum = county) %>% 
+  prepare_bayes_wtp_data(
+    wtp.data,
+    
+    preference_value_diff = seq(-100, 100, 10), 
+    num_preference_value_diff = length(preference_value_diff), 
+    
+    wtp_utility_df = 3,
+    tau_mu_wtp_diff = 100,
+    mu_wtp_df_student_t = 7,
+    tau_sigma_wtp_diff = 50,
+    sigma_wtp_df_student_t = 2.5
+  )
 
+names(wtp_stan_data)
+wtp_stan_data$num_wtp_obs
 
 # Endline ------------------------------------------------------------------
+
 
 # total monitored
 analysis.data %>%
