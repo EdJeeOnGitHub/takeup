@@ -71,8 +71,6 @@ dist_cts_no_covs_output = wrapper_function(
   table_name = "rf_dist_cts_no_covs_spec_tbl"
 )
 
-
-
 #### Takeup Discrete Distance + LASSO Covs + Cluster Expected Distance
 discrete_distance_regression = function(data, weights) {
   feols(
@@ -2201,3 +2199,53 @@ het_tbl = het_fits %>%
   custom_save_latex_table(
     table_name = "het-tes-tbl"
   )
+
+#### Change in Externality Knowledge (Table 13)
+
+externality_data = endline.data %>%
+    mutate(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious
+    ) %>%
+    select(KEY.individ, cluster.id, externality_omnibus) 
+
+externality_knowledge_df = cov_analysis_data %>%
+  select(
+    cluster_id, 
+    cluster.id,
+    assigned_treatment,
+    assigned_dist_group,
+    mu_d,
+    standard_cluster.dist.to.pot,
+    county,
+    all_of(l_cov_vars),
+    KEY.individ
+    )  %>%
+    inner_join(
+      externality_data %>% select(-cluster.id),
+      by = "KEY.individ"
+    ) 
+
+externality_knowledge_regression = function(data, weights) {
+  feols(
+    externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d  | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+externality_knowledge_output = wrapper_function(
+  data = externality_knowledge_df,
+  regression_spec = externality_knowledge_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/externality-knowledge-tidy-tes.csv",
+  table_name = "rf_externality_knowledge_tbl",
+  table_options = list(
+    dependent_var = "Dependent variable: Externality Knowledge"
+  )
+)
