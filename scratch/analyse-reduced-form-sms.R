@@ -21,9 +21,6 @@ script_options = docopt::docopt(
 ) 
 
 library(tidyverse)
-library(posterior)
-library(tidybayes)
-library(brms)
 library(marginaleffects)
 library(ggthemes)
 
@@ -88,7 +85,7 @@ analysis_data %>%
     summarise(
         n = n()
     )
-stop()
+# stop()
 
 
 library(fixest)
@@ -98,6 +95,47 @@ rf_fit = feols(
     cluster =  ~cluster.id
     )
 
+reminder_fit = feols(
+    data = analysis_data %>%
+        filter(assigned_treatment == "control") %>%
+        mutate(sms_treatment = factor(sms_treatment, levels = c("smscontrol", "socialinfo", "reminderonly"))),
+    dewormed ~ sms_treatment + .[l_cov_vars] + clust_expected_dist | county, 
+    cluster =  ~cluster.id
+)
+# Generating control mean and sd
+analysis_data %>%
+    filter(assigned_treatment == "control") %>%
+    filter(sms_treatment == "smscontrol") %>%
+    summarise(
+        mean = mean(dewormed, na.rm = TRUE),
+        sd = sd(dewormed, na.rm = TRUE)
+    )
+
+
+reminder_fit %>%
+    etable(
+        dict = c(
+            "sms_treatmentsocialinfo" = "Social Info",
+            "sms_treatmentreminderonly" = "Reminder Only",
+            "county" = "County FE",
+            "cluster.id" = "Community",
+            "dewormed" = "Dewormed"
+        ),
+        keep = c(
+            "%sms_treatmentsocialinfo", 
+            "%sms_treatmentreminderonly"
+        ),
+        fitstat = c("n"),
+        digits = 3,
+        tex = TRUE,
+        title = "SMS Reminder Treatment Effects"
+        # file = "temp-data/sms-reminder-fit.tex",
+        # replace = TRUE
+    )
+
+
+analysis_data %>%
+    count(assigned_treatment, sms_treatment)
 
 
 nobs(rf_fit)
@@ -173,9 +211,9 @@ plot_df = bind_rows(
 ) %>%
    select(contrast, sms_treatment, assigned_dist_group, estimate, conf.low, conf.high) %>%
     mutate(
-        lhs = str_extract(contrast, "(?<=\\()\\w+"),
-        rhs = str_extract(contrast, "\\w+(?=\\)$)")
-    ) %>%
+        lhs = str_extract(contrast, "\\w+(?= -)"),
+        rhs = str_extract(contrast, "(?<= - )\\w+$")
+    ) %>% 
     filter(rhs == "control") %>%
     filter(sms_treatment != "reminderonly")  %>%
     mutate(
@@ -185,9 +223,12 @@ plot_df = bind_rows(
         lhs = fct_relabel(lhs, str_to_title),
         sms_treatment = case_when(
             sms_treatment == "socialinfo" ~ "Social Info", 
-            sms_treatment == "smscontrol" ~ "SMS Control"
+            sms_treatment == "smscontrol" ~ "SMS Control",
+            sms_treatment == "reminderonly" ~ "Reminder Only",
         )
     )
+
+plot_df
 
 p_sms_df = plot_df %>%
     ggplot(aes(
