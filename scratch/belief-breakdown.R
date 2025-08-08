@@ -14,6 +14,19 @@ load(file.path("data", "analysis.RData"))
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
+monitored_data = analysis.data %>%
+  filter(mon_status == "monitored")
+
+monitored_sms_data <- analysis.data %>% 
+  filter(mon_status == "monitored") %>% 
+  filter(have_phone == "Yes") %>%
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
 monitored_nosms_data <- analysis.data %>% 
   filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
@@ -35,6 +48,30 @@ nosms_data <- analysis.data %>%
 analysis_data <- monitored_nosms_data %>% 
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group)
 
+
+endline.data
+
+endline_actual_ids = unique(endline.data$KEY.individ)
+endline_all_ids= unique(all.endline.data$KEY.individ)
+
+not_in_actual_endline = setdiff(endline_all_ids, endline_actual_ids) %>% unique()
+
+all.endline.data %>%
+  filter((KEY.individ %in% not_in_actual_endline)) %>%
+  View()
+
+
+consent_endline = all.endline.data %>%
+  filter(consent == TRUE & reconsent == TRUE & monitor.consent == TRUE) 
+
+all.endline.data %>%
+  count(reconsent)
+
+all.endline.data %>%
+  count(monitor.consent)
+
+  select(contains("consent"))  %>%
+  skimr::skim()
 
 # WTP Stan Data -----------------------------------------------------------
 
@@ -71,29 +108,168 @@ beliefs_treatment_map_design_matrix <- cluster_treatment_map %>%
   modelr::model_matrix(beliefs_treatment_formula) %>% 
   distinct()
 
-analysis_data %<>% 
-  nest_join(
-    endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")),
-    by = "KEY.individ", 
-    name = "knowledge_data"
-  ) %>% 
+# analysis_data %<>% 
+#   nest_join(
+#     endline.know.table.data %>% 
+#       filter(fct_match(know.table.type, "table.A")),
+#     by = "KEY.individ", 
+#     name = "knowledge_data"
+#   ) %>% 
+#   mutate(
+#     map_dfr(knowledge_data, ~ {
+#       tibble(
+#         obs_know_person = sum(.x$num.recognized),
+#         obs_know_person_prop = mean(.x$num.recognized),
+#         knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
+#         knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
+#         knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
+#         thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
+#         thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
+#         thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
+#       )
+#     }
+#   ))
+
+
+endline.know.table.data %>%
+    filter(fct_match(know.table.type, "table.A"))  %>%
+    group_by(KEY.individ) %>%
+    mutate(num.recognized = sum(num.recognized))  %>%
+    filter(num.recognized > 0) %>%
+    ungroup() %>%
+    summarise(
+      n_indiv = n_distinct(KEY.individ)
+    )
+
+
+know_a_table = endline.know.table.data %>%
+  filter(fct_match(know.table.type, "table.A")) 
+
+sms_treat = monitored_sms_data %>%
+  filter(sms.treatment %in% c("social.info", "reminder.only")) 
+
+# out of total endline sample, we randomly sampled 1627 people to implement beliefs.
+# Amongst them, XYZ didn't recognize anyone, and remaining ABC in the SMS sample, 
+# who are not used in the main analysis.o
+
+
+# out of endline sample, we randomly sampled 1627 people to implement beliefs.
+# In the non-SMS sample this leads to ABC total beliefs observations, of which 
+# XYZ didn't recognize anyone.
+
+
+know_a_clusters = know_a_table %>%
+  pull(cluster.id)
+
+ana_clusters = analysis_data %>%
+  pull(cluster.id)
+
+setdiff(ana_clusters, know_a_clusters)
+
+
+know_a_ids = know_a_table %>%
+  pull(KEY.individ)
+
+ana_ids = analysis_data %>%
+  pull(KEY.individ)
+
+setdiff( know_a_ids, ana_ids)
+
+not_in_monitored = setdiff(know_a_ids, monitored_data$KEY.individ)
+
+stop()
+
+
+
+know_a_table %>%
+  filter(KEY.individ %in% not_in_monitored)  %>%
+  colnames()
+
+
+
+know_a_table = know_a_table %>%
+  group_by(KEY.individ) %>%
+  mutate(num.recognized = sum(num.recognized)) %>%
+  mutate(any_recognized = num.recognized > 0) %>%
+  ungroup() %>%
   mutate(
-    map_dfr(knowledge_data, ~ {
-      tibble(
-        obs_know_person = sum(.x$num.recognized),
-        obs_know_person_prop = mean(.x$num.recognized),
-        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
-        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
-        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
-        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
-        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
-        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
-      )
-    }
-  ))
+    id_in_analysis = if_else(KEY.individ %in% analysis_data$KEY.individ, 1, 0),
+    id_in_sms = if_else(KEY.individ %in% sms_treat$KEY.individ, 1, 0),
+    id_in_either = if_else(KEY.individ %in% analysis_data$KEY.individ | KEY.individ %in% sms_treat$KEY.individ, 1, 0),
+    id_in_mon = if_else(KEY.individ %in% monitored_data$KEY.individ, 1, 0)
+  )
+
+know_a_table %>%
+  summarise(
+    pr_in_ana = mean(id_in_analysis, na.rm = TRUE),
+    pr_in_sms = mean(id_in_sms, na.rm = TRUE),
+    pr_in_either = mean(id_in_either, na.rm = TRUE)
+  )
+
+know_a_table %>%
+  group_by(id_in_analysis, id_in_sms, id_in_mon) %>%
+  summarise(
+    n_indiv = n_distinct(KEY.individ)
+  )
 
 
+endline.data %>%
+  filter(
+    KEY.individ %in% in_know_not_in_mon
+  )
+
+all.endline.data %>%
+  filter(
+    KEY.individ %in% in_know_not_in_mon
+  )
+
+in_know_not_in_mon = know_a_table %>%
+  filter(id_in_mon == 0) %>%
+  pull(KEY.individ)
+
+
+
+
+all.endline.data %>%
+  filter(KEY.individ %in% in_know_not_in_mon)  %>%
+  skimr::skim()
+
+
+all.endline.data %>%
+  filter(!(KEY.individ %in% in_know_not_in_mon))  %>%
+  skimr::skim()
+
+
+all.endline.data %>%
+  filter(!(KEY.individ %in% in_know_not_in_mon))  %>%
+  count(return)
+
+
+know_a_table %>%
+  filter(id_in_mon == 0)  %>%
+  count(dewormed)
+
+
+know_a_table %>%
+  filter(id_in_mon == 1)  %>%
+  count(dewormed)
+
+know_a_table %>%
+  filter(id_in_analysis == 1) %>%
+  group_by(KEY.individ) %>%
+  summarise(
+    n_recognized = sum(num.recognized)
+  ) %>%
+  count(n_recognized) 
+
+know_a_table %>%
+  group_by(id_in_analysis, id_in_sms, any_recognized) %>%
+  summarise(
+    n_indiv = n_distinct(KEY.individ)
+  )
+
+analysis_data %>%
+    count(obs_know_person > 0)
 
 analysis_data %>%
     filter(obs_know_person > 0)  %>%
@@ -115,6 +291,9 @@ analysis_data %>%
     mutate(prop = value/obs_know_person) %>%
     filter(prop > 1)
 stop()
+
+
+
 comp_belief_data = analysis_data %>%
     filter(obs_know_person > 0)  %>%
     select(KEY.individ, contains("know"), assigned.treatment, dist.pot.group, assigned_dist_group) %>%

@@ -1561,7 +1561,8 @@ x = 1+1
 all_optim_df = read_csv(
   file.path(
     params$optim_input_path,
-    "posterior-clean-summ-optim-w-static-control.csv"
+    # "posterior-clean-summ-optim-w-static-control.csv"
+    "posterior-clean-summ-optim.csv"
   )
 )  %>%
   mutate(fix_type = replace_na(fix_type, "no-fix"))

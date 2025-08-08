@@ -37,6 +37,71 @@ l_cov_vars = c(
   "age.census"
 )
 
+
+
+#### Change in Externality Knowledge (Table 13)
+
+
+endline.data %>%
+  count(spread_worms)
+
+externality_data = endline.data %>%
+    mutate(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
+        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # variables use different binary encoding for yes/no and the original 
+        # code corrects this but doesn't correct "don't know" correctly
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious
+    ) %>%
+    select(KEY.individ, cluster.id, externality_omnibus) 
+
+externality_knowledge_df = cov_analysis_data %>%
+  select(
+    cluster_id, 
+    cluster.id,
+    assigned_treatment,
+    assigned_dist_group,
+    mu_d,
+    standard_cluster.dist.to.pot,
+    county,
+    all_of(l_cov_vars),
+    KEY.individ
+    )  %>%
+    inner_join(
+      externality_data %>% select(-cluster.id),
+      by = "KEY.individ"
+    ) 
+
+externality_knowledge_regression = function(data, weights) {
+  feols(
+    externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d  | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+externality_knowledge_output = wrapper_function(
+  data = externality_knowledge_df,
+  regression_spec = externality_knowledge_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/externality-knowledge-tidy-tes.csv",
+  table_name = "rf_externality_knowledge_tbl",
+  table_options = list(
+    dependent_var = "Dependent variable: Externality Knowledge"
+  )
+)
+
+# externality_knowledge_output$ti
+names(externality_knowledge_output)
+externality_knowledge_output$tidy_summary %>%
+print(n = 100)
+
 #### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
 dist_cts_regression = function(data, weights) {
   feols(
@@ -2199,53 +2264,3 @@ het_tbl = het_fits %>%
   custom_save_latex_table(
     table_name = "het-tes-tbl"
   )
-
-#### Change in Externality Knowledge (Table 13)
-
-externality_data = endline.data %>%
-    mutate(
-      fully_aware_externalities = case_when(
-        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-        TRUE ~ FALSE
-      ),
-      know_worms_infectious = spread_worms == "yes",
-      externality_omnibus = fully_aware_externalities | know_worms_infectious
-    ) %>%
-    select(KEY.individ, cluster.id, externality_omnibus) 
-
-externality_knowledge_df = cov_analysis_data %>%
-  select(
-    cluster_id, 
-    cluster.id,
-    assigned_treatment,
-    assigned_dist_group,
-    mu_d,
-    standard_cluster.dist.to.pot,
-    county,
-    all_of(l_cov_vars),
-    KEY.individ
-    )  %>%
-    inner_join(
-      externality_data %>% select(-cluster.id),
-      by = "KEY.individ"
-    ) 
-
-externality_knowledge_regression = function(data, weights) {
-  feols(
-    externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d  | county,
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-externality_knowledge_output = wrapper_function(
-  data = externality_knowledge_df,
-  regression_spec = externality_knowledge_regression,
-  tidy_summ_path = "temp-data/tidy-rf-tes/externality-knowledge-tidy-tes.csv",
-  table_name = "rf_externality_knowledge_tbl",
-  table_options = list(
-    dependent_var = "Dependent variable: Externality Knowledge"
-  )
-)
