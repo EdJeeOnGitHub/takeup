@@ -24,7 +24,6 @@ if (interactive()) {
     source(file.path( "dist_structural_util.R"))
     source(file.path("multilvlr", "multilvlr_util.R"))
 }
-
 source(file.path("scratch", "reduced-form-setup.R"))
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
@@ -36,6 +35,239 @@ l_cov_vars = c(
   "female",
   "age.census"
 )
+
+#### Change in Externality Knowledge (Table 13)
+# Checking endline vs baseline externality knowledge
+balance_data = read_rds(
+  file.path(
+    "temp-data",
+    "saved_balance_data.rds"
+  )
+)
+
+balance_analysis_data = balance_data$analysis_data
+baseline_worm_data = balance_data$baseline_worm_data
+endline_vars = balance_data$endline_vars
+endline_and_baseline_worm_data = balance_data$endline_and_baseline_worm_data
+pretreat_data = balance_data$pretreat_data
+clean_census_data = balance_data$clean_census_data
+
+endline_and_baseline_worm_data
+
+create_te_table = function(data, var) {
+  data %>%
+  group_by(
+    treat_dist,
+    type
+  ) %>%
+  summarise(
+    mean = mean({{var}}, na.rm = TRUE)
+  ) %>%
+  mutate(
+    treat = str_extract(treat_dist, "(?<=treat\\: )\\w+"),
+    dist = str_extract(treat_dist, "(?<=dist\\: )\\w+"),
+  ) %>%
+  pivot_wider(names_from = type, values_from = mean)  %>%
+  group_by(dist) %>%
+  mutate(
+    baseline_te = baseline - baseline[treat == "control"],
+    endline_te = endline - endline[treat == "control"]
+  ) %>%
+  select(-treat_dist)
+}
+
+endline_and_baseline_worm_data %>%
+  create_te_table(
+    externality_omnibus
+  )
+
+endline_and_baseline_worm_data %>%
+  create_te_table(
+    know_worms_infectious
+  )
+
+endline_and_baseline_worm_data %>%
+  create_te_table(
+    fully_aware_externalities
+  )
+
+externality_data = endline.data %>%
+    mutate(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious
+    ) %>%
+    select(KEY.individ, cluster.id, externality_omnibus) 
+colnames(baseline.data)
+
+
+
+solo_baseline_data = baseline.data  %>%
+    transmute(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious,
+      cluster.id
+    ) %>%
+    left_join(
+      cov_analysis_data %>%
+        select(
+          standard_cluster.dist.to.pot,
+          assigned_treatment,
+          assigned_dist_group,
+          mu_d,
+          cluster_id
+        ) %>% unique(),
+        by = c("cluster.id" = "cluster_id")
+    )
+
+solo_endline_data = endline.data %>%
+    transmute(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious,
+      cluster.id
+    ) %>%
+    left_join(
+      cov_analysis_data %>%
+        select(
+          standard_cluster.dist.to.pot,
+          assigned_treatment,
+          assigned_dist_group,
+          mu_d,
+          cluster.id.x
+        ) %>% unique(),
+        by = c("cluster.id" = "cluster.id.x")
+    )
+
+solo_comp_df = inner_join(
+  solo_endline_data %>%
+    group_by(assigned_treatment, assigned_dist_group) %>%
+    summarise(
+      mean_know_endline = mean(know_worms_infectious, na.rm = TRUE)
+    ),
+  solo_baseline_data %>%
+    group_by(assigned_treatment, assigned_dist_group) %>%
+    summarise(
+      mean_know_baseline = mean(know_worms_infectious, na.rm = TRUE)
+    ),
+    by = c("assigned_treatment", "assigned_dist_group")
+)
+solo_comp_df
+
+baseline_externality_data = baseline.data %>%
+    mutate(
+      fully_aware_externalities = case_when(
+        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        TRUE ~ FALSE
+      ),
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious
+    ) %>%
+    select(KEY.individ, cluster.id, externality_omnibus) 
+
+externality_knowledge_df = cov_analysis_data %>%
+  select(
+    cluster_id, 
+    cluster.id,
+    assigned_treatment,
+    assigned_dist_group,
+    mu_d,
+    standard_cluster.dist.to.pot,
+    county,
+    all_of(l_cov_vars),
+    KEY.individ
+    )  %>%
+    inner_join(
+      externality_data %>% select(-cluster.id),
+      by = "KEY.individ"
+    ) 
+
+full_externality_knowledge_df = analysis.data  %>%
+  mutate(
+    female = gender == "female",
+    cluster_id = dense_rank(cluster.id)
+    ) %>%
+  select(
+    cluster_id,
+    cluster.id,
+    assigned_treatment = assigned.treatment,
+    assigned_dist_group = dist.pot.group,
+    # mu_d,
+    # standard_cluster.dist.to.pot,
+    # standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot),
+    county,
+    all_of(l_cov_vars),
+    KEY.individ
+    )  %>%
+    inner_join(
+      externality_data %>% select(-cluster.id),
+      by = "KEY.individ"
+    ) %>%
+    left_join(
+      cov_analysis_data %>%
+        select(cluster.id.x, mu_d, standard_cluster.dist.to.pot) %>%
+        unique(),
+      by = c("cluster.id" = "cluster.id.x")
+    )
+
+    colnames(externality_knowledge_df)
+    colnames(full_externality_knowledge_df)
+
+externality_knowledge_df %>% nrow()
+full_externality_knowledge_df %>% nrow()
+externality_knowledge_regression = function(data, weights) {
+  feols(
+    externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d   | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+externality_knowledge_output = wrapper_function(
+  data = externality_knowledge_df,
+  regression_spec = externality_knowledge_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/externality-knowledge-tidy-tes.csv",
+  table_name = "rf_externality_knowledge_tbl",
+  table_options = list(
+    dependent_var = "Dependent variable: Externality Knowledge"
+  )
+)
+
+full_externality_knowledge_output = wrapper_function(
+  data = full_externality_knowledge_df,
+  regression_spec = externality_knowledge_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/full-externality-knowledge-tidy-tes.csv",
+  table_name = "rf_full_externality_knowledge_tbl",
+  table_options = list(
+    dependent_var = "Dependent variable: Externality Knowledge"
+  )
+)
+
+full_externality_knowledge_output$tidy_summary %>%
+  print(n = 40)
+
+
+externality_knowledge_output$tidy_summary %>%
+  select(
+    assigned_treatment, assigned_dist_group, estimate, std_error, pval
+  ) %>%
+  print(n = 100)
+
 
 #### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
 dist_cts_regression = function(data, weights) {
@@ -786,7 +1018,7 @@ fob_levels %>%
 #### Alternative Regressions ---------------------------------------------------
 endline.data
 ####  Endline Predicted Deworming Takeup
-endline_data = endline.data %>%
+endline_data_full = endline.data %>%
   mutate(
     assigned_treatment = as_factor(assigned.treatment), 
     assigned_dist_group = as_factor(dist.pot.group),
@@ -798,11 +1030,21 @@ endline_data = endline.data %>%
     have_ink = ink_visible
   )  %>%
   left_join(
-    cov_analysis_data %>%
-      select(KEY.individ, mu_d, all_of(l_cov_vars), mon_status),
+    analysis.data %>%
+      select(KEY.individ, gender, age.census, cluster.id) %>%
+      mutate(female = gender == "female")  %>%
+      left_join(
+        cov_analysis_data %>%
+          select(cluster.id.x, mu_d) %>%
+          unique(),
+          by = c("cluster.id" = "cluster.id.x")
+      ) %>%
+      select(KEY.individ, female, age.census, mu_d),
       by = "KEY.individ"
   )
 
+endline_data = endline_data_full %>%
+  filter(true.monitored == TRUE & sms.treatment == "sms.control")
 
 
 pred_dworm_fit = function(data, weights) {
@@ -813,17 +1055,6 @@ pred_dworm_fit = function(data, weights) {
     weights = ~wt
   )
 }
-
-
-# Verifying that endline prediction sample is drawn from main analysis sample --
-# i.e. monitored and SMS control only used.
-endline_data %>%
-  filter(mon_status == "monitored", sms.treatment == "sms.control") %>% 
-  select(
-    dworm_frac, assigned_treatment, assigned_dist_group, all_of(l_cov_vars), mu_d
-  ) %>%
-  na.omit() %>%
-  nrow()
 
 pred_dworm_output = wrapper_function(
   data = endline_data,
@@ -839,6 +1070,25 @@ pred_dworm_output = wrapper_function(
     )
 )
 
+
+pred_dworm_full_output = wrapper_function(
+  data = endline_data_full,
+  regression_spec = pred_dworm_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/predicted-endline-deworm-takeup-full-sample-tidy-tes.csv",
+  table_name = "predicted_endline_deworm_takeup_full_spec_tbl",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Predicted Take-up", 
+    type = "APE", 
+    stars = TRUE,
+    drop_H0s = TRUE
+    )
+)
+
+pred_dworm_full_output$tidy_summary  %>%
+  filter(assigned_treatment == "bracelet")
+pred_dworm_output$tidy_summary  %>%
+  filter(assigned_treatment == "bracelet")
 
 
 #### Incentive Implementation --------------------------------------------------
@@ -2199,53 +2449,3 @@ het_tbl = het_fits %>%
   custom_save_latex_table(
     table_name = "het-tes-tbl"
   )
-
-#### Change in Externality Knowledge (Table 13)
-
-externality_data = endline.data %>%
-    mutate(
-      fully_aware_externalities = case_when(
-        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-        TRUE ~ FALSE
-      ),
-      know_worms_infectious = spread_worms == "yes",
-      externality_omnibus = fully_aware_externalities | know_worms_infectious
-    ) %>%
-    select(KEY.individ, cluster.id, externality_omnibus) 
-
-externality_knowledge_df = cov_analysis_data %>%
-  select(
-    cluster_id, 
-    cluster.id,
-    assigned_treatment,
-    assigned_dist_group,
-    mu_d,
-    standard_cluster.dist.to.pot,
-    county,
-    all_of(l_cov_vars),
-    KEY.individ
-    )  %>%
-    inner_join(
-      externality_data %>% select(-cluster.id),
-      by = "KEY.individ"
-    ) 
-
-externality_knowledge_regression = function(data, weights) {
-  feols(
-    externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d  | county,
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-}
-
-externality_knowledge_output = wrapper_function(
-  data = externality_knowledge_df,
-  regression_spec = externality_knowledge_regression,
-  tidy_summ_path = "temp-data/tidy-rf-tes/externality-knowledge-tidy-tes.csv",
-  table_name = "rf_externality_knowledge_tbl",
-  table_options = list(
-    dependent_var = "Dependent variable: Externality Knowledge"
-  )
-)

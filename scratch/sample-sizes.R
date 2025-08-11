@@ -69,8 +69,7 @@ analysis_data <- monitored_nosms_data %>%
     indiv_id = row_number()
     )
 
-### WTP Stan Data
-stop()
+### WTP Number of observations
 wtp_stan_data <- analysis.data %>% 
   mutate(stratum = county) %>% 
   prepare_bayes_wtp_data(
@@ -86,8 +85,79 @@ wtp_stan_data <- analysis.data %>%
     sigma_wtp_df_student_t = 2.5
   )
 
-names(wtp_stan_data)
-wtp_stan_data$num_wtp_obs
+wtp_out = analysis.data %>%
+  mutate(stratum = county) %>%
+  prepare_bayes_wtp_data(
+    wtp.data,
+    
+    preference_value_diff = seq(-100, 100, 10), 
+    num_preference_value_diff = length(preference_value_diff), 
+    
+    wtp_utility_df = 3,
+    tau_mu_wtp_diff = 100,
+    mu_wtp_df_student_t = 7,
+    tau_sigma_wtp_diff = 50,
+    sigma_wtp_df_student_t = 2.5
+  )
+
+  wtp.data  %>%
+    summarise(
+      n = n_distinct(KEY)
+    ) 
+
+analysis.data %>%
+    filter(
+           assigned.treatment == "control") %>%
+    count(
+      wtp_samp = !is.na(gift_choice), 
+      sms_control = sms.treatment.2 == "sms.control",
+      monitored = true.monitored
+      ) 
+
+analysis.data %>%
+    filter(
+           assigned.treatment == "control",
+           sms.treatment.2 == "sms.control")  %>%
+    count(gift_choice) %>%
+    filter(!is.na(gift_choice)) %>%
+    summarise(
+      n = sum(n)
+    )
+
+
+
+# Gift preference for bracelet vs calendar sample
+analysis_data %>%
+    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    # filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
+    filter(
+      dewormed == FALSE
+    )  %>%
+    ungroup() %>%
+    select(KEY.individ, cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  
+
+
+analysis_data %>%
+  # 9805
+  filter(!is.na(gift_choice)) %>%
+  # 2,312
+  filter(monitored) %>%
+  # 2,312
+  filter(monitor.consent)  %>%
+  # 2,312
+  filter(!hh.baseline.sample.pool)  %>%
+  # 1940
+  filter(!is.na(sms.treatment))  %>%
+  # 1940
+  filter(dewormed == FALSE)
+  # 1,174
+
 
 # Endline ------------------------------------------------------------------
 
