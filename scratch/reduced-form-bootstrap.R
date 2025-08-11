@@ -95,7 +95,11 @@ externality_data = endline.data %>%
     mutate(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
+        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # variables use different binary encoding for yes/no and the original 
+        # code corrects this but doesn't correct "don't know" correctly
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,
         TRUE ~ FALSE
       ),
       know_worms_infectious = spread_worms == "yes",
@@ -170,8 +174,12 @@ solo_comp_df
 baseline_externality_data = baseline.data %>%
     mutate(
       fully_aware_externalities = case_when(
+        # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
+        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # variables use different binary encoding for yes/no and the original 
+        # code corrects this but doesn't correct "don't know" correctly
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,
         TRUE ~ FALSE
       ),
       know_worms_infectious = spread_worms == "yes",

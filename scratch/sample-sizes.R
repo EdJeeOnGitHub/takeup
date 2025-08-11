@@ -33,6 +33,25 @@ monitored_sms_data = analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
+analysis.data %>%
+  count(sms.treatment.2, monitored)
+
+  nrow(analysis.data)
+analysis.data %>%
+  count(sms.treatment.2)
+
+
+monitored_sms_data %>%
+  count(sms.treatment)
+
+
+monitored_sms_data %>%
+  count(sms.treatment.2) 
+
+monitored_sms_data %>%
+  count(sms.treatment, sms.treatment.2)
+
+
 #### SMS Stuff
 monitored_nosms_data
 

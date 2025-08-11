@@ -155,7 +155,11 @@ clean_worm_covariates = function(data) {
     mutate(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
+        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # variables use different binary encoding for yes/no and the original 
+        # code corrects this but doesn't correct "don't know" correctly
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,
         TRUE ~ FALSE
       ),
       know_worms_infectious = spread_worms == "yes",
@@ -942,6 +946,7 @@ create_balance_comparisons = function(fit) {
     return(final_clean_comp_df)
 }
 
+
 comp_balance_tidy_df = balance_fits %>%
   map_dfr(
     create_balance_comparisons, 
@@ -1575,111 +1580,6 @@ saveRDS(
 
 
 
-# #### Continuous Balance - regressions
-# #| cts-dist-balance
-# dist_balance_cts_fun = function(rhs_var) {
-#   ## Indiv
-#   indiv_balance_cts_fit = feols(
-#       data = clean_census_data %>%
-#         mutate(dist_measure = {{ rhs_var }}/1000), 
-#       .[indiv_balance_vars] ~  dist_measure + dist_measure^2,
-#       cluster = ~cluster.id
-#       ) 
-
-#   ## Know
-
-#   ## baseline
-#   baseline_balance_cts_fit = feols(
-#       data = baseline_balance_data %>%
-#         mutate(dist_measure = {{ rhs_var }}/1000), 
-#       .[baseline_vars] ~  dist_measure + dist_measure^2, 
-#       ~cluster.id
-#       ) 
-
-#     return(
-#       c(
-#         indiv_balance_cts_fit,
-#         baseline_balance_cts_fit
-#       )
-#     )
-# }
-
-# dist_balance_disc_fun = function(rhs_var, interval_length) {
-#   clean_census_data = clean_census_data %>%
-#     mutate(
-#       dist_measure = cut_interval({{ rhs_var }}, length = interval_length )
-#     )
-
-#   baseline_balance_data = baseline_balance_data %>%
-#     mutate(
-#       dist_measure = cut_interval({{ rhs_var }}, length = interval_length )
-#     )
-
-#   ## Indiv
-#   indiv_balance_disc_fit = feols(
-#       data = clean_census_data,
-#       .[indiv_balance_vars] ~  0 + dist_measure + i(county, ref = "Busia"),
-#       cluster = ~cluster.id
-#       ) 
-
-#   ## baseline
-#   baseline_balance_disc_fit = feols(
-#       data = baseline_balance_data,
-#       .[baseline_vars] ~ 0 + dist_measure + i(county, ref = "Busia"), 
-#       ~cluster.id
-#       ) 
-
-#     return(
-#       c(
-#         indiv_balance_disc_fit,
-#         baseline_balance_disc_fit
-#       )
-#     )
-# }
-
-
-# disc_dist_balance = dist_balance_disc_fun(cluster.dist.to.pot, interval_length = 750)
-# fully_cts_dist_balance = dist_balance_cts_fun(cluster.dist.to.pot)
-
-
-# fully_cts_dist_balance %>%
-#   saveRDS(
-#     file.path(
-#       script_options$output_path,
-#       "fully_cts_dist_balance.rds"
-#     )
-#   )
-
-
-# construct_joint_test_m = function(object) {
-#   n_coef = length(coef(object)) - 2
-#   diag_m = diag(n_coef - 1)
-#   neg_1_m = matrix(-1, nrow = n_coef - 1, ncol = 1)
-#   mat_0 = matrix(0, nrow = n_coef -1, ncol = 2)
-#   hyp_m = cbind(neg_1_m, diag_m)
-#   hyp_m = cbind(hyp_m, mat_0)
-#   return(hyp_m)
-# }
-
-
-# R_dist_cts_discrete = construct_joint_test_m(disc_dist_balance[[1]])
-# pval_cts_binned_dist = map_dbl(
-#   disc_dist_balance,
-#   ~car::lht(
-#     .x,
-#     R_dist_cts_discrete,
-#     test = "F"
-#   )$`Pr(>Chisq)`[2]
-# ) 
-
-# pval_cts_binned_dist %>%
-#   saveRDS(
-#     file.path(
-#       script_options$output_path,
-#       "discrete_cts_dist_balance.rds"
-#     )
-#   )
-
 baseline.data %>%
   unnest(when_treat)  %>%
   count(when_treat) %>%
@@ -1697,3 +1597,24 @@ baseline.data %>%
     prop = 100*n/sum(n)
   ) %>%
   mutate(ed = cumsum(prop))
+
+
+
+## Rerunning worm fits as discovered a coding error in 
+# neighbour_worms_affect and worms_affect on 2025-08-08
+# just manually editing .tex file here rather than rerunning entire balance
+bl_worm = map_dfr(baseline_worm_fit, create_balance_comparisons, .id = "lhs")
+
+bl_worm %>%
+  filter(str_detect(lhs, "omni")) %>%
+  select(lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, estimate, std.error, p.value) %>%
+  mutate(p.value = round(p.value, 3)) 
+
+  (baseline_worm_fit %>%
+    map(~perform_balance_joint_test(.x, "", joint_R = hyp_matrix, close_R = hyp_matrix_close, far_R = hyp_matrix_far)))$`lhs: externality_omnibus`
+
+  perform_balance_joint_test(baseline_worm_fit, "", 
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far)
+
