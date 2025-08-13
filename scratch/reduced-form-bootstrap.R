@@ -219,7 +219,8 @@ full_externality_knowledge_df = analysis.data  %>%
     # standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot),
     county,
     all_of(l_cov_vars),
-    KEY.individ
+    KEY.individ,
+    everything()
     )  %>%
     inner_join(
       externality_data %>% select(-cluster.id),
@@ -234,9 +235,20 @@ full_externality_knowledge_df = analysis.data  %>%
 
     colnames(externality_knowledge_df)
     colnames(full_externality_knowledge_df)
+stop()
+
+
+full_externality_knowledge_df %>%
+  filter(!is.na(externality_omnibus)) %>%
+  count(true.monitored, sms.treatment.2) %>%
+  mutate(all = sum(n))
+
+
 
 externality_knowledge_df %>% nrow()
 full_externality_knowledge_df %>% nrow()
+
+
 externality_knowledge_regression = function(data, weights) {
   feols(
     externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d   | county,
@@ -255,9 +267,11 @@ externality_knowledge_output = wrapper_function(
     dependent_var = "Dependent variable: Externality Knowledge"
   )
 )
-
+# robustness to including non-monitored individuals in the 
+# externality knowledge regression
 full_externality_knowledge_output = wrapper_function(
-  data = full_externality_knowledge_df,
+  data = full_externality_knowledge_df %>%
+    filter(sms.treatment.2 == "sms.control"),
   regression_spec = externality_knowledge_regression,
   tidy_summ_path = "temp-data/tidy-rf-tes/full-externality-knowledge-tidy-tes.csv",
   table_name = "rf_full_externality_knowledge_tbl",
@@ -1077,10 +1091,13 @@ pred_dworm_output = wrapper_function(
     drop_H0s = TRUE
     )
 )
+endline_data_full %>%
+    filter(sms.treatment == "sms.control" & true.monitored == TRUE)
 
-
+# monitored + non monitored sample - but still SMS control
 pred_dworm_full_output = wrapper_function(
-  data = endline_data_full,
+  data = endline_data_full %>%
+    filter(sms.treatment == "sms.control"),
   regression_spec = pred_dworm_fit,
   tidy_summ_path = "temp-data/tidy-rf-tes/predicted-endline-deworm-takeup-full-sample-tidy-tes.csv",
   table_name = "predicted_endline_deworm_takeup_full_spec_tbl",
@@ -1092,6 +1109,10 @@ pred_dworm_full_output = wrapper_function(
     drop_H0s = TRUE
     )
 )
+
+pred_dworm_full_output$tidy_summary %>%
+  print(n = 100)
+
 
 pred_dworm_full_output$tidy_summary  %>%
   filter(assigned_treatment == "bracelet")
@@ -1262,12 +1283,106 @@ incentive_check_tbl %>%
   custom_save_latex_table("incentive-check-tbl")
 
 #### Preference for Gift Fit Not Dewormed ---------------------------------------
-pref_gift_fit_not_dewormed = analysis_data %>%
-    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+
+pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
+    # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent) %>%
+    # 3,329 %>%
+    filter(dewormed == FALSE) %>%
+    # 1,808
     group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
     mutate(arm.size = n()) %>% 
     group_by(gift_choice, add = TRUE) %>%
-    # filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
+    ungroup() %>%
+    select(KEY.individ, cluster.id, gift_choice, 
+      assigned.treatment, dist.pot.group, county, gender,
+      age.census
+      ) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    mutate(
+      assigned_treatment = factor(assigned.treatment),
+      assigned_dist_group = factor(dist.pot.group),
+      cluster_id = factor(cluster.id),
+      female = gender == "female"
+      ) %>%
+      left_join(
+        cov_analysis_data %>%
+          select(cluster.id.x, mu_d, standard_cluster.dist.to.pot) %>%unique(),
+          by = c("cluster.id" = "cluster.id.x")
+      )
+
+  analysis.data  %>%
+  # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent) %>%
+    # 3,329 %>%
+    filter(dewormed == FALSE)
+    # 1,808
+
+  analysis.data  %>%
+  # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent)  %>%
+    # 3,329
+    filter(!hh.baseline.sample.pool)  %>%
+    # 2,820
+    filter(dewormed == FALSE)
+    # 1,566
+
+
+  analysis.data  %>%
+  # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent)  %>%
+    # 3,329
+    filter(!hh.baseline.sample.pool)  %>%
+    # 2,820
+    filter(sms.treatment.2 == "sms.control") %>%
+    # 1,940
+    filter(dewormed == FALSE)
+    # 1,174
+
+
+analysis_data %>%
+    filter(
+      !is.na(gift_choice), 
+      monitored, 
+      monitor.consent, 
+      !hh.baseline.sample.pool, 
+      !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    filter(
+      dewormed == FALSE
+    )  
+
+
+pref_gift_fit_not_dewormed = analysis_data %>%
+    filter(
+      !is.na(gift_choice), 
+      monitored, 
+      monitor.consent, 
+      !hh.baseline.sample.pool, 
+      !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
     filter(
       dewormed == FALSE
     )  %>%
@@ -1287,7 +1402,8 @@ pref_gift_fit_not_dewormed = analysis_data %>%
           by = "KEY.individ"
       )
 
-
+pref_gift_fit_not_dewormed %>%
+  count(sms.treatment.2)
 
 
 pref_gift_fit = function(data, weights) {
@@ -1311,6 +1427,25 @@ wrapper_function(
     stars = TRUE
     )
 )
+
+pref_gift_not_dewormed_full_sample_fit = wrapper_function(
+  data = pref_gift_fit_not_dewormed_full_sample,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-full-sample-FLIPPED-tidy-tes.csv",
+  table_name = "preference_for_bracelet_full_sample_FLIPPED_spec_tbl",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Prefer Bracelet", 
+    stars = TRUE
+    ),
+    flip_calendar_sign = TRUE
+)
+
+pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "- cal"))
+  print(n = 100)
+
+
 
 #### Travel Time --------------------------------------------------------
 
@@ -2457,3 +2592,82 @@ het_tbl = het_fits %>%
   custom_save_latex_table(
     table_name = "het-tes-tbl"
   )
+
+
+# WTP Checks
+
+wtp_out = analysis.data %>%
+  mutate(stratum = county) %>%
+  prepare_bayes_wtp_data(
+    wtp.data,
+    
+    preference_value_diff = seq(-100, 100, 10), 
+    num_preference_value_diff = length(preference_value_diff), 
+    
+    wtp_utility_df = 3,
+    tau_mu_wtp_diff = 100,
+    mu_wtp_df_student_t = 7,
+    tau_sigma_wtp_diff = 50,
+    sigma_wtp_df_student_t = 2.5
+  )
+
+analysis.data %>%
+    filter(
+           assigned.treatment == "control") %>%
+    filter(!is.na(gift_choice)) %>%
+    mutate(
+      sms_control = sms.treatment.2 == "sms.control",
+      monitored = true.monitored
+    ) %>%
+    group_by(sms_control, monitored, gift_choice) %>%
+    summarise(
+      n = n()
+    ) %>%
+    pivot_wider(
+      names_from = gift_choice,
+      values_from = n
+    )  %>%
+    mutate(
+      n_total = bracelet + calendar,
+      pct_calendar = 100 * calendar / (calendar + bracelet),
+      n_neither = neither
+    ) %>%
+    select(-neither)
+
+    count(
+      wtp_samp = !is.na(gift_choice), 
+      sms_control = sms.treatment.2 == "sms.control",
+      monitored = true.monitored
+      ) 
+
+origin_prepared_analysis_data = analysis.data
+origin_prepared_analysis_data %>%
+    filter(!is.na(gift_choice) ,
+     gift_choice != "neither",
+           assigned.treatment == "control",
+           sms.treatment.2 == "sms.control")
+
+  incentive_choice_data <- origin_prepared_analysis_data %>%
+    filter(!is.na(gift_choice) & gift_choice != "neither",
+           assigned.treatment == "control",
+           sms.treatment.2 == "sms.control") %>%
+    select(county, cluster.id, gift_choice, phone_owner) %>%
+    mutate(offer = 0,
+           response = "keep")
+
+  incentive_choice_data <- wtp.data %>%
+    semi_join(origin_prepared_analysis_data, "cluster.id") %>% # Make sure we have the same clusters
+    filter(!is.na(first_choice)) %>%
+    transmute(county, cluster.id,
+              gift_choice = first_choice,
+              offer = price,
+              response = second_choice) %>%
+    bind_rows(incentive_choice_data) %>%
+    mutate(gift_choice = 2 * (gift_choice == "calendar") - 1,
+           response = 2 * (response == "switch") - 1) 
+
+incentive_choice_data
+
+
+wtp.data %>%
+  select(first_choice, price)
