@@ -36,6 +36,90 @@ l_cov_vars = c(
   "age.census"
 )
 
+
+
+#### NP Fit Plots -------------------------------------------------------------------
+
+library(ggthemes)
+canva_palette_vibrant = "Primary colors with a vibrant twist"
+colour_tibble = tibble(
+  assigned_treatment = c("control", "ink", "calendar", "bracelet", "signal"),
+  colors = c(canva_pal(canva_palette_vibrant)(4), "#000000")
+) %>%
+  mutate(
+    assigned_treatment = str_to_title(assigned_treatment),
+    assigned_treatment = factor(assigned_treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+
+summ_analysis_data = analysis_data %>%
+  group_by(cluster.id, assigned.treatment) %>%
+  summarise(
+    mean_dist = mean(cluster.dist.to.pot),
+    mean_dewormed = mean(dewormed)
+  ) %>%
+  ungroup() %>%
+  left_join(colour_tibble, by = c("assigned.treatment" = "assigned_treatment")) %>%
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+max_dist = analysis_data %>%
+  summarise(
+    max_dist = max(cluster.dist.to.pot/1000)
+  ) %>%
+  pull(max_dist)
+
+  analysis_data %>%
+    group_by(assigned.treatment) %>%
+    summarise(n_cl = n_distinct(cluster.id)) 
+  analysis_data %>%
+    group_by(assigned.treatment, dist.pot.group) %>%
+    summarise(n_cl = n_distinct(cluster.id)) 
+
+p_np_fit = cov_analysis_data %>% 
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  ) %>%
+  ggplot(aes(
+    x = dist.to.pot/1000,
+    y = as.numeric(dewormed),
+    colour = assigned.treatment
+  )) +
+  geom_smooth(se = FALSE, method = "gam") +
+  geom_point(
+    data = summ_analysis_data,
+    aes(
+      x = mean_dist/1000,
+      y = mean_dewormed,
+      colour = assigned.treatment
+    )
+  ) +
+  theme_bw() +
+  scale_colour_manual("", values = deframe(colour_tibble))  +
+  scale_x_continuous(
+    breaks = seq(0, 2.5, 0.5),
+    labels = scales::number_format(accuracy = 0.1),
+    limits = c(0, max(2.5, max_dist)) 
+  ) +
+  labs(
+    x = "Distance to Treatment (km)",
+    y = "Take-up Probability"
+  ) +
+  theme(legend.position = "bottom")
+p_np_fit
+ggsave(
+  plot = p_np_fit,
+  filename = file.path(
+    "presentations",
+    "takeup-np-rf-fit.pdf"
+  ),
+  width = 8,
+  height = 6
+)
+
+
+
 #### Change in Externality Knowledge (Table 13)
 # Checking endline vs baseline externality knowledge
 balance_data = read_rds(
@@ -76,10 +160,8 @@ create_te_table = function(data, var) {
   select(-treat_dist)
 }
 
-endline_and_baseline_worm_data %>%
-  create_te_table(
-    externality_omnibus
-  )
+
+
 
 endline_and_baseline_worm_data %>%
   create_te_table(
@@ -187,10 +269,12 @@ baseline_externality_data = baseline.data %>%
     ) %>%
     select(KEY.individ, cluster.id, externality_omnibus) 
 
+
 externality_knowledge_df = cov_analysis_data %>%
   select(
     cluster_id, 
     cluster.id,
+    cluster.id.x,
     assigned_treatment,
     assigned_dist_group,
     mu_d,
@@ -203,6 +287,55 @@ externality_knowledge_df = cov_analysis_data %>%
       externality_data %>% select(-cluster.id),
       by = "KEY.individ"
     ) 
+
+baseline.data  %>%
+  select(KEY.individ, cluster.id, matches("^(praise|stigma)_[^_]+$"))  
+
+baseline.data %>%
+  select(KEY)
+
+
+clean_perception_data = baseline.data %>% 
+  select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
+  gather(key = key, value = response, -cluster.id) %>% 
+  separate(key, c("praise.stigma", "topic"), "_") %>% 
+  separate(topic, c("topic", "question.group"), -2)  %>%
+  filter(!is.na(response))  
+
+cluster_perception_data = clean_perception_data %>%
+  group_by(cluster.id, praise.stigma, topic) %>%
+  summarise(
+    mean_yes = mean(response == "yes", na.rm = TRUE)
+  )   %>%
+  left_join(
+  externality_knowledge_df %>%
+    group_by(cluster.id.x) %>%
+    summarise(
+      mean_externality_knowledge = mean(externality_omnibus, na.rm = TRUE)
+    ),
+    by = c("cluster.id" = "cluster.id.x")
+  )
+
+cluster_perception_data  %>%
+  filter(topic == "dewor") %>%
+  ungroup() %>%
+  mutate(above_median_externality_know = mean_externality_knowledge > median(mean_externality_knowledge, na.rm = TRUE)) %>%
+  feols(
+    mean_yes ~ above_median_externality_know, 
+    data = .,
+    split = ~praise.stigma,
+    vcov = "HC1"
+  ) 
+
+cluster_perception_data  %>%
+  filter(topic == "dewor") %>%
+  feols(
+    mean_yes ~ mean_externality_knowledge, 
+    data = .,
+    split = ~praise.stigma,
+    vcov = "HC1"
+  ) 
+
 
 full_externality_knowledge_df = analysis.data  %>%
   mutate(

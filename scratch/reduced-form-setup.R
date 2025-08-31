@@ -845,6 +845,18 @@ create_tes = function(draws, ...) {
         )
 }
 
+create_cal_flip_tes = function(draws, ...){
+    draws %>%
+        group_by(seed, assigned_dist_group, ...) %>%
+        mutate(
+            mean_pred = case_when(
+              assigned_treatment == "control" ~ mean_pred,
+              assigned_treatment == "calendar" ~ -1*(mean_pred - mean_pred[assigned_treatment == "control"]),
+              TRUE ~ mean_pred - mean_pred[assigned_treatment == "control"]
+            )
+        )
+}
+
 create_signal_tes = function(draws, ...) {
     draws %>%
         group_by(seed, assigned_dist_group, ...) %>%
@@ -864,6 +876,15 @@ clean_signal_draws = function(draws, ...) {
             assigned_treatment = signal,
             estimate = mean_pred
         )
+}
+
+clean_te_flip_cal_draws = function(draws, ...) {
+  draws %>%
+        filter(!is.na(assigned_treatment)) %>%
+        select(-signal) %>%
+        create_cal_flip_tes(., ...) %>%
+        add_predictions(., ...)  %>%
+        rename(estimate = mean_pred)
 }
 
 clean_te_draws = function(draws, ...) {
@@ -926,7 +947,8 @@ create_regression_output = function(data, f,  B_draws = 500,
                                     dependent_var = "Dependent variable: Take-up",
                                     type = "APE",
                                     stars = TRUE,
-                                    drop_H0s = FALSE
+                                    drop_H0s = FALSE,
+                                    flip_calendar_sign = FALSE
                                     ) {
 
   if (type == "APE") {
@@ -946,8 +968,13 @@ create_regression_output = function(data, f,  B_draws = 500,
     .progress = TRUE
     )
 
+  if (flip_calendar_sign) {
+    clean_te_draws_df = bs_draws %>%
+      clean_te_flip_cal_draws()
+  } else {  
   clean_te_draws_df = bs_draws %>%
     clean_te_draws()
+  }
 
   clean_signal_draws_df = bs_draws %>%
     clean_signal_draws()
@@ -967,11 +994,17 @@ create_regression_output = function(data, f,  B_draws = 500,
     rename(realised_pred = estimate) %>%
     select(realised_pred, assigned_dist_group, assigned_treatment)
 
-
-  te_fit = realised_fit %>%
-    clean_te_draws() %>%
-    rename(realised_pred = estimate) %>%
-    select(realised_pred, assigned_dist_group, assigned_treatment)
+  if (flip_calendar_sign) {
+    te_fit = realised_fit %>%
+      clean_te_flip_cal_draws() %>%
+      rename(realised_pred = estimate) %>%
+      select(realised_pred, assigned_dist_group, assigned_treatment)
+  } else {
+    te_fit = realised_fit %>%
+      clean_te_draws() %>%
+      rename(realised_pred = estimate) %>%
+      select(realised_pred, assigned_dist_group, assigned_treatment)
+  }
 
   signal_summ = add_summ_stats(clean_signal_draws_df, signal_fit)
   te_summ = add_summ_stats(clean_te_draws_df, te_fit)
@@ -1221,7 +1254,8 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
     return(table)
 }
 
-wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat) {
+wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat, 
+                            flip_calendar_sign = FALSE) {
   default_table_options = list(
     caption = "Average Treatment Effects: Reduced Form",
     dependent_var = "Dependent variable: Take-up",
@@ -1238,8 +1272,8 @@ wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, t
     type = table_options$type,
     stars = table_options$stars,
     drop_H0s = table_options$drop_H0s,
-    stat = stat
-
+    stat = stat,
+    flip_calendar_sign = flip_calendar_sign
   )
   output$tidy_summary %>%
     write_csv(tidy_summ_path)
