@@ -758,6 +758,17 @@ add_predictions = function(draws, ...) {
             mutate(
                 assigned_treatment = "bracelet - calendar"
             )
+      
+    abs_cal_minus_abs_bra = draws %>%
+            filter(assigned_treatment == "bracelet" | assigned_treatment == "calendar") %>%
+            group_by(seed, assigned_dist_group, ...) %>%
+            summarise(
+                mean_pred = abs(mean_pred[assigned_treatment == "calendar"]) - abs(mean_pred[assigned_treatment == "bracelet"]),
+            ) %>%
+            mutate(
+                assigned_treatment = "abs(calendar) - abs(bracelet)"
+            )
+
     
     bra_minus_control = draws %>%
             filter(
@@ -781,7 +792,7 @@ add_predictions = function(draws, ...) {
     ) %>%
     mutate(assigned_treatment = "bracelet - no signal") 
 
-    draws = bind_rows(draws, bra_minus_cal, bra_minus_no_signal)
+    draws = bind_rows(draws, bra_minus_cal, abs_cal_minus_abs_bra, bra_minus_no_signal)
 
     fc_draws = draws %>%
     group_by(
@@ -799,7 +810,7 @@ add_predictions = function(draws, ...) {
     mutate(
         assigned_treatment = factor(
             assigned_treatment,
-            levels = c("control", "bracelet - calendar", "bracelet - no signal", "ink", "calendar", "bracelet")
+            levels = c("control", "abs(calendar) - abs(bracelet)", "bracelet - calendar", "bracelet - no signal", "ink", "calendar", "bracelet")
         ),
         assigned_dist_group = factor(
             assigned_dist_group,
@@ -853,7 +864,8 @@ create_cal_flip_tes = function(draws, ...){
               assigned_treatment == "control" ~ mean_pred,
               assigned_treatment == "calendar" ~ -1*(mean_pred - mean_pred[assigned_treatment == "control"]),
               TRUE ~ mean_pred - mean_pred[assigned_treatment == "control"]
-            )
+            ),
+            cal_flipped = if_else(assigned_treatment == "calendar", TRUE, FALSE)
         )
 }
 
@@ -1052,10 +1064,11 @@ create_regression_output = function(data, f,  B_draws = 500,
         c(
           "Control", 
           "Bracelet - No Signal", 
+          "$|Calendar| - |Bracelet|$",
           "$H0$: Any Signal > No Signal, $p$-value",
-          "$H0$: Any Signal $\\neq$ No Signal, $p$-value",
+          "$H0$: Any Signal $=$ No Signal, $p$-value",
           "$H0$: Bracelet > Calendar, $p$-value",
-          "$H0$: Bracelet $\\neq$ Calendar, $p$-value",
+          "$H0$: Bracelet $=$ Calendar, $p$-value",
           "Ink", "Bracelet", "Calendar"
         ))) %>% 
       arrange(assigned_treatment) %>%
@@ -1069,7 +1082,6 @@ create_regression_output = function(data, f,  B_draws = 500,
     default_tbl = default_tbl,
     different_order_tbl = different_order_tbl
   ))
-
 }
 
 
@@ -1090,6 +1102,7 @@ prep_tbl = function(tes, stat = "ci", stars = FALSE) {
         "ink",
         "control",
         "Observations",
+        "abs(calendar) - abs(bracelet)",
         "bracelet - no signal",
         "signal",
         "bracelet - calendar",
@@ -1168,7 +1181,7 @@ prep_tbl = function(tes, stat = "ci", stars = FALSE) {
             assigned_treatment = fct_relabel(assigned_treatment, str_to_title),
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal > No Signal, $p$-value"  = "Signal"), 
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet > Calendar, $p$-value" = "Bracelet - Calendar"),
-
+            assigned_treatment = fct_recode(assigned_treatment, "$|Calendar| - |Bracelet|$" = "Abs(Calendar) - Abs(Bracelet)"),
 
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal $\\neq$ No Signal, $p$-value"  = "Signal Two-Side Pval"), 
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet $\\neq$ Calendar, $p$-value" = "Bracelet - Calendar Two-Side Pval")

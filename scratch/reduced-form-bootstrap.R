@@ -1506,6 +1506,52 @@ analysis_data %>%
     )  
 
 
+summ_gift_df = analysis.data %>%
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent) %>%
+    # 3,329 %>%
+    filter(dewormed == FALSE) %>%
+    # 1,808
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    ungroup() %>%
+    select(KEY.individ, cluster.id, gift_choice, 
+      assigned.treatment, dist.pot.group, county, gender,
+      age.census
+      ) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    mutate(assigned_treatment = factor(assigned.treatment))
+    
+
+summ_gift_df  %>%
+    group_by(assigned_treatment, dist.pot.group) %>%
+    summarise(
+      n = n(),
+      mean_want_bracelet = mean(want_bracelet)
+    ) %>%
+    bind_rows(
+      summ_gift_df %>%
+        group_by(assigned_treatment) %>%
+        summarise(
+          dist.pot.group = "combined",
+          n = n(),
+          mean_want_bracelet = mean(want_bracelet)
+        )
+    ) %>%
+    arrange(assigned_treatment) %>%
+    group_by(dist.pot.group) %>%
+    mutate(
+      te = mean_want_bracelet - mean_want_bracelet[assigned_treatment == "control"], 
+    )
+
+
+
 pref_gift_fit_not_dewormed = analysis_data %>%
     filter(
       !is.na(gift_choice), 
@@ -1561,6 +1607,35 @@ wrapper_function(
     )
 )
 
+pref_ed$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
+
+
+pref_not_flipped = wrapper_function(
+  data = pref_gift_fit_not_dewormed_full_sample,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/temp.csv",
+  table_name = "temp-pref-bra",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Prefer Bracelet", 
+    stars = TRUE
+    ),
+    flip_calendar_sign = FALSE
+)
+
+pref_not_flipped
+
+pref_not_flipped$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
+
+
+pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
+
 pref_gift_not_dewormed_full_sample_fit = wrapper_function(
   data = pref_gift_fit_not_dewormed_full_sample,
   regression_spec = pref_gift_fit,
@@ -1575,7 +1650,7 @@ pref_gift_not_dewormed_full_sample_fit = wrapper_function(
 )
 
 pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "- cal"))
+  filter(str_detect(assigned_treatment, "- cal")) %>%
   print(n = 100)
 
 
