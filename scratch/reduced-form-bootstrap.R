@@ -366,9 +366,6 @@ full_externality_knowledge_df = analysis.data  %>%
       by = c("cluster.id" = "cluster.id.x")
     )
 
-    colnames(externality_knowledge_df)
-    colnames(full_externality_knowledge_df)
-stop()
 
 
 full_externality_knowledge_df %>%
@@ -441,6 +438,22 @@ dist_cts_output = wrapper_function(
   table_name = "rf_dist_cts_spec_tbl"
 )
 
+dist_cts_exclude_baseline_output = wrapper_function(
+  data = cov_analysis_data %>%
+    filter(sms.treatment == "sms.control"),
+  regression_spec = dist_cts_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-dist-cts-exclude-baseline-tidy-tes.csv",
+  table_name = "rf_dist_cts_exclude_baseline_spec_tbl"
+)
+
+dist_cts_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
+dist_cts_exclude_baseline_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
 #### Takeup Continuous Distance + No Covs + Cluster Expected Distance
 dist_cts_no_covs_regression = function(data, weights) {
   feols(
@@ -458,6 +471,8 @@ dist_cts_no_covs_output = wrapper_function(
   table_name = "rf_dist_cts_no_covs_spec_tbl"
 )
 
+
+
 #### Takeup Discrete Distance + LASSO Covs + Cluster Expected Distance
 discrete_distance_regression = function(data, weights) {
   feols(
@@ -474,6 +489,23 @@ discrete_distance_covs_output = wrapper_function(
   tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-covs-tidy-tes.csv",
   table_name = "rf_discrete_dist_covs_tbl"
 )
+
+##### Excluding baseline sample
+
+discrete_distance_covs_exclude_baseline_output = wrapper_function(
+  data = cov_analysis_data %>%
+    filter(sms.treatment == "sms.control"),
+  regression_spec = discrete_distance_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-covs-exclude-baseline-tidy-tes.csv",
+  table_name = "rf_discrete_dist_covs_exclude_baseline_tbl"
+)
+
+discrete_distance_covs_output$tidy_summary %>%
+  print(n = Inf)
+
+discrete_distance_covs_exclude_baseline_output$tidy_summary %>%
+  print(n = Inf)
+
 
 #### Takeup HH Distance + LASSO Covs + Cluster Expected Distance
 hh_spec_regression = function(data, weights) {
@@ -2180,84 +2212,94 @@ overall_judgement_score_df = clean_perception_data %>%
   mutate(cluster.id = factor(cluster.id))
 
 
-  
+het_ols = function(data, judge_data) {
+  age_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        age_gt_40 +
+        i(treatment, age_gt_40, "control")  
+        | county,
+        cluster = ~cluster.id
+    ) 
+  judge_fit = data %>%
+    left_join(
+      judge_data %>% 
+        select(cluster.id, judge_score_gt_mean),
+        by = "cluster.id"
+    ) %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        judge_score_gt_mean +
+        i(treatment, judge_score_gt_mean, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
+  phone_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        have_phone_lgl +
+        i(treatment, have_phone_lgl, "control")  
+        | county,
+        cluster = ~cluster.id
+    ) 
+
+  prevdeworm_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        frac_prev_dewormed_gt_mean +
+        i(treatment, frac_prev_dewormed_gt_mean, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
+    
+  externality_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        frac_externality_gt_mean +
+        i(treatment, frac_externality_gt_mean, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
 
 
-age_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      age_gt_40 +
-      i(treatment, age_gt_40, "control")  
-      | county,
-      cluster = ~cluster.id
-  ) 
+  gender_fit = data %>%
+    mutate(female = gender == "female") %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        female +
+        i(treatment, female, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
+    return(list(
+      age_fit = age_fit,
+      judge_fit = judge_fit,
+      phone_fit = phone_fit,
+      prevdeworm_fit = prevdeworm_fit,
+      externality_fit = external
+    ))
+}  
 
+het_fits = het_ols(analysis_data, overall_judgement_score_df
 
-judge_het_fit = analysis_data %>%
-  left_join(
-    overall_judgement_score_df %>% 
-      select(cluster.id, judge_score_gt_mean),
-      by = "cluster.id"
-  ) %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      judge_score_gt_mean +
-      i(treatment, judge_score_gt_mean, "control")  
-      | county,
-      cluster = ~cluster.id
-  ) 
-
-phone_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      have_phone_lgl +
-      i(treatment, have_phone_lgl, "control")  
-      | county,
-      cluster = ~cluster.id
-  ) 
-  
-
-
-prevdeworm_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      frac_prev_dewormed_gt_mean +
-      i(treatment, frac_prev_dewormed_gt_mean, "control")  
-      | county,
-      cluster = ~cluster.id
-  )
-  
-externality_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      frac_externality_gt_mean +
-      i(treatment, frac_externality_gt_mean, "control")  
-      | county,
-      cluster = ~cluster.id
-  )
-
-
-gender_het_fit = analysis_data %>%
-  mutate(female = gender == "female") %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      female +
-      i(treatment, female, "control")  
-      | county,
-      cluster = ~cluster.id
-  )
+age_het_fit = het_fits$age_fit
+judge_het_fit = het_fits$judge_fit
+phone_het_fit = het_fits$phone_fit
+prevdeworm_het_fit = het_fits$prevdeworm_fit
+externality_het_fit = het_fits$externality_fit
+gender_het_fit = het_fits$gender_fit
 
 tex_postprocessing = function(tex) {
     tex %>%
