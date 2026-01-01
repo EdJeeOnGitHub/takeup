@@ -160,6 +160,8 @@ analysis.data %>%
       monitored = true.monitored
       ) 
 
+      wtp.data
+
 analysis.data %>%
     filter(
            assigned.treatment == "control",

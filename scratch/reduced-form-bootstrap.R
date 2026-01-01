@@ -36,6 +36,90 @@ l_cov_vars = c(
   "age.census"
 )
 
+
+
+#### NP Fit Plots -------------------------------------------------------------------
+
+library(ggthemes)
+canva_palette_vibrant = "Primary colors with a vibrant twist"
+colour_tibble = tibble(
+  assigned_treatment = c("control", "ink", "calendar", "bracelet", "signal"),
+  colors = c(canva_pal(canva_palette_vibrant)(4), "#000000")
+) %>%
+  mutate(
+    assigned_treatment = str_to_title(assigned_treatment),
+    assigned_treatment = factor(assigned_treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+
+summ_analysis_data = analysis_data %>%
+  group_by(cluster.id, assigned.treatment) %>%
+  summarise(
+    mean_dist = mean(cluster.dist.to.pot),
+    mean_dewormed = mean(dewormed)
+  ) %>%
+  ungroup() %>%
+  left_join(colour_tibble, by = c("assigned.treatment" = "assigned_treatment")) %>%
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  )
+max_dist = analysis_data %>%
+  summarise(
+    max_dist = max(cluster.dist.to.pot/1000)
+  ) %>%
+  pull(max_dist)
+
+  analysis_data %>%
+    group_by(assigned.treatment) %>%
+    summarise(n_cl = n_distinct(cluster.id)) 
+  analysis_data %>%
+    group_by(assigned.treatment, dist.pot.group) %>%
+    summarise(n_cl = n_distinct(cluster.id)) 
+
+p_np_fit = cov_analysis_data %>% 
+  mutate(
+    assigned.treatment = str_to_title(assigned.treatment),
+    assigned.treatment = factor(assigned.treatment, levels = c("Control", "Ink", "Calendar", "Bracelet", "Signal"))
+  ) %>%
+  ggplot(aes(
+    x = dist.to.pot/1000,
+    y = as.numeric(dewormed),
+    colour = assigned.treatment
+  )) +
+  geom_smooth(se = FALSE, method = "gam") +
+  geom_point(
+    data = summ_analysis_data,
+    aes(
+      x = mean_dist/1000,
+      y = mean_dewormed,
+      colour = assigned.treatment
+    )
+  ) +
+  theme_bw() +
+  scale_colour_manual("", values = deframe(colour_tibble))  +
+  scale_x_continuous(
+    breaks = seq(0, 2.5, 0.5),
+    labels = scales::number_format(accuracy = 0.1),
+    limits = c(0, max(2.5, max_dist)) 
+  ) +
+  labs(
+    x = "Distance to Treatment (km)",
+    y = "Take-up Probability"
+  ) +
+  theme(legend.position = "bottom")
+p_np_fit
+ggsave(
+  plot = p_np_fit,
+  filename = file.path(
+    "presentations",
+    "takeup-np-rf-fit.pdf"
+  ),
+  width = 8,
+  height = 6
+)
+
+
+
 #### Change in Externality Knowledge (Table 13)
 # Checking endline vs baseline externality knowledge
 balance_data = read_rds(
@@ -76,10 +160,8 @@ create_te_table = function(data, var) {
   select(-treat_dist)
 }
 
-endline_and_baseline_worm_data %>%
-  create_te_table(
-    externality_omnibus
-  )
+
+
 
 endline_and_baseline_worm_data %>%
   create_te_table(
@@ -187,10 +269,12 @@ baseline_externality_data = baseline.data %>%
     ) %>%
     select(KEY.individ, cluster.id, externality_omnibus) 
 
+
 externality_knowledge_df = cov_analysis_data %>%
   select(
     cluster_id, 
     cluster.id,
+    cluster.id.x,
     assigned_treatment,
     assigned_dist_group,
     mu_d,
@@ -203,6 +287,55 @@ externality_knowledge_df = cov_analysis_data %>%
       externality_data %>% select(-cluster.id),
       by = "KEY.individ"
     ) 
+
+baseline.data  %>%
+  select(KEY.individ, cluster.id, matches("^(praise|stigma)_[^_]+$"))  
+
+baseline.data %>%
+  select(KEY)
+
+
+clean_perception_data = baseline.data %>% 
+  select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
+  gather(key = key, value = response, -cluster.id) %>% 
+  separate(key, c("praise.stigma", "topic"), "_") %>% 
+  separate(topic, c("topic", "question.group"), -2)  %>%
+  filter(!is.na(response))  
+
+cluster_perception_data = clean_perception_data %>%
+  group_by(cluster.id, praise.stigma, topic) %>%
+  summarise(
+    mean_yes = mean(response == "yes", na.rm = TRUE)
+  )   %>%
+  left_join(
+  externality_knowledge_df %>%
+    group_by(cluster.id.x) %>%
+    summarise(
+      mean_externality_knowledge = mean(externality_omnibus, na.rm = TRUE)
+    ),
+    by = c("cluster.id" = "cluster.id.x")
+  )
+
+cluster_perception_data  %>%
+  filter(topic == "dewor") %>%
+  ungroup() %>%
+  mutate(above_median_externality_know = mean_externality_knowledge > median(mean_externality_knowledge, na.rm = TRUE)) %>%
+  feols(
+    mean_yes ~ above_median_externality_know, 
+    data = .,
+    split = ~praise.stigma,
+    vcov = "HC1"
+  ) 
+
+cluster_perception_data  %>%
+  filter(topic == "dewor") %>%
+  feols(
+    mean_yes ~ mean_externality_knowledge, 
+    data = .,
+    split = ~praise.stigma,
+    vcov = "HC1"
+  ) 
+
 
 full_externality_knowledge_df = analysis.data  %>%
   mutate(
@@ -219,7 +352,8 @@ full_externality_knowledge_df = analysis.data  %>%
     # standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot),
     county,
     all_of(l_cov_vars),
-    KEY.individ
+    KEY.individ,
+    everything()
     )  %>%
     inner_join(
       externality_data %>% select(-cluster.id),
@@ -232,11 +366,19 @@ full_externality_knowledge_df = analysis.data  %>%
       by = c("cluster.id" = "cluster.id.x")
     )
 
-    colnames(externality_knowledge_df)
-    colnames(full_externality_knowledge_df)
+
+
+full_externality_knowledge_df %>%
+  filter(!is.na(externality_omnibus)) %>%
+  count(true.monitored, sms.treatment.2) %>%
+  mutate(all = sum(n))
+
+
 
 externality_knowledge_df %>% nrow()
 full_externality_knowledge_df %>% nrow()
+
+
 externality_knowledge_regression = function(data, weights) {
   feols(
     externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d   | county,
@@ -255,9 +397,11 @@ externality_knowledge_output = wrapper_function(
     dependent_var = "Dependent variable: Externality Knowledge"
   )
 )
-
+# robustness to including non-monitored individuals in the 
+# externality knowledge regression
 full_externality_knowledge_output = wrapper_function(
-  data = full_externality_knowledge_df,
+  data = full_externality_knowledge_df %>%
+    filter(sms.treatment.2 == "sms.control"),
   regression_spec = externality_knowledge_regression,
   tidy_summ_path = "temp-data/tidy-rf-tes/full-externality-knowledge-tidy-tes.csv",
   table_name = "rf_full_externality_knowledge_tbl",
@@ -294,6 +438,22 @@ dist_cts_output = wrapper_function(
   table_name = "rf_dist_cts_spec_tbl"
 )
 
+dist_cts_exclude_baseline_output = wrapper_function(
+  data = cov_analysis_data %>%
+    filter(sms.treatment == "sms.control"),
+  regression_spec = dist_cts_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-dist-cts-exclude-baseline-tidy-tes.csv",
+  table_name = "rf_dist_cts_exclude_baseline_spec_tbl"
+)
+
+dist_cts_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
+dist_cts_exclude_baseline_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
 #### Takeup Continuous Distance + No Covs + Cluster Expected Distance
 dist_cts_no_covs_regression = function(data, weights) {
   feols(
@@ -311,6 +471,8 @@ dist_cts_no_covs_output = wrapper_function(
   table_name = "rf_dist_cts_no_covs_spec_tbl"
 )
 
+
+
 #### Takeup Discrete Distance + LASSO Covs + Cluster Expected Distance
 discrete_distance_regression = function(data, weights) {
   feols(
@@ -327,6 +489,23 @@ discrete_distance_covs_output = wrapper_function(
   tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-covs-tidy-tes.csv",
   table_name = "rf_discrete_dist_covs_tbl"
 )
+
+##### Excluding baseline sample
+
+discrete_distance_covs_exclude_baseline_output = wrapper_function(
+  data = cov_analysis_data %>%
+    filter(sms.treatment == "sms.control"),
+  regression_spec = discrete_distance_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-covs-exclude-baseline-tidy-tes.csv",
+  table_name = "rf_discrete_dist_covs_exclude_baseline_tbl"
+)
+
+discrete_distance_covs_output$tidy_summary %>%
+  print(n = Inf)
+
+discrete_distance_covs_exclude_baseline_output$tidy_summary %>%
+  print(n = Inf)
+
 
 #### Takeup HH Distance + LASSO Covs + Cluster Expected Distance
 hh_spec_regression = function(data, weights) {
@@ -1077,10 +1256,13 @@ pred_dworm_output = wrapper_function(
     drop_H0s = TRUE
     )
 )
+endline_data_full %>%
+    filter(sms.treatment == "sms.control" & true.monitored == TRUE)
 
-
+# monitored + non monitored sample - but still SMS control
 pred_dworm_full_output = wrapper_function(
-  data = endline_data_full,
+  data = endline_data_full %>%
+    filter(sms.treatment == "sms.control"),
   regression_spec = pred_dworm_fit,
   tidy_summ_path = "temp-data/tidy-rf-tes/predicted-endline-deworm-takeup-full-sample-tidy-tes.csv",
   table_name = "predicted_endline_deworm_takeup_full_spec_tbl",
@@ -1092,6 +1274,10 @@ pred_dworm_full_output = wrapper_function(
     drop_H0s = TRUE
     )
 )
+
+pred_dworm_full_output$tidy_summary %>%
+  print(n = 100)
+
 
 pred_dworm_full_output$tidy_summary  %>%
   filter(assigned_treatment == "bracelet")
@@ -1262,12 +1448,152 @@ incentive_check_tbl %>%
   custom_save_latex_table("incentive-check-tbl")
 
 #### Preference for Gift Fit Not Dewormed ---------------------------------------
-pref_gift_fit_not_dewormed = analysis_data %>%
-    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) %>% 
+
+pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
+    # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent) %>%
+    # 3,329 %>%
+    filter(dewormed == FALSE) %>%
+    # 1,808
     group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
     mutate(arm.size = n()) %>% 
     group_by(gift_choice, add = TRUE) %>%
-    # filter(assigned.treatment %in% c("control",  "calendar", "bracelet")) %>%
+    ungroup() %>%
+    select(KEY.individ, cluster.id, gift_choice, 
+      assigned.treatment, dist.pot.group, county, gender,
+      age.census
+      ) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    mutate(
+      assigned_treatment = factor(assigned.treatment),
+      assigned_dist_group = factor(dist.pot.group),
+      cluster_id = factor(cluster.id),
+      female = gender == "female"
+      ) %>%
+      left_join(
+        cov_analysis_data %>%
+          select(cluster.id.x, mu_d, standard_cluster.dist.to.pot) %>%unique(),
+          by = c("cluster.id" = "cluster.id.x")
+      )
+
+  analysis.data  %>%
+  # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent) %>%
+    # 3,329 %>%
+    filter(dewormed == FALSE)
+    # 1,808
+
+  analysis.data  %>%
+  # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent)  %>%
+    # 3,329
+    filter(!hh.baseline.sample.pool)  %>%
+    # 2,820
+    filter(dewormed == FALSE)
+    # 1,566
+
+
+  analysis.data  %>%
+  # 38,019
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent)  %>%
+    # 3,329
+    filter(!hh.baseline.sample.pool)  %>%
+    # 2,820
+    filter(sms.treatment.2 == "sms.control") %>%
+    # 1,940
+    filter(dewormed == FALSE)
+    # 1,174
+
+
+analysis_data %>%
+    filter(
+      !is.na(gift_choice), 
+      monitored, 
+      monitor.consent, 
+      !hh.baseline.sample.pool, 
+      !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    filter(
+      dewormed == FALSE
+    )  
+
+
+summ_gift_df = analysis.data %>%
+    filter(!is.na(gift_choice)) %>%
+    # 3,676
+    filter(monitored) %>%
+    # 3,329
+    filter(monitor.consent) %>%
+    # 3,329 %>%
+    filter(dewormed == FALSE) %>%
+    # 1,808
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
+    ungroup() %>%
+    select(KEY.individ, cluster.id, gift_choice, 
+      assigned.treatment, dist.pot.group, county, gender,
+      age.census
+      ) %>%
+    mutate(
+      want_bracelet = gift_choice == "bracelet"
+    )  %>%
+    mutate(assigned_treatment = factor(assigned.treatment))
+    
+
+summ_gift_df  %>%
+    group_by(assigned_treatment, dist.pot.group) %>%
+    summarise(
+      n = n(),
+      mean_want_bracelet = mean(want_bracelet)
+    ) %>%
+    bind_rows(
+      summ_gift_df %>%
+        group_by(assigned_treatment) %>%
+        summarise(
+          dist.pot.group = "combined",
+          n = n(),
+          mean_want_bracelet = mean(want_bracelet)
+        )
+    ) %>%
+    arrange(assigned_treatment) %>%
+    group_by(dist.pot.group) %>%
+    mutate(
+      te = mean_want_bracelet - mean_want_bracelet[assigned_treatment == "control"], 
+    )
+
+
+
+pref_gift_fit_not_dewormed = analysis_data %>%
+    filter(
+      !is.na(gift_choice), 
+      monitored, 
+      monitor.consent, 
+      !hh.baseline.sample.pool, 
+      !is.na(sms.treatment)) %>% 
+    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
+    mutate(arm.size = n()) %>% 
+    group_by(gift_choice, add = TRUE) %>%
     filter(
       dewormed == FALSE
     )  %>%
@@ -1287,7 +1613,8 @@ pref_gift_fit_not_dewormed = analysis_data %>%
           by = "KEY.individ"
       )
 
-
+pref_gift_fit_not_dewormed %>%
+  count(sms.treatment.2)
 
 
 pref_gift_fit = function(data, weights) {
@@ -1311,6 +1638,54 @@ wrapper_function(
     stars = TRUE
     )
 )
+
+pref_ed$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
+
+
+pref_not_flipped = wrapper_function(
+  data = pref_gift_fit_not_dewormed_full_sample,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/temp.csv",
+  table_name = "temp-pref-bra",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Prefer Bracelet", 
+    stars = TRUE
+    ),
+    flip_calendar_sign = FALSE
+)
+
+pref_not_flipped
+
+pref_not_flipped$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
+
+
+pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
+
+pref_gift_not_dewormed_full_sample_fit = wrapper_function(
+  data = pref_gift_fit_not_dewormed_full_sample,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-full-sample-FLIPPED-tidy-tes.csv",
+  table_name = "preference_for_bracelet_full_sample_FLIPPED_spec_tbl",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Prefer Bracelet", 
+    stars = TRUE
+    ),
+    flip_calendar_sign = TRUE
+)
+
+pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "- cal")) %>%
+  print(n = 100)
+
+
 
 #### Travel Time --------------------------------------------------------
 
@@ -1837,84 +2212,94 @@ overall_judgement_score_df = clean_perception_data %>%
   mutate(cluster.id = factor(cluster.id))
 
 
-  
+het_ols = function(data, judge_data) {
+  age_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        age_gt_40 +
+        i(treatment, age_gt_40, "control")  
+        | county,
+        cluster = ~cluster.id
+    ) 
+  judge_fit = data %>%
+    left_join(
+      judge_data %>% 
+        select(cluster.id, judge_score_gt_mean),
+        by = "cluster.id"
+    ) %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        judge_score_gt_mean +
+        i(treatment, judge_score_gt_mean, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
+  phone_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        have_phone_lgl +
+        i(treatment, have_phone_lgl, "control")  
+        | county,
+        cluster = ~cluster.id
+    ) 
+
+  prevdeworm_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        frac_prev_dewormed_gt_mean +
+        i(treatment, frac_prev_dewormed_gt_mean, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
+    
+  externality_fit = data %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        frac_externality_gt_mean +
+        i(treatment, frac_externality_gt_mean, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
 
 
-age_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      age_gt_40 +
-      i(treatment, age_gt_40, "control")  
-      | county,
-      cluster = ~cluster.id
-  ) 
+  gender_fit = data %>%
+    mutate(female = gender == "female") %>%
+    feols(
+      dewormed ~  
+        treatment + 
+        standard_cluster.dist.to.pot + 
+        female +
+        i(treatment, female, "control")  
+        | county,
+        cluster = ~cluster.id
+    )
+    return(list(
+      age_fit = age_fit,
+      judge_fit = judge_fit,
+      phone_fit = phone_fit,
+      prevdeworm_fit = prevdeworm_fit,
+      externality_fit = external
+    ))
+}  
 
+het_fits = het_ols(analysis_data, overall_judgement_score_df
 
-judge_het_fit = analysis_data %>%
-  left_join(
-    overall_judgement_score_df %>% 
-      select(cluster.id, judge_score_gt_mean),
-      by = "cluster.id"
-  ) %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      judge_score_gt_mean +
-      i(treatment, judge_score_gt_mean, "control")  
-      | county,
-      cluster = ~cluster.id
-  ) 
-
-phone_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      have_phone_lgl +
-      i(treatment, have_phone_lgl, "control")  
-      | county,
-      cluster = ~cluster.id
-  ) 
-  
-
-
-prevdeworm_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      frac_prev_dewormed_gt_mean +
-      i(treatment, frac_prev_dewormed_gt_mean, "control")  
-      | county,
-      cluster = ~cluster.id
-  )
-  
-externality_het_fit = analysis_data %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      frac_externality_gt_mean +
-      i(treatment, frac_externality_gt_mean, "control")  
-      | county,
-      cluster = ~cluster.id
-  )
-
-
-gender_het_fit = analysis_data %>%
-  mutate(female = gender == "female") %>%
-  feols(
-    dewormed ~  
-      treatment + 
-      standard_cluster.dist.to.pot + 
-      female +
-      i(treatment, female, "control")  
-      | county,
-      cluster = ~cluster.id
-  )
+age_het_fit = het_fits$age_fit
+judge_het_fit = het_fits$judge_fit
+phone_het_fit = het_fits$phone_fit
+prevdeworm_het_fit = het_fits$prevdeworm_fit
+externality_het_fit = het_fits$externality_fit
+gender_het_fit = het_fits$gender_fit
 
 tex_postprocessing = function(tex) {
     tex %>%
@@ -2457,3 +2842,82 @@ het_tbl = het_fits %>%
   custom_save_latex_table(
     table_name = "het-tes-tbl"
   )
+
+
+# WTP Checks
+
+wtp_out = analysis.data %>%
+  mutate(stratum = county) %>%
+  prepare_bayes_wtp_data(
+    wtp.data,
+    
+    preference_value_diff = seq(-100, 100, 10), 
+    num_preference_value_diff = length(preference_value_diff), 
+    
+    wtp_utility_df = 3,
+    tau_mu_wtp_diff = 100,
+    mu_wtp_df_student_t = 7,
+    tau_sigma_wtp_diff = 50,
+    sigma_wtp_df_student_t = 2.5
+  )
+
+analysis.data %>%
+    filter(
+           assigned.treatment == "control") %>%
+    filter(!is.na(gift_choice)) %>%
+    mutate(
+      sms_control = sms.treatment.2 == "sms.control",
+      monitored = true.monitored
+    ) %>%
+    group_by(sms_control, monitored, gift_choice) %>%
+    summarise(
+      n = n()
+    ) %>%
+    pivot_wider(
+      names_from = gift_choice,
+      values_from = n
+    )  %>%
+    mutate(
+      n_total = bracelet + calendar,
+      pct_calendar = 100 * calendar / (calendar + bracelet),
+      n_neither = neither
+    ) %>%
+    select(-neither)
+
+    count(
+      wtp_samp = !is.na(gift_choice), 
+      sms_control = sms.treatment.2 == "sms.control",
+      monitored = true.monitored
+      ) 
+
+origin_prepared_analysis_data = analysis.data
+origin_prepared_analysis_data %>%
+    filter(!is.na(gift_choice) ,
+     gift_choice != "neither",
+           assigned.treatment == "control",
+           sms.treatment.2 == "sms.control")
+
+  incentive_choice_data <- origin_prepared_analysis_data %>%
+    filter(!is.na(gift_choice) & gift_choice != "neither",
+           assigned.treatment == "control",
+           sms.treatment.2 == "sms.control") %>%
+    select(county, cluster.id, gift_choice, phone_owner) %>%
+    mutate(offer = 0,
+           response = "keep")
+
+  incentive_choice_data <- wtp.data %>%
+    semi_join(origin_prepared_analysis_data, "cluster.id") %>% # Make sure we have the same clusters
+    filter(!is.na(first_choice)) %>%
+    transmute(county, cluster.id,
+              gift_choice = first_choice,
+              offer = price,
+              response = second_choice) %>%
+    bind_rows(incentive_choice_data) %>%
+    mutate(gift_choice = 2 * (gift_choice == "calendar") - 1,
+           response = 2 * (response == "switch") - 1) 
+
+incentive_choice_data
+
+
+wtp.data %>%
+  select(first_choice, price)
