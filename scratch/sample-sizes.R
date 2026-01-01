@@ -10,6 +10,7 @@ load(file.path("data", "analysis.RData"))
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
+
 # stick to monitored sms.treatment group
 # remove sms.treatment.2
 
@@ -33,10 +34,35 @@ monitored_sms_data = analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
+baseline.data %>%
+  write_csv("temp-data/debug-baseline-data.csv")
+
+
+endline.data %>%
+  write_csv("temp-data/debug-endline-data.csv")
+
+
+endline.data %>%
+  group_by(sms.treatment) %>%
+  summarise(
+    n_hh = n_distinct(KEY)
+  )
+
+
+
+
+
+
+monitored_sms_data
+
+
+monitored_nosms_data
+
+analysis.data
+
 analysis.data %>%
   count(sms.treatment.2, monitored)
 
-  nrow(analysis.data)
 analysis.data %>%
   count(sms.treatment.2)
 
@@ -62,12 +88,13 @@ monitored_data = analysis.data %>%
     filter(mon_status == "monitored") 
 
 monitored_data %>%
+  count(wave)
+
+
+monitored_data %>%
     select(contains("consent")) %>%
     skimr::skim()
 
-    summarise(
-        n_distinct(KEY.individ)
-    )
 
 nosms_data <- analysis.data %>% 
   filter(sms.treatment.2 == "sms.control") %>% 
@@ -204,6 +231,52 @@ sms = 3935
 all.endline.data %>%
   count(consent)
 
+all.endline.data %>%
+  select(KEY.individ)
+
+baseline.data %>%
+  select(KEY) %>%
+  slice(1:3)
+
+monitored_sms_data %>%
+  select(KEY) %>%
+  slice(1:3)
+
+baseline.data %>%
+  colnames()
+
+intersect(
+  baseline.data %>%
+    pull(KEY),
+  census.data %>%
+    pull(KEY)
+)
+
+baseline.data
+
+
+census.data %>%
+  filter(true.monitored == 1) %>%
+  group_by(cluster.id, sms.treatment, assigned.treatment) %>%
+  summarise(
+    n_hh = n_distinct(KEY),
+    n_indiv = n_distinct(KEY.individ)
+  )
+
+monitored_nosms_data %>%
+  count(hh.baseline.sample.pool)
+
+monitored_sms_data %>%
+  count(hh.baseline.sample.pool)
+
+analysis_data %>%
+  count(hh.baseline.sample.pool)
+
+analysis_data %>%
+    filter(!is.na(gift_choice), monitored, monitor.consent, !hh.baseline.sample.pool, !is.na(sms.treatment)) 
+
+monitored_sms_data %>%
+  select(KEY.individ)
 
 
 baseline + endline
@@ -231,6 +304,11 @@ know_a_table = endline.know.table.data %>%
 
 sms_treat = monitored_sms_data %>%
   filter(sms.treatment %in% c("social.info", "reminder.only")) 
+
+sms_treat
+
+
+sms_treat
 
 # out of total endline sample, we randomly sampled 1627 people to implement beliefs.
 # Amongst them, XYZ didn't recognize anyone, and remaining ABC in the SMS sample, 
