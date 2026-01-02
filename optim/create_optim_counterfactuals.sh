@@ -19,7 +19,7 @@ POSTERIOR_MEDIAN="" # --posterior-median or ""
 SKIP_PREDICTION=0 # 1
 SKIP_OA=0 # 1 or 0
 SKIP_PP=0 # 1 or 0
-RUN_TARGET_CREATION=0
+RUN_TARGET_CREATION=1
 RUN_ESTIMATION="--run-estimation"
 
 ## Welfare function, constraint type, geographic setting
@@ -228,9 +228,9 @@ compare_option () {
 
 
 
-# run_optim "control" "control" # run control control
+run_optim "control" "control" # run control control
 # run_optim "control" "bracelet" # counterfactual varying bracelet visibility
-run_optim "bracelet" "bracelet" # now bracelet bracelet
+# run_optim "bracelet" "bracelet" # now bracelet bracelet
 
  ## now we suppress reputation completely. 
  ## this is because I didn't think of creating a treatment variable with 0 visibility
@@ -245,7 +245,7 @@ run_optim "bracelet" "bracelet" # now bracelet bracelet
 #  STATIC_SIGNAL_PM="--static-signal-pm" # "--static-signal-pm"
 #  STATIC_SIGNAL_DIST=500
 #  DEMAND_NAME="static-" 
-#  run_optim "control" "bracelet"
+#  run_optim "control" "control"
 
 # if [[ ${POSTERIOR_MEDIAN} == "--posterior-median" ]]
 # then 

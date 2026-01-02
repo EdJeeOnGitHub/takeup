@@ -26,11 +26,11 @@ script_options <- docopt::docopt(
  --min-cost                                                                                                                                                                        
  --constraint-type=agg                                                                                                                                                              
  --welfare-function=identity                                                                                                                                                        
- --optim-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots                                                                                            
- --optim-input-a-filename=target-rep-distconstraint-3500-util-identity-mu1250-cutoff-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws-optimal-allocation.rds
+ --optim-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/dist-constraint-3500                                                                      
+ --optim-input-a-filename=target-rep-distconstraint-3500-util-identity-static-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws-optimal-allocation.rds
  --data-input-name=full-many-pots-experiment.rds                                                                                                                                    
  --output-path=optim/plots/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots                                                                                               
- --output-basename=agg-target-rep-distconstraint-3500-util-identity-mu1250-cutoff-b-bracelet-mu-bracelet-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws                          
+ --output-basename=agg-target-rep-dist-constraint-3500-util-identity-static-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-post-draws                          
  --cutoff-type=cutoff                                                                                                                                                               
  --pdf-output-path=presentations/optim-takeup-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-fig                                                                                           
 

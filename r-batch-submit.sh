@@ -8,8 +8,6 @@
 cd $PBS_O_WORKDIR
 
 
-
-
 fit_models () {
 
 AKARING_OUTPUT_PATH="/share/akaringlab/takeup-output/"

@@ -29,17 +29,16 @@ script_options <- docopt::docopt(
                                 --min-cost  \
                                 --constraint-type=agg \
                                 --target-constraint=summ-agg-identity-experiment-target-constraint.csv \
-                                --output-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
-                                --input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots  \
+                                --output-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/dist-constraint-3500 \
+                                --input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/dist-constraint-3500  \
                                 --data-input-name=full-many-pots-experiment.rds
                                 --data-input-path=optim/data
                                 --time-limit=10000 \
-                                --output-filename=TEST-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
-                                --demand-input-filename=pred-demand-dist-fit86-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv
+                                --output-filename=static-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
+                                --demand-input-filename=pred-demand-dist-fit86-static-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv
                                 --welfare-function=identity
                                 --solver=gurobi
-                                --posterior-median
-                                --distance-constraint=4500
+                                --distance-constraint=3500
 
                              " else commandArgs(trailingOnly = TRUE)
 ) 
@@ -109,7 +108,6 @@ pot_data = dist_data$pot_df
 
 demand_input_path = file.path(script_options$input_path, 
                               script_options$demand_input_filename)
-
 initial_demand_data = read_csv(demand_input_path) %>%
   as.data.table() 
 
@@ -165,7 +163,6 @@ if (script_options$constraint_type == "indiv") {
     summarise(target_util = mean(target_util)) %>%
     pull(target_util)
 }
-
 
 # Have precomputed SWF in this case so just load that csv
 if (script_options$constraint_type == "agg") {
@@ -231,7 +228,6 @@ baseline_constraints = add_distance_constraints(
   n = data$n, 
   m = data$m
 )
-
 # Have to set -Inf utility from very 0 takeup in no-cutoff to -1e10 since 
 # optimiser gets upset by negative infinity
 v_neg_value = demand_data %>%
@@ -252,7 +248,6 @@ demand_data = demand_data %>%
       }
       )
   )
-
 
 target_optim
 
@@ -372,7 +367,7 @@ tidy_output = tidy_output %>%
   )
 
 summ_output = tidy_output %>% 
-  head(1) %>%
+  slice(2) %>%
   unnest(model_output) %>%
   summarise(
     util = sum(swf(demand)),

@@ -34,6 +34,11 @@ monitored_sms_data = analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
+
+
+endline.know.table.data %>%
+  write_csv("temp-data/debug-endline-know-table-data.csv")
+
 baseline.data %>%
   write_csv("temp-data/debug-baseline-data.csv")
 

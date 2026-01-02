@@ -15,15 +15,15 @@ struct_hier_f_fixed = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FIXED_FOB"
 
 models_we_want = tribble(
     ~model, ~fit_version,
-    rfnr, 97,
-    rfnr, 98,
-    rfnrngp, 98,
-    rfnrdb, 99,
-    rfnr, 99,
-    struct_dbdc, 98,
-    struct_hier_s, 98,
-    struct_hier_f, 95,
-    struct_hier_f, 100,
+    # rfnr, 97,
+    # rfnr, 98,
+    # rfnrngp, 98,
+    # rfnrdb, 99,
+    # rfnr, 99,
+    # struct_dbdc, 98,
+    # struct_hier_s, 98,
+    # struct_hier_f, 95,
+    # struct_hier_f, 100,
     struct_hier_f, 101,
     struct_hier_f_fixed, 101
 )

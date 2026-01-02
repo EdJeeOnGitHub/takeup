@@ -121,6 +121,7 @@ census_dict <- census.data %>%
     hhh_name = hhh_full_name %>% str_replace_all("\\s+", " "))
 
 
+
 validate.coords <- . %>% 
   mutate(invalid.coord = 
            (!is.na(lon) & (lon > county.bbox["x", "max"] | lon < county.bbox["x", "min"])) |
@@ -247,6 +248,12 @@ identify.closest.cluster <- function(.data, data.coords.formula = ~ lon + lat,  
 raw_baseline_data <- tu.data.reader(raw.data.path("Baseline Survey.csv")) 
 
 
+census.data 
+
+
+
+
+
 reclean_baseline_data = tu.data.reader(raw.data.path("Baseline Survey.csv")) %>% 
   filter(SubmissionDate >= "2016-09-05", 
          present == 1 | !is.na(age), 
@@ -255,6 +262,7 @@ reclean_baseline_data = tu.data.reader(raw.data.path("Baseline Survey.csv")) %>%
   left_join(filter(., !invalid.coord) %>% identify.closest.cluster, "KEY") %>%
   left_join(cluster.wave.county.data, "cluster.id") 
 
+rawraw.data.path("Baseline Survey.csv")
 
 
 

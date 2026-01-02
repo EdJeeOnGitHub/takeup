@@ -1,7 +1,7 @@
 
 dir.create("presentations/rf-tables/main-specs", showWarnings = FALSE)
 
-
+# Useful variables/hyperparameters
 ci_width = as.numeric(params$width)
 treat_levels_c = c("control", "ink", "calendar", "bracelet")
 treat_levels = c("ink", "calendar", "bracelet")
@@ -15,16 +15,14 @@ output_basepath = file.path(
   str_glue("output_dist_fit{params$fit_version}")
 )
 
-
 ## Loading Scripts
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
-source(file.path( "dist_structural_util.R"))
-source(file.path("multilvlr", "multilvlr_util.R"))
+source(file.path("scratch", "reduced-form-functions.R"))
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
-## Loading Data
+## Loading Data - these are all intermediate cleaned data files
 rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
 rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
 cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
@@ -36,6 +34,7 @@ baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling d
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
+# Only take sms.control HHs
 nosms_data <- analysis.data %>% 
   filter(sms.treatment.2 == "sms.control") %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
@@ -47,7 +46,7 @@ nosms_data <- analysis.data %>%
   ungroup()
 
 
-
+# Only take monitored, no sms HHs
 monitored_nosms_data <- analysis.data %>% 
   filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
@@ -58,7 +57,7 @@ monitored_nosms_data <- analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
-
+# main analysis sample
 analysis_data <- monitored_nosms_data
 
 analysis_data %>%
@@ -66,13 +65,15 @@ analysis_data %>%
     "temp-data/analysis-data.csv"
   )
 
+# Save cluster distance sd in case we need to unstandardize - two variables 
+# as there are two different naming conventions in use
 sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 dist_sd = sd(analysis_data$cluster.dist.to.pot)
 
 
-
-
 ## Load Census Data
+# Setting up environment to avoid variable name clashes - this .RData file has 
+# multiple datasets inside it with common df names
 census_data_env = new.env()
 with_env = function(f, e = parent.frame()) {
     stopifnot(is.function(f))
@@ -92,7 +93,7 @@ n_indiv_df = census_data %>%
         n_per_cluster = sum(num.individuals)
     )
 
-
+# Cleaning covariate data functions
 clean_worm_covariates = function(data) {
   cov_data = data %>%
     unnest(when_treat) %>%
@@ -211,11 +212,6 @@ clean_pretreat_covariates = function(baseline_data, endline_data) {
     return(cov_data)
 }
 
-
-baseline_worm = baseline.data %>%
-  clean_worm_covariates()
-
-
 clean_takeup_variables = function(data) {
   data %>%
     mutate(
@@ -223,6 +219,15 @@ clean_takeup_variables = function(data) {
       have_phone_lgl = phone_owner
     )
 }
+
+
+# Apply cleaning functions
+
+
+
+## Cleaning baseline worm covariates
+baseline_worm = baseline.data %>%
+  clean_worm_covariates()
 ## Cleaning up analysis data
 analysis_data = analysis_data %>%
   clean_takeup_variables()
@@ -238,28 +243,9 @@ cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rd
   select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
   unique()
 
-
 pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
   left_join(cluster_treat_df, by = "cluster.id") %>%
   filter(!is.na(treat_dist))
-
-
-colnames(endline.data)
-
-
-endline.data %>%
-  group_by(dist.pot.group) %>%
-  summarise(
-    mean_time_travel = mean(time_travel, na.rm = TRUE),
-    median_time_travel = median(time_travel, na.rm = TRUE)
-  )
-
-endline.data %>%
-  group_by(dist.pot.group) %>%
-  summarise(
-    frac_pay_0 = mean(travel_pay == 0, na.rm = TRUE),
-    mean_pay = mean(travel_pay, na.rm = TRUE)
-  )
 
 
 endline.data = endline.data %>%
@@ -273,55 +259,8 @@ endline.data = endline.data %>%
     )
   )
 
-  endline.data %>%
-    write_csv("temp-data/endline-data.csv")
-
 endline.data %>%
-  count(travel_clean) %>%
-  mutate(
-    pct = 100*n/sum(n)
-  )
-
-endline.data %>%
-  summarise(
-    mean_time_travel = mean(time_travel, na.rm = TRUE),
-    median_time_travel = median(time_travel, na.rm = TRUE)
-  )
-
-
-endline.data %>%
-  summarise(
-    frac_pay_0 = mean(travel_pay == 0, na.rm = TRUE),
-    mean_pay = mean(travel_pay, na.rm = TRUE)
-  )
-
-endline.data %>%
-  mutate(
-    travel = case_when(
-      travel == "1" ~ "walk",
-      travel == "2" ~ "motorbike",
-      travel == "3" ~ "car/taxi",
-      travel == "4" ~ "bus",
-      travel == "5" ~ "free ride"
-    )
-  ) %>%
-  group_by(dist.pot.group) %>%
-  count(travel) %>%
-  arrange(-n) %>%
-  pivot_wider(
-    names_from = dist.pot.group,
-    values_from = n
-  ) %>%
-  mutate(
-    pct_close = 100*close / sum(close, na.rm = TRUE),
-    pct_far = 100*far / sum(far, na.rm = TRUE)
-  )
-
-
-
-
-
-
+  write_csv("temp-data/endline-data.csv")
 
 ## Baseline Balance
 baseline_worm_data = baseline_worm %>%
@@ -335,7 +274,7 @@ baseline_worm_data = baseline_worm %>%
 sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv")
 sens_imp_hh_df = read_csv("data/raw-data/Sensitization Monitoring Form-household.csv")
 
-
+# not sure what this does - inherited from KN
 unique_hh_message_df = sens_imp_hh_df %>%
   mutate(
     message_list = str_split(message, " ")
@@ -351,8 +290,7 @@ unique_hh_message_df = sens_imp_hh_df %>%
     availability_message = map_lgl(message_list, ~all(c(6, 7) %in% .x))
     )
 
-
-
+# Same with this
 clean_sens_imp_df = sens_imp_df %>%
   filter(!is.na(enumerator)) %>%
   filter(!is.na(announcement)) %>%
@@ -505,803 +443,8 @@ analysis_data = analysis_data %>%
       by = "KEY.individ"
   )
 
-#### Functions for RF bootstrap ------------------------------------------------
-# Estimate and Predict to generate ATEs
 
-# For a given set of IDs, create bs data - n.b. this allows cluster to appear 
-# multiple times
-create_bs_data = function(split_data, ids) {
-    bs_df = do.call(rbind, split_data[ids])
-    return(bs_df)
-}
-
-
-# Create bootstrapped predictions
-create_bs_preds = function(pred_df, ...) {
-    # check if combined already present for PEAs
-    combined_present = "combined" %in% pred_df$assigned_dist_group
-    preds = pred_df %>%
-        group_by(
-            assigned_treatment,
-            assigned_dist_group,
-            ...
-        ) %>%
-        summarise(
-            mean_pred = mean(pred, na.rm = TRUE),
-            .groups = "drop"
-        )
-    if (!combined_present) {
-      preds = preds %>%
-        bind_rows(
-            pred_df %>%
-                group_by(
-                    assigned_treatment,
-                    ...
-                ) %>%
-                summarise(
-                    mean_pred = mean(pred, na.rm = TRUE),
-                    .groups = "drop"
-                ) %>%
-                mutate(
-                    assigned_dist_group = "combined"
-                )
-        )
-    }
-        
-
-    signal_pred = pred_df %>%
-        mutate(
-          signal = case_when(
-            assigned_treatment %in% c("bracelet", "ink") ~ "signal",
-            assigned_treatment %in% c("calendar", "control") ~ "no signal"
-          )
-        ) %>%
-        group_by(signal, assigned_dist_group, ...) %>%
-        summarise(
-            mean_pred = mean(pred, na.rm = TRUE),
-            .groups = "drop"
-        ) 
-            
-    if (!combined_present) {
-      signal_pred = signal_pred %>%
-            bind_rows(
-            pred_df %>%
-                mutate(
-                  signal = case_when(
-                    assigned_treatment %in% c("bracelet", "ink") ~ "signal",
-                    assigned_treatment %in% c("calendar", "control") ~ "no signal"
-                  )
-                ) %>%
-                group_by(
-                    signal, 
-                    ...
-                ) %>%
-                summarise(
-                    mean_pred = mean(pred, na.rm = TRUE)
-                ) %>%
-                mutate(
-                    assigned_dist_group = "combined"
-                )
-            )
-    } 
-          
-    preds = bind_rows(preds, signal_pred)
-       return(preds)
-}
-
-
-
-# Function to generate samples from a Dirichlet distribution
-generate_dirichlet <- function(alpha, n) {
-  # Generate matrix of gamma samples
-  gamma_samples <- matrix(rgamma(n * length(alpha), shape = alpha, scale = 1), nrow = n)
-  
-  # Normalize rows to sum to 1
-  dirichlet_samples <- gamma_samples / rowSums(gamma_samples)
-  
-  return(dirichlet_samples)
-}
-
-pred_bs_f = function(f, data, weights, realised_fit = FALSE) {
-    if (realised_fit == TRUE) {
-        data$wt = 1
-    } else {
-        data$wt = weights[data$cluster_id]
-    }
-    fit = f(data, weights = ~wt)
-
-    pred_data = bind_rows(
-      data %>%
-        mutate(assigned_treatment = "bracelet"),
-      data %>%
-        mutate(assigned_treatment = "calendar"),
-      data %>%
-        mutate(assigned_treatment = "ink"),
-      data %>%
-        mutate(assigned_treatment = "control")
-    )
-
-    pred_data$pred = predict(fit, newdata = pred_data)
-    data = pred_data %>%
-        select(
-            assigned_dist_group,
-            assigned_treatment,
-            standard_cluster.dist.to.pot,
-            pred,
-            any_of("sms_treatment")
-        )
-
-
-    return(data)
-}
-
-pred_bs_f_at_x = function(f,  data, weights, realised_fit = FALSE) {
-    if (realised_fit == TRUE) {
-        data$wt = 1
-    } else {
-        data$wt = weights[data$cluster_id]
-    }
-    fit = f(data, weights = ~wt)
-    data = data %>%
-        group_by(assigned_dist_group) %>%
-        mutate(
-          average_standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot),
-          average_dist.to.pot = mean(dist.to.pot)
-        ) %>%
-        ungroup() 
-
-
-    collapsed_data = data %>%  
-      mutate(
-        standard_cluster.dist.to.pot = average_standard_cluster.dist.to.pot,
-        dist.to.pot = average_dist.to.pot,
-        county = "Kakamega"
-      ) %>%
-      select(
-        standard_cluster.dist.to.pot,
-        dist.to.pot,
-        county,
-        assigned_dist_group,
-        assigned_treatment,
-        signal,
-        any_of("sms_treatment")
-      ) %>%
-      distinct() %>%
-      bind_rows(
-        data %>%
-          group_by(assigned_treatment) %>%
-          summarise(
-              standard_cluster.dist.to.pot = mean(standard_cluster.dist.to.pot),
-              dist.to.pot = mean(dist.to.pot),
-              county = "Kakamega",
-              signal = unique(signal)
-          ) %>%
-          mutate(
-            assigned_dist_group = "combined"
-          )
-      )
-
-    pea_pred = collapsed_data %>%  
-      predict(
-        fit, newdata = .
-      )
-
-    collapsed_data$pred = pea_pred
-
-
-    pea_signal_pred = collapsed_data %>%
-      predict(
-        fit, newdata = .
-      )
-
-    collapsed_data$signal_pred = pea_signal_pred
-    collapsed_data = collapsed_data %>%
-        select(
-            assigned_dist_group,
-            assigned_treatment,
-            signal,
-            standard_cluster.dist.to.pot,
-            pred,
-            signal_pred,
-            any_of("sms_treatment")
-        )
-
-    return(collapsed_data)
-
-}
-
-bayes_bs_f_at_x = function(seed, f, data, ...) {
-    set.seed(seed)
-    n_clusters = length(unique(data$cluster.id))
-    alpha = rep(1, n_clusters)
-    weights = generate_dirichlet(alpha, 1)
-    bs_fit = pred_bs_f_at_x(f,  data, weights = weights) %>%
-        create_bs_preds(., ...)
-    bs_fit$seed = seed
-    return(bs_fit)
-} 
-
-bayes_bs_f = function(seed, f, data, ...) {
-    set.seed(seed)
-    n_clusters = length(unique(data$cluster.id))
-    alpha = rep(1, n_clusters)
-    weights = generate_dirichlet(alpha, 1)
-    bs_fit = pred_bs_f(f, data, weights = weights) %>%
-        create_bs_preds(., ...)
-    bs_fit$seed = seed
-    return(bs_fit)
-} 
-
-actual_bayesian_bs_fit_at_x = function(seed, f,  data, ...) {
-    bs_fit = pred_bs_f_at_x(f,  data, 1, realised_fit = TRUE) %>%
-        create_bs_preds(., ...)
-    bs_fit$seed = seed
-    return(bs_fit)
-} 
-actual_bayesian_bs_fit = function(seed, f,  data, ...) {
-    bs_fit = pred_bs_f(f,  data, 1, realised_fit = TRUE) %>%
-        create_bs_preds(., ...)
-    bs_fit$seed = seed
-    data$wt = 1
-    fit = f(data, weights = ~wt)
-    return(list(bs_fit = bs_fit, fit = fit))
-} 
-
-
-add_predictions = function(draws, ...) {
-    bra_minus_cal = draws %>%
-            filter(assigned_treatment == "bracelet" | assigned_treatment == "calendar") %>%
-            group_by(seed, assigned_dist_group, ...) %>%
-            summarise(
-                mean_pred = mean_pred[assigned_treatment == "bracelet"] - mean_pred[assigned_treatment == "calendar"],
-            ) %>%
-            mutate(
-                assigned_treatment = "bracelet - calendar"
-            )
-      
-    abs_cal_minus_abs_bra = draws %>%
-            filter(assigned_treatment == "bracelet" | assigned_treatment == "calendar") %>%
-            group_by(seed, assigned_dist_group, ...) %>%
-            summarise(
-                mean_pred = abs(mean_pred[assigned_treatment == "calendar"]) - abs(mean_pred[assigned_treatment == "bracelet"]),
-            ) %>%
-            mutate(
-                assigned_treatment = "abs(calendar) - abs(bracelet)"
-            )
-
-    
-    bra_minus_control = draws %>%
-            filter(
-              assigned_treatment == "bracelet" 
-              ) %>%
-            group_by(seed, assigned_dist_group, ...) %>%
-            summarise(
-                mean_pred = mean_pred[assigned_treatment == "bracelet"],
-            ) %>%
-            mutate(
-                assigned_treatment = "bracelet - control"
-            )
-
-    bra_minus_no_signal = bind_rows(
-      bra_minus_cal,
-      bra_minus_control
-    ) %>%
-    group_by(seed, assigned_dist_group, ...) %>%
-    summarise(
-      mean_pred = mean(mean_pred)
-    ) %>%
-    mutate(assigned_treatment = "bracelet - no signal") 
-
-    draws = bind_rows(draws, bra_minus_cal, abs_cal_minus_abs_bra, bra_minus_no_signal)
-
-    fc_draws = draws %>%
-    group_by(
-        seed,
-        assigned_treatment, ...
-    ) %>%
-    summarise(
-        mean_pred = mean_pred[assigned_dist_group == "far"] - mean_pred[assigned_dist_group == "close"],
-        assigned_dist_group = "far - close",
-        .groups = "drop"
-    )
-
-    draws = bind_rows(draws, fc_draws) %>%
-    ungroup() %>%
-    mutate(
-        assigned_treatment = factor(
-            assigned_treatment,
-            levels = c("control", "abs(calendar) - abs(bracelet)", "bracelet - calendar", "bracelet - no signal", "ink", "calendar", "bracelet")
-        ),
-        assigned_dist_group = factor(
-            assigned_dist_group,
-            levels = c("combined", "close", "far", "far - close")
-        )
-    ) 
-
-    return(draws)
-}
-
-add_signal_predictions = function(draws, ...) {
-    fc_draws = draws %>%
-    group_by(
-        seed,
-        signal,
-        ...
-    ) %>%
-    summarise(
-        mean_pred = mean_pred[assigned_dist_group == "far"] - mean_pred[assigned_dist_group == "close"],
-        assigned_dist_group = "far - close"
-    )
-    draws = bind_rows(draws, fc_draws) %>%
-        ungroup() %>%
-        mutate(
-            signal = factor(
-                signal,
-                levels = c("no signal", "signal")
-            ),
-            assigned_dist_group = factor(
-                assigned_dist_group,
-                levels = c("combined", "close", "far", "far - close")
-            )
-        ) 
-
-    return(draws)
-}
-
-create_tes = function(draws, ...) {
-    draws %>%
-        group_by(seed, assigned_dist_group, ...) %>%
-        mutate(
-            mean_pred = if_else(assigned_treatment == "control", mean_pred, mean_pred - mean_pred[assigned_treatment == "control"])
-        )
-}
-
-create_cal_flip_tes = function(draws, ...){
-    draws %>%
-        group_by(seed, assigned_dist_group, ...) %>%
-        mutate(
-            mean_pred = case_when(
-              assigned_treatment == "control" ~ mean_pred,
-              assigned_treatment == "calendar" ~ -1*(mean_pred - mean_pred[assigned_treatment == "control"]),
-              TRUE ~ mean_pred - mean_pred[assigned_treatment == "control"]
-            ),
-            cal_flipped = if_else(assigned_treatment == "calendar", TRUE, FALSE)
-        )
-}
-
-create_signal_tes = function(draws, ...) {
-    draws %>%
-        group_by(seed, assigned_dist_group, ...) %>%
-        mutate(
-            mean_pred = if_else(signal == "no signal", mean_pred, mean_pred - mean_pred[signal == "no signal"])
-        )
-}
-
-
-clean_signal_draws = function(draws, ...) {
-    draws %>%
-        filter(!is.na(signal)) %>%
-        select(-assigned_treatment) %>%
-        create_signal_tes(., ...) %>%
-        add_signal_predictions(., ...) %>%
-        rename(
-            assigned_treatment = signal,
-            estimate = mean_pred
-        )
-}
-
-clean_te_flip_cal_draws = function(draws, ...) {
-  draws %>%
-        filter(!is.na(assigned_treatment)) %>%
-        select(-signal) %>%
-        create_cal_flip_tes(., ...) %>%
-        add_predictions(., ...)  %>%
-        rename(estimate = mean_pred)
-}
-
-clean_te_draws = function(draws, ...) {
-    draws %>%
-        filter(!is.na(assigned_treatment)) %>%
-        select(-signal) %>%
-        create_tes(., ...) %>%
-        add_predictions(., ...)  %>%
-        rename(estimate = mean_pred)
-}
-
-
-
-round_pval = function(pvals, digits = 3) {
-    pvals = round(pvals, digits)
-    pvals = if_else(pvals == 0, "<0.001", as.character(pvals))
-    return(pvals)
-}
-
-add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
-    clean_tes = bs_draws %>%
-      group_by(
-          assigned_treatment,
-          assigned_dist_group,
-      ) %>%
-      summarise(
-          std_error = sd(estimate),
-          conf.low = quantile(estimate, (1 - ci_width)/2, na.rm = TRUE),
-          conf.high = quantile(estimate, 1 - (1 - ci_width)/2, na.rm = TRUE)
-      ) %>%
-      left_join(
-          actual_fit,
-          by = c("assigned_dist_group", "assigned_treatment")
-      ) %>%
-      mutate(
-          pval = 2*pnorm(-abs(realised_pred)/std_error),
-          oneside_pval = pnorm(-realised_pred/std_error)
-      ) %>%
-      mutate(
-          pval = round_pval(pval, 3),
-          oneside_pval = round_pval(oneside_pval, 3)
-      ) %>%
-      select(
-          assigned_treatment, 
-          assigned_dist_group, 
-          realised_pred, 
-          std_error, 
-          conf.low,
-          conf.high,
-          pval, 
-          oneside_pval) %>%
-      rename(estimate = realised_pred) 
-      return(clean_tes)
-}
-
-# wrapper function for all of the above
-create_regression_output = function(data, f,  B_draws = 500, 
-                                    stat = params$stat,
-                                    caption = "Average Treatment Effects: Reduced Form",
-                                    dependent_var = "Dependent variable: Take-up",
-                                    type = "APE",
-                                    stars = TRUE,
-                                    drop_H0s = FALSE,
-                                    flip_calendar_sign = FALSE
-                                    ) {
-
-  if (type == "APE") {
-    bs_f = bayes_bs_f
-    actual_f = actual_bayesian_bs_fit
-  } else {
-    bs_f = bayes_bs_f_at_x
-    actual_f = actual_bayesian_bs_fit_at_x
-  }
-  bs_draws = map_dfr(
-    1:B_draws,
-    ~bs_f(
-      seed = .x,
-      f = f,
-      data = data
-    ),
-    .progress = TRUE
-    )
-
-  if (flip_calendar_sign) {
-    clean_te_draws_df = bs_draws %>%
-      clean_te_flip_cal_draws()
-  } else {  
-  clean_te_draws_df = bs_draws %>%
-    clean_te_draws()
-  }
-
-  clean_signal_draws_df = bs_draws %>%
-    clean_signal_draws()
-
-  realised_fit_output = actual_f(
-    seed = "realised fit",
-    f = f,
-    data = data
-  )
-  realised_fit = realised_fit_output$bs_fit
-  n_obs = nobs(realised_fit_output$fit)
-
-
-
-  signal_fit = realised_fit %>%
-    clean_signal_draws() %>%
-    rename(realised_pred = estimate) %>%
-    select(realised_pred, assigned_dist_group, assigned_treatment)
-
-  if (flip_calendar_sign) {
-    te_fit = realised_fit %>%
-      clean_te_flip_cal_draws() %>%
-      rename(realised_pred = estimate) %>%
-      select(realised_pred, assigned_dist_group, assigned_treatment)
-  } else {
-    te_fit = realised_fit %>%
-      clean_te_draws() %>%
-      rename(realised_pred = estimate) %>%
-      select(realised_pred, assigned_dist_group, assigned_treatment)
-  }
-
-  signal_summ = add_summ_stats(clean_signal_draws_df, signal_fit)
-  te_summ = add_summ_stats(clean_te_draws_df, te_fit)
-
-  pval_only_terms = c("bracelet - calendar", "signal")
-
-  n_obs_df = tibble(
-    assigned_treatment = factor("Observations"),
-    pval = as.character(prettyNum(n_obs, big.mark = ",")),
-    assigned_dist_group = unique(te_summ$assigned_dist_group),
-    show_pval_only = TRUE,
-    n_obs_line = TRUE
-  )
-
-  overall_summ = bind_rows(
-    signal_summ,
-    te_summ
-  ) %>%
-    mutate(
-      show_pval_only = assigned_treatment %in% pval_only_terms
-    ) %>%
-    filter(assigned_treatment != "no signal")  %>%
-    mutate(n_obs_line = FALSE) %>%
-    bind_rows(n_obs_df) 
-
-  if (drop_H0s) {
-    overall_summ = overall_summ %>%
-      filter(show_pval_only == FALSE | n_obs_line == TRUE)
-  }
-
-  default_tbl = overall_summ %>%
-    prep_tbl(stat = stat, stars = stars) %>%
-    nice_kbl_table(
-      cap = caption,
-      outcome_var = dependent_var
-      )
-
-
-  different_order_tbl = overall_summ %>%
-    prep_tbl(stat = stat, stars = stars) %>%
-    filter(assigned_treatment != "Observations") %>%
-    mutate(
-      assigned_treatment = fct_relevel(
-        assigned_treatment, 
-        c(
-          "Control", 
-          "Bracelet - No Signal", 
-          "$|Calendar| - |Bracelet|$",
-          "$H0$: Any Signal > No Signal, $p$-value",
-          "$H0$: Any Signal $=$ No Signal, $p$-value",
-          "$H0$: Bracelet > Calendar, $p$-value",
-          "$H0$: Bracelet $=$ Calendar, $p$-value",
-          "Ink", "Bracelet", "Calendar"
-        ))) %>% 
-      arrange(assigned_treatment) %>%
-    nice_kbl_table(
-      cap = caption,
-      outcome_var = dependent_var
-    )
-
-  return(list(
-    tidy_summary = overall_summ,
-    default_tbl = default_tbl,
-    different_order_tbl = different_order_tbl
-  ))
-}
-
-
-
-### Table/Kable functions ------------------------------------------------------
-prep_tbl = function(tes, stat = "ci", stars = FALSE) {
-
-    tbl_dist_levels = c(
-        "combined",
-        "close",
-        "far",
-        "far - close"
-    )
-
-    tbl_contrast_levels = c(
-        "bracelet",
-        "calendar",
-        "ink",
-        "control",
-        "Observations",
-        "abs(calendar) - abs(bracelet)",
-        "bracelet - no signal",
-        "signal",
-        "bracelet - calendar",
-        "signal two-side pval",
-        "bracelet - calendar two-side pval"
-    )
-
-
-
-    if (stat == "ci") {
-        tes = tes %>%
-            mutate(
-                val = paste0(
-                    "(",
-                    round(conf.low, 3),
-                    ", ",
-                    round(conf.high, 3),
-                    ")"
-                )
-            )
-    } else if (stat == "std.error"){
-        tes = tes %>%
-            mutate(val = paste0("{(", round(std_error, 3), ")}"))
-    } else {
-        tes = tes %>%
-            mutate(
-                val = paste0("{(", round_pval(pval, 3), ")}")
-            )
-    }
-
-
-
-
-    tbl =  tes %>%
-        select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, pval, oneside_pval, show_pval_only, n_obs_line)  %>%
-        mutate(
-          show_stars = 
-            ((assigned_treatment %in% c("bracelet", "calendar", "ink")) | assigned_dist_group == "far - close") & stars == TRUE,
-          stars = case_when(
-            pval < 0.001 ~ "***",
-            pval < 0.05 ~ "**",
-            pval < 0.1 ~ "*",
-            TRUE ~ ""
-          )
-        ) %>%
-        mutate(across(where(is.numeric), ~round(.x, 3))) %>%
-        mutate(
-            estim_std = case_when(
-              show_pval_only == TRUE ~ linebreak(paste0(pval), align = "c"),
-              show_stars == TRUE ~ linebreak(paste0(estimate, stars, "\n", str_glue("{val}")), align = "c"),
-              TRUE ~ linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c")
-            )
-        ) %>%
-        bind_rows(
-            filter(., show_pval_only == TRUE & n_obs_line == FALSE) %>%
-              mutate(
-                estim_std = linebreak(paste0(pval), align = "c")
-              ) %>%
-              mutate(estim_std = as.character(estim_std)) %>%
-              mutate(
-                assigned_treatment = paste0(assigned_treatment, " two-side pval")
-              )
-        ) %>%
-        select(assigned_treatment, assigned_dist_group, estim_std) %>%
-        mutate(
-            assigned_dist_group = factor(assigned_dist_group, tbl_dist_levels),
-            assigned_dist_group = fct_relabel(assigned_dist_group, str_to_title),
-            assigned_treatment = factor(assigned_treatment, tbl_contrast_levels)
-        ) %>%
-        arrange(assigned_dist_group, assigned_treatment) %>%
-        pivot_wider(
-            names_from = assigned_dist_group,
-            values_from = estim_std
-        ) %>%
-        mutate(
-            assigned_treatment = fct_relabel(assigned_treatment, str_to_title),
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal > No Signal, $p$-value"  = "Signal"), 
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet > Calendar, $p$-value" = "Bracelet - Calendar"),
-            assigned_treatment = fct_recode(assigned_treatment, "$|Calendar| - |Bracelet|$" = "Abs(Calendar) - Abs(Bracelet)"),
-
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal $\\neq$ No Signal, $p$-value"  = "Signal Two-Side Pval"), 
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet $\\neq$ Calendar, $p$-value" = "Bracelet - Calendar Two-Side Pval")
-        )  %>%
-        filter(
-          !(assigned_treatment %in% c("Bracelet - No Signal", "$H0$: Bracelet > Calendar, $p$-value", "$H0$: Any Signal > No Signal, $p$-value"))
-        )
-    
-    return(tbl)
-}
-
-nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up", stat = params$stat) {
-  linesep_str = if_else(stat == "ci", "\\addlinespace", "")
-
-  nice_kbl = tbl %>%
-  kbl(
-    col.names = c(
-      # "Estimand", 
-      # "Treatment", 
-      outcome_var,
-      paste0("(", 1:4, ")")
-    ), 
-    format = "latex", 
-    linesep = linesep_str, 
-    booktabs = TRUE, 
-    escape = FALSE, 
-    align = "lcccc", 
-    caption = cap
-  )  %>%
-  kable_styling(
-    latex_options = c("scale_down")
-  ) %>%
-  add_header_above(
-    c(" ", 
-      "Combined", 
-      "Close", 
-      "Far", 
-      "Far - Close"
-      ), 
-    line = FALSE
-  ) %>%
-  add_header_above(
-    c(
-      " " = 1,
-      "Reduced Form" = 4
-      )
-  ) %>%
-  row_spec(c(3), hline_after = TRUE) 
-}
-
-custom_save_latex_table = function(table, table_name, table_output_path = params$table_output_path){
-  table_conn = file(
-    file.path(
-      table_output_path, paste0(table_name, ".tex")
-    )
-  )
-
-  attr(table, "kable_meta")$contents = str_replace_all(attr(table, "kable_meta")$contents, "removeme12345", " ")
-  table[1] = str_replace_all(table[1], "removeme12345", " ")
-
-
-  clean_table = table %>%
-    str_remove(
-      ., 
-      fixed("\\begin{table}")
-    ) %>%
-    str_remove(
-      .,
-      "\\\\caption\\{.*\\}"
-    ) %>%
-    str_remove(
-      ., 
-      "\\\\end\\{table\\}"
-    ) 
-    
-    
-    clean_table %>%
-      writeLines(
-        table_conn
-      )
-    close(table_conn)
-
-    return(table)
-}
-
-wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat, 
-                            flip_calendar_sign = FALSE) {
-  default_table_options = list(
-    caption = "Average Treatment Effects: Reduced Form",
-    dependent_var = "Dependent variable: Take-up",
-    type = "APE",
-    stars = TRUE,
-    drop_H0s = FALSE
-  )
-  table_options = modifyList(default_table_options, table_options)
-  output = create_regression_output(
-    data = data,
-    f = regression_spec,
-    caption = table_options$caption,
-    dependent_var = table_options$dependent_var,
-    type = table_options$type,
-    stars = table_options$stars,
-    drop_H0s = table_options$drop_H0s,
-    stat = stat,
-    flip_calendar_sign = flip_calendar_sign
-  )
-  output$tidy_summary %>%
-    write_csv(tidy_summ_path)
-  output$default_tbl %>%
-    custom_save_latex_table(
-      table_name = table_name
-    )
-  output$different_order_tbl %>%
-    custom_save_latex_table(
-      table_name = paste0(table_name, "_weird_order")
-    )
-    return(output)
-}
-
-#### Frequentist Estimates ####
+# Adding on Borusyak and Hull variables
 # load expected distances
 cell_expected_dist_df = read_csv(here::here("data", "cell_expected_dist_df.csv")) %>%
   rename(cell_expected_dist = dist, assigned_treatment = random_treat, assigned_dist_group = random_dist_group) 
@@ -1310,6 +453,7 @@ cluster_expected_dist_df = read_csv(here::here("data", "cluster_expected_dist.cs
   mutate(cluster.id = factor(cluster.id))
 
 
+# Cleaning up analysis data coding of factors + adding BH variables
 analysis_data = analysis_data %>%
     mutate(
         county = factor(county),
@@ -1335,6 +479,7 @@ analysis_data %>%
   write_csv(
     "temp-data/analysis-data.csv"
   )
+
 cluster_dispersion_df = analysis_data %>%
   group_by(
     assigned_treatment,
@@ -1357,7 +502,8 @@ no_outlier_analysis_data = outlier_analysis_data %>%
   mutate(cluster_id = cur_group_id()) %>%
   ungroup()
 
-## Covariates Added
+## Generating another version of analysis data with covariate data which we used to use 
+# stata briefly
 cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>%
   mutate(assigned_dist_group = dist.pot.group) %>%
   mutate(

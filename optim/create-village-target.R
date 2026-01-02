@@ -14,11 +14,10 @@ script_options <- docopt::docopt(
 "),
   args = if (interactive()) "
                             pred-demand-dist-fit86-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv \
-                            --input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-log-full-many-pots \
-                            --output-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-log-full-many-pots \
-                            --output-basename=target-closest-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
-                            --util-function=identity \
-                            --assign-closest
+                            --input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/pc-pred-demands \
+                            --output-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
+                            --output-basename=target-experimental-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
+                            --util-function=identity 
                              " else commandArgs(trailingOnly = TRUE)
 ) 
 
@@ -47,7 +46,7 @@ target_demand_df = demand_df %>%
 
 summ_output_file = file.path(
             script_options$output_path,
-            paste0("summ-agg-log-", script_options$output_basename, ".csv")
+            paste0("summ-agg-", script_options$output_basename, ".csv")
         )
 
 
