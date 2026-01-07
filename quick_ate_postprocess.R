@@ -64,7 +64,6 @@ create_tes = function(.data, group_var, levels = FALSE) {
   return(tes)
 }
 
-
 # N.B. treat_idx (the second idx, is the mu (signalling) idx)
 mu_idx_mapper = tibble(
   treat_idx = 1:4,

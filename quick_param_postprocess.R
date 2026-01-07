@@ -132,7 +132,8 @@ takeup_wtp_params = load_param_draws(
   chain = script_options$chain,
   prior_predictive = script_options$prior,
   input_path = script_options$input_path,
-  hyper_wtp_mu
+  hyper_wtp_mu,
+  wtp_value_utility
 )
 
 clean_takeup_wtp_df = takeup_wtp_params %>%
@@ -155,7 +156,17 @@ summ_param_df = clean_param_df %>%
     i_treat,
     type, value, conf.low, conf.high
   ) %>%
+  filter(name != "wtp_value_utility" ) %>%
   mutate(across(where(is.numeric), round, 3)) %>%
+  bind_rows(
+    clean_param_df %>%
+      filter(name == "wtp_value_utility") %>%
+      select(
+        name,
+        type, value, conf.low, conf.high
+      ) %>%
+      mutate(across(where(is.numeric), round, 5)) 
+  ) %>%
   mutate(
     estim_value = linebreak(
       paste0(value, "\n", "(", conf.low, ", ", conf.high, ")"), 
@@ -176,7 +187,8 @@ summ_param_df = clean_param_df %>%
       str_detect(name, "beta_\\d") ~ str_glue("\\beta_{{{treatment}}}"),
       str_detect(name, "centered_cluster_beta_beliefs") ~ str_glue("\\beta^O_{{{treatment}}}"),
       str_detect(name, "centered_cluster_dist_beta_beliefs") ~ str_glue("\\gamma^O_{{{treatment}}}"),
-      name == "hyper_wtp_mu" ~ "\\psi"
+      name == "hyper_wtp_mu" ~ "\\psi",
+      name == "wtp_value_utility" ~ "\\rho"
     )
   ) %>%
   mutate(type = factor(type, levels = c("param", "obs", "wtp"))) %>%
@@ -203,7 +215,7 @@ param_tbl = summ_param_df %>%
     "Visibility Parameters", 8, 15
   ) %>%
   pack_rows(
-    "WTP Parameter", 16, 16
+    "WTP Parameter", 16, 17
   )
 
 custom_save_latex_table = function(table, table_filename){

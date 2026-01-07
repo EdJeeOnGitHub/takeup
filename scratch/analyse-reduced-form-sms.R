@@ -193,13 +193,13 @@ comp_combined_df = avg_comparisons(
         rf_fit,
         variable = "assigned_treatment",
         newdata = datagrid(
+            assigned_dist_group = unique(analysis_data$assigned_dist_group),
             assigned_treatment = unique(analysis_data$assigned_treatment),
             sms_treatment = unique(analysis_data$sms_treatment)
             ), 
         by = "sms_treatment",
         conf.level = 0.95
     )
-
 plot_df = bind_rows(
     comp_combined_df %>%
         tidy() %>%
@@ -228,8 +228,6 @@ plot_df = bind_rows(
         )
     )
 
-plot_df
-
 p_sms_df = plot_df %>%
     ggplot(aes(
         x = estimate,
@@ -251,5 +249,7 @@ p_sms_df = plot_df %>%
     ) +
     ggthemes::scale_color_canva("", palette = canva_palette_vibrant)   +
     geom_vline(xintercept = 0, linetype = "dotted")
+
+p_sms_df
 
 ggsave(plot = p_sms_df, filename = file.path(script_options$output_path, "sms-TE-by-dist-incentive.pdf"), width = 8, height = 6)

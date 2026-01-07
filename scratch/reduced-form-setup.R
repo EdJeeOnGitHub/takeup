@@ -36,6 +36,18 @@ baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling d
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
+baseline.data
+
+all.endline.data %>%
+  write_csv(
+    "temp-data/debug-all-endline-data.csv"
+  )
+
+analysis.data %>%
+  write_csv(
+    "temp-data/debug-analysis-data.csv"
+  )
+
 nosms_data <- analysis.data %>% 
   filter(sms.treatment.2 == "sms.control") %>% 
   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
