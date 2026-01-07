@@ -36,12 +36,15 @@ library(broom)
 library(ggplot2)
 library(ggmap)
 library(stringr)
-library(rgeos)
+# library(rgeos)
 
-source("../util.R")
-source("takeup_rct_assign_clusters.R")
+
+
+# source("../util.R")
+# source("takeup_rct_assign_clusters.R")
 
 knitr::opts_chunk$set(echo = FALSE, cache = TRUE, message = FALSE, cache.path = "takeup_pap-cache/", fig.path = "takeup_pap-fig/", fig.align = "center")
+knitr::opts_chunk$set(eval = FALSE)
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"

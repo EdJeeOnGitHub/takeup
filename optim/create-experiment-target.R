@@ -26,8 +26,7 @@ script_options <- docopt::docopt(
                             --output-basename=summ-agg-identity \
                             --cutoff-type=cutoff
                             --data-input-name=full-many-pots-experiment.rds \
-                            --posterior-median \
-                            --demand-input-path=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
+                            --demand-input-path=optim/data/ \
                             --demand-input-filename=pred-demand-dist-fit86-cutoff-b-control-mu-control-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv
                              " else commandArgs(trailingOnly = TRUE)
 ) 
@@ -60,7 +59,6 @@ demand_df = read_csv(
         script_options$demand_input_filename
     )
 )
-
 
 
 ## Loading Data

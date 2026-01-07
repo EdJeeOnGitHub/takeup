@@ -49,6 +49,21 @@ monitored_sms_data <- analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
+analysis.data %>%
+    select(contains("consent"))
+
+analysis.data %>%
+    count(sms.consent)
+
+analysis.data %>%
+    count(census.consent)
+
+analysis.data %>%
+    count(monitor.consent)
+
+
+
+
 analysis_data <- monitored_sms_data %>% 
     filter(have_phone == "Yes") %>%
     mutate(

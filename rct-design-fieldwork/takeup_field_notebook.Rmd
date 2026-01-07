@@ -12,6 +12,7 @@ output:
       collapsed: no
 ---
 
+
 ```{r setup, include=FALSE}
 library(magrittr)
 library(tidyverse)
@@ -31,7 +32,7 @@ library(here)
 library(econometr)
 
 #source("../util.R")
-source("takeup_rct_assign_clusters.R")
+source("rct-design-fieldwork/takeup_rct_assign_clusters.R")
 
 knitr::opts_chunk$set(cache = TRUE)
 
@@ -197,7 +198,7 @@ cluster.survey.data <- read_rds(here("data", "takeup_cluster_survey.rds"))
 
 rct.villages <- read_rds(here("data", "rct_target_villages_2.0.rds")) %>% 
   mutate(new.village = FALSE) %>% 
-  bind_rows(read_rds("../data/rct_target_villages_2.0-4.rds") %>% 
+  bind_rows(read_rds("data/rct_target_villages_2.0-4.rds") %>% 
               mutate(new.village = TRUE))
   
 all.villages <- rct.villages %>% 
@@ -216,14 +217,15 @@ all.villages <- rct.villages %>%
     }
   }) %>% 
   ungroup %>% 
-  mutate(dist.group = convert.to.sp(., ~ target.lon + target.lat, wgs.84) %>% 
-           spTransform(kenya.proj4) %>% 
-           gDistance(byid = TRUE) %>% 
-           as.dist %>% 
-           hclust %>% 
-           cutree(h = 1000)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(num.dist.groups = unique(dist.group) %>% length) %>% 
+  # EJ: No longer runs without rgeos which is deprecated
+  # mutate(dist.group = convert.to.sp(., ~ target.lon + target.lat, wgs.84) %>% 
+  #          spTransform(kenya.proj4) %>% 
+  #          gDistance(byid = TRUE) %>% 
+  #          as.dist %>% 
+  #          hclust %>% 
+  #          cutree(h = 1000)) %>% 
+  # group_by(cluster.id) %>% 
+  # mutate(num.dist.groups = unique(dist.group) %>% length) %>% 
   ungroup %>% 
   left_join(cluster.wave.county.data, "cluster.id") %>% 
   mutate(village.name.group = target.village_name %>% 
@@ -247,7 +249,7 @@ rm(rct.villages)
 rct.village.codes %<>%
   left_join(select(all.villages, village, targeted.village), "village")
 
-pre.census.data <- read_rds("../data/pre.census.processed.rds")
+pre.census.data <- read_rds("data/pre.census.processed.rds")
 ```
 
 ```{r, eval=FALSE}
@@ -400,19 +402,19 @@ hh.census.data %<>%
   select(-matches("\\.[xy]$"))
 
 hh.census.data %<>% 
-  anti_join(plyr::ldply(paste0("../data/", c("takeup_returns_toremove.csv", 
+  anti_join(plyr::ldply(paste0("data/", c("takeup_returns_toremove.csv", 
                     "takeup_moved_notvalid_toremove.csv",
                     "takeup_noconsent_toremove.csv")), read_csv),
             by = c("KEY" = "key"))
 
-hh.id.dict <- read_rds("../data/takeup_hh_id_dict.rds")
+hh.id.dict <- read_rds("data/takeup_hh_id_dict.rds")
 
 hh.census.data %<>% 
   select(-county) %>% 
   left_join(cluster.wave.county.data, "cluster.id") %>% 
   left_join(hh.id.dict, "KEY")
 
-person.id.dict <- read_rds("../data/takeup_person_id_dict.rds")
+person.id.dict <- read_rds("data/takeup_person_id_dict.rds")
 
 clean.names <- . %>% 
   mutate_at(vars(matches("1st|mid|2nd|clan")), str_to_upper) %>% 
@@ -485,6 +487,10 @@ hh.census.data %>%
 
 ```{r, eval=FALSE}
 # This isn't very important; we are expecting some difference (see Arthur's response on Slack)
+hh.census.data %>%
+  select(number_individuals, num.individuals) %>%
+  summarise(across(c(number_individuals, num.individuals), sum, na.rm = TRUE) )
+
 hh.census.data %>% 
   validate::check_that(number_individuals == num.individuals) %>% 
   summary %>% 
@@ -1866,6 +1872,46 @@ write_rds(wave1.sms.ctrl.individuals, file.path("..", "data", "takeup_sms_ctrl_4
 ```
 
 ```{r update-main-data-with-sms, eval=TRUE}
+
+takeup.dict %>%
+  summarise(
+    n_p = n_distinct(person_key),
+    n_k = n_distinct(KEY.individ),
+    n_c = n_distinct(cluster_key)
+  )
+
+
+sms.treated = read_rds(file.path("data", "takeup_sms_sample_all_6.rds"))
+wave1.sms.ctrl.individuals = bind_rows(phone.owner = read_rds(file.path("data", "takeup_sms_ctrl_4.1_wave1.rds")),
+                                        non.phone.owner = read_rds(file.path("data", "takeup_sms_ctrl_nonphone_1.0_wave1.rds")),
+                                        .id = "sms.ctrl.subpop")
+wave2.sms.ctrl.individuals = read_rds(file.path("data", "takeup_sms_ctrl_1.0_wave2.rds"))
+
+combined.sms.sample = bind_rows(sms.treated,
+                                 wave1.sms.ctrl.individuals, 
+                                 wave2.sms.ctrl.individuals) 
+
+wave2.sms.ctrl.individuals
+sms.treated
+
+
+# census.data %<>%
+#   right_join(combined.sms.sample, ., "KEY.individ", suffix = c(".sms.recruit", ".census")) %>% 
+#   mutate(phone = ifelse(nchar(phone) == 10 & str_sub(phone, 1, 1) == "0", str_sub(phone, 2), phone),
+#          phone = ifelse(!is.na(phone), paste0("+254", phone), NA),
+#          monitored = (!is.na(sms.treatment) & (sms.treatment == "sms.control" | (!is.na(sms.consent) & sms.consent))) | 
+#                           individ.baseline.sample.pool,
+#          true.monitored = (wave == 2 & monitored) | KEY.individ %in% takeup.dict$KEY.individ
+         
+#          )
+
+takeup.dict <- c("data/takeup_survey_dict_wave1.csv") %>%  # Only needed for wave 1
+  map_df(~ read_csv(.) %>% transmute(person_key, KEY.individ, cluster_key)) 
+
+
+takeup.dict
+
+
 takeup.dict <- c("../data/takeup_survey_dict_wave1.csv") %>%  # Only needed for wave 1
   map_df(~ read_csv(.) %>% transmute(person_key, KEY.individ, cluster_key)) 
 
@@ -1890,8 +1936,11 @@ census.data %<>%
   right_join(combined.sms.sample, ., "KEY.individ", suffix = c(".sms.recruit", ".census")) %>% 
   mutate(phone = ifelse(nchar(phone) == 10 & str_sub(phone, 1, 1) == "0", str_sub(phone, 2), phone),
          phone = ifelse(!is.na(phone), paste0("+254", phone), NA),
-         monitored = (!is.na(sms.treatment) & (sms.treatment == "sms.control" | (!is.na(sms.consent) & sms.consent))) | individ.baseline.sample.pool,
-         true.monitored = (wave == 2 & monitored) | KEY.individ %in% takeup.dict$KEY.individ)
+         monitored = (!is.na(sms.treatment) & (sms.treatment == "sms.control" | (!is.na(sms.consent) & sms.consent))) | 
+                          individ.baseline.sample.pool,
+         true.monitored = (wave == 2 & monitored) | KEY.individ %in% takeup.dict$KEY.individ
+         
+         )
 ```
 
 ```{r generate-sample-csv, eval=FALSE} 
@@ -1970,6 +2019,104 @@ select.endline.sample <- function(eligible.individ) {
 
 
 ```{r select-wave1-endline, eval=FALSE}
+
+census.data %>%
+  summarize(n = sum(!is.na(sms.treatment)))
+
+
+full_takeup_dict = c("data/takeup_survey_dict_wave1.csv") %>%  # Only needed for wave 1
+  map_df(~ read_csv(.)) 
+
+
+takeup.dict = c("data/takeup_survey_dict_wave1.csv") %>%  # Only needed for wave 1
+  map_df(~ read_csv(.) %>% transmute(person_key, KEY.individ, cluster_key)) 
+
+census.data %>%
+  filter(wave == 1) %>%
+  count(sms.treatment, true.monitored) 
+
+census.data %>%
+  filter(wave == 2) %>%
+  count(sms.treatment, true.monitored) 
+
+
+census.data %>%
+  filter(wave == 2) %>%
+  count(sms.consent, sms.treatment, true.monitored)
+
+census.data %>%
+  filter(!is.na(sms.treatment)) %>%
+  count(true.monitored)
+
+census.data %>%
+  count(true.monitored)
+census.data %>%
+  filter(!is.na(sms.treatment)) %>%
+  count(true.monitored)
+
+census.data %>%
+  count(!is.na(sms.treatment), !is.na(true.monitored))
+
+census.data %>%
+  count(monitored, sms.treatment)
+
+census.data %>%
+  write_csv("debug-census-data.csv")
+
+
+
+
+census.data %>%
+  filter(!is.na(sms.treatment)) %>%
+  group_by(sms_control = sms.treatment == "sms.control") %>%
+  count(true.monitored)
+
+
+census.data %>%
+  count(sms.treatment, true.monitored)
+
+# Wave 1 Endline Sample - not everyone monitored!
+census.data %>%
+  filter(wave == 1,
+         !is.na(sms.treatment),
+         sms.treatment == "sms.control" | sms.consent, # & between(sms.status.success, 4, 6)),
+         is.na(sms.ctrl.backup) | !sms.ctrl.backup)  %>%
+  filter(true.monitored == FALSE) %>%
+  count(have_phone, sms.treatment)
+
+
+census.data %>%
+  filter(wave == 1,
+         !is.na(sms.treatment),
+         sms.treatment == "sms.control" | sms.consent, # & between(sms.status.success, 4, 6)),
+         is.na(sms.ctrl.backup) | !sms.ctrl.backup)  %>%
+  count(true.monitored, sms.treatment)
+
+
+
+# Wave 2 Endline Sample  - everyone monitored
+
+census.data %>%
+  filter(wave == 2) %>%
+  filter(sms.treatment == "sms.control") %>%
+  count(have_phone)
+
+census.data %>% 
+  filter(wave == 2,
+         !is.na(sms.treatment),
+         sms.treatment == "sms.control" | sms.consent, # & between(sms.status.success, 4, 6)),
+         is.na(sms.ctrl.backup) | !sms.ctrl.backup) %>%
+  count(monitored, true.monitored)
+
+
+wave1.endline.individuals <- read_rds("data/takeup_endline_wave1_8.0.rds")
+wave2.endline.individuals <- read_rds("data/takeup_endline_wave2_1.0.rds")
+
+endline_people_karim = bind_rows(wave1.endline.individuals, wave2.endline.individuals)
+
+endline_people_karim
+
+
 wave1.endline.individuals <- census.data %>% 
   filter(wave == 1,
          !is.na(sms.treatment),

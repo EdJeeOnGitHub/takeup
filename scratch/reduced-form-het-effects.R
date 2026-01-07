@@ -1158,7 +1158,10 @@ gpt_df = gpt_df %>%
             TRUE ~ "misc"
         ) 
     ) 
-
+gpt_df %>%
+    filter(gpt_category_clean == "misc") %>%
+    select(`gpt-3.5-turbo`) %>%
+    rename(gpt_response = `gpt-3.5-turbo`) 
 
 #### SOB Regressions ####
 
@@ -1231,8 +1234,15 @@ sob_gpt_fit_df %>%
         "temp-data/second-order-gpt-reason-distribution.csv"
     )
 
+endline.know.table.data %>%
+    filter(!is.na(second.order))  %>%
+    filter(!is.na(second.order.reason)) 
 
-
+endline.know.table.data %>%
+        filter(!is.na(second.order)) %>%
+        filter(!is.na(second.order.reason)) %>%
+        filter(category_sob_reason != "other") %>%
+        summarise(n_indiv = n_distinct(KEY.individ))
 
 gpt_endline_know_notknow_table_data = bind_rows(
     endline.know.table.data %>%
