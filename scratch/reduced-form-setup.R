@@ -1,5 +1,24 @@
 
-dir.create("presentations/rf-tables/main-specs", showWarnings = FALSE)
+if (interactive()) {
+library(tidyverse)
+library(broom)
+library(data.table)
+library(kableExtra)
+library(knitr)
+library(fixest)
+    params = lst(
+        table_output_path = "presentations/rf-tables/main-specs",
+        show_probs = FALSE,
+        width = 0.95,
+        cache = FALSE,
+        fit = FALSE,
+        stat = "std.error" # "ci", "p", "std.error"
+    )
+    source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
+    source(file.path("analysis_util.R"))
+    source(file.path( "dist_structural_util.R"))
+    source(file.path("multilvlr", "multilvlr_util.R"))
+}
 
 # Useful variables/hyperparameters
 ci_width = as.numeric(params$width)
@@ -28,6 +47,9 @@ rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.r
 cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
 load(file.path("data", "takeup_village_pot_dist.RData"))
 load(file.path("data", "analysis.RData"))
+
+
+census.data
 
 baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
 
@@ -550,3 +572,79 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
   )
 
 write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-data.csv")
+
+
+
+all_data = analysis.data %>% 
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+n_endline_know_sms_treat = 1043
+n_endline_know_sms_control = 2686
+n_endline_know_total = n_endline_know_sms_treat + n_endline_know_sms_control
+
+
+endline.know.table.data
+
+all_data %>%
+  left_join(
+    endline.know.table.data %>%
+      mutate(in_know_table = TRUE) %>%
+      select(KEY.individ, in_know_table) %>%
+      distinct(), 
+      by = "KEY.individ"
+  ) %>%
+  filter(
+    in_know_table == TRUE
+  ) 
+
+#### Figuring out who's in endline knowledge data
+summ_endline_know_table = endline.know.table.data %>%
+  group_by(KEY.individ, know.table.type) %>%
+  summarise(
+    obs_know_person = sum(num.recognized),
+    obs_know_person_prop = mean(num.recognized),
+    knows_other_dewormed = sum(fct_match(dewormed, c("yes", "no")), na.rm = TRUE),
+    knows_other_dewormed_yes = sum(fct_match(dewormed, "yes"), na.rm = TRUE),
+    knows_other_dewormed_no = sum(fct_match(dewormed, "no"), na.rm = TRUE),
+    thinks_other_knows = sum(fct_match(second.order, c("yes", "no")), na.rm = TRUE),
+    thinks_other_knows_yes = sum(fct_match(second.order, "yes"), na.rm = TRUE),
+    thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE)
+  )
+summ_know_A_df = summ_endline_know_table %>%
+  filter(know.table.type == "table.A") 
+
+summ_know_B_df = summ_endline_know_table %>%
+  filter(know.table.type == "table.B")
+
+
+summ_endline_know_table %>%
+  left_join(
+    analysis_data %>%
+      select(KEY.individ, sms.treatment)  %>% 
+      mutate(
+        sms_status = case_when(
+          sms.treatment == "sms.control" ~ "control", 
+          sms.treatment %in% c("reminder.only", "social.info") ~ "treat",
+          TRUE ~ NA_character_
+        )
+      ),
+      by = "KEY.individ"
+  ) %>%
+  ungroup() %>%
+  count(sms_status)
+
+all_data %>%
+  select(KEY.individ, sms.treatment.2)
+
+summ_endline_know_table %>%
+  filter(know.table.type == "table.A")  %>%
+  print(n = 100)
+
+endline.know.table.data %>%
+  select(KEY.individ)

@@ -3,9 +3,7 @@ library(tidyverse)
 source("analysis_util.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
 source("dist_structural_util.R")
-
 # Data --------------------------------------------------------------------
-
 load(file.path("data", "analysis.RData"))
 
 standardize <- as_mapper(~ (.) / sd(.))
@@ -33,7 +31,6 @@ monitored_sms_data = analysis.data %>%
   group_by(cluster.id) %>% 
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
-
 
 
 endline.know.table.data %>%
@@ -96,9 +93,6 @@ monitored_data %>%
   count(wave)
 
 
-monitored_data %>%
-    select(contains("consent")) %>%
-    skimr::skim()
 
 
 nosms_data <- analysis.data %>% 
@@ -601,3 +595,166 @@ census.data %>%
   filter(true.monitored == 1) %>%
   count(recruit)
 
+
+
+
+df_Takeup_Census = read_csv("data/raw-data/Takeup Census.csv")
+
+nrow(df_Takeup_Census)
+
+df_Census = read_csv("data/raw-data/Census.csv", guess_max = 10000)
+
+df_Census_WIDE = read_csv("data/raw-data/Census_WIDE.csv", guess_max = 10000)
+
+
+rds_census = read_rds("data/takeup_census.rds")
+library(haven)
+dta_census = read_dta("data/census.dta")
+
+indiv_census = read_csv("data/raw-data/Census-survey-individual.csv")
+
+## Load Census Data
+census_data_env = new.env()
+with_env = function(f, e = parent.frame()) {
+    stopifnot(is.function(f))
+    environment(f) = e
+    f
+}
+load_census_function = function(){
+  load(file.path("data", "takeup_census.RData"))
+  return(census.data)
+}
+census_data = with_env(load_census_function, census_data_env)() %>%
+  rename(census.consent = consent) # Rename this to reduce chance of error
+
+n_indiv_df = census_data %>%
+    group_by(cluster.id) %>%
+    summarise(
+        n_per_cluster = sum(num.individuals)
+    )
+
+clean_census_data = census_data %>%
+  filter(!is.na(assigned.treatment)) %>%
+  # right_join(
+  #   analysis_data %>%
+  #     select(cluster.id, dist.pot.group, cluster.dist.to.pot) %>%
+  #     unique()
+  # ) %>%
+  mutate(
+    female = gender == 2,
+    age = age.census,
+    have_phone_lgl = have_phone == "Yes" 
+    )
+
+clean_census_data %>%
+  write_csv("temp-data/debug-clean-census-data.csv")
+
+nrow(clean_census_data)
+
+census_vars = c(
+  "dewormed",
+  "know_age" # just include this so fixest creates a list of fits...
+)
+
+clean_census_data %>%
+  filter(!is.na(know_age))
+
+
+  orig =  bind_rows(table.A = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableA.csv")) %>% 
+                                        transmute(num.recognized = recogniseA,
+                                                  dewormed = dewormedA,
+                                                  second.order = order_2ndA,
+                                                  second.order.reason = order_2nd_reason,
+                                                  relationship = relationshipA,
+                                                  relationship.other = relationshipA_other,
+                                                  times.seen = times_seenA,
+                                                  visited = visitedA, 
+                                                  know.other.index = instanceA,
+                                                  PARENT_KEY, KEY),
+                                      table.B = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableB.csv")) %>% 
+                                        transmute(num.recognized = recogniseB,
+                                                  dewormed = dewormedB,
+                                                  dewormed.know.only = dewormedBB,
+                                                  know.other.index = instanceB + 0:9, 
+                                                  know.other.index.2 = know.other.index + 1, 
+                                                  PARENT_KEY, KEY),
+                                      .id = "know.table.type") %>% 
+    mutate(recognized = num.recognized > 0)
+
+
+
+create_endline_know_table = function() {
+
+  endline.know.table.data <- bind_rows(table.A = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableA.csv")) %>% 
+                                        transmute(num.recognized = recogniseA,
+                                                  dewormed = dewormedA,
+                                                  second.order = order_2ndA,
+                                                  second.order.reason = order_2nd_reason,
+                                                  relationship = relationshipA,
+                                                  relationship.other = relationshipA_other,
+                                                  times.seen = times_seenA,
+                                                  visited = visitedA, 
+                                                  know.other.index = instanceA,
+                                                  PARENT_KEY, KEY),
+                                      table.B = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableB.csv")) %>% 
+                                        transmute(num.recognized = recogniseB,
+                                                  dewormed = dewormedB,
+                                                  dewormed.know.only = dewormedBB,
+                                                  know.other.index = instanceB + 0:9, 
+                                                  know.other.index.2 = know.other.index + 1, 
+                                                  PARENT_KEY, KEY),
+                                      .id = "know.table.type") %>% 
+    mutate(recognized = num.recognized > 0)
+
+  survey.know.list <- file.path("instruments", "SurveyCTO Forms", "Endline Survey", "Deployed Form Version", 
+                                c("knowledge_list.csv", "kak_knowledge_list.csv")) %>% 
+    map_df(read_csv, col_types = cols(knowledge_person_key = col_character(), survey.type = col_character()), .id = "wave") %>% 
+    mutate(wave = as.integer(wave)) %>% 
+    filter(wave == 1 | !is.na(survey.type))
+
+  endline.know.table.data = endline.know.table.data %>%
+    inner_join(select(endline.data, KEY.individ, wave, cluster.id, assigned.treatment, sms.treatment, dist.pot.group, KEY), 
+              by = c("PARENT_KEY" = "KEY")) %>% 
+    inner_join(select(survey.know.list, person_key, know.other.index, KEY.individ.other),
+              by = c("KEY.individ" = "person_key", "know.other.index")) %>% 
+    left_join(select(survey.know.list, person_key, know.other.index, KEY.individ.other), # Get the second person (table B)
+              by = c("KEY.individ" = "person_key", "know.other.index.2" = "know.other.index"),
+              suffix = c(".1", ".2")) %>% 
+    mutate(across(c(recognized, dewormed, dewormed.know.only), factor, levels = c(0:1, 98), labels = c("no", "yes", "don't know"))) %>% 
+    mutate(across(second.order, factor, levels = c(1:2, 97:98), labels = c("yes", "no", "prefer not say", "don't know"))) %>% 
+    mutate(across(relationship, factor, levels = c(1:5, 99), labels = c("hh member", "extended family", "friend", "neighbor", "church", "other"))) %>%
+    mutate(relationship = if_else(fct_match(relationship, "other") & fct_match(str_to_lower(relationship.other), c("village member", "village mate", "same village", "village elder", "village mates", "villager")),
+                                  "village member", as.character(relationship)) %>% factor,
+          dewormed = if_else(fct_match(know.table.type, "table.B") & is.na(dewormed), dewormed.know.only, dewormed)) %>% 
+    left_join(filter(analysis.data, monitored) %>% transmute(KEY.individ, respondent.dewormed.any = dewormed.any),
+              by = "KEY.individ") %>% 
+    left_join(filter(analysis.data, monitored) %>% transmute(KEY.individ, actual.other.dewormed.any.1 = dewormed.any),
+              by = c("KEY.individ.other.1" = "KEY.individ")) %>% 
+    left_join(filter(analysis.data, monitored) %>% transmute(KEY.individ, actual.other.dewormed.any.2 = dewormed.any),
+              by = c("KEY.individ.other.2" = "KEY.individ")) %>% 
+    mutate(actual.other.dewormed.any.either = actual.other.dewormed.any.1 | (fct_match(know.table.type, "table.B") & actual.other.dewormed.any.2)) 
+    return(endline.know.table.data)
+}
+
+
+karim_endline_know_table = create_endline_know_table()
+stop()
+
+nrow(endline.know.table.data)
+
+nrow(karim_endline_know_table)
+
+
+all.equal(karim_endline_know_table %>%  
+select(know.table.type, dewormed, KEY.individ), 
+endline.know.table.data %>%
+  select(know.table.type, dewormed, KEY.individ))
+
+
+endline_keys = endline.know.table.data %>%
+  pull(KEY.individ)
+
+orig_keys = karim_endline_know_table %>%
+  pull(KEY.individ)
+
+setdiff(endline_keys, orig_keys)
