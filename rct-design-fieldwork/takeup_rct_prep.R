@@ -470,6 +470,12 @@ rct.targetable.schools <- get.cluster.villages.data(rct.cluster.selection) %>%
 #write_rds(rct.targetable.schools, "data/rct_targetable_schools_2.0.rds")
 rct.targetable.schools <- read_rds("data/rct_targetable_schools_2.0.rds")
 
+# Saving as a csv the original distance assignment for all 158 clusters.
+rct.targetable.schools %>%
+  select(contains("id"), contains("treat"), village.dist.cat, assigned.dist.cat, cluster.dist.cat, selected.targeted)  %>%
+  filter(selected.targeted == TRUE) %>%
+  write_csv("data/original-cluster-distance-assignment.csv")
+
 # rct.cluster.selection@data %<>% left_join(targetable.schools %>% 
 #                                             spTransform(wgs.84) %>% 
 rct.cluster.selection@data %<>% left_join(rct.schools.data %>% 
