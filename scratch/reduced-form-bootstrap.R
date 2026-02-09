@@ -587,26 +587,9 @@ endline.know.table.data %>%
 
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
-  nest_join(
-    endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")),
-    by = "KEY.individ", 
-    name = "knowledge_data"
-  ) %>% 
-  mutate(
-    map_dfr(knowledge_data, ~ {
-      tibble(
-        obs_know_person = sum(.x$num.recognized),
-        obs_know_person_prop = mean(.x$num.recognized),
-        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
-        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
-        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
-        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
-        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
-        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
-      )
-    }
-  )) %>%
+  left_join(
+    summ_know_A_df, by = "KEY.individ"
+  ) %>%
     filter(obs_know_person > 0)
 
 
@@ -633,28 +616,9 @@ disagg_belief_all_df = all_data %>%
     by = "cluster.id"
   ) %>% 
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
-  nest_join(
-    endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")) %>%
-      mutate(ed_in_endline_flag = TRUE),
-    by = "KEY.individ", 
-    name = "knowledge_data"
-  ) %>% 
-  mutate(
-    map_dfr(knowledge_data, ~ {
-      tibble(
-        obs_know_person = sum(.x$num.recognized),
-        obs_know_person_prop = mean(.x$num.recognized),
-        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
-        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
-        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
-        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
-        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
-        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
-        ed_in_endline_flag = any(.x$ed_in_endline_flag, na.rm = TRUE)
-      )
-    }
-  )) %>%
+  left_join(
+    summ_know_A_df, by = "KEY.individ"
+  ) %>%
     # filter(obs_know_person > 0)  %>%
     select(
       KEY.individ, 
@@ -744,26 +708,7 @@ disagg_belief_all_df %>%
 
 disagg_base_belief_data = cov_analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
-  nest_join(
-    endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")),
-    by = "KEY.individ", 
-    name = "knowledge_data"
-  ) %>% 
-  mutate(
-    map_dfr(knowledge_data, ~ {
-      tibble(
-        obs_know_person = sum(.x$num.recognized),
-        obs_know_person_prop = mean(.x$num.recognized),
-        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
-        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
-        knows_other_dewormed_no = sum(fct_match(.x$dewormed, "no"), na.rm = TRUE),
-        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
-        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
-        thinks_other_knows_no = sum(fct_match(.x$second.order, "no"), na.rm = TRUE),
-      )
-    }
-  )) %>%
+  left_join(summ_know_A_df, by = "KEY.individ") %>%
     filter(obs_know_person > 0)  %>%
     select(
       KEY.individ, 

@@ -95,7 +95,8 @@ prepare.analysis.data <- function(.census.data, .takeup.data, .endline.data, .ba
 multi.factor <- function(.col, labels, levels, ...) {
   if (missing(levels)) {
     levels <- c(seq_along(labels), 97:99)
-    labels %<>% c("prefer not say", "DK", "other")
+    labels = labels %>%
+        c("prefer not say", "DK", "other")
   } 
   
   map(str_split(.col, " "), factor, levels = levels, labels = labels, ...)

@@ -49,24 +49,17 @@ load(file.path("data", "takeup_village_pot_dist.RData"))
 load(file.path("data", "analysis.RData"))
 
 
-census.data
+endline_data = ed_edits_prepare.endline.data(all.endline.data, census.data, cluster.strat.data)
+# Remove endline.data - this is subset to a subsample we don't actually want
+# instead, use all.endline.data
+rm(endline.data)
 
 baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
-baseline.data
 
-all.endline.data %>%
-  write_csv(
-    "temp-data/debug-all-endline-data.csv"
-  )
-
-analysis.data %>%
-  write_csv(
-    "temp-data/debug-analysis-data.csv"
-  )
 
 # Only take sms.control HHs
 nosms_data <- analysis.data %>% 
@@ -94,10 +87,6 @@ monitored_nosms_data <- analysis.data %>%
 # main analysis sample
 analysis_data <- monitored_nosms_data
 
-analysis_data %>%
-  write_csv(
-    "temp-data/analysis-data.csv"
-  )
 
 # Save cluster distance sd in case we need to unstandardize - two variables 
 # as there are two different naming conventions in use
@@ -277,12 +266,12 @@ cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rd
   select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
   unique()
 
-pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
+pretreat_data = clean_pretreat_covariates(baseline.data, endline_data) %>%
   left_join(cluster_treat_df, by = "cluster.id") %>%
   filter(!is.na(treat_dist))
 
 
-endline.data = endline.data %>%
+endline_data = endline_data %>%
   mutate(
     travel_clean = case_when(
       travel == "1" ~ "walk",
@@ -293,8 +282,6 @@ endline.data = endline.data %>%
     )
   )
 
-endline.data %>%
-  write_csv("temp-data/endline-data.csv")
 
 ## Baseline Balance
 baseline_worm_data = baseline_worm %>%
@@ -509,10 +496,6 @@ analysis_data = analysis_data %>%
       standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
       standard_cell_expected_dist = cell_expected_dist/sd_of_dist
     )
-analysis_data %>%
-  write_csv(
-    "temp-data/analysis-data.csv"
-  )
 
 cluster_dispersion_df = analysis_data %>%
   group_by(
@@ -584,27 +567,150 @@ all_data = analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
-n_endline_know_sms_treat = 1043
-n_endline_know_sms_control = 2686
-n_endline_know_total = n_endline_know_sms_treat + n_endline_know_sms_control
+#### Create endline knowledge tables
+raw_endline_know_table_data = bind_rows(table.A = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableA.csv")) %>% 
+                                       transmute(num.recognized = recogniseA,
+                                                 dewormed = dewormedA,
+                                                 second.order = order_2ndA,
+                                                 second.order.reason = order_2nd_reason,
+                                                 relationship = relationshipA,
+                                                 relationship.other = relationshipA_other,
+                                                 times.seen = times_seenA,
+                                                 visited = visitedA, 
+                                                 know.other.index = instanceA,
+                                                 PARENT_KEY, KEY),
+                                     table.B = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableB.csv")) %>% 
+                                       transmute(num.recognized = recogniseB,
+                                                 dewormed = dewormedB,
+                                                 dewormed.know.only = dewormedBB,
+                                                 know.other.index = instanceB + 0:9, 
+                                                 know.other.index.2 = know.other.index + 1, 
+                                                 PARENT_KEY, KEY),
+                                     .id = "know.table.type") %>% 
+  mutate(recognized = num.recognized > 0)
+
+raw_endline_know_table_data %>%
+  summarise(
+    n = n(),
+    n_indiv = n_distinct(PARENT_KEY)
+  )
+
+survey_know_list = file.path("instruments", "SurveyCTO Forms", "Endline Survey", "Deployed Form Version", 
+                              c("knowledge_list.csv", "kak_knowledge_list.csv")) %>% 
+  map_dfr(read_csv, .id = "wave") %>% 
+  mutate(wave = as.integer(wave))  %>%
+  filter(wave == 1 | !is.na(survey.type))
 
 
-endline.know.table.data
 
-all_data %>%
-  left_join(
-    endline.know.table.data %>%
-      mutate(in_know_table = TRUE) %>%
-      select(KEY.individ, in_know_table) %>%
-      distinct(), 
-      by = "KEY.individ"
+endline_know_table_data = raw_endline_know_table_data %>%
+  # Join on actual individuals from the endline
+  left_join(select(endline_data, KEY.individ, wave, cluster.id, assigned.treatment, sms.treatment, dist.pot.group, KEY), 
+             by = c("PARENT_KEY" = "KEY")) %>% 
+  # Use the knowledge list so we know who knows each other
+  left_join(select(survey_know_list, person_key, know.other.index, KEY.individ.other),
+             by = c("KEY.individ" = "person_key", "know.other.index")) %>% 
+  left_join(select(survey_know_list, person_key, know.other.index, KEY.individ.other), # Get the second person (table B)
+            by = c("KEY.individ" = "person_key", "know.other.index.2" = "know.other.index"),
+            suffix = c(".1", ".2")) %>% 
+  mutate(across(c(recognized, dewormed, dewormed.know.only), factor, levels = c(0:1, 98), labels = c("no", "yes", "don't know"))) %>% 
+  mutate(across(second.order, factor, levels = c(1:2, 97:98), labels = c("yes", "no", "prefer not say", "don't know"))) %>% 
+  mutate(across(relationship, factor, levels = c(1:5, 99), labels = c("hh member", "extended family", "friend", "neighbor", "church", "other"))) %>%
+  mutate(relationship = if_else(fct_match(relationship, "other") & fct_match(str_to_lower(relationship.other), c("village member", "village mate", "same village", "village elder", "village mates", "villager")),
+                                "village member", as.character(relationship)) %>% factor,
+         dewormed = if_else(fct_match(know.table.type, "table.B") & is.na(dewormed), dewormed.know.only, dewormed)) %>% 
+  left_join(filter(analysis.data, monitored) %>% transmute(KEY.individ, respondent.dewormed.any = dewormed.any),
+            by = "KEY.individ") %>% 
+  left_join(filter(analysis.data, monitored) %>% transmute(KEY.individ, actual.other.dewormed.any.1 = dewormed.any),
+            by = c("KEY.individ.other.1" = "KEY.individ")) %>% 
+  left_join(filter(analysis.data, monitored) %>% transmute(KEY.individ, actual.other.dewormed.any.2 = dewormed.any),
+            by = c("KEY.individ.other.2" = "KEY.individ")) %>% 
+  mutate(actual.other.dewormed.any.either = actual.other.dewormed.any.1 | (fct_match(know.table.type, "table.B") & actual.other.dewormed.any.2)) 
+
+# Missing some people in here - let's find from where
+endline_know_table_data %>%
+  filter(is.na(KEY.individ)) %>%
+  summarise(
+    n_parents = n_distinct(PARENT_KEY)
+  )
+
+endline_know_table_data %>%
+  skimr::skim()
+
+
+
+# HHs in endline, not in know table
+in_endline_not_know_table = endline_data %>% 
+  select(KEY.individ, KEY) %>%
+  anti_join(raw_endline_know_table_data, by = c("KEY" = "PARENT_KEY")) %>%
+  pull(KEY) %>%
+  unique()
+
+in_know_table_not_endline = raw_endline_know_table_data %>% 
+  select(PARENT_KEY) %>%
+  anti_join(endline_data, by = c("PARENT_KEY" = "KEY")) %>%
+  pull(PARENT_KEY) %>%
+  unique()
+
+raw_endline_know_table_data %>%
+  select(PARENT_KEY) %>%
+  anti_join(all.endline.data %>% select(KEY), by = c("PARENT_KEY" = "KEY")) %>%
+  pull(PARENT_KEY) %>%
+  unique()  %>%
+  length()
+
+n_in_know_table = raw_endline_know_table_data %>%
+  summarise(n = n_distinct(PARENT_KEY)) %>%
+  pull(n)
+n_in_endline = endline_data %>%
+  summarise(n = n_distinct(KEY)) %>%
+  pull(n)
+
+n_in_know_table
+n_in_endline
+in_endline_not_know_table %>% length()
+in_know_table_not_endline %>% length()
+
+
+endline_know_table_data %>%
+  summarise(
+    n_parent_keys = n_distinct(PARENT_KEY),
+    n_indiv_keys = n_distinct(KEY.individ),
+    n_indiv_keys_know_treat = n_distinct(KEY.individ[!is.na(assigned.treatment)]),
+    n_indiv_keys_know_dewormed = n_distinct(KEY.individ[!is.na(dewormed)])
+  )
+
+endline_data = endline_data %>%
+  mutate(
+    in_know_table = KEY %in% raw_endline_know_table_data$PARENT_KEY
+  )
+
+endline_data %>%
+  group_by(in_know_table, dist.pot.group) %>%
+  summarise(
+    n = n()
   ) %>%
-  filter(
-    in_know_table == TRUE
-  ) 
+  mutate(pct = n / sum(n))
 
-#### Figuring out who's in endline knowledge data
-summ_endline_know_table = endline.know.table.data %>%
+endline_data %>%
+  group_by(in_know_table, assigned.treatment) %>%
+  summarise(
+    n = n()
+  ) %>%
+  mutate(pct = n / sum(n))
+
+endline_data %>%
+  group_by(in_know_table) %>%
+  summarise(
+    n = n(),
+    n_monitored_consent = sum(monitor.consent == "yes", na.rm = TRUE),
+    n_monitored = sum(monitored, na.rm = TRUE),
+    n_reconsent = sum(reconsent),
+  )
+
+
+summ_endline_know_table = endline_know_table_data %>%
+  filter(!is.na(KEY.individ)) %>%
   group_by(KEY.individ, know.table.type) %>%
   summarise(
     obs_know_person = sum(num.recognized),
@@ -614,14 +720,26 @@ summ_endline_know_table = endline.know.table.data %>%
     knows_other_dewormed_no = sum(fct_match(dewormed, "no"), na.rm = TRUE),
     thinks_other_knows = sum(fct_match(second.order, c("yes", "no")), na.rm = TRUE),
     thinks_other_knows_yes = sum(fct_match(second.order, "yes"), na.rm = TRUE),
-    thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE)
-  )
+    thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE) 
+  ) %>%
+  ungroup()
 summ_know_A_df = summ_endline_know_table %>%
   filter(know.table.type == "table.A") 
 
 summ_know_B_df = summ_endline_know_table %>%
   filter(know.table.type == "table.B")
 
+2686 + 1043
+
+summ_endline_know_table %>%
+  summarise(
+    n_indiv = n_distinct(KEY.individ)
+  )
+
+endline_know_table_data %>%
+  summarise(
+    n_indiv = n_distinct(KEY.individ)
+  )
 
 summ_endline_know_table %>%
   left_join(
@@ -639,12 +757,22 @@ summ_endline_know_table %>%
   ungroup() %>%
   count(sms_status)
 
-all_data %>%
-  select(KEY.individ, sms.treatment.2)
 
-summ_endline_know_table %>%
-  filter(know.table.type == "table.A")  %>%
-  print(n = 100)
+# Saving datasets to csv for debugging purposes - these are the datasets we use
+# for the main analysis, but it's useful to have them in csv format to inspect
+# and share with others more easily.
 
-endline.know.table.data %>%
-  select(KEY.individ)
+all.endline.data %>%
+  write_csv(
+    "temp-data/debug-all-endline-data.csv"
+  )
+
+analysis.data %>%
+  write_csv(
+    "temp-data/debug-analysis-data.csv"
+  )
+
+analysis_data %>%
+  write_csv(
+    "temp-data/analysis-data.csv"
+  )

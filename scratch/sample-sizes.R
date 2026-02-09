@@ -758,3 +758,32 @@ orig_keys = karim_endline_know_table %>%
   pull(KEY.individ)
 
 setdiff(endline_keys, orig_keys)
+
+
+## Endline know data
+orig_endline_know_table <- bind_rows(table.A = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableA.csv")) %>% 
+                                       transmute(num.recognized = recogniseA,
+                                                 dewormed = dewormedA,
+                                                 second.order = order_2ndA,
+                                                 second.order.reason = order_2nd_reason,
+                                                 relationship = relationshipA,
+                                                 relationship.other = relationshipA_other,
+                                                 times.seen = times_seenA,
+                                                 visited = visitedA, 
+                                                 know.other.index = instanceA,
+                                                 PARENT_KEY, KEY),
+                                     table.B = read_csv(file.path("data", "raw-data", "Endline Survey-survey-sec_D-tableB.csv")) %>% 
+                                       transmute(num.recognized = recogniseB,
+                                                 dewormed = dewormedB,
+                                                 dewormed.know.only = dewormedBB,
+                                                 know.other.index = instanceB + 0:9, 
+                                                 know.other.index.2 = know.other.index + 1, 
+                                                 PARENT_KEY, KEY),
+                                     .id = "know.table.type") %>% 
+  mutate(recognized = num.recognized > 0)
+
+
+  orig_endline_know_table %>%
+    summarise(
+      n_indiv = n_distinct(PARENT_KEY)
+    )
