@@ -173,7 +173,7 @@ endline_and_baseline_worm_data %>%
     fully_aware_externalities
   )
 
-externality_data = endline.data %>%
+externality_data = endline_data %>%
     mutate(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
@@ -188,7 +188,6 @@ externality_data = endline.data %>%
       externality_omnibus = fully_aware_externalities | know_worms_infectious
     ) %>%
     select(KEY.individ, cluster.id, externality_omnibus) 
-colnames(baseline.data)
 
 
 
@@ -215,7 +214,7 @@ solo_baseline_data = baseline.data  %>%
         by = c("cluster.id" = "cluster_id")
     )
 
-solo_endline_data = endline.data %>%
+solo_endline_data = endline_data %>%
     transmute(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
@@ -272,11 +271,6 @@ externality_knowledge_df = cov_analysis_data %>%
       by = "KEY.individ"
     ) 
 
-baseline.data  %>%
-  select(KEY.individ, cluster.id, matches("^(praise|stigma)_[^_]+$"))  
-
-baseline.data %>%
-  select(KEY)
 
 
 clean_perception_data = baseline.data %>% 
@@ -625,7 +619,6 @@ disagg_belief_all_df = all_data %>%
       contains("know"), 
       assigned.treatment, 
       sms.treatment,
-      ed_in_endline_flag,
       dist.pot.group, 
       assigned_dist_group,
       cluster.id,
@@ -646,7 +639,6 @@ disagg_belief_all_df = all_data %>%
            assigned_dist_group,
            sms.treatment,
            obs_know_person,
-           ed_in_endline_flag,
            knows_other_dewormed_yes,
            knows_other_dewormed_no,
            doesnt_know_other_dewormed, 
@@ -673,36 +665,6 @@ disagg_belief_all_df = all_data %>%
     mutate(prop = value/obs_know_person) 
 
 
-# Calculating how many people recognize at least one person
-# per sub-sample in our full belief data
-disagg_belief_all_df %>%
-  filter(ed_in_endline_flag == TRUE) %>%
-  group_by(
-    not_mon = is.na(dewormed), 
-    sms.treatment,
-    obs_at_least_1 = obs_know_person > 0
-    ) %>%
-  summarise(
-    n = n_distinct(KEY.individ)
-  ) %>%
-  filter(
-    (not_mon == FALSE & sms.treatment == "reminder.only") |
-    (not_mon == FALSE & sms.treatment == "sms.control") |
-    (not_mon == FALSE & sms.treatment == "social.info") |
-    (not_mon == TRUE & sms.treatment == "sms.control")
-  ) %>%
-  pivot_wider(
-    names_from = obs_at_least_1,
-    names_prefix = "obs_at_least_1_",
-    values_from = n
-  ) %>%
-  rename(
-    recognize_0 = obs_at_least_1_FALSE,
-    recognize_someone = obs_at_least_1_TRUE
-  ) 
-
- disagg_belief_all_df = disagg_belief_all_df %>%
-  filter(obs_know_person > 0) 
 
 
 
@@ -1133,7 +1095,7 @@ fob_levels %>%
 
 #### Alternative Regressions ---------------------------------------------------
 ####  Endline Predicted Deworming Takeup
-endline_data_full = endline.data %>%
+endline_data_full = endline_data %>%
   mutate(
     assigned_treatment = as_factor(assigned.treatment), 
     assigned_dist_group = as_factor(dist.pot.group),
@@ -1617,10 +1579,10 @@ pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
 
 #### Travel Time --------------------------------------------------------
 
-endline.data %>%
+endline_data %>%
   count(travel)
 
-  endline.data %>%
+  endline_data %>%
   mutate(
     travel_clean = case_when(
       travel == "1" ~ "walk",
@@ -1637,7 +1599,7 @@ endline.data %>%
       more_robust_pr_walk = mean(str_detect(travel, "1"), na.rm = TRUE)
     )
 
-travel_time_df = endline.data %>%
+travel_time_df = endline_data %>%
   mutate(
     travel = if_else(travel == "99", NA_character_, travel),
   ) %>%
@@ -1735,7 +1697,7 @@ analysis_data %>%
     n_in_far = mean(dist.to.pot >= 1250, na.rm = TRUE)
   )
 
-endline.data = endline.data %>%
+endline_data = endline_data %>%
   mutate(
     travel_clean = case_when(
       travel == "1" ~ "walk",
@@ -1747,26 +1709,26 @@ endline.data = endline.data %>%
   )
 
 
-endline.data %>%
+endline_data %>%
   count(travel_clean) %>%
   mutate(
     pct = 100*n/sum(n)
   )
 
-endline.data %>%
+endline_data %>%
   summarise(
     mean_time_travel = mean(time_travel, na.rm = TRUE),
     median_time_travel = median(time_travel, na.rm = TRUE)
   )
 
 
-endline.data %>%
+endline_data %>%
   summarise(
     frac_pay_0 = mean(travel_pay == 0, na.rm = TRUE),
     mean_pay = mean(travel_pay, na.rm = TRUE)
   )
 
-endline.data %>%
+endline_data %>%
   mutate(
     travel = case_when(
       travel == "1" ~ "walk",
