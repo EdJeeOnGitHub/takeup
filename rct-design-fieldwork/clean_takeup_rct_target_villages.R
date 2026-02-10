@@ -105,8 +105,7 @@ rct.cluster.selection %<>% left_join(cluster.survey.data %>%
                                                       dist.switchable = any(dist.switchable)) %>%
                                             ungroup,
                                           by = "cluster.id") %>%
-  left_join(rct.schools.data %>%
-              st_drop_geometry() %>%
+  left_join(rct.targetable.schools %>%
               filter(selected.targeted) %>%
               select(pot.cluster.id, village.dist.cat, cluster.dist.cat),
             by = c("cluster.id" = "pot.cluster.id"))
@@ -134,7 +133,7 @@ rct.villages <- cluster.survey.data %>%
   ungroup
 
 # write_rds(rct.villages, "rct_target_villages_2.0.rds")
-rct.villages <- read_rds("rct_target_villages_2.0.rds")
+rct.villages <- read_rds(file.path(raw_data_path, "rct_target_villages_2.0.rds"))
 
 unused.villages <- cluster.survey.data %>% anti_join(rct.villages, by = c("cluster.id", "target.village.id"))
 
@@ -198,7 +197,7 @@ write.rct.village.info <- function(.data, .file.name) {
 
 }
 
-rct.villages %>% write.rct.village.info("takeup_rct_villages.csv")
+rct.villages %>% write.rct.village.info("REATTEMPTED-takeup_rct_villages.csv")
 
 # Plot RCT clusters and villages ------------------------------------------
 

@@ -1,5 +1,79 @@
 library(tidyverse)
 
+
+orig_cluster_df = read_csv("data/original-cluster-distance-assignment.csv")
+
+
+orig_cluster_df %>%
+  count(village.dist.cat)
+
+orig_cluster_df %>%
+  count(cluster.dist.cat) 
+
+orig_cluster_df %>%
+  count(cluster.dist.cat, village.dist.cat) 
+
+orig_cluster_df %>%
+  count(cluster.dist.cat, village.dist.cat) %>%
+  group_by(village.dist.cat) %>%
+  mutate(
+    total_cat = sum(n)
+  )
+
+analysis.data %>%
+  left_join(
+    orig_cluster_df,
+    by = c("cluster.id" = "pot.cluster.id")
+  ) %>%
+  group_by(
+    dist.pot.group, village.dist.cat
+  ) %>%
+  summarise(
+    n_cluster = n_distinct(cluster.id)
+  )
+
+analysis.data %>%
+  colnames()
+
+80 - 6
+78 - 8
+
+analysis.data %>%
+  group_by(dist.pot.group) %>%
+  summarise(
+    n_cluster = n_distinct(cluster.id)
+  )
+
+
+ana_cluster_df = analysis.data %>%
+  group_by(cluster.id) %>%
+  summarise(
+    dist.pot.group = unique(dist.pot.group)
+  )
+
+
+orig_cluster_df %>%
+  left_join(
+    ana_cluster_df %>%
+      select(cluster.id, ana_dist.pot.group = dist.pot.group)  %>% 
+      mutate(in_ana_df = TRUE),
+    by = c("pot.cluster.id" = "cluster.id")
+  ) %>%
+  filter(is.na(in_ana_df)) 
+
+ana_cluster_df %>%
+  select(cluster.id, ana_dist.pot.group = dist.pot.group) %>%
+
+
+setdiff(
+orig_cluster_df %>%
+  pull(pot.cluster.id),
+ana_cluster_df %>%
+  pull(cluster.id)
+)
+
+
+
 source("analysis_util.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
 source("dist_structural_util.R")

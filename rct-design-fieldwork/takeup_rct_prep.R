@@ -398,22 +398,14 @@ targetable.schools <- rct.schools.data %>%
   spTransform(kenya.proj4) %>% 
   magrittr::extract(drop(!gWithin(., sp.exclude, byid = TRUE)), )
 
-# prof <- lineprof::lineprof(xx <- get.rct.clusters(rct.schools.data, rct.areas, rct.schools.data,
-#                    num.clusters = c(control.ink = 75, bracelet.airtime = 75),
-#                    ca.outer.radius = c(control.ink = 2500, bracelet.airtime = 4000),
-#                    # ca.outer.radius = c(control.ink = 2500, bracelet = 4000, airtime = 4000),
-#                    ca.inner.radius = 2500, # c(control.ink = 2500, bracelet = 2500, airtime = 2500),
-#                    cluster.group.order = "random",
-#                    cluster.size.tester = generate.cluster.pop.area.tester(),
-#                    plot.rct.clusters = FALSE))
 
+## ED: Here, RCT clusters are selected
 zz7 <- foreach(simul.id = 1:10, .errorhandling = "remove") %dopar% {
   school.buffer.radius <- 1000
   min.area.frac <- 0.6
   school.area <- pi * (school.buffer.radius^2)
   
   rct.clusters <- get.rct.clusters(rct.schools.data, NULL, rct.schools.data,
-  # rct.clusters <- get.rct.clusters(rct.health.facilities, NULL, rct.schools.data, 
                    num.clusters = c(control.ink = 79, bracelet.airtime = 79),
                    ca.outer.radius = c(control.ink = 3000, bracelet.airtime = 4000), 
                    ca.inner.radius = 2500, 
@@ -429,24 +421,16 @@ zz7 <- foreach(simul.id = 1:10, .errorhandling = "remove") %dopar% {
   
 }
 
-# names(zz4) <- 1:10
-# cdc.data <- ldply(.data = zz4, .id = "simul.id", .fun = . %>% get.cluster.villages.data %>% group_by(pot.cluster.id, cluster.group) %>% summarize(cdc = first(cluster.dist.cat)) %>% count(cluster.group, cdc))
-# 
-# cdc.data %>% 
-#   group_by(simul.id, cluster.group) %>% 
-#   mutate(bal.limit = ceiling(sum(n)/2)) %>% 
-#   ungroup %>% 
-#   filter(cdc != "mixed") %>% 
-#   group_by(simul.id) %>% 
-#   summarize(balanced = all(n <= bal.limit))
-
-# zz.plots <- zz4[1:4] %>% purrr::map(~ ggplot.clusters(., pilot.locations = pilot.loc.data)) 
-
 # RCT Assignment ----------------------------------------------------------
-
 rct.cluster.selection <- read_rds("data/rct_cluster_selection_2.0.rds")
+# ED: Here, distance group is randomized. Clusters categorized as "mixed" are
+# randomized into "far" and "close" distance groups. Then, one school is
+# selected from each cluster that falls into the same distance category as the
+# cluster. This is the school that will be targeted for the RCT intervention.
 
+# Classify close/far/mixed
 rct.targetable.schools <- get.cluster.villages.data(rct.cluster.selection) %>% 
+# randomize mixed into close/far targeting 50/50 within cluster groups
   left_join(distinct(., pot.cluster.id) %>% 
               select(-c(targeted.cluster.id, village.dist.cat, dist)) %>% 
               left_join(count(., cluster.group, cluster.dist.cat) %>% 
@@ -460,6 +444,7 @@ rct.targetable.schools <- get.cluster.villages.data(rct.cluster.selection) %>%
                                                 cluster.dist.cat, 
                                                 sample(c(rep("far", first(alloc.far)), rep("close", first(alloc.close)))))) %>% 
               select(pot.cluster.id, assigned.dist.cat)) %>% 
+# sample and assign an anchor school from the same distance category as the cluster
   left_join(filter(., village.dist.cat == assigned.dist.cat) %>% 
               group_by(pot.cluster.id) %>% 
               sample_n(1) %>% 

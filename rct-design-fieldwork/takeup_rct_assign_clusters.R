@@ -388,7 +388,8 @@ get.cluster.villages.data <- function(rct.clusters, school.buffer.radius = 1000,
   school.area <- pi * (school.buffer.radius^2)
   
   all.rct.clusters <- gUnaryUnion(rct.clusters)
-  
+  # By default the rct.clusters are 2.5km buffers (after chunks for overlap taken out) 
+  # subset to schools within these buffers.
   schools.within <- .rct.schools.data %>% 
     spTransform(CRS(kenya.proj4)) %>% 
     gWithin(rct.clusters, byid = TRUE) %>% 
