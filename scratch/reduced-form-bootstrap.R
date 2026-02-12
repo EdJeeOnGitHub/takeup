@@ -505,25 +505,7 @@ hh_spec_output = wrapper_function(
 
 #### Beliefs -------------------------------------------------------------------
 
-endline.know.table.data %>%
-  count(relationship)
-
-
-endline.know.table.data %>%
-  filter(fct_match(know.table.type, "table.A"))  %>%
-  filter(num.recognized > 0) %>%
-  group_by(
-    relationship,
-    dewormed
-  ) %>%
-  count() %>%
-  pivot_wider(
-    names_from = dewormed,
-    values_from = n,
-    values_fill = 0
-  )
-
-endline.know.table.data %>%
+endline_know_table_data %>%
   filter(fct_match(know.table.type, "table.A"))  %>%
   filter(num.recognized > 0) %>%
   group_by(
@@ -578,23 +560,12 @@ endline.know.table.data %>%
     )
 
 
-
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   left_join(
     summ_know_A_df, by = "KEY.individ"
   ) %>%
     filter(obs_know_person > 0)
-
-
-all_data = analysis.data %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
 
 
 
@@ -663,8 +634,6 @@ disagg_belief_all_df = all_data %>%
     )) %>%
     mutate(belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord")) %>%
     mutate(prop = value/obs_know_person) 
-
-
 
 
 
@@ -839,23 +808,8 @@ discrete_fob_full_output = wrapper_function(
 
 not_in_monitored = readRDS("temp-data/not_in_monitored.rds")
 
-clean_endline_extra_df =  endline.know.table.data %>% 
+clean_endline_extra_df = summ_endline_know_table %>%
     filter(fct_match(know.table.type, "table.A")) %>%
-    filter(KEY.individ %in% not_in_monitored)  %>%
-    group_by(KEY.individ) %>%
-    summarise(
-      obs_know_person = sum(num.recognized),
-      obs_know_person_prop = mean(num.recognized),
-      knows_other_dewormed = sum(fct_match(dewormed, c("yes", "no")), na.rm = TRUE),
-      knows_other_dewormed_yes = sum(fct_match(dewormed, "yes"), na.rm = TRUE),
-      knows_other_dewormed_no = sum(fct_match(dewormed, "no"), na.rm = TRUE),
-      thinks_other_knows = sum(fct_match(second.order, c("yes", "no")), na.rm = TRUE),
-      thinks_other_knows_yes = sum(fct_match(second.order, "yes"), na.rm = TRUE),
-      thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE),
-      assigned.treatment = first(assigned.treatment),
-      dist.pot.group = first(dist.pot.group),
-      cluster.id = first(cluster.id)
-    ) %>%
     left_join(
       cluster_expected_dist_df %>%
         mutate(cluster.id = as.numeric(cluster.id)),
