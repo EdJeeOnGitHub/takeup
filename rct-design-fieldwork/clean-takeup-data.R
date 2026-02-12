@@ -11,11 +11,13 @@ load(file.path("data", "analysis.RData"))
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
+analysis.data = analysis.data %>%
+  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+            by = "cluster.id") 
+
 # Only take sms.control HHs
 nosms_data = analysis.data %>% 
   filter(sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
   group_by(cluster.id) %>% 
@@ -26,8 +28,6 @@ nosms_data = analysis.data %>%
 # Only take monitored, no sms HHs
 monitored_nosms_data = analysis.data %>% 
   filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
   group_by(cluster.id) %>% 

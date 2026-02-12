@@ -55,6 +55,7 @@ source("clean-analysis-util.R")
 baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
 endline_data = read_rds("data/clean-data/clean-endline-data.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
+endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
@@ -537,8 +538,6 @@ write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-da
 
 
 all_data = full_analysis_data %>% 
-  left_join(analysis_data %>% transmute(cluster.id = as.numeric(cluster.id), cluster.dist.to.pot) %>% distinct(),
-            by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
   group_by(cluster.id) %>% 

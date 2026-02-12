@@ -5,25 +5,45 @@ library(kableExtra)
 library(knitr)
 library(fixest)
 
-if (interactive()) {
-    params = lst(
-        table_output_path = "presentations/rf-tables/main-specs",
-        show_probs = FALSE,
-        width = 0.95,
-        cache = FALSE,
-        fit = FALSE,
-        stat = "std.error" # "ci", "p", "std.error"
-    )
-    source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-    source(file.path("analysis_util.R"))
-    source(file.path( "dist_structural_util.R"))
-    source(file.path("multilvlr", "multilvlr_util.R"))
-} else {
-    source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-    source(file.path("analysis_util.R"))
-    source(file.path( "dist_structural_util.R"))
-    source(file.path("multilvlr", "multilvlr_util.R"))
-}
+script_options <- docopt::docopt(
+  "Usage:
+  reduced-form-bootstrap.R [options]
+
+Options:
+  --plots              Run NP fit plots section
+  --externality        Run externality knowledge section
+  --takeup             Run takeup regressions + levels section
+  --beliefs            Run beliefs (FOB/SOB) regressions + levels section
+  --endline            Run endline/incentive/preference/travel section
+  --sms                Run SMS heterogeneity section
+  --heterogeneity      Run heterogeneity + WTP section
+  --table-output-path=<path>  Table output path [default: presentations/rf-tables/main-specs]
+  --stat=<stat>        Statistic to show [default: std.error]
+",
+  args = if (interactive()) "
+            --takeup
+  " else commandArgs(trailingOnly = TRUE)
+)
+
+# TODO: Heterogeneity not working (marginaleffects probably changed too much)
+
+run_all <- !any(script_options$plots, script_options$externality, script_options$takeup,
+                script_options$beliefs, script_options$endline, script_options$sms,
+                script_options$heterogeneity)
+
+params <- lst(
+  table_output_path = script_options$table_output_path,
+  show_probs = FALSE,
+  width = 0.95,
+  cache = FALSE,
+  fit = FALSE,
+  stat = script_options$stat
+)
+
+source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
+source(file.path("analysis_util.R"))
+source(file.path("dist_structural_util.R"))
+source(file.path("multilvlr", "multilvlr_util.R"))
 source(file.path("scratch", "reduced-form-setup.R"))
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
@@ -39,6 +59,8 @@ l_cov_vars = c(
 
 
 #### NP Fit Plots -------------------------------------------------------------------
+
+if (run_all || script_options$plots) {
 
 library(ggthemes)
 canva_palette_vibrant = "Primary colors with a vibrant twist"
@@ -118,9 +140,14 @@ ggsave(
   height = 6
 )
 
+} # end plots
+
 
 
 #### Change in Externality Knowledge (Table 13)
+
+if (run_all || script_options$externality) {
+
 # Checking endline vs baseline externality knowledge
 balance_data = read_rds(
   file.path(
@@ -398,8 +425,13 @@ externality_knowledge_output$tidy_summary %>%
   ) %>%
   print(n = 100)
 
+} # end externality
+
 
 #### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
+
+if (run_all || script_options$takeup) {
+
 dist_cts_regression = function(data, weights) {
   feols(
     dewormed ~ 0 + assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, cluster.dist.to.pot, "control")  +  mu_d + .[l_cov_vars] | county, 
@@ -502,8 +534,18 @@ hh_spec_output = wrapper_function(
   table_name = "rf_hh_spec_tbl"
 )
 
+} # end takeup regressions
+
 
 #### Beliefs -------------------------------------------------------------------
+
+if (run_all || script_options$beliefs) {
+
+summ_know_A_df = summ_endline_know_table %>%
+  filter(fct_match(know.table.type, "table.A"))
+
+summ_know_B_df = summ_endline_know_table %>%
+  filter(fct_match(know.table.type, "table.B"))
 
 endline_know_table_data %>%
   filter(fct_match(know.table.type, "table.A"))  %>%
@@ -752,8 +794,6 @@ know_1_all_df = know_all_df  %>%
   mutate(cluster_id = as.numeric(cluster.id)) 
 
 
-know_1_all_df %>%
-  select(cluster_id)
 
 discrete_f_know = function(data, weights) {
   feols(
@@ -808,7 +848,12 @@ discrete_fob_full_output = wrapper_function(
 
 not_in_monitored = readRDS("temp-data/not_in_monitored.rds")
 
+
 clean_endline_extra_df = summ_endline_know_table %>%
+  left_join(
+    endline_data %>%
+      select(KEY.individ, cluster.id, assigned.treatment, dist.pot.group) %>% distinct(), by = "KEY.individ"
+  )  %>%
     filter(fct_match(know.table.type, "table.A")) %>%
     left_join(
       cluster_expected_dist_df %>%
@@ -926,11 +971,16 @@ discrete_sob_output = wrapper_function(
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-sob-tidy-tes.csv"
 )
 
+} # end beliefs regressions
+
 
 
 #### Levels --------------------------------------------------------------------
 
 #### Takeup LEVELS Continuous Distance + LASSO Covs + Expected Distance
+
+if (run_all || script_options$takeup) {
+
 # For plotting
 dist_cts_spec_bs_draws = map_dfr(
   1:500,
@@ -1002,11 +1052,16 @@ tidy_discrete_distance_cov_levels = left_join(
   select(-signal, -seed) %>%
   rename(estimate = mean_pred)
 tidy_discrete_distance_cov_levels %>%
-  write_csv("temp-data/discrete-dist-covs-tidy-levels.csv")  
+  write_csv("temp-data/discrete-dist-covs-tidy-levels.csv")
+
+} # end takeup levels
 
 
 
 #### FOB Levels Discrete Distance + LASSO Covs + Expected Distance
+
+if (run_all || script_options$beliefs) {
+
 fob_bs_draws = map_dfr(
   1:500,
   ~bayes_bs_f(
@@ -1043,11 +1098,16 @@ fob_levels = left_join(
   rename(estimate = mean_pred)
 
 fob_levels %>%
-  write_csv("temp-data/reducedformfob-tidy-levels.csv")  
+  write_csv("temp-data/reducedformfob-tidy-levels.csv")
+
+} # end beliefs levels
 
 
 
 #### Alternative Regressions ---------------------------------------------------
+
+if (run_all || script_options$endline) {
+
 ####  Endline Predicted Deworming Takeup
 endline_data_full = endline_data %>%
   mutate(
@@ -1061,7 +1121,7 @@ endline_data_full = endline_data %>%
     have_ink = ink_visible
   )  %>%
   left_join(
-    analysis.data %>%
+    full_analysis_data %>%
       select(KEY.individ, gender, age.census, cluster.id) %>%
       mutate(female = gender == "female")  %>%
       left_join(
@@ -1245,11 +1305,6 @@ wide_incentive_check_input_df = tidy_incentive_check_df %>%
 
 
 
-n_incentive_df %>%
-  pivot_wider(
-    names_from = variable_type,
-    values_from = n
-  )
 
 wide_incentive_check_input_df = wide_incentive_check_input_df %>%
   bind_rows(
@@ -1293,7 +1348,7 @@ incentive_check_tbl %>%
 
 #### Preference for Gift Fit Not Dewormed ---------------------------------------
 
-pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
+pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
     # 38,019
     filter(!is.na(gift_choice)) %>%
     # 3,676
@@ -1326,7 +1381,7 @@ pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
           by = c("cluster.id" = "cluster.id.x")
       )
 
-  analysis.data  %>%
+  full_analysis_data  %>%
   # 38,019
     filter(!is.na(gift_choice)) %>%
     # 3,676
@@ -1337,7 +1392,7 @@ pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
     filter(dewormed == FALSE)
     # 1,808
 
-  analysis.data  %>%
+  full_analysis_data  %>%
   # 38,019
     filter(!is.na(gift_choice)) %>%
     # 3,676
@@ -1351,7 +1406,7 @@ pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
     # 1,566
 
 
-  analysis.data  %>%
+  full_analysis_data  %>%
   # 38,019
     filter(!is.na(gift_choice)) %>%
     # 3,676
@@ -1382,7 +1437,7 @@ analysis_data %>%
     )  
 
 
-summ_gift_df = analysis.data %>%
+summ_gift_df = full_analysis_data %>%
     filter(!is.na(gift_choice)) %>%
     # 3,676
     filter(monitored) %>%
@@ -1457,8 +1512,6 @@ pref_gift_fit_not_dewormed = analysis_data %>%
           by = "KEY.individ"
       )
 
-pref_gift_fit_not_dewormed %>%
-  count(sms.treatment.2)
 
 
 pref_gift_fit = function(data, weights) {
@@ -1483,9 +1536,6 @@ wrapper_function(
     )
 )
 
-pref_ed$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "cal|bra")) %>%
-  print(n = 100)
 
 
 pref_not_flipped = wrapper_function(
@@ -1508,9 +1558,6 @@ pref_not_flipped$tidy_summary %>%
   print(n = 100)
 
 
-pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "cal|bra")) %>%
-  print(n = 100)
 
 pref_gift_not_dewormed_full_sample_fit = wrapper_function(
   data = pref_gift_fit_not_dewormed_full_sample,
@@ -1704,7 +1751,7 @@ endline_data %>%
     pct_far = 100*far / sum(far, na.rm = TRUE)
   )
 
-
+} # end endline
 
 
 
@@ -1712,10 +1759,14 @@ endline_data %>%
 
 
 #### SMS -----------------------------------------------------------------------
-monitored_sms_data <- analysis.data %>% 
+
+if (run_all || script_options$sms) {
+
+
+stop()
+
+monitored_sms_data <- full_analysis_data %>%
   filter(mon_status == "monitored") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   group_by(cluster.id) %>% 
   mutate(cluster_id = cur_group_id()) %>% 
@@ -2002,7 +2053,12 @@ p_sms_tes = clean_sms_tes %>%
 
 ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
 
+} # end sms
+
 #### Heterogeneity -------------------------------------------------------------
+
+if (run_all || script_options$heterogeneity) {
+
 library(marginaleffects)
 analysis_data = analysis_data %>%
   mutate(cluster.id = as.character(cluster.id)) %>%
@@ -2022,13 +2078,16 @@ analysis_data = analysis_data %>%
       by = "cluster.id"
   )
 
+  analysis_data %>%
+    select(cluster.dist.to.pot)
+
 analysis_data = analysis_data %>%
   mutate(
     age_gt_40 = age.census > 40
   ) %>%
   mutate(treatment = factor(assigned_treatment, levels = c("control", "bracelet", "calendar", "ink"))) 
 
-clean_perception_data = baseline.data %>% 
+clean_perception_data = baseline_data %>% 
   select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
   gather(key = key, value = response, -cluster.id) %>% 
   separate(key, c("praise.stigma", "topic"), "_") %>% 
@@ -2132,7 +2191,8 @@ het_ols = function(data, judge_data) {
       judge_fit = judge_fit,
       phone_fit = phone_fit,
       prevdeworm_fit = prevdeworm_fit,
-      externality_fit = external
+      externality_fit = externality_fit,
+      gender_fit = gender_fit
     ))
 }  
 
@@ -2690,7 +2750,7 @@ het_tbl = het_fits %>%
 
 # WTP Checks
 
-wtp_out = analysis.data %>%
+wtp_out = full_analysis_data %>%
   mutate(stratum = county) %>%
   prepare_bayes_wtp_data(
     wtp.data,
@@ -2705,7 +2765,7 @@ wtp_out = analysis.data %>%
     sigma_wtp_df_student_t = 2.5
   )
 
-analysis.data %>%
+ full_analysis_data %>%
     filter(
            assigned.treatment == "control") %>%
     filter(!is.na(gift_choice)) %>%
@@ -2734,7 +2794,7 @@ analysis.data %>%
       monitored = true.monitored
       ) 
 
-origin_prepared_analysis_data = analysis.data
+origin_prepared_analysis_data = full_analysis_data
 origin_prepared_analysis_data %>%
     filter(!is.na(gift_choice) ,
      gift_choice != "neither",
@@ -2765,3 +2825,5 @@ incentive_choice_data
 
 wtp.data %>%
   select(first_choice, price)
+
+} # end heterogeneity
