@@ -191,7 +191,7 @@ externality_data = endline_data %>%
 
 
 
-solo_baseline_data = baseline.data  %>%
+solo_baseline_data = baseline_data  %>%
     transmute(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
@@ -273,7 +273,7 @@ externality_knowledge_df = cov_analysis_data %>%
 
 
 
-clean_perception_data = baseline.data %>% 
+clean_perception_data = baseline_data %>% 
   select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
   gather(key = key, value = response, -cluster.id) %>% 
   separate(key, c("praise.stigma", "topic"), "_") %>% 
@@ -315,7 +315,7 @@ cluster_perception_data  %>%
   ) 
 
 
-full_externality_knowledge_df = analysis.data  %>%
+full_externality_knowledge_df = full_analysis_data %>%
   mutate(
     female = gender == "female",
     cluster_id = dense_rank(cluster.id)

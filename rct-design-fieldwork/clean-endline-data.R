@@ -331,3 +331,9 @@ endline_data %>%
 
 summ_endline_know_table %>%
     write_csv("data/clean-data/clean-endline-know-table-data.csv")
+
+endline_data %>%
+    write_rds("data/clean-data/clean-endline-data.rds")
+
+summ_endline_know_table %>%
+    write_rds("data/clean-data/clean-endline-know-table-data.rds")

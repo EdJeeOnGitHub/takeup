@@ -88,3 +88,7 @@ cat("Complete data on ", n_complete, " individuals in baseline survey\n")
 write_csv(
   reclean_baseline_data,
   "data/clean-data/clean-baseline-data.csv")
+
+write_rds(
+  reclean_baseline_data,
+  "data/clean-data/clean-baseline-data.rds")

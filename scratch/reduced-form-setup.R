@@ -46,47 +46,26 @@ rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
 rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
 cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
 load(file.path("data", "takeup_village_pot_dist.RData"))
-load(file.path("data", "analysis.RData"))
+# load(file.path("data", "analysis.RData"))
 library(here)
 source("clean-analysis-util.R")
 
 
 
-baseline_data = read_csv("data/clean-data/clean-baseline-data.csv")
-endline_data = read_csv("data/clean-data/clean-endline-data.csv")
-summ_endline_know_table = read_csv("data/clean-data/clean-endline-know-table-data.csv")
+baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
+endline_data = read_rds("data/clean-data/clean-endline-data.rds")
+summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
+analysis_data = read_rds("data/clean-data/monitored-nosms-takeup-data.rds") 
+full_analysis_data = read_rds("data/clean-data/full-takeup-data.rds")
 
-
-# Only take sms.control HHs
-nosms_data <- analysis.data %>% 
-  filter(sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
-
-# Only take monitored, no sms HHs
-monitored_nosms_data <- analysis.data %>% 
-  filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
-# main analysis sample
-analysis_data <- monitored_nosms_data
-
+# Save cluster distance sd in case we need to unstandardize - two variables 
+# as there are two different naming conventions in use
+sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
+dist_sd = sd(analysis_data$cluster.dist.to.pot)
 
 # Save cluster distance sd in case we need to unstandardize - two variables 
 # as there are two different naming conventions in use
@@ -249,7 +228,7 @@ clean_takeup_variables = function(data) {
 
 
 ## Cleaning baseline worm covariates
-baseline_worm = baseline.data %>%
+baseline_worm = baseline_data %>%
   clean_worm_covariates()
 ## Cleaning up analysis data
 analysis_data = analysis_data %>%
@@ -266,7 +245,7 @@ cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rd
   select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
   unique()
 
-pretreat_data = clean_pretreat_covariates(baseline.data, endline_data) %>%
+pretreat_data = clean_pretreat_covariates(baseline_data, endline_data) %>%
   left_join(cluster_treat_df, by = "cluster.id") %>%
   filter(!is.na(treat_dist))
 
@@ -292,8 +271,8 @@ baseline_worm_data = baseline_worm %>%
   filter(!is.na(treat_dist))
 
 # monitoring checks
-sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv")
-sens_imp_hh_df = read_csv("data/raw-data/Sensitization Monitoring Form-household.csv")
+sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv", guess_max = 10000)
+sens_imp_hh_df = read_csv("data/raw-data/Sensitization Monitoring Form-household.csv", guess_max = 10000)
 
 # not sure what this does - inherited from KN
 unique_hh_message_df = sens_imp_hh_df %>%
@@ -557,9 +536,8 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
 write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-data.csv")
 
 
-
-all_data = analysis.data %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+all_data = full_analysis_data %>% 
+  left_join(analysis_data %>% transmute(cluster.id = as.numeric(cluster.id), cluster.dist.to.pot) %>% distinct(),
             by = "cluster.id") %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
@@ -573,17 +551,17 @@ all_data = analysis.data %>%
 # for the main analysis, but it's useful to have them in csv format to inspect
 # and share with others more easily.
 
-all.endline.data %>%
-  write_csv(
-    "temp-data/debug-all-endline-data.csv"
-  )
+# all.endline.data %>%
+#   write_csv(
+#     "temp-data/debug-all-endline-data.csv"
+#   )
 
-analysis.data %>%
-  write_csv(
-    "temp-data/debug-analysis-data.csv"
-  )
+# analysis.data %>%
+#   write_csv(
+#     "temp-data/debug-analysis-data.csv"
+#   )
 
-analysis_data %>%
-  write_csv(
-    "temp-data/analysis-data.csv"
-  )
+# analysis_data %>%
+#   write_csv(
+#     "temp-data/analysis-data.csv"
+#   )

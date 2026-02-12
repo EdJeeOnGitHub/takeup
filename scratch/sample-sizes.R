@@ -1,5 +1,14 @@
 library(tidyverse)
+source("analysis_util.R")
+source(file.path("multilvlr", "multilvlr_util.R"))
+source("dist_structural_util.R")
+# Data --------------------------------------------------------------------
+load(file.path("data", "analysis.RData"))
 
+colnames(analysis.data)
+analysis.data %>%
+  filter(cluster.id == 169)   %>%
+    select(contains("dist"))
 
 orig_cluster_df = read_csv("data/original-cluster-distance-assignment.csv")
 
@@ -30,7 +39,9 @@ analysis.data %>%
   ) %>%
   summarise(
     n_cluster = n_distinct(cluster.id)
-  )
+  ) %>%
+  group_by(dist.pot.group) %>%
+  mutate(n_total = sum(n_cluster)) 
 
 analysis.data %>%
   colnames()
@@ -74,11 +85,6 @@ ana_cluster_df %>%
 
 
 
-source("analysis_util.R")
-source(file.path("multilvlr", "multilvlr_util.R"))
-source("dist_structural_util.R")
-# Data --------------------------------------------------------------------
-load(file.path("data", "analysis.RData"))
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
