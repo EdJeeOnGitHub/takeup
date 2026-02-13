@@ -817,16 +817,126 @@ discrete_pct_yesnodk_output = wrapper_function(
 )
 
 
-discrete_pct_yesno_output$tidy_summary %>%
-  mutate(across(where(is.numeric), ~round(., 3))) %>%
-  print(n = Inf)
+panel_a_tex_path = file.path(
+  script_options$table_output_path,
+  "rf_discrete_fob_spec_tbl.tex"
+)
 
+panel_b_tex_path = file.path(
+  script_options$table_output_path,
+  "rf_discrete_pct_yesno_spec_tbl.tex"
+)
 
+panel_c_tex_path = file.path(
+  script_options$table_output_path,
+  "rf_discrete_pct_yesnodk_spec_tbl.tex"
+)
 
-discrete_pct_yesnodk_output$tidy_summary %>%
-  mutate(across(where(is.numeric), ~round(., 3))) %>%
-  print(n = Inf)
-# TODO: Put these all in one table
+#' Combine multiple .tex panel tables into a single table with Panel A/B/C headers.
+#'
+#' @param panel_paths Named character vector of .tex file paths. Names become
+#'   panel titles (e.g., "Panel A: Observability").
+#' @param output_path Path to write the combined .tex file.
+#' @param notes Optional character string of table notes (placed inside a
+#'   threeparttable tablenotes environment). NULL for no notes.
+#' @return Invisibly returns the combined tex lines.
+combine_panel_tables <- function(panel_paths, output_path, notes = NULL,
+                                 drop_rows = NULL, replacements = NULL) {
+
+  # Read all panels
+  panels <- lapply(panel_paths, readLines)
+
+  # Helper: extract body lines between first \midrule and \bottomrule
+  extract_body <- function(lines) {
+    midrule_idx <- which(grepl("^\\\\midrule", lines))
+    bottomrule_idx <- which(grepl("^\\\\bottomrule", lines))
+    stopifnot(length(midrule_idx) >= 1, length(bottomrule_idx) >= 1)
+    # Body is everything from the first \midrule to just before \bottomrule
+    lines[midrule_idx[1]:max(bottomrule_idx - 1)]
+  }
+
+  # Count columns from the first panel's tabular spec
+  first_panel <- panels[[1]]
+  tabular_line <- first_panel[grep("\\\\begin\\{tabular\\}", first_panel)[1]]
+  # Count 'c' and 'l' in the column spec to get number of columns
+  col_spec <- regmatches(tabular_line, regexpr("\\{[lcr]+\\}", tabular_line))
+  n_cols <- nchar(gsub("[^lcr]", "", col_spec))
+
+  # Build the header from the first panel (everything up to and excluding the
+  # first \midrule), but remove the "Dependent variable:" row
+  header_end <- which(grepl("^\\\\midrule", first_panel))[1] - 1
+  header_lines <- first_panel[1:header_end]
+  header_lines <- header_lines[!grepl("^Dependent variable:", header_lines)]
+
+  # Build combined output
+  out <- header_lines
+
+  for (i in seq_along(panels)) {
+    panel_title <- names(panel_paths)[i]
+    body <- extract_body(panels[[i]])
+    # Drop unwanted rows (e.g., |Calendar| - |Bracelet|)
+    if (!is.null(drop_rows)) {
+      body <- body[!grepl(drop_rows, body)]
+    }
+    # Skip only the first \midrule (we add our own before the panel title),
+    # but keep internal \midrules (e.g., between coefficients and statistics)
+    first_midrule <- which(grepl("^\\\\midrule$", body))[1]
+    if (!is.na(first_midrule)) {
+      body <- body[-first_midrule]
+    }
+    # Apply text replacements
+    if (!is.null(replacements)) {
+      for (j in seq_along(replacements)) {
+        body <- gsub(names(replacements)[j], replacements[[j]], body)
+      }
+    }
+    # Panel title row spanning all columns
+    out <- c(out,
+      sprintf("\\midrule"),
+      sprintf("\\multicolumn{%d}{l}{\\textit{%s}} \\\\", n_cols, panel_title),
+      body
+    )
+  }
+
+  out <- c(out, "\\bottomrule")
+
+  # Close tabular
+  out <- c(out, "\\end{tabular}}")
+
+  # Wrap in threeparttable if notes are provided
+  if (!is.null(notes)) {
+    out <- c(
+      "\\begin{threeparttable}",
+      out,
+      "\\begin{tablenotes}[flushleft]",
+      "\\small",
+      sprintf("\\item \\textit{Notes:} %s", notes),
+      "\\end{tablenotes}",
+      "\\end{threeparttable}"
+    )
+  }
+
+  writeLines(out, output_path)
+  message("Combined panel table written to: ", output_path)
+  invisible(out)
+}
+
+# Combine the three belief decomposition panels
+combine_panel_tables(
+  panel_paths = c(
+    "Panel A: Definite-answer rate (Table 1 observability)" = panel_a_tex_path,
+    "Panel B: Conditional accuracy (given definite answer)" = panel_b_tex_path,
+    "Panel C: Correct observability" = panel_c_tex_path
+  ),
+  output_path = file.path(
+    script_options$table_output_path,
+    "rf_discrete_belief_decomposition_tbl.tex"
+  ),
+  drop_rows = "\\$\\|Calendar\\|",
+  replacements = c("^Control " = "Control mean ")
+)
+
+# TODO: Use full endline sample, not just analysis sample here.
 stop()
 
 #### Checking using full sample (SMS + non-monitored) doesn't change results
