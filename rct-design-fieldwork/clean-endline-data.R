@@ -296,6 +296,26 @@ endline_data = endline_data %>%
 
 summ_endline_know_table = endline_know_table_data %>%
   filter(!is.na(KEY.individ)) %>%
+  mutate(
+    # convert table A first person (as only 1 in table A) to yes/no
+    actual_other_dewormed_1_lgl = case_when(
+      actual.other.dewormed.any.1 == TRUE ~ "yes",
+      actual.other.dewormed.any.1 == FALSE ~ "no",
+      TRUE ~ NA_character_
+    ),
+    # if "don't know", set to NA, otherwise check if classification matches actual deworming status of other person
+    correct_classification_yesno = case_when(
+      dewormed == "don't know" ~ NA,
+      dewormed != "don't know" ~ (actual_other_dewormed_1_lgl == dewormed),
+      TRUE ~ NA
+    ),
+    # if "don't know", set to FALSE, otherwise check if classification matches actual deworming status of other person
+    correct_classification_yesnodk = case_when(
+      dewormed == "don't know" ~ FALSE,
+      dewormed != "don't know" ~ (actual_other_dewormed_1_lgl == dewormed),
+      TRUE ~ NA
+    )
+    ) %>%
   group_by(KEY.individ, know.table.type) %>%
   summarise(
     obs_know_person = sum(num.recognized),
@@ -305,9 +325,13 @@ summ_endline_know_table = endline_know_table_data %>%
     knows_other_dewormed_no = sum(fct_match(dewormed, "no"), na.rm = TRUE),
     thinks_other_knows = sum(fct_match(second.order, c("yes", "no")), na.rm = TRUE),
     thinks_other_knows_yes = sum(fct_match(second.order, "yes"), na.rm = TRUE),
-    thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE) 
+    thinks_other_knows_no = sum(fct_match(second.order, "no"), na.rm = TRUE),
+    pct_correct_classification_yesno = mean(correct_classification_yesno, na.rm = TRUE),
+    pct_correct_classification_yesnodk = mean(correct_classification_yesnodk, na.rm = TRUE)
   ) %>%
   ungroup()
+
+
 summ_know_A_df = summ_endline_know_table %>%
   filter(know.table.type == "table.A") 
 

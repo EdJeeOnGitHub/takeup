@@ -234,6 +234,7 @@ baseline_worm = baseline_data %>%
 ## Cleaning up analysis data
 analysis_data = analysis_data %>%
   clean_takeup_variables()
+
 ## Getting cluster treatment assignment
 cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))  %>%
   mutate(
@@ -542,7 +543,8 @@ all_data = full_analysis_data %>%
   mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
   group_by(cluster.id) %>% 
   mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
+  ungroup() %>%
+  clean_takeup_variables()
 
 
 

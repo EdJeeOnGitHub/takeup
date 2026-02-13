@@ -540,7 +540,6 @@ hh_spec_output = wrapper_function(
 #### Beliefs -------------------------------------------------------------------
 
 if (run_all || script_options$beliefs) {
-  stop()
 
 summ_know_A_df = summ_endline_know_table %>%
   filter(fct_match(know.table.type, "table.A"))
@@ -661,6 +660,48 @@ belief_shared_vars = c(
   "standard_cluster.dist.to.pot", "dist.to.pot", "county", "dewormed"
 )
 
+
+endline_data %>%
+  count(dewormed.reported, true.monitored)
+
+# joining covariates onto endline_data
+endline_data = endline_data %>%
+  left_join(
+    all_data %>%
+      select(KEY.individ, all_of(l_cov_vars)),
+    by = "KEY.individ"
+  ) %>%
+  # Adding cluster level covariates
+  left_join(
+    cov_analysis_data %>%
+      select(cluster.id.x, mu_d, standard_clust_expected_dist, standard_cluster.dist.to.pot) %>%
+      mutate(cluster.id = as.numeric(cluster.id.x)) %>%
+      unique(),
+    by = "cluster.id"
+  )
+
+  
+# Used for Conditional accuracy and Correct observability
+endline_belief_df = endline_data %>%
+  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
+  inner_join(summ_know_A_df, by = "KEY.individ") %>%
+  select(any_of(belief_shared_vars), sms.treatment, dist.pot.group, assigned_treatment, assigned_dist_group,
+         all_of(l_cov_vars), 
+         standard_cluster.dist.to.pot,
+         standard_clust_expected_dist, contains("know"), contains("pct"), mu_d)  %>%
+  mutate(cluster_id = cluster.id)
+
+
+# IDs in summ_know_A_df that aren't in endline_data
+anti_join(summ_know_A_df, endline_data, by = "KEY.individ") %>%
+  pull(KEY.individ)  %>% unique() %>% length()
+
+# IDs in endline_data that aren't in summ_know_A_df
+anti_join(endline_data, summ_know_A_df, by = "KEY.individ") %>%
+  pull(KEY.individ)  %>% unique() %>% length()
+
+
+
 disagg_belief_all_df = all_data %>%
   mutate(female = gender == "female") %>%
   left_join(
@@ -685,7 +726,6 @@ disagg_base_belief_data = cov_analysis_data %>%
   disaggregate_beliefs()
 
 know_df = disagg_base_belief_data %>% make_know_df()
-
 know_all_df = disagg_belief_all_df %>% make_know_df()
 
 
@@ -699,6 +739,22 @@ know_1_all_df = know_all_df  %>%
   filter(belief_type == "1ord") %>%
   mutate(cluster_id = as.numeric(cluster.id)) 
 
+
+discrete_pct_yesno = function(data, weights) {
+  feols(
+    pct_correct_classification_yesno ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + .[l_cov_vars] +  mu_d | county,
+    data = data,
+    weights = weights
+  )
+}
+
+discrete_pct_yesnodk = function(data, weights) {
+  feols(
+    pct_correct_classification_yesnodk ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + .[l_cov_vars] +  mu_d | county,
+    data = data,
+    weights = weights
+  )
+}
 
 
 discrete_f_know = function(data, weights) {
@@ -737,6 +793,41 @@ discrete_fob_output = wrapper_function(
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
 )
+
+
+discrete_pct_yesno_output = wrapper_function(
+  data = endline_belief_df,
+  regression_spec = discrete_pct_yesno,
+  table_options = list(
+    dependent_var = "Dependent variable: Conditional accuracy (Yes/No)"
+  ),
+  table_name = "rf_discrete_pct_yesno_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-pct-yesno-tidy-tes.csv"
+)
+
+
+discrete_pct_yesnodk_output = wrapper_function(
+  data = endline_belief_df,
+  regression_spec = discrete_pct_yesnodk,
+  table_options = list(
+    dependent_var = "Dependent variable: Conditional accuracy (Yes/No/Don't Know)"
+  ),
+  table_name = "rf_discrete_pct_yesnodk_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-pct-yesnodk-tidy-tes.csv"
+)
+
+
+discrete_pct_yesno_output$tidy_summary %>%
+  mutate(across(where(is.numeric), ~round(., 3))) %>%
+  print(n = Inf)
+
+
+
+discrete_pct_yesnodk_output$tidy_summary %>%
+  mutate(across(where(is.numeric), ~round(., 3))) %>%
+  print(n = Inf)
+# TODO: Put these all in one table
+stop()
 
 #### Checking using full sample (SMS + non-monitored) doesn't change results
 
