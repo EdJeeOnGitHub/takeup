@@ -995,7 +995,7 @@ analysis_data %>%
     aes(
     # color = dist.pot.group, 
     fill = dist.pot.group),
-               data = mutate(village.centers, assigned.treatment = fct_relabel(assigned.treatment, str_to_title))) +
+    data = mutate(village.centers, assigned.treatment = fct_relabel(assigned.treatment, str_to_title))) +
   geom_vline(xintercept = c(1250), linetype = "dashed") +
   labs(y = "Count") +
   scale_x_continuous("Distance to Treatment Location (meters)", breaks = seq(0, 10000, 2500/4)) +
