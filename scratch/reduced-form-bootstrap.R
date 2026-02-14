@@ -21,11 +21,10 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-            --beliefs
+            --sms
   " else commandArgs(trailingOnly = TRUE)
 )
-
-# TODO: Heterogeneity not working (marginaleffects probably changed too much)
+# TODO: Fix --sms and --heterogeneity
 
 run_all <- !any(script_options$plots, script_options$externality, script_options$takeup,
                 script_options$beliefs, script_options$endline, script_options$sms,
@@ -697,10 +696,8 @@ anti_join(summ_know_A_df, endline_data, by = "KEY.individ") %>%
   pull(KEY.individ)  %>% unique() %>% length()
 
 # IDs in endline_data that aren't in summ_know_A_df
-anti_join(endline_data, summ_know_A_df, by = "KEY.individ") %>%
+anti_join(endline_data, bind_rows(summ_know_A_df, summ_know_B_df), by = "KEY.individ") %>%
   pull(KEY.individ)  %>% unique() %>% length()
-
-
 
 disagg_belief_all_df = all_data %>%
   mutate(female = gender == "female") %>%
@@ -936,8 +933,6 @@ combine_panel_tables(
   replacements = c("^Control " = "Control mean ")
 )
 
-# TODO: Use full endline sample, not just analysis sample here.
-stop()
 
 #### Checking using full sample (SMS + non-monitored) doesn't change results
 
@@ -1216,7 +1211,7 @@ fob_levels %>%
 if (run_all || script_options$endline) {
 
 ####  Endline Predicted Deworming Takeup
-endline_data_full = endline_data %>%
+endline_data = endline_data %>%
   mutate(
     assigned_treatment = as_factor(assigned.treatment), 
     assigned_dist_group = as_factor(dist.pot.group),
@@ -1241,8 +1236,6 @@ endline_data_full = endline_data %>%
       by = "KEY.individ"
   )
 
-endline_data = endline_data_full %>%
-  filter(true.monitored == TRUE & sms.treatment == "sms.control")
 
 
 pred_dworm_fit = function(data, weights) {
@@ -1267,34 +1260,21 @@ pred_dworm_output = wrapper_function(
     drop_H0s = TRUE
     )
 )
-endline_data_full %>%
-    filter(sms.treatment == "sms.control" & true.monitored == TRUE)
-
-# monitored + non monitored sample - but still SMS control
-pred_dworm_full_output = wrapper_function(
-  data = endline_data_full %>%
-    filter(sms.treatment == "sms.control"),
-  regression_spec = pred_dworm_fit,
-  tidy_summ_path = "temp-data/tidy-rf-tes/predicted-endline-deworm-takeup-full-sample-tidy-tes.csv",
-  table_name = "predicted_endline_deworm_takeup_full_spec_tbl",
-  table_options = list(
-    caption = "Average Treatment Effects: Reduced Form", 
-    dependent_var = "Dependent variable: Predicted Take-up", 
-    type = "APE", 
-    stars = TRUE,
-    drop_H0s = TRUE
-    )
-)
-
-pred_dworm_full_output$tidy_summary %>%
-  print(n = 100)
-
-
-pred_dworm_full_output$tidy_summary  %>%
-  filter(assigned_treatment == "bracelet")
-pred_dworm_output$tidy_summary  %>%
-  filter(assigned_treatment == "bracelet")
-
+# # monitored + non monitored sample - but still SMS control
+# pred_dworm_full_output = wrapper_function(
+#   data = endline_data_full %>%
+#     filter(sms.treatment == "sms.control"),
+#   regression_spec = pred_dworm_fit,
+#   tidy_summ_path = "temp-data/tidy-rf-tes/predicted-endline-deworm-takeup-full-sample-tidy-tes.csv",
+#   table_name = "predicted_endline_deworm_takeup_full_spec_tbl",
+#   table_options = list(
+#     caption = "Average Treatment Effects: Reduced Form", 
+#     dependent_var = "Dependent variable: Predicted Take-up", 
+#     type = "APE", 
+#     stars = TRUE,
+#     drop_H0s = TRUE
+#     )
+# )
 
 #### Incentive Implementation --------------------------------------------------
 
@@ -1455,6 +1435,7 @@ incentive_check_tbl %>%
 
 #### Preference for Gift Fit Not Dewormed ---------------------------------------
 
+# TODO check this sample
 pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
     # 38,019
     filter(!is.na(gift_choice)) %>%
@@ -1868,42 +1849,6 @@ endline_data %>%
 #### SMS -----------------------------------------------------------------------
 
 if (run_all || script_options$sms) {
-
-
-stop()
-
-monitored_sms_data <- full_analysis_data %>%
-  filter(mon_status == "monitored") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
-
-
-
-
-sms_analysis_data <- monitored_sms_data %>% 
-    mutate(
-    assigned_treatment = assigned.treatment, 
-    assigned_dist_group = dist.pot.group, 
-    sms_treatment = sms.treatment.2, 
-    phone_owner = if_else(phone_owner == TRUE, "phone", "nophone"), 
-    sms_treatment = str_replace_all(sms_treatment, "\\.", "")) %>%
-    # reminder.only only present in control condition
-    filter(phone_owner == "phone") %>%
-    mutate(sms_treatment = factor(sms_treatment)) %>%
-    mutate(
-        county = factor(county),
-        cluster.id = factor(cluster.id),
-        assigned_treatment = assigned.treatment,
-        assigned_dist_group = dist.pot.group,
-        signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
-        signal = factor(signal, levels = c("no signal", "signal"))
-    )
-
-
-
 
 
 f_sms = function(data, weights) {

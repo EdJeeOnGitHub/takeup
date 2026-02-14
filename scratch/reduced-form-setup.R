@@ -50,18 +50,70 @@ load(file.path("data", "takeup_village_pot_dist.RData"))
 library(here)
 source("clean-analysis-util.R")
 
+standardize <- as_mapper(~ (.) / sd(.))
+unstandardize <- function(standardized, original) standardized * sd(original)
 
-
+# Load datasets
 baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
 endline_data = read_rds("data/clean-data/clean-endline-data.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
 
-standardize <- as_mapper(~ (.) / sd(.))
-unstandardize <- function(standardized, original) standardized * sd(original)
-
 analysis_data = read_rds("data/clean-data/monitored-nosms-takeup-data.rds") 
 full_analysis_data = read_rds("data/clean-data/full-takeup-data.rds")
+
+# Subset to main analysis sample
+# baseline data is easy - 1,995 in baseline
+baseline_data = baseline_data
+
+# endline data, subset to those with SMS control - 2,659 individuals
+endline_data = endline_data %>%
+  filter(sms.treatment == "sms.control")
+
+
+# SMS sample
+monitored_sms_data = full_analysis_data %>%
+  filter(mon_status == "monitored") %>% 
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
+  group_by(cluster.id) %>% 
+  mutate(cluster_id = cur_group_id()) %>% 
+  ungroup()
+
+
+sms_control_df = monitored_sms_data %>%
+  filter(sms.treatment == "sms.control") %>%
+  filter(!is.na(cluster.id)) %>%
+  filter(have_phone == "Yes") %>%
+  filter(sms.ctrl.sample.order == 1) 
+
+sms_treat_df = monitored_sms_data %>%
+  filter(sms.treatment != "sms.control") %>%
+  filter(!is.na(sms.treatment)) %>%
+  filter(!is.na(cluster.id)) %>%
+  filter(have_phone == "Yes")  %>%
+  filter(sms.consent == TRUE)
+
+
+sms_analysis_data = bind_rows(
+  sms_control_df, sms_treat_df
+) %>%
+  mutate(
+    assigned_treatment = assigned.treatment, 
+    assigned_dist_group = dist.pot.group, 
+    sms_treatment = sms.treatment.2, 
+    phone_owner = if_else(phone_owner == TRUE, "phone", "nophone"), 
+    sms_treatment = str_replace_all(sms_treatment, "\\.", "")
+  ) %>%
+    mutate(sms_treatment = factor(sms_treatment)) %>%
+    mutate(
+        county = factor(county),
+        cluster.id = factor(cluster.id),
+        assigned_treatment = assigned.treatment,
+        assigned_dist_group = dist.pot.group,
+        signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+        signal = factor(signal, levels = c("no signal", "signal"))
+    )
+
 
 # Save cluster distance sd in case we need to unstandardize - two variables 
 # as there are two different naming conventions in use
