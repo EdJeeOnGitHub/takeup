@@ -21,7 +21,7 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-            --sms
+   --sms
   " else commandArgs(trailingOnly = TRUE)
 )
 # TODO: Fix --sms and --heterogeneity
@@ -29,6 +29,35 @@ Options:
 run_all <- !any(script_options$plots, script_options$externality, script_options$takeup,
                 script_options$beliefs, script_options$endline, script_options$sms,
                 script_options$heterogeneity)
+
+tex_postprocessing = function(tex) {
+    tex %>%
+        str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
+        str_remove("\\\\end\\{table\\}") %>%
+        str_replace(
+          .,
+          "Covariate",
+          "\\\\midrule Covariate"
+        )
+}
+# Prefix all messages/output with current section and report errors
+current_section <- "(setup)"
+section_message <- function(...) message(sprintf("[%s] %s", current_section, paste0(...)))
+run_section <- function(name, expr) {
+  current_section <<- name
+  section_message("Starting")
+  tryCatch(
+    {
+      result <- force(expr)
+      section_message("Done")
+      invisible(result)
+    },
+    error = function(e) {
+      section_message("ERROR: ", conditionMessage(e))
+      stop(sprintf("[%s] %s", name, conditionMessage(e)), call. = FALSE)
+    }
+  )
+}
 
 params <- lst(
   table_output_path = script_options$table_output_path,
@@ -59,7 +88,7 @@ l_cov_vars = c(
 
 #### NP Fit Plots -------------------------------------------------------------------
 
-if (run_all || script_options$plots) {
+if (run_all || script_options$plots) run_section("NP Fit Plots", {
 
 library(ggthemes)
 canva_palette_vibrant = "Primary colors with a vibrant twist"
@@ -139,65 +168,13 @@ ggsave(
   height = 6
 )
 
-} # end plots
+}) # end plots
 
 
 
 #### Change in Externality Knowledge (Table 13)
 
-if (run_all || script_options$externality) {
-
-# Checking endline vs baseline externality knowledge
-balance_data = read_rds(
-  file.path(
-    "temp-data",
-    "saved_balance_data.rds"
-  )
-)
-
-balance_analysis_data = balance_data$analysis_data
-baseline_worm_data = balance_data$baseline_worm_data
-endline_vars = balance_data$endline_vars
-endline_and_baseline_worm_data = balance_data$endline_and_baseline_worm_data
-pretreat_data = balance_data$pretreat_data
-clean_census_data = balance_data$clean_census_data
-
-endline_and_baseline_worm_data
-
-create_te_table = function(data, var) {
-  data %>%
-  group_by(
-    treat_dist,
-    type
-  ) %>%
-  summarise(
-    mean = mean({{var}}, na.rm = TRUE)
-  ) %>%
-  mutate(
-    treat = str_extract(treat_dist, "(?<=treat\\: )\\w+"),
-    dist = str_extract(treat_dist, "(?<=dist\\: )\\w+"),
-  ) %>%
-  pivot_wider(names_from = type, values_from = mean)  %>%
-  group_by(dist) %>%
-  mutate(
-    baseline_te = baseline - baseline[treat == "control"],
-    endline_te = endline - endline[treat == "control"]
-  ) %>%
-  select(-treat_dist)
-}
-
-
-
-
-endline_and_baseline_worm_data %>%
-  create_te_table(
-    know_worms_infectious
-  )
-
-endline_and_baseline_worm_data %>%
-  create_te_table(
-    fully_aware_externalities
-  )
+if (run_all || script_options$externality) run_section("Externality Knowledge", {
 
 externality_data = endline_data %>%
     mutate(
@@ -211,135 +188,14 @@ externality_data = endline_data %>%
         TRUE ~ FALSE
       ),
       know_worms_infectious = spread_worms == "yes",
-      externality_omnibus = fully_aware_externalities | know_worms_infectious
-    ) %>%
-    select(KEY.individ, cluster.id, externality_omnibus) 
-
-
-
-solo_baseline_data = baseline_data  %>%
-    transmute(
-      fully_aware_externalities = case_when(
-        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-        TRUE ~ FALSE
-      ),
-      know_worms_infectious = spread_worms == "yes",
       externality_omnibus = fully_aware_externalities | know_worms_infectious,
-      cluster.id
-    ) %>%
-    left_join(
-      cov_analysis_data %>%
-        select(
-          standard_cluster.dist.to.pot,
-          assigned_treatment,
-          assigned_dist_group,
-          mu_d,
-          cluster_id
-        ) %>% unique(),
-        by = c("cluster.id" = "cluster_id")
-    )
-
-solo_endline_data = endline_data %>%
-    transmute(
-      fully_aware_externalities = case_when(
-        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
-        TRUE ~ FALSE
-      ),
-      know_worms_infectious = spread_worms == "yes",
-      externality_omnibus = fully_aware_externalities | know_worms_infectious,
-      cluster.id
-    ) %>%
-    left_join(
-      cov_analysis_data %>%
-        select(
-          standard_cluster.dist.to.pot,
-          assigned_treatment,
-          assigned_dist_group,
-          mu_d,
-          cluster.id.x
-        ) %>% unique(),
-        by = c("cluster.id" = "cluster.id.x")
-    )
-
-solo_comp_df = inner_join(
-  solo_endline_data %>%
-    group_by(assigned_treatment, assigned_dist_group) %>%
-    summarise(
-      mean_know_endline = mean(know_worms_infectious, na.rm = TRUE)
-    ),
-  solo_baseline_data %>%
-    group_by(assigned_treatment, assigned_dist_group) %>%
-    summarise(
-      mean_know_baseline = mean(know_worms_infectious, na.rm = TRUE)
-    ),
-    by = c("assigned_treatment", "assigned_dist_group")
-)
-solo_comp_df
-
-
-externality_knowledge_df = cov_analysis_data %>%
-  select(
-    cluster_id, 
-    cluster.id,
-    cluster.id.x,
-    assigned_treatment,
-    assigned_dist_group,
-    mu_d,
-    standard_cluster.dist.to.pot,
-    county,
-    all_of(l_cov_vars),
-    KEY.individ
-    )  %>%
-    inner_join(
-      externality_data %>% select(-cluster.id),
-      by = "KEY.individ"
+      assigned_treatment = assigned.treatment,
+      assigned_dist_group = dist.pot.group
     ) 
+    # select(KEY.individ, cluster.id, externality_omnibus) 
 
 
-
-clean_perception_data = baseline_data %>% 
-  select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
-  gather(key = key, value = response, -cluster.id) %>% 
-  separate(key, c("praise.stigma", "topic"), "_") %>% 
-  separate(topic, c("topic", "question.group"), -2)  %>%
-  filter(!is.na(response))  
-
-cluster_perception_data = clean_perception_data %>%
-  group_by(cluster.id, praise.stigma, topic) %>%
-  summarise(
-    mean_yes = mean(response == "yes", na.rm = TRUE)
-  )   %>%
-  left_join(
-  externality_knowledge_df %>%
-    group_by(cluster.id.x) %>%
-    summarise(
-      mean_externality_knowledge = mean(externality_omnibus, na.rm = TRUE)
-    ),
-    by = c("cluster.id" = "cluster.id.x")
-  )
-
-cluster_perception_data  %>%
-  filter(topic == "dewor") %>%
-  ungroup() %>%
-  mutate(above_median_externality_know = mean_externality_knowledge > median(mean_externality_knowledge, na.rm = TRUE)) %>%
-  feols(
-    mean_yes ~ above_median_externality_know, 
-    data = .,
-    split = ~praise.stigma,
-    vcov = "HC1"
-  ) 
-
-cluster_perception_data  %>%
-  filter(topic == "dewor") %>%
-  feols(
-    mean_yes ~ mean_externality_knowledge, 
-    data = .,
-    split = ~praise.stigma,
-    vcov = "HC1"
-  ) 
-
+externality_knowledge_df = externality_data
 
 full_externality_knowledge_df = full_analysis_data %>%
   mutate(
@@ -372,17 +228,6 @@ full_externality_knowledge_df = full_analysis_data %>%
 
 
 
-full_externality_knowledge_df %>%
-  filter(!is.na(externality_omnibus)) %>%
-  count(true.monitored, sms.treatment.2) %>%
-  mutate(all = sum(n))
-
-
-
-externality_knowledge_df %>% nrow()
-full_externality_knowledge_df %>% nrow()
-
-
 externality_knowledge_regression = function(data, weights) {
   feols(
     externality_omnibus ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d   | county,
@@ -391,6 +236,7 @@ externality_knowledge_regression = function(data, weights) {
     weights = ~wt
   )
 }
+
 
 externality_knowledge_output = wrapper_function(
   data = externality_knowledge_df,
@@ -401,21 +247,6 @@ externality_knowledge_output = wrapper_function(
     dependent_var = "Dependent variable: Externality Knowledge"
   )
 )
-# robustness to including non-monitored individuals in the 
-# externality knowledge regression
-full_externality_knowledge_output = wrapper_function(
-  data = full_externality_knowledge_df %>%
-    filter(sms.treatment.2 == "sms.control"),
-  regression_spec = externality_knowledge_regression,
-  tidy_summ_path = "temp-data/tidy-rf-tes/full-externality-knowledge-tidy-tes.csv",
-  table_name = "rf_full_externality_knowledge_tbl",
-  table_options = list(
-    dependent_var = "Dependent variable: Externality Knowledge"
-  )
-)
-
-full_externality_knowledge_output$tidy_summary %>%
-  print(n = 40)
 
 
 externality_knowledge_output$tidy_summary %>%
@@ -424,12 +255,80 @@ externality_knowledge_output$tidy_summary %>%
   ) %>%
   print(n = 100)
 
-} # end externality
+#### Praise/Stigma by Externality Knowledge
+
+praise_stigma_perception_data = baseline_data %>%
+  select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>%
+  gather(key = key, value = response, -cluster.id) %>%
+  separate(key, c("praise.stigma", "topic"), "_") %>%
+  separate(topic, c("topic", "question.group"), -2) %>%
+  filter(!is.na(response))
+
+cluster_perception_data = praise_stigma_perception_data %>%
+  group_by(cluster.id, praise.stigma, topic) %>%
+  summarise(
+    mean_yes = mean(response == "yes", na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(
+    full_externality_knowledge_df %>%
+      group_by(cluster.id) %>%
+      summarise(
+        mean_externality_knowledge = mean(externality_omnibus, na.rm = TRUE),
+        .groups = "drop"
+      ),
+    by = "cluster.id"
+  )
+
+praise_stigma_by_ext_know_fit = cluster_perception_data %>%
+  filter(topic == "dewor") %>%
+  ungroup() %>%
+  mutate(above_median_externality_know = mean_externality_knowledge > median(mean_externality_knowledge, na.rm = TRUE)) %>%
+  feols(
+    mean_yes ~ above_median_externality_know,
+    data = .,
+    split = ~praise.stigma,
+    vcov = "HC1"
+  )
+
+fitstat_register(
+  "ctrl_mean_ps",
+  function(est) {
+    y = model.matrix(est, type = "lhs")
+    list(mean = mean(y, na.rm = TRUE), sd = sprintf("(%.3f)", sd(y, na.rm = TRUE)))
+  },
+  alias = c("ctrl_mean_ps.mean" = "Dep. var. mean", "ctrl_mean_ps.sd" = ""),
+  subtypes = c("mean", "sd")
+)
+
+etable(
+  praise_stigma_by_ext_know_fit,
+  tex = TRUE,
+  title = "Praise and Stigma by Externality Knowledge",
+  dict = c(
+    mean_yes = "Fraction Yes",
+    above_median_externality_knowTRUE = "Above Median Ext. Knowledge"
+  ),
+  fitstat = ~ctrl_mean_ps.mean + ctrl_mean_ps.sd + n,
+  depvar = FALSE,
+  digits = 3,
+  digits.stats = 3,
+  drop.section = "fixef",
+  postprocess.tex = tex_postprocessing,
+  replace = TRUE,
+  style.df = style.df(depvar.title = "", fixef.title = "", var.title = "", stats.title = ""),
+  notes = ""
+  # file = file.path(
+  #   params$table_output_path, "new-praise-stigma-by-externality-knowledge.tex"
+  # )
+)
+
+}) # end externality
 
 
 #### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
 
-if (run_all || script_options$takeup) {
+if (run_all || script_options$takeup) run_section("Takeup Regressions", {
 
 dist_cts_regression = function(data, weights) {
   feols(
@@ -533,12 +432,15 @@ hh_spec_output = wrapper_function(
   table_name = "rf_hh_spec_tbl"
 )
 
-} # end takeup regressions
+}) # end takeup regressions
 
 
 #### Beliefs -------------------------------------------------------------------
 
-if (run_all || script_options$beliefs) {
+
+
+
+if (run_all || script_options$beliefs) run_section("Beliefs Regressions", {
 
 summ_know_A_df = summ_endline_know_table %>%
   filter(fct_match(know.table.type, "table.A"))
@@ -606,50 +508,6 @@ belief_ana_df = analysis_data %>%
   left_join(summ_know_A_df, by = "KEY.individ") %>%
   filter(obs_know_person > 0)
 
-disaggregate_beliefs = function(.data) {
-  .data %>%
-    mutate(
-      doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed,
-      doesnt_think_other_knows = obs_know_person - thinks_other_knows
-    ) %>%
-    gather(variable, value,
-      knows_other_dewormed_yes, knows_other_dewormed_no, doesnt_know_other_dewormed,
-      thinks_other_knows_yes, thinks_other_knows_no, doesnt_think_other_knows
-    ) %>%
-    mutate(
-      knowledge_type = case_when(
-        str_detect(variable, "_yes") ~ "yes",
-        str_detect(variable, "_no") ~ "no",
-        str_detect(variable, "doesnt") ~ "doesn't know"
-      ),
-      belief_type = if_else(str_detect(variable, "think"), "2ord", "1ord"),
-      prop = value / obs_know_person
-    )
-}
-
-make_know_df = function(.data) {
-  .data %>%
-    filter(knowledge_type == "doesn't know") %>%
-    mutate(prop_knows = 1 - prop) %>%
-    group_by(cluster.id) %>%
-    mutate(cluster_id = cur_group_id()) %>%
-    ungroup() %>%
-    mutate(
-      county = factor(county),
-      cluster.id = factor(cluster.id),
-      assigned_treatment = assigned.treatment,
-      signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
-      signal = factor(signal, levels = c("no signal", "signal"))
-    ) %>%
-    left_join(
-      cluster_expected_dist_df %>% mutate(cluster.id = as.numeric(cluster.id)),
-      by = c("cluster_id" = "cluster.id")
-    ) %>%
-    mutate(
-      standard_clust_expected_dist = clust_expected_dist / sd_of_dist,
-      mu_d = standard_clust_expected_dist
-    )
-}
 
 belief_shared_vars = c(
   "KEY.individ", "assigned.treatment", "assigned_dist_group",
@@ -660,25 +518,6 @@ belief_shared_vars = c(
 )
 
 
-endline_data %>%
-  count(dewormed.reported, true.monitored)
-
-# joining covariates onto endline_data
-endline_data = endline_data %>%
-  left_join(
-    all_data %>%
-      select(KEY.individ, all_of(l_cov_vars)),
-    by = "KEY.individ"
-  ) %>%
-  # Adding cluster level covariates
-  left_join(
-    cov_analysis_data %>%
-      select(cluster.id.x, mu_d, standard_clust_expected_dist, standard_cluster.dist.to.pot) %>%
-      mutate(cluster.id = as.numeric(cluster.id.x)) %>%
-      unique(),
-    by = "cluster.id"
-  )
-
   
 # Used for Conditional accuracy and Correct observability
 endline_belief_df = endline_data %>%
@@ -687,7 +526,7 @@ endline_belief_df = endline_data %>%
   select(any_of(belief_shared_vars), sms.treatment, dist.pot.group, assigned_treatment, assigned_dist_group,
          all_of(l_cov_vars), 
          standard_cluster.dist.to.pot,
-         standard_clust_expected_dist, contains("know"), contains("pct"), mu_d)  %>%
+         standard_clust_expected_dist, contains("know"), contains("pct"), mu_d, contains("cluster"))  %>%
   mutate(cluster_id = cluster.id)
 
 
@@ -699,42 +538,29 @@ anti_join(summ_know_A_df, endline_data, by = "KEY.individ") %>%
 anti_join(endline_data, bind_rows(summ_know_A_df, summ_know_B_df), by = "KEY.individ") %>%
   pull(KEY.individ)  %>% unique() %>% length()
 
-disagg_belief_all_df = all_data %>%
-  mutate(female = gender == "female") %>%
-  left_join(
-    cov_analysis_data %>%
-      select(cluster.id, mu_d, standard_clust_expected_dist) %>%
-      mutate(cluster.id = as.numeric(cluster.id)) %>%
-      unique(),
-    by = "cluster.id"
-  ) %>%
-  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
-  left_join(summ_know_A_df, by = "KEY.individ") %>%
-  select(any_of(belief_shared_vars), sms.treatment, dist.pot.group,
-         all_of(l_cov_vars), standard_clust_expected_dist, contains("know")) %>%
-  disaggregate_beliefs()
 
-disagg_base_belief_data = cov_analysis_data %>%
-  mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
-  left_join(summ_know_A_df, by = "KEY.individ") %>%
+summ_know_A_df %>%
   filter(obs_know_person > 0) %>%
-  select(any_of(belief_shared_vars), dist.pot.group,
-         all_of(l_cov_vars), standard_clust_expected_dist, contains("know")) %>%
-  disaggregate_beliefs()
+  summarize(
+    n_indiv = n_distinct(KEY.individ)
+  )
 
-know_df = disagg_base_belief_data %>% make_know_df()
-know_all_df = disagg_belief_all_df %>% make_know_df()
+      # doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed,
+      # doesnt_think_other_knows = obs_know_person - thinks_other_knows
 
+endline_know_A_df = endline_data %>%
+  left_join(
+    summ_know_A_df,
+    by = "KEY.individ"
+  ) %>%
+  filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
+  mutate(
+    assigned_treatment = assigned.treatment,
+    assigned_dist_group = dist.pot.group,
+    prop_know_fob = knows_other_dewormed / obs_know_person,
+    prop_know_sob = thinks_other_knows / obs_know_person
+  ) 
 
-know_1_df = know_df  %>%
-  filter(belief_type == "1ord") 
-know_2_df = know_df  %>%
-  filter(belief_type == "2ord")
-
-
-know_1_all_df = know_all_df  %>%
-  filter(belief_type == "1ord") %>%
-  mutate(cluster_id = as.numeric(cluster.id)) 
 
 
 discrete_pct_yesno = function(data, weights) {
@@ -780,9 +606,13 @@ hh_f_know = function(data, weights) {
 
 
 #### FOB Discrete Distance + LASSO Covs + Cluster Expected Distance
+
+# source("scratch/old-knowledge-reduced-form-code.R")
+
+
 discrete_fob_output = wrapper_function(
-  data = know_df %>%
-    filter(belief_type == "1ord"),
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_fob),
   regression_spec = discrete_f_know,
   table_options = list(
     dependent_var = "Dependent variable: Observability"
@@ -790,6 +620,7 @@ discrete_fob_output = wrapper_function(
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
 )
+
 
 
 discrete_pct_yesno_output = wrapper_function(
@@ -934,113 +765,11 @@ combine_panel_tables(
 )
 
 
-#### Checking using full sample (SMS + non-monitored) doesn't change results
-
-discrete_fob_full_output = wrapper_function(
-  data = know_1_all_df,
-  regression_spec = discrete_f_know,
-  table_options = list(
-    dependent_var = "Dependent variable: Observability"
-  ),
-  table_name = "rf_discrete_fob_fullsample_spec_tbl",
-  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-fullsample-tidy-tes.csv"
-)
-
-#### Checking weird 150 individuals don't cause issues
-
-not_in_monitored = readRDS("temp-data/not_in_monitored.rds")
-
-
-clean_endline_extra_df = summ_endline_know_table %>%
-  left_join(
-    endline_data %>%
-      select(KEY.individ, cluster.id, assigned.treatment, dist.pot.group) %>% distinct(), by = "KEY.individ"
-  )  %>%
-    filter(fct_match(know.table.type, "table.A")) %>%
-    left_join(
-      cluster_expected_dist_df %>%
-        mutate(cluster.id = as.numeric(cluster.id)),
-      by = c("cluster.id" = "cluster.id")
-    ) %>%
-    # convert to same format as know_df
-    mutate(
-      standard_clust_expected_dist = clust_expected_dist/sd_of_dist,
-      mu_d = standard_clust_expected_dist,
-    ) %>%
-    mutate(
-      assigned_treatment = assigned.treatment,
-      assigned_dist_group = dist.pot.group,
-      signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
-      signal = factor(signal, levels = c("no signal", "signal"))
-    ) %>%
-    mutate(
-      prop_knows = obs_know_person_prop,
-      cluster.id = factor(cluster.id)
-    ) %>%
-    left_join(
-      analysis_data %>%
-        select(cluster.id, county, standard_cluster.dist.to.pot) %>%
-        unique(), 
-        by = "cluster.id"
-    )
-
-
-
-extra_know_df = bind_rows(
-  know_df %>% 
-    filter(belief_type == "1ord"),
-  clean_endline_extra_df %>%
-    mutate(cluster.id = factor(cluster.id))
-)
-
-
-extra_fit = extra_know_df %>%
-  feols(
-    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control")  ,
-    cluster = ~cluster.id
-  )
-single_fit = know_df %>%
-  filter(belief_type == "1ord") %>%
-  feols(
-    prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") ,
-    cluster = ~cluster.id
-  )
-
-
-tidy_comp_extra_df = bind_rows(
-  extra_fit %>%
-    tidy(conf.int = TRUE) %>%
-    mutate(type = "extra 150 people"),
-    single_fit %>%
-    tidy(conf.int = TRUE) %>% 
-    mutate(type = "current analysis")
-)
-
-tidy_comp_extra_df %>%
-  ggplot(aes(
-    x = estimate,
-    xmin = conf.low,
-    xmax = conf.high,
-    y = term,
-    colour = type
-  )) +
-  geom_pointrange(
-    position = position_dodge(width = 0.5),
-    size = 1
-  )  +
-  theme_bw()
-ggsave(
-  "temp-data/extra_fit_comp.pdf",
-  width = 10,
-  height = 5
-)
-
-
 
 #### FOB Continuous Distance + LASSO Covs + Cluster Expected Distance
 cts_fob_output = wrapper_function(
-  data = know_df %>%
-    filter(belief_type == "1ord"),
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_fob),
   regression_spec = cts_f_know,
   table_options = list(
     dependent_var = "Dependent variable: Observability"
@@ -1051,8 +780,8 @@ cts_fob_output = wrapper_function(
 
 #### FOB HH Distance + LASSO Covs + Cluster Expected Distance
 hh_fob_output = wrapper_function(
-  data = know_df %>%
-    filter(belief_type == "1ord"),
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_fob),
   regression_spec = hh_f_know,
   table_options = list(
     dependent_var = "Dependent variable: Observability"
@@ -1063,8 +792,8 @@ hh_fob_output = wrapper_function(
 
 #### SOB Discrete Distance + LASSO Covs + Cluster Expected Distance
 discrete_sob_output = wrapper_function(
-  data = know_df %>%
-    filter(belief_type == "2ord"),
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_sob),
   regression_spec = discrete_f_know,
   table_options = list(
     dependent_var = "Dependent variable: Observability Beliefs"
@@ -1073,7 +802,7 @@ discrete_sob_output = wrapper_function(
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-sob-tidy-tes.csv"
 )
 
-} # end beliefs regressions
+}) # end beliefs regressions
 
 
 
@@ -1081,7 +810,7 @@ discrete_sob_output = wrapper_function(
 
 #### Takeup LEVELS Continuous Distance + LASSO Covs + Expected Distance
 
-if (run_all || script_options$takeup) {
+if (run_all || script_options$takeup) run_section("Takeup Levels", {
 
 # For plotting
 dist_cts_spec_bs_draws = map_dfr(
@@ -1156,21 +885,21 @@ tidy_discrete_distance_cov_levels = left_join(
 tidy_discrete_distance_cov_levels %>%
   write_csv("temp-data/discrete-dist-covs-tidy-levels.csv")
 
-} # end takeup levels
+}) # end takeup levels
 
 
 
 #### FOB Levels Discrete Distance + LASSO Covs + Expected Distance
 
-if (run_all || script_options$beliefs) {
+if (run_all || script_options$beliefs) run_section("Beliefs Levels", {
 
 fob_bs_draws = map_dfr(
   1:500,
   ~bayes_bs_f(
     seed = .x,
     f = discrete_f_know,
-    data = know_df %>%
-      filter(belief_type == "1ord")
+    data = endline_know_A_df %>%
+      mutate(prop_knows = prop_know_fob)
   ),
   .progress = TRUE
   )
@@ -1178,8 +907,8 @@ fob_bs_draws = map_dfr(
 fob_levels_point = actual_bayesian_bs_fit(
   seed = "realised fit",
   f = discrete_f_know,
-  data = know_df %>%
-    filter(belief_type == "1ord")
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_fob)
 )$bs_fit %>%
   filter(!is.na(assigned_treatment)) 
 
@@ -1202,13 +931,13 @@ fob_levels = left_join(
 fob_levels %>%
   write_csv("temp-data/reducedformfob-tidy-levels.csv")
 
-} # end beliefs levels
+}) # end beliefs levels
 
 
 
 #### Alternative Regressions ---------------------------------------------------
 
-if (run_all || script_options$endline) {
+if (run_all || script_options$endline) run_section("Endline/Incentive/Preference/Travel", {
 
 ####  Endline Predicted Deworming Takeup
 endline_data = endline_data %>%
@@ -1221,21 +950,7 @@ endline_data = endline_data %>%
     dworm_frac = dworm_rate / 10,
     # different naming convention here
     have_ink = ink_visible
-  )  %>%
-  left_join(
-    full_analysis_data %>%
-      select(KEY.individ, gender, age.census, cluster.id) %>%
-      mutate(female = gender == "female")  %>%
-      left_join(
-        cov_analysis_data %>%
-          select(cluster.id.x, mu_d) %>%
-          unique(),
-          by = c("cluster.id" = "cluster.id.x")
-      ) %>%
-      select(KEY.individ, female, age.census, mu_d),
-      by = "KEY.individ"
-  )
-
+  ) 
 
 
 pred_dworm_fit = function(data, weights) {
@@ -1246,6 +961,7 @@ pred_dworm_fit = function(data, weights) {
     weights = ~wt
   )
 }
+
 
 pred_dworm_output = wrapper_function(
   data = endline_data,
@@ -1260,21 +976,6 @@ pred_dworm_output = wrapper_function(
     drop_H0s = TRUE
     )
 )
-# # monitored + non monitored sample - but still SMS control
-# pred_dworm_full_output = wrapper_function(
-#   data = endline_data_full %>%
-#     filter(sms.treatment == "sms.control"),
-#   regression_spec = pred_dworm_fit,
-#   tidy_summ_path = "temp-data/tidy-rf-tes/predicted-endline-deworm-takeup-full-sample-tidy-tes.csv",
-#   table_name = "predicted_endline_deworm_takeup_full_spec_tbl",
-#   table_options = list(
-#     caption = "Average Treatment Effects: Reduced Form", 
-#     dependent_var = "Dependent variable: Predicted Take-up", 
-#     type = "APE", 
-#     stars = TRUE,
-#     drop_H0s = TRUE
-#     )
-# )
 
 #### Incentive Implementation --------------------------------------------------
 
@@ -1288,6 +989,14 @@ endline_data = endline_data %>%
     meandeworm_ink = mean_deworm_string_f(ink_meaning),
     meandeworm_cal = mean_deworm_string_f(cal_meaning)
   )
+
+
+
+bad_vars = c(
+  "bad_bracelet",
+  "bad_ink",
+  "bad_calendar"
+)
 
 
 got_vars = c(
@@ -1311,10 +1020,31 @@ mean_vars = c(
   "meandeworm_cal"
 )
 
+display_vars = c(
+  "display_bracelet",
+  "display_ink",
+  "display_cal"
+)
+
+endline_data = endline_data %>%
+  mutate(
+    display_bracelet = wear_bracelet == 1,
+    display_ink = ink_visible == 1,
+    display_cal = case_when(
+      str_detect(
+        str_to_lower(cal_where), 
+        "wall|living|table|hang"
+      ) ~ TRUE,
+      !is.na(cal_where) ~ FALSE,
+      TRUE ~ NA
+    )
+  )
+
+
 long_incentive_check_df = endline_data %>%
-  select(all_of(c(got_vars, have_vars, seen_vars, mean_vars)), assigned_treatment, cluster_id, county)  %>%
+  select(all_of(c(got_vars, have_vars, seen_vars, mean_vars, display_vars, bad_vars)), assigned_treatment, cluster_id, county)  %>%
   pivot_longer(
-    cols = all_of(c(got_vars, have_vars, seen_vars, mean_vars))
+    cols = all_of(c(got_vars, have_vars, seen_vars, mean_vars, display_vars, bad_vars))
   ) %>%
   mutate(
     variable_type = str_extract(name, "(\\w+)(?=_)"),
@@ -1326,7 +1056,6 @@ long_incentive_check_df = endline_data %>%
     treat_type = paste0(assigned_treatment, "_", variable_type)
   ) %>%
   select(-name)
-
 
 
 tidy_incentive_check_df = long_incentive_check_df %>%
@@ -1384,10 +1113,12 @@ wide_incentive_check_input_df = tidy_incentive_check_df %>%
   ) %>%
   select(
     treatment,
+    seen, # "have you seen people wearing these "X"?"/ "have you seen people these calendars before"
+    meandeworm, # "What does it mean if a person has a bracelet?" -> coded into deworm mentions
     got, # "Did you receive X when you went for deworming?"
     have, # "Do you still have X?"
-    seen, # "have you seen people wearing these "X"?"/ "have you seen people these calendars before"
-    meandeworm # "What does it mean if a person has a bracelet?" -> coded into deworm mentions
+    display, # "Do you wear the bracelet?" / "Is the ink visible?"
+    bad # Drawbacks of incentive
   )
 
 
@@ -1414,14 +1145,16 @@ wide_incentive_check_input_df = wide_incentive_check_input_df %>%
   )
 
 incentive_check_tbl = wide_incentive_check_input_df %>%
+  select(-bad) %>%
   knitr::kable(
     format = "latex",
       col.names = c(
         "", 
-        "Received incentive when treated", 
-        "Have incentive currently", 
-        "Seen incentive", 
-        "Link incentive to deworming"),
+        "Seen incentive",
+        "Link to deworming",
+        "Received incentive",
+        "Have incentive",
+        "Wearing/displayed"),
       escape = FALSE, 
       booktabs = TRUE,
       align = "lcccc", 
@@ -1433,7 +1166,33 @@ incentive_check_tbl = wide_incentive_check_input_df %>%
 incentive_check_tbl %>%
   custom_save_latex_table("incentive-check-tbl")
 
-#### Preference for Gift Fit Not Dewormed ---------------------------------------
+# incentive drawbacks
+incentive_drawback_tbl = wide_incentive_check_input_df %>%
+  select(treatment, bad) %>%
+  knitr::kable(
+    format = "latex",
+    col.names = c(
+      "Treatment", 
+      "Reported any drawback"
+    ),
+    escape = FALSE, 
+    booktabs = TRUE,
+    align = "lc", 
+    caption = "Endline Incentive Drawbacks"
+  ) %>% 
+  row_spec(c(2), hline_after = TRUE) 
+
+incentive_drawback_tbl %>%
+  custom_save_latex_table("incentive-drawback-tbl")
+ 
+
+long_incentive_check_df %>%
+  group_by(variable_type) %>%
+  summarise(
+    n_na = sum(is.na(value)),
+    n_non_na = sum(!is.na(value))
+  )
+### Preference for Gift Fit Not Dewormed ---------------------------------------
 
 # TODO check this sample
 pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
@@ -1446,9 +1205,13 @@ pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
     # 3,329 %>%
     filter(dewormed == FALSE) %>%
     # 1,808
+    filter(sms.treatment == "sms.control") %>%
+    # 1,365
+    filter(gift_choice %in% c("bracelet", "calendar")) %>%
+    # 1,350
     group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
     mutate(arm.size = n()) %>% 
-    group_by(gift_choice, add = TRUE) %>%
+    group_by(gift_choice, .add = TRUE) %>%
     ungroup() %>%
     select(KEY.individ, cluster.id, gift_choice, 
       assigned.treatment, dist.pot.group, county, gender,
@@ -1467,62 +1230,9 @@ pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
         cov_analysis_data %>%
           select(cluster.id.x, mu_d, standard_cluster.dist.to.pot) %>%unique(),
           by = c("cluster.id" = "cluster.id.x")
-      )
-
-  full_analysis_data  %>%
-  # 38,019
-    filter(!is.na(gift_choice)) %>%
-    # 3,676
-    filter(monitored) %>%
-    # 3,329
-    filter(monitor.consent) %>%
-    # 3,329 %>%
-    filter(dewormed == FALSE)
-    # 1,808
-
-  full_analysis_data  %>%
-  # 38,019
-    filter(!is.na(gift_choice)) %>%
-    # 3,676
-    filter(monitored) %>%
-    # 3,329
-    filter(monitor.consent)  %>%
-    # 3,329
-    filter(!hh.baseline.sample.pool)  %>%
-    # 2,820
-    filter(dewormed == FALSE)
-    # 1,566
-
-
-  full_analysis_data  %>%
-  # 38,019
-    filter(!is.na(gift_choice)) %>%
-    # 3,676
-    filter(monitored) %>%
-    # 3,329
-    filter(monitor.consent)  %>%
-    # 3,329
-    filter(!hh.baseline.sample.pool)  %>%
-    # 2,820
-    filter(sms.treatment.2 == "sms.control") %>%
-    # 1,940
-    filter(dewormed == FALSE)
-    # 1,174
-
-
-analysis_data %>%
-    filter(
-      !is.na(gift_choice), 
-      monitored, 
-      monitor.consent, 
-      !hh.baseline.sample.pool, 
-      !is.na(sms.treatment)) %>% 
-    group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
-    mutate(arm.size = n()) %>% 
-    group_by(gift_choice, add = TRUE) %>%
-    filter(
-      dewormed == FALSE
-    )  
+      ) %>%
+      ungroup() %>%
+      mutate(cluster_id_rank = dense_rank(cluster.id))
 
 
 summ_gift_df = full_analysis_data %>%
@@ -1661,7 +1371,6 @@ pref_gift_not_dewormed_full_sample_fit = wrapper_function(
 )
 
 pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "- cal")) %>%
   print(n = 100)
 
 
@@ -1687,6 +1396,7 @@ endline_data %>%
       ed = mean(travel_clean == "walk", na.rm = TRUE),
       more_robust_pr_walk = mean(str_detect(travel, "1"), na.rm = TRUE)
     )
+
 
 travel_time_df = endline_data %>%
   mutate(
@@ -1839,7 +1549,7 @@ endline_data %>%
     pct_far = 100*far / sum(far, na.rm = TRUE)
   )
 
-} # end endline
+}) # end endline
 
 
 
@@ -1848,9 +1558,118 @@ endline_data %>%
 
 #### SMS -----------------------------------------------------------------------
 
-if (run_all || script_options$sms) {
+if (run_all || script_options$sms) run_section("SMS Heterogeneity", {
+  stop()
+
+pval_only_terms = c("bracelet - calendar", "signal")
+
+sms_analysis_data %>%
+  count(gender)
+
+anti_join(
+  cluster_expected_dist_df %>%
+    select(cluster.id) %>%
+    unique(),
+  sms_analysis_data %>%
+    select(cluster.id) %>%
+    unique(),
+  by = "cluster.id"
+)
+
+anti_join(
+  sms_analysis_data %>%
+    select(cluster.id) %>%
+    unique(),
+  cluster_expected_dist_df %>%
+    select(cluster.id) %>%
+    unique(),
+  by = "cluster.id"
+)
+
+sms_analysis_data_control = sms_analysis_data %>%
+  filter(assigned_treatment == "control") %>%
+  left_join(
+    cluster_expected_dist_df %>%
+      transmute(cluster.id, mu_d = as.numeric(clust_expected_dist)/sd_of_dist),
+    by = c("cluster.id" = "cluster.id")
+  ) %>%
+  mutate(
+    sms_treatment = factor(sms_treatment, levels = c("smscontrol", "reminderonly", "socialinfo")),
+    female = gender == "female",
+    cluster.id = as.numeric(cluster.id)
+    ) 
+  
+sms_control_reg = sms_analysis_data_control %>%
+  feols(
+    dewormed ~  sms_treatment + .[l_cov_vars] + mu_d | county,
+    data = .,
+    cluster = ~cluster_id
+  )
+
+fitstat_register(
+  "control_mean_sms_control",
+  function(est) {
+    d = model.matrix(est, type = "lhs")
+    base_idx = est$obs_selection$obsRemoved == FALSE
+    # Use the model's data to find control obs
+    ctrl = sms_analysis_data_control %>% filter(sms_treatment == "smscontrol")
+    ctrl_sd = sd(ctrl$dewormed, na.rm = TRUE)
+    list(mean = mean(ctrl$dewormed, na.rm = TRUE), sd = sprintf("(%.3f)", ctrl_sd))
+  },
+  alias = c("control_mean_sms_control.mean" = "Control mean", "control_mean_sms_control.sd" = ""),
+  subtypes = c("mean", "sd")
+)
+
+etable(
+  list("Takeup" = sms_control_reg),
+  tex = TRUE,
+  title = "Effects of Reminder and Social Info SMS on Take-up in Control Group",
+  dict = c(
+    dewormed = "Take-up",
+    sms_treatmentsocialinfo = "Social Info",
+    sms_treatmentreminderonly = "Reminder Only"
+  ),
+  keep = c("Social Info", "Reminder Only"),
+  fitstat = ~control_mean_sms_control.mean + control_mean_sms_control.sd + n,
+  depvar = FALSE,
+  digits = 3,
+  digits.stats = 3,
+  drop.section = "fixef",
+  postprocess.tex = tex_postprocessing,
+  replace = TRUE,
+  style.df = style.df(depvar.title = "", fixef.title = ""),
+  notes = "",
+  file = file.path(
+    params$table_output_path, "incentive-control-sms-te.tex"
+  )
+)
+# \begingroup
+# \centering
+# \begin{tabular}{lc}
+#    \tabularnewline \midrule \midrule
+#    Model:        & (1)\\  
+#    \midrule
+#    \emph{Variables}\\
+#    Reminder Only & 0.167$^{***}$\\   
+#                  & (0.029)\\   
+#    Social Info   & 0.131$^{***}$\\   
+#                  & (0.028)\\   
+#    \midrule
+#    \emph{Fit statistics}\\
+#    Control mean  & 0.330\\  
+#                  & (0.470)\\  
+#    Observations  & 1,705\\  
+#    \midrule \midrule
+#    \multicolumn{2}{l}{\emph{Clustered (cluster\_id) standard-errors in parentheses}}\\
+#    \multicolumn{2}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+# \end{tabular}
+# \par\endgroup
 
 
+
+
+
+    # prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + .[l_cov_vars] +  mu_d | county,
 f_sms = function(data, weights) {
   feols(
     dewormed ~ 0  + 
@@ -1962,6 +1781,8 @@ realised_sms_signal_fit = realised_sms_fit %>%
 realised_sms_tes
 realised_sms_signal_fit
 
+
+
 both_sms_fits = bind_rows(
   sms_bs_tes,
   sms_signal_bs_tes
@@ -2022,21 +1843,21 @@ clean_sms_tes %>%
   select(assigned_treatment, assigned_dist_group, sms_treatment, pval, oneside_pval)
 
 
-clean_sms_tes %>%
-  filter(sms_treatment != "smscontrol")  %>%
-  mutate(show_pval_only = FALSE) %>%
-  filter(sms_treatment != "reminderonly") %>%
-  mutate(
-    show_pval_only = assigned_treatment %in% pval_only_terms
-  ) %>%
-  prep_tbl(stat = params$stat) %>%
-  nice_kbl_table(
-    cap = "Heterogeneous SMS Average Treatment Effects",
-    outcome_var = "Dependent variable: Take-up"
-  ) %>%
-  custom_save_latex_table(
-    table_name = "sms_diff_tes_tbl"
-  )
+# clean_sms_tes %>%
+#   filter(sms_treatment != "smscontrol")  %>%
+#   mutate(show_pval_only = FALSE) %>%
+#   filter(sms_treatment != "reminderonly") %>%
+#   mutate(
+#     show_pval_only = assigned_treatment %in% pval_only_terms
+#   ) %>%
+#   prep_tbl(stat = params$stat) %>%
+#   nice_kbl_table(
+#     cap = "Heterogeneous SMS Average Treatment Effects",
+#     outcome_var = "Dependent variable: Take-up"
+#   ) %>%
+#   custom_save_latex_table(
+#     table_name = "sms_diff_tes_tbl"
+#   )
 
 library(ggthemes)
 
@@ -2103,13 +1924,14 @@ p_sms_tes = clean_sms_tes %>%
     palette = "Primary colors with a vibrant twist"
   )
 
+p_sms_tes
 ggsave("temp-data/p-sms-tes.pdf", width = 8, height = 6)
 
-} # end sms
+}) # end sms
 
 #### Heterogeneity -------------------------------------------------------------
 
-if (run_all || script_options$heterogeneity) {
+if (run_all || script_options$heterogeneity) run_section("Heterogeneity + WTP", {
 
 library(marginaleffects)
 analysis_data = analysis_data %>%
@@ -2128,16 +1950,12 @@ analysis_data = analysis_data %>%
         cluster.id = factor(cluster.id)
       ),
       by = "cluster.id"
-  )
-
-  analysis_data %>%
-    select(cluster.dist.to.pot)
-
-analysis_data = analysis_data %>%
-  mutate(
-    age_gt_40 = age.census > 40
   ) %>%
-  mutate(treatment = factor(assigned_treatment, levels = c("control", "bracelet", "calendar", "ink"))) 
+  mutate(
+    age_gt_40 = age.census > 40,
+    treatment = factor(assigned_treatment, levels = c("control", "bracelet", "calendar", "ink"))
+  ) 
+
 
 clean_perception_data = baseline_data %>% 
   select(cluster.id, matches("^(praise|stigma)_[^_]+$")) %>% 
@@ -2174,8 +1992,8 @@ het_ols = function(data, judge_data) {
         treatment + 
         standard_cluster.dist.to.pot + 
         age_gt_40 +
-        i(treatment, age_gt_40, "control")  
-        | county,
+        i(treatment, age_gt_40, "control")   +
+        factor(county),
         cluster = ~cluster.id
     ) 
   judge_fit = data %>%
@@ -2189,8 +2007,8 @@ het_ols = function(data, judge_data) {
         treatment + 
         standard_cluster.dist.to.pot + 
         judge_score_gt_mean +
-        i(treatment, judge_score_gt_mean, "control")  
-        | county,
+        i(treatment, judge_score_gt_mean, "control") +
+        factor(county),
         cluster = ~cluster.id
     )
   phone_fit = data %>%
@@ -2199,8 +2017,8 @@ het_ols = function(data, judge_data) {
         treatment + 
         standard_cluster.dist.to.pot + 
         have_phone_lgl +
-        i(treatment, have_phone_lgl, "control")  
-        | county,
+        i(treatment, have_phone_lgl, "control") +
+        factor(county),
         cluster = ~cluster.id
     ) 
 
@@ -2210,8 +2028,8 @@ het_ols = function(data, judge_data) {
         treatment + 
         standard_cluster.dist.to.pot + 
         frac_prev_dewormed_gt_mean +
-        i(treatment, frac_prev_dewormed_gt_mean, "control")  
-        | county,
+        i(treatment, frac_prev_dewormed_gt_mean, "control") +
+        factor(county),
         cluster = ~cluster.id
     )
     
@@ -2221,8 +2039,8 @@ het_ols = function(data, judge_data) {
         treatment + 
         standard_cluster.dist.to.pot + 
         frac_externality_gt_mean +
-        i(treatment, frac_externality_gt_mean, "control")  
-        | county,
+        i(treatment, frac_externality_gt_mean, "control")   +
+        factor(county),
         cluster = ~cluster.id
     )
 
@@ -2234,8 +2052,8 @@ het_ols = function(data, judge_data) {
         treatment + 
         standard_cluster.dist.to.pot + 
         female +
-        i(treatment, female, "control")  
-        | county,
+        i(treatment, female, "control") +
+        factor(county),
         cluster = ~cluster.id
     )
     return(list(
@@ -2248,6 +2066,8 @@ het_ols = function(data, judge_data) {
     ))
 }  
 
+
+
 het_fits = het_ols(analysis_data, overall_judgement_score_df)
 
 age_het_fit = het_fits$age_fit
@@ -2257,16 +2077,6 @@ prevdeworm_het_fit = het_fits$prevdeworm_fit
 externality_het_fit = het_fits$externality_fit
 gender_het_fit = het_fits$gender_fit
 
-tex_postprocessing = function(tex) {
-    tex %>%
-        str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
-        str_remove("\\\\end\\{table\\}") %>%
-        str_replace(
-          .,
-          "Covariate",
-          "\\\\midrule Covariate"
-        )
-}
 
   etable(
     list(
@@ -2335,470 +2145,6 @@ tex_postprocessing = function(tex) {
       depvar.title = "", 
       fixef.title = "")
   )
-
-feols(
-  data = analysis_data,
-  dewormed ~ treatment*standard_cluster.dist.to.pot  + age_gt_40 | county,
-  cluster = ~cluster.id
-)
-
-
-age_het_preds =  bind_rows(
-  age_het_fit %>%
-    avg_comparisons(
-      newdata = datagrid(
-        age_gt_40 =  FALSE
-      ),
-      variables = list(
-        assigned_treatment = "reference"
-      )
-    ) %>%
-    tidy(conf.int = TRUE),
-  age_het_fit %>%
-    avg_predictions(
-      newdata = datagrid(
-        assigned_treatment = "control"
-      ),
-      variables = list(age_gt_40 = c(TRUE, FALSE))
-    ) %>%
-    tidy(conf.int = TRUE)  %>%
-    mutate(
-      control_mean = paste0("control_", age_gt_40)
-    ),
-  age_het_fit %>%
-    avg_comparisons(
-      variables = list(
-        assigned_treatment = "reference",
-        age_gt_40  = c(TRUE, FALSE)
-        ),
-      cross = TRUE
-    )  %>%
-    tidy(
-      conf.int = TRUE,
-    )
-) %>%
-    mutate(
-      het_variable = "age_gt_40"
-    )
-
-
-
-
-judge_het_fit = analysis_data %>%
-  left_join(
-    overall_judgement_score_df %>% 
-      select(cluster.id, judge_score_gt_mean),
-      by = "cluster.id"
-  ) %>%
-  feglm(
-    dewormed ~ 0 + 
-      assigned_treatment + 
-      standard_cluster.dist.to.pot + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
-      judge_score_gt_mean +
-      i(assigned_treatment, judge_score_gt_mean, "control")  
-      | county,
-      family = "probit",
-      cluster = ~cluster.id
-  ) 
-  
-
-judge_het_preds =  bind_rows(
-  judge_het_fit %>%
-    avg_comparisons(
-      newdata = datagrid(
-        judge_score_gt_mean =  FALSE
-      ),
-      variables = list(
-        assigned_treatment = "reference"
-      )
-    ) %>%
-    tidy(conf.int = TRUE),
-  judge_het_fit %>%
-    avg_predictions(
-      newdata = datagrid(
-        assigned_treatment = "control"
-      ),
-      variables = list(judge_score_gt_mean = c(TRUE, FALSE))
-    ) %>%
-    tidy(conf.int = TRUE)  %>%
-    mutate(
-      control_mean = paste0("control_", judge_score_gt_mean)
-    ),
-  judge_het_fit %>%
-    avg_comparisons(
-      variables = list(
-        assigned_treatment = "reference",
-        judge_score_gt_mean  = c(TRUE, FALSE)
-        ),
-      cross = TRUE
-    )  %>%
-    tidy(
-      conf.int = TRUE,
-    )
-) %>%
-    mutate(
-      het_variable = "judge_score_gt_mean"
-    )
-
-
-
-
-phone_het_fit = analysis_data %>%
-  feglm(
-    dewormed ~ 0 + 
-      assigned_treatment + 
-      standard_cluster.dist.to.pot + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
-      have_phone_lgl +
-      i(assigned_treatment, have_phone_lgl, "control")  
-      | county,
-      family = "probit",
-      cluster = ~cluster.id
-  ) 
-  
-  
-  
-phone_het_preds =  bind_rows(
-  phone_het_fit %>%
-    avg_comparisons(
-      newdata = datagrid(
-        have_phone_lgl =  FALSE
-      ),
-      variables = list(
-        assigned_treatment = "reference"
-      )
-    ) %>%
-    tidy(conf.int = TRUE),
-  phone_het_fit %>%
-    avg_predictions(
-      newdata = datagrid(
-        assigned_treatment = "control"
-      ),
-      variables = list(have_phone_lgl = c(TRUE, FALSE))
-    ) %>%
-    tidy(conf.int = TRUE)  %>%
-    mutate(
-      control_mean = paste0("control_", have_phone_lgl)
-    ),
-  phone_het_fit %>%
-    avg_comparisons(
-      variables = list(
-        assigned_treatment = "reference",
-        have_phone_lgl  = c(TRUE, FALSE)
-        ),
-      cross = TRUE
-    )  %>%
-    tidy(
-      conf.int = TRUE,
-    )
-) %>%
-    mutate(
-      het_variable = "have_phone_lgl"
-    )
-
-
-prevdeworm_het_fit = analysis_data %>%
-  feglm(
-    dewormed ~ 0 + 
-      assigned_treatment + 
-      standard_cluster.dist.to.pot + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
-      frac_prev_dewormed_gt_mean +
-      i(assigned_treatment, frac_prev_dewormed_gt_mean, "control")  
-      | county,
-      family = "probit",
-      cluster = ~cluster.id
-  )
-  
-prevdeworm_het_preds =  bind_rows(
-   prevdeworm_het_fit %>%
-    avg_comparisons(
-      newdata = datagrid(
-        frac_prev_dewormed_gt_mean =  FALSE
-      ),
-      variables = list(
-        assigned_treatment = "reference"
-      )
-    ) %>%
-    tidy(conf.int = TRUE),
-  prevdeworm_het_fit %>%
-    avg_predictions(
-      newdata = datagrid(
-        assigned_treatment = "control"
-      ),
-      variables = list(frac_prev_dewormed_gt_mean = c(TRUE, FALSE))
-    ) %>%
-    tidy(conf.int = TRUE)  %>%
-    mutate(
-      control_mean = paste0("control_", frac_prev_dewormed_gt_mean)
-    ),
-  prevdeworm_het_fit %>%
-    avg_comparisons(
-      variables = list(
-        assigned_treatment = "reference",
-        frac_prev_dewormed_gt_mean  = c(TRUE, FALSE)
-        ),
-      cross = TRUE
-    )  %>%
-    tidy(
-      conf.int = TRUE,
-    )
-) %>%
-    mutate(
-      het_variable = "frac_prev_dewormed_gt_mean"
-    )
-  
-  
-
-externality_het_fit = analysis_data %>%
-  feglm(
-    dewormed ~ 0 + 
-      assigned_treatment + 
-      standard_cluster.dist.to.pot + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
-      frac_externality_gt_mean +
-      i(assigned_treatment, frac_externality_gt_mean, "control")  
-      | county,
-      family = "probit",
-      cluster = ~cluster.id
-  )
-  
-  
-  
-  
-  
-externality_het_preds =  bind_rows(
-  externality_het_fit %>%
-    avg_comparisons(
-      newdata = datagrid(
-        frac_externality_gt_mean =  FALSE
-      ),
-      variables = list(
-        assigned_treatment = "reference"
-      )
-    ) %>%
-    tidy(conf.int = TRUE),
-  externality_het_fit %>%
-    avg_predictions(
-      newdata = datagrid(
-        assigned_treatment = "control"
-      ),
-      variables = list(frac_externality_gt_mean = c(TRUE, FALSE))
-    ) %>%
-    tidy(conf.int = TRUE)  %>%
-    mutate(
-      control_mean = paste0("control_", frac_externality_gt_mean)
-    ),
-  externality_het_fit %>%
-    avg_comparisons(
-      variables = list(
-        assigned_treatment = "reference",
-        frac_externality_gt_mean  = c(TRUE, FALSE)
-        ),
-      cross = TRUE
-    )  %>%
-    tidy(
-      conf.int = TRUE,
-    )
-) %>%
-    mutate(
-      het_variable = "frac_externality_gt_mean"
-    )
-  
-
-gender_het_fit = analysis_data %>%
-  feglm(
-    dewormed ~ 0 + 
-      assigned_treatment + 
-      standard_cluster.dist.to.pot + 
-      i(assigned_treatment, standard_cluster.dist.to.pot, "control") +
-      gender +
-      i(assigned_treatment, gender, "control")  
-      | county,
-      family = "probit",
-      cluster = ~cluster.id
-  )
-    
-gender_het_preds =  bind_rows(
-  gender_het_fit %>%
-    avg_comparisons(
-      newdata = datagrid(
-        gender = "male"
-      ),
-      variables = list(
-        assigned_treatment = "reference"
-      )
-    ) %>%
-    tidy(conf.int = TRUE),
-  gender_het_fit %>%
-    avg_predictions(
-      newdata = datagrid(
-        assigned_treatment = "control"
-      ),
-      variables = list(gender = c("male", "female"))
-    ) %>%
-    tidy(conf.int = TRUE)  %>%
-    mutate(
-      control_mean = paste0("control_", gender)
-    ),
-  gender_het_fit %>%
-    avg_comparisons(
-      variables = list(
-        assigned_treatment = "reference",
-        gender  = c("male", "female")
-        ),
-      cross = TRUE
-    )  %>%
-    tidy(
-      conf.int = TRUE,
-    )
-) %>%
-    mutate(
-      het_variable = "gender"
-    )
-
-
-
-
-
-het_preds = bind_rows(
-  age_het_preds,
-  gender_het_preds,
-  phone_het_preds,
-  judge_het_preds,
-  prevdeworm_het_preds,
-  externality_het_preds
-) %>%
-  select(het_variable, control_mean, contrast, assigned_treatment, contrast_assigned_treatment, estimate, std.error, p.value )
-
-
-het_tbl = het_preds %>%
-  mutate(
-    te_diff = !is.na(contrast_assigned_treatment),
-    te_diff = case_when(
-      control_mean == "control_female" ~ TRUE,
-      control_mean == "control_male" ~ FALSE,
-      str_detect(control_mean, "TRUE") ~ TRUE,
-      str_detect(control_mean, "FALSE") ~ FALSE,
-      TRUE ~ te_diff
-    ),
-    term = case_when(
-      !is.na(control_mean) ~ "Control mean",
-      !is.na(contrast) & contrast != "control" ~ str_extract(contrast, "(?<=mean\\()\\w+") %>% str_to_title(),
-      !is.na(contrast_assigned_treatment)  ~ str_extract(contrast_assigned_treatment, "(?<=mean\\()\\w+")  %>% str_to_title()
-    )
-  ) %>%
-  select(het_variable, term, te_diff, estimate, std.error) %>%
-  mutate(
-    across(where(is.numeric), ~round(., 3)),
-    val = paste0("{[", std.error, "]}"),
-    estim_std = linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
-  )  %>%
-  select(-estimate, -std.error, -val) %>%
-  pivot_wider(
-    names_from = c(het_variable, te_diff),
-    values_from = estim_std
-  ) %>%
-  kbl(
-    col.names = c(
-      "Treatment",
-
-      "$\\leq 40$",
-      "$> 40$",
-
-      "Male",
-      "Female",
-
-      "No",
-      "Yes",
-
-      "No",
-      "Yes",
-
-      "No",
-      "Yes",
-
-      "No",
-      "Yes"
-    ),
-    align = "lcccccccccccc",
-    booktabs = TRUE,
-    format = "latex",
-    escape = FALSE
-  ) %>%
-  kable_styling(
-    latex_options = c("scale_down")
-  ) %>% 
-  add_header_above(
-   c(
-    " " = 1,
-    "Age" = 2,
-    "Gender" = 2,
-    "Phone Owner" = 2,
-    "Judgemental" = 2,
-    "Previously Dewormed" = 2,
-    "Understand Externalities" = 2
-    )
-  )  %>%
-  add_header_above(
-    c(
-      " " = 7,
-      "Community Level" = 6
-    )
-  ) %>%
-  row_spec(c(3), hline_after = TRUE) 
-
-het_tbl %>%
-  custom_save_latex_table(
-    table_name = "het-tes-tbl"
-  )
-
-het_tbl = het_fits %>%
-  mutate(
-    term = str_extract(
-      contrast_assigned_treatment,
-      "(?<=mean\\()\\w+"
-    )
-  ) %>%
-  select(
-    het_variable, term, estimate, std.error, p.value
-  ) %>%
-  mutate(
-    across(where(is.numeric), ~round(., 3)),
-    val = paste0("{[", std.error, "]}"),
-    estim_std = linebreak(paste0(estimate,"\n", str_glue("{val}")), align = "c") 
-  ) %>%
-  select(het_variable, term, estim_std) %>%
-  mutate(term = str_to_title(term))  %>%
-  pivot_wider(
-    names_from = het_variable,
-    values_from = estim_std
-  )  %>%
-  kbl(
-    col.names = c(
-      "Heterogeneous Treatment Effects",
-      "Female",
-      "Phone Owner",
-      "Community Judgemental",
-      "Community Understand Externalities"
-      ),
-    booktabs = TRUE,
-    escape = FALSE,
-    align = "lcccc",
-    format = "latex"
-  ) %>%
-  kable_styling(
-    latex_options = c("scale_down")
-  ) 
-
-
-
- het_tbl %>%
-  custom_save_latex_table(
-    table_name = "het-tes-tbl"
-  )
-
 
 # WTP Checks
 
@@ -2878,4 +2224,4 @@ incentive_choice_data
 wtp.data %>%
   select(first_choice, price)
 
-} # end heterogeneity
+}) # end heterogeneity

@@ -59,16 +59,22 @@ endline_data = read_rds("data/clean-data/clean-endline-data.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
 
-analysis_data = read_rds("data/clean-data/monitored-nosms-takeup-data.rds") 
-full_analysis_data = read_rds("data/clean-data/full-takeup-data.rds")
+analysis_data = read_rds("data/clean-data/monitored-nosms-takeup-data.rds")  %>%
+  mutate(cluster_id_rank = dense_rank(cluster.id))
+full_analysis_data = read_rds("data/clean-data/full-takeup-data.rds") %>%
+  mutate(cluster_id_rank = dense_rank(cluster.id))
 
 # Subset to main analysis sample
 # baseline data is easy - 1,995 in baseline
-baseline_data = baseline_data
+baseline_data = baseline_data %>%
+  mutate(cluster_id_rank = dense_rank(cluster.id))
 
 # endline data, subset to those with SMS control - 2,659 individuals
 endline_data = endline_data %>%
-  filter(sms.treatment == "sms.control")
+  filter(sms.treatment == "sms.control") %>%
+  mutate(
+    cluster_id_rank = dense_rank(cluster.id)
+  )
 
 
 # SMS sample
@@ -313,7 +319,9 @@ endline_data = endline_data %>%
       travel == "4" ~ "bus",
       travel == "5" ~ "free ride"
     )
-  )
+  ) 
+  
+  
 
 
 ## Baseline Balance
@@ -599,6 +607,25 @@ all_data = full_analysis_data %>%
   clean_takeup_variables()
 
 
+l_cov_vars = c(
+  "female",
+  "age.census"
+)
+endline_data = endline_data  %>%
+# joining covariates onto endline_data - do this as both beliefs and endline need it
+  left_join(
+    all_data %>%
+      select(KEY.individ, all_of(l_cov_vars)),
+    by = "KEY.individ"
+  ) %>%
+  # Adding cluster level covariates
+  left_join(
+    cov_analysis_data %>%
+      select(cluster.id.x, mu_d, standard_clust_expected_dist, standard_cluster.dist.to.pot) %>%
+      mutate(cluster.id = as.numeric(cluster.id.x)) %>%
+      unique(),
+    by = "cluster.id"
+  )
 
 # Saving datasets to csv for debugging purposes - these are the datasets we use
 # for the main analysis, but it's useful to have them in csv format to inspect

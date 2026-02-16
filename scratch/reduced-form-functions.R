@@ -100,7 +100,10 @@ pred_bs_f = function(f, data, weights, realised_fit = FALSE) {
     if (realised_fit == TRUE) {
         data$wt = 1
     } else {
-        data$wt = weights[data$cluster_id]
+        data$wt = weights[data$cluster_id_rank]
+    }
+    if (any(is.na(data$wt))) {
+      stop("NA weights found in pred_bs_f")
     }
     fit = f(data, weights = ~wt)
 
@@ -133,7 +136,7 @@ pred_bs_f_at_x = function(f,  data, weights, realised_fit = FALSE) {
     if (realised_fit == TRUE) {
         data$wt = 1
     } else {
-        data$wt = weights[data$cluster_id]
+        data$wt = weights[data$cluster_id_rank]
     }
     fit = f(data, weights = ~wt)
     data = data %>%
@@ -543,6 +546,7 @@ create_regression_output = function(data, f,  B_draws = 500,
 
   default_tbl = overall_summ %>%
     prep_tbl(stat = stat, stars = stars) %>%
+    filter(assigned_treatment != "$|Calendar| - |Bracelet|$") %>%
     nice_kbl_table(
       cap = caption,
       outcome_var = dependent_var
