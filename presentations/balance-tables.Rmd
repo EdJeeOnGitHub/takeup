@@ -965,7 +965,6 @@ att_treat_panel_names = att_treat_panel_df$sample %>%
     "takeup_sample" = str_glue("Panel A: Takeup sample, $N={N_att_fmt}$"),
     "pretreat" = str_glue("Panel B: Baseline demographics, $N={N_att_fmt}$"),
     "baseline_worm" = str_glue("Panel C: Deworming knowledge, $N={N_att_fmt}$"),
-    # "social_image_concerns" = str_glue("Panel D: Social image concerns, $N={N_att_fmt}$"),
     "implementation" = str_glue("Panel D: Implementation, $N={N_att_fmt}$")
   )
 
@@ -996,6 +995,98 @@ attrition_treat_bal_table = attrition_treat_wide %>%
 
 attrition_treat_bal_table %>%
   custom_save_latex_table("attrition-treat-balance-table")
+
+```
+
+
+```{r}
+#| monitoring-attrition-treat-balance
+
+mon_attrition_comp_df = read_csv(
+  file.path("temp-data", "monitoring_attrition_comp_df.csv")
+)
+
+mon_attrition_data = read_rds(
+  file.path("temp-data", "monitoring_attrition_joint_tests.rds")
+)
+mon_attrition_joint_tests = mon_attrition_data$joint_tests
+N_mon_attrition = mon_attrition_data$n_mon_attrition
+
+mon_attrition_joint_signif = map_dbl(mon_attrition_joint_tests, "joint_pval") %>% round(4)
+mon_attrition_close_joint = map_dbl(mon_attrition_joint_tests, "close_pval") %>% round(4)
+mon_attrition_far_joint = map_dbl(mon_attrition_joint_tests, "far_pval") %>% round(4)
+
+mon_attrition_lhs_df = tribble(
+  ~lhs, ~clean_name, ~sample, ~row_num,
+  "lhs: age.census", "Age", "census", 1L,
+  "lhs: female", "Female", "census", 2L,
+  "lhs: n_per_cluster", "Number of individuals per community", "census", 4L,
+  "lhs: cluster.dist.to.pot", "Distance to PoT", "census", 5L
+) %>%
+  mutate(lhs_no_prefix = str_remove(lhs, "lhs: "))
+
+mon_attrition_wide = create_balance_input(
+  mon_attrition_comp_df %>%
+    filter(comp_type == "treatment" | term == "sample_mean"),
+  col_order = col_order,
+  digits = 3,
+  comp_df = TRUE,
+  show_pval = TRUE
+) %>%
+  mutate(
+    close_joint_p = mon_attrition_close_joint,
+    far_joint_p = mon_attrition_far_joint,
+    joint_p = mon_attrition_joint_signif
+  ) %>%
+  select(all_of(col_diff_order)) %>%
+  mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+  mutate(across(where(is.character), replace_na, "-")) %>%
+  inner_join(mon_attrition_lhs_df %>% select(lhs, clean_name, sample, row_num)) %>%
+  mutate(lhs = clean_name) %>%
+  select(-clean_name) %>%
+  arrange(sample, row_num) %>%
+  select(-sample, -row_num)
+
+colnames(mon_attrition_wide) = colnames(mon_attrition_wide) %>%
+  str_replace("_close", "") %>%
+  str_replace("_far", "") %>%
+  str_replace("con_combined", "Sample mean") %>%
+  str_to_title()
+
+mon_att_col_names = colnames(mon_attrition_wide)
+mon_att_col_names[1] = ""
+mon_att_col_names[mon_att_col_names == "Joint_p"] = "Joint Test"
+mon_att_col_names[mon_att_col_names == "Far_joint_p"] = "Joint Test"
+mon_att_col_names[mon_att_col_names == "Close_joint_p"] = "Joint Test"
+
+N_mon_att_fmt = format(N_mon_attrition, big.mark = ",")
+mon_att_panel_list = c(length(unique(mon_attrition_lhs_df$lhs)))
+names(mon_att_panel_list) = str_glue("Panel A: Census variables, $N={N_mon_att_fmt}$")
+
+mon_attrition_bal_table = mon_attrition_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = mon_att_col_names,
+    caption = "Monitoring Attrition Treatment Balance",
+    align = paste0("l", strrep("c", ncol(mon_attrition_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) %>%
+  pack_rows(
+    index = mon_att_panel_list,
+    italic = TRUE,
+    escape = FALSE,
+    hline_after = TRUE,
+    hline_before = TRUE,
+    bold = TRUE
+  )
+
+mon_attrition_bal_table %>%
+  custom_save_latex_table("monitoring-attrition-balance-table")
 
 ```
 

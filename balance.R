@@ -9,15 +9,16 @@ Options:
   --fit-ri
   --main
   --attrition
+  --monitored-attrition
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --attrition
+    --monitored-attrition
     " else commandArgs(trailingOnly = TRUE)
-) 
+)
 
 
-run_all <- !any(script_options$main, script_options$attrition, script_options$continuous_distance)
+run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance)
 
 set.seed(12932)
 
@@ -1101,5 +1102,220 @@ list(
   n_attrition = n_attrition
 ) %>%
   saveRDS(file.path(script_options$output_path, "attrition_treat_joint_tests.rds"))
+
+}
+
+# ============================================================================
+# Monitoring Attrition Balance Checks
+# ============================================================================
+# 991 wave 1 individuals were eligible for PoT monitoring (monitored == TRUE
+# in the census) but didn't make it onto the monitoring roster (true.monitored
+# == FALSE). These individuals are excluded from the structural model. We check
+# whether this attrition is correlated with treatment.
+
+if (run_all || script_options$monitored_attrition) {
+
+library(fixest)
+
+# Construct survey_cto_dropped from census_data (has monitored & true.monitored)
+# and join onto full_analysis_data for analysis variables
+
+
+census_data %>%
+  count(monitored, true.monitored)
+census_data %>%
+  count(wave)
+
+mon_attrition_data = census_data %>%
+  filter(is.na(sms.treatment) | sms.treatment == "sms.control")  %>%
+  filter(have_phone == "No") %>%
+  filter(monitored == TRUE) %>%
+  filter(wave == 1) %>%
+  mutate(
+    survey_cto_dropped = monitored & !true.monitored
+  ) %>%
+  select(KEY.individ, survey_cto_dropped, monitored, true.monitored) %>%
+  inner_join(
+    full_analysis_data %>%
+      select(KEY.individ, assigned.treatment, dist.pot.group, county, cluster.id,
+             age.census, gender, have_phone, cluster.dist.to.pot, name_matched),
+    by = "KEY.individ"
+  ) %>%
+  filter(!is.na(assigned.treatment)) %>%
+  mutate(
+    female = as.numeric(gender == "female"),
+    have_phone_lgl = as.numeric(have_phone == "Yes")
+  ) %>%
+  left_join(
+    n_indiv_df %>% transmute(cluster.id, n_per_cluster),
+    by = "cluster.id"
+  ) 
+
+
+
+
+cat("\n--- Monitoring Attrition Summary ---\n")
+cat("Total non-Phone SMS control individuals:", nrow(mon_attrition_data), "\n")
+cat("Dropped from monitoring roster:", sum(mon_attrition_data$survey_cto_dropped), "\n")
+
+# ---- Test 1: Does treatment predict survey_cto_dropped? ----
+mon_attrition_pooled = mon_attrition_data %>%
+  feols(
+    survey_cto_dropped ~ i(assigned.treatment, ref = "control") | county,
+    cluster = ~cluster.id
+  )
+
+mon_attrition_treat_dist = mon_attrition_data %>%
+  feols(
+    survey_cto_dropped ~ i(assigned.treatment, dist.pot.group, ref = "control") | county,
+    cluster = ~cluster.id
+  )
+
+setFixest_dict(c(
+  survey_cto_dropped = "Dropped from Monitoring",
+  "assigned.treatment::ink" = "Ink",
+  "assigned.treatment::calendar" = "Calendar",
+  "assigned.treatment::bracelet" = "Bracelet"
+))
+
+mon_attrition_tex_postprocessing = function(tex) {
+  tex %>%
+    str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
+    str_remove("\\\\end\\{table\\}") %>%
+    str_replace(., "Covariate", "\\\\midrule Covariate")
+}
+
+etable(mon_attrition_pooled, mon_attrition_treat_dist,
+       headers = c("Pooled", "Treat $\\times$ Distance"),
+       depvar = FALSE,
+       fitstat = c("n", "r2"),
+       se.below = TRUE,
+       tex = TRUE,
+       title = "Differential Monitoring Attrition by Treatment Assignment",
+       label = "tab:monitoring-attrition-treatment",
+       notes = "",
+       file = "presentations/tables/monitoring-attrition-by-treatment.tex",
+       replace = TRUE,
+       postprocess.tex = mon_attrition_tex_postprocessing,
+       digits = 3,
+       digits.stats = 3,
+       drop.section = "fixef",
+       style.df = style.df(depvar.title = "", fixef.title = "", var.title = "", stats.title = "")
+)
+
+# ---- Test 2: Are census covariates balanced between kept and dropped? ----
+mon_attrition_balance_vars = c(
+  age.census = "Age",
+  female = "Female",
+  n_per_cluster = "Number of individuals per community",
+  cluster.dist.to.pot = "Distance to PoT"
+)
+
+mon_attrition_balance_df = map_dfr(names(mon_attrition_balance_vars), function(v) {
+  fit = feols(as.formula(paste0(v, " ~ survey_cto_dropped ")),
+              data = mon_attrition_data, cluster = ~cluster.id)
+  ct = coeftable(fit)
+
+  group_means = mon_attrition_data %>%
+    summarise(
+      mean_present = mean(.data[[v]][!survey_cto_dropped], na.rm = TRUE),
+      mean_missing = mean(.data[[v]][survey_cto_dropped], na.rm = TRUE),
+      n_present = sum(!is.na(.data[[v]]) & !survey_cto_dropped),
+      n_missing = sum(!is.na(.data[[v]]) & survey_cto_dropped)
+    )
+
+  tibble(
+    variable = v,
+    label = mon_attrition_balance_vars[v],
+    mean_present = group_means$mean_present,
+    mean_missing = group_means$mean_missing,
+    diff = ct["survey_cto_droppedTRUE", "Estimate"],
+    se = ct["survey_cto_droppedTRUE", "Std. Error"],
+    pval = ct["survey_cto_droppedTRUE", "Pr(>|t|)"],
+    n_present = group_means$n_present,
+    n_missing = group_means$n_missing
+  )
+})
+
+cat("\n--- Monitoring Attrition Covariate Balance ---\n")
+mon_attrition_balance_df %>%
+  mutate(stars = case_when(pval < 0.01 ~ "***", pval < 0.05 ~ "**", pval < 0.1 ~ "*", TRUE ~ "")) %>%
+  select(label, mean_present, mean_missing, diff, se, pval, stars) %>%
+  print(n = Inf)
+
+# ---- .tex output ----
+mon_fmt = function(x, d = 3) formatC(x, format = "f", digits = d)
+mon_stars_tex = function(p) case_when(p < 0.01 ~ "^{***}", p < 0.05 ~ "^{**}", p < 0.1 ~ "^{*}", TRUE ~ "")
+
+mon_tex_rows = mon_attrition_balance_df %>%
+  mutate(row = paste0(
+    label, " & ",
+    mon_fmt(mean_present), " & ",
+    mon_fmt(mean_missing), " & ",
+    "$", mon_fmt(diff), mon_stars_tex(pval), "$ & ",
+    "$(", mon_fmt(se), ")$ & ",
+    format(n_present + n_missing, big.mark = ","),
+    " \\\\"
+  )) %>%
+  pull(row)
+
+mon_n_present_total = max(mon_attrition_balance_df$n_present)
+mon_n_missing_total = max(mon_attrition_balance_df$n_missing)
+
+mon_tex_table = c(
+  "\\centering",
+  "\\begin{tabular}{l ccccc}",
+  "\\hline\\hline",
+  paste0(" & \\multicolumn{1}{c}{Monitored} & \\multicolumn{1}{c}{Dropped} & ",
+         "\\multicolumn{1}{c}{Difference} & \\multicolumn{1}{c}{SE} & \\multicolumn{1}{c}{N} \\\\"),
+  "\\hline",
+  "\\addlinespace",
+  "\\textit{Census Variables} \\\\",
+  "\\addlinespace",
+  mon_tex_rows,
+  "\\hline\\hline",
+  "\\end{tabular}"
+)
+
+writeLines(mon_tex_table, "presentations/tables/monitoring-attrition-covariate-balance.tex")
+
+# ---- Test 3: Treatment balance among dropped individuals ----
+mon_attrition_treat_data = mon_attrition_data %>%
+  filter(survey_cto_dropped) %>%
+  mutate(
+    treat_dist = paste0("treat: ", assigned.treatment, ", dist: ", dist.pot.group) %>% factor()
+  )
+
+n_mon_attrition = nrow(mon_attrition_treat_data)
+
+mon_attrition_treat_fits = feols(
+  data = mon_attrition_treat_data,
+  .[names(mon_attrition_balance_vars)] ~ 0 + treat_dist,
+  cluster = ~cluster.id
+)
+
+# Pairwise comparisons
+mon_attrition_treat_comp_df = mon_attrition_treat_fits %>%
+  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+
+mon_attrition_treat_comp_df %>%
+  write_csv(file.path(script_options$output_path, "monitoring_attrition_comp_df.csv"))
+
+# Joint tests (close, far, overall)
+mon_attrition_treat_joint_tests = map(
+  mon_attrition_treat_fits,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+list(
+  joint_tests = mon_attrition_treat_joint_tests,
+  n_mon_attrition = n_mon_attrition
+) %>%
+  saveRDS(file.path(script_options$output_path, "monitoring_attrition_joint_tests.rds"))
 
 }
