@@ -173,8 +173,17 @@ clean_worm_covariates = function(data) {
           ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
       )
       ), 
+      adults_can_get_worms = map2_lgl(
+        who_worms,
+        who_worms_other,
+        ~any(
+          "everyone" %in% .x |
+          str_detect(str_to_lower(.y), "any") |
+          "adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")
+        )
+      ),
       correct_when_treat = when_treat %in% c("every 3 months",
-                                     "every 6 months"), 
+                                             "every 6 months"), 
       know_how_stop_worms = map2_lgl(
         stop_worms, 
         stop_worms_other,
@@ -183,17 +192,39 @@ clean_worm_covariates = function(data) {
           "wearing shoes", 
           "using toilets", 
           "wash hands") | str_detect(.y, "cooked|prepar|cook"))),
-      adult_in_family_treated = who_treated %in% c("adult", "both")
+      adult_in_family_treated = who_treated %in% c("adult", "both"),
+      know_medicine_stops_worms = map_lgl(
+        stop_worms,
+        ~any("medicine" %in% .x,
+         na.rm = TRUE)
+      ),
+      know_children_get_worms = map2_lgl(
+        who_worms,
+        who_worms_other,
+        ~any(c("child", "everyone") %in% .x | str_detect(.y, "child"), na.rm = TRUE)
+      ),
+      sick_worms_only = map_lgl(
+        who_worms,
+        ~any(
+          .x == "sick",
+          na.rm = TRUE
+        )
+      )
     )
 
   cov_data = cov_data %>%
     mutate(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ NA,
+        # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
+        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # variables use different binary encoding for yes/no and the original 
+        # code corrects this but doesn't correct "don't know" correctly
+        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,
         TRUE ~ FALSE
       ),
-      know_worms_infectious = spread_worms == "yes"
+      know_worms_infectious = spread_worms == "yes",
+      externality_omnibus = fully_aware_externalities | know_worms_infectious
     )
   
     treated_past_present = "treated" %in% colnames(data) 
@@ -205,7 +236,8 @@ clean_worm_covariates = function(data) {
             treated == "no" ~ FALSE, 
             TRUE ~ NA
           ),
-      family_treated_lgl = family_treated == "yes"
+      family_treated_lgl = family_treated == "yes",
+       treated_past_year = treated_when %in% c("1-2 mon", "3-5 mon", "6-7 mon", "8-9 mon", "10-11 mon", "1 year")
         )
     }
     return(cov_data)

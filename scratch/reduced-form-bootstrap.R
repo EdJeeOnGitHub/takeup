@@ -21,7 +21,7 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-   --sms
+   --endline 
   " else commandArgs(trailingOnly = TRUE)
 )
 # TODO: Fix --sms and --heterogeneity
@@ -939,6 +939,8 @@ fob_levels %>%
 
 if (run_all || script_options$endline) run_section("Endline/Incentive/Preference/Travel", {
 
+
+
 ####  Endline Predicted Deworming Takeup
 endline_data = endline_data %>%
   mutate(
@@ -951,6 +953,18 @@ endline_data = endline_data %>%
     # different naming convention here
     have_ink = ink_visible
   ) 
+
+endline_data %>%
+  mutate(
+      have_incentive = coalesce(have_bracelet, have_ink, have_cal),
+      have_incentive_phone = coalesce(have_bracelet, have_ink, have_cal, !is.na(have_phone))
+  ) %>%
+  summarise(
+    n_not_na_incentive = sum(!is.na(have_incentive)),
+    n_na_incentive = sum(is.na(have_incentive)),
+    n_not_na_phone = sum(!is.na(have_incentive_phone)),
+    n_na_phone = sum(is.na(have_incentive_phone))
+  )
 
 
 pred_dworm_fit = function(data, weights) {
@@ -1026,6 +1040,20 @@ display_vars = c(
   "display_cal"
 )
 
+endline_data %>%
+  mutate(
+    have_incentive = coalesce(have_bracelet, have_ink, have_cal),
+    have_incentive_phone = coalesce(have_bracelet, have_ink, have_cal, !is.na(have_phone))
+  ) %>%
+  count(have_incentive_phone)
+
+endline_data %>%
+  mutate(
+    have_incentive = coalesce(have_bracelet, have_ink, have_cal),
+    have_incentive_phone = coalesce(have_bracelet, have_ink, have_cal, have_phone == "Yes")
+  ) %>%
+  count(have_incentive)
+
 endline_data = endline_data %>%
   mutate(
     display_bracelet = wear_bracelet == 1,
@@ -1057,6 +1085,13 @@ long_incentive_check_df = endline_data %>%
   ) %>%
   select(-name)
 
+
+long_incentive_check_df %>%
+  group_by(variable_type) %>%
+  summarise(
+    n_na = sum(is.na(value)),
+    n_non_na = sum(!is.na(value))
+  )
 
 tidy_incentive_check_df = long_incentive_check_df %>%
   filter(!is.na(value)) %>%
@@ -1145,7 +1180,6 @@ wide_incentive_check_input_df = wide_incentive_check_input_df %>%
   )
 
 incentive_check_tbl = wide_incentive_check_input_df %>%
-  select(-bad) %>%
   knitr::kable(
     format = "latex",
       col.names = c(
@@ -1154,10 +1188,12 @@ incentive_check_tbl = wide_incentive_check_input_df %>%
         "Link to deworming",
         "Received incentive",
         "Have incentive",
-        "Wearing/displayed"),
+        "Wearing/displayed",
+        "Reported any drawback"
+        ),
       escape = FALSE, 
       booktabs = TRUE,
-      align = "lcccc", 
+      align = "lccccc", 
       caption = "Endline Incentive Checks"
   ) %>% 
   row_spec(c(2), hline_after = TRUE) 

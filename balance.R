@@ -27,262 +27,21 @@ library(fixest)
 library(magrittr)
 library(furrr)
 
-
-
-
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
-source(file.path( "dist_structural_util.R"))
+source(file.path("dist_structural_util.R"))
 source(file.path("multilvlr", "multilvlr_util.R"))
-
-wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
-
-rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
-rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
-cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
-load(file.path("data", "takeup_village_pot_dist.RData"))
-load(file.path("data", "analysis.RData"))
-
-baseline.data = read_rds("temp-data/reclean_baseline_data.rds") # Not sampling data!
-
-baseline.data
-
-
-standardize <- as_mapper(~ (.) / sd(.))
-unstandardize <- function(standardized, original) standardized * sd(original)
-
-nosms_data <- analysis.data %>% 
-  filter(sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
-monitored_nosms_data <- analysis.data %>% 
-  filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>% 
-  left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-            by = "cluster.id") %>% 
-  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
-  group_by(cluster.id) %>% 
-  mutate(cluster_id = cur_group_id()) %>% 
-  ungroup()
-
-
-analysis_data <- monitored_nosms_data
-
-## Load Census Data
-census_data_env = new.env()
-with_env = function(f, e = parent.frame()) {
-    stopifnot(is.function(f))
-    environment(f) = e
-    f
-}
-load_census_function = function(){
-  load(file.path("data", "takeup_census.RData"))
-  return(census.data)
-}
-census_data = with_env(load_census_function, census_data_env)() %>%
-  rename(census.consent = consent) # Rename this to reduce chance of error
-
-n_indiv_df = census_data %>%
-    group_by(cluster.id) %>%
-    summarise(
-        n_per_cluster = sum(num.individuals)
-    )
-
-
-clean_worm_covariates = function(data) {
-  cov_data = data %>%
-    unnest(when_treat) %>%
-    mutate(
-      who_worms_other = if_else(is.na(who_worms_other), "", who_worms_other),
-      stop_worms_other = replace_na(stop_worms_other, ""),
-      when_treat = replace_na(when_treat, "DK"),
-      # these are nested lists of responses so we map_lgl and use any()
-      all_can_get_worms = map2_lgl(
-        who_worms, 
-        who_worms_other,
-        ~any(
-          "everyone" %in% .x | 
-          str_detect(str_to_lower(.y), "any") | 
-          (("adult" %in% .x) & ("child" %in% .x)) |
-          ("adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")) & ("child" %in% .x | str_detect(str_to_lower(.y), "child|under|young|teenager|below"))
-      )
-      ), 
-      adults_can_get_worms = map2_lgl(
-        who_worms,
-        who_worms_other,
-        ~any(
-          "everyone" %in% .x |
-          str_detect(str_to_lower(.y), "any") |
-          "adult" %in% .x | str_detect(str_to_lower(.y), "adult|man|woman|men|women|person")
-        )
-      ),
-      correct_when_treat = when_treat %in% c("every 3 months",
-                                             "every 6 months",
-                                             "every year"
-                                             ), 
-      know_how_stop_worms = map2_lgl(
-        stop_worms, 
-        stop_worms_other,
-        ~any(.x %in% c(
-          "medicine", 
-          "wearing shoes", 
-          "using toilets", 
-          "wash hands") | str_detect(.y, "cooked|prepar|cook"))),
-      adult_in_family_treated = who_treated %in% c("adult", "both"),
-      know_medicine_stops_worms = map_lgl(
-        stop_worms,
-        ~any("medicine" %in% .x,
-         na.rm = TRUE)
-      ),
-      know_children_get_worms = map2_lgl(
-        who_worms,
-        who_worms_other,
-        ~any(c("child", "everyone") %in% .x | str_detect(.y, "child"), na.rm = TRUE)
-      ),
-      sick_worms_only = map_lgl(
-        who_worms,
-        ~any(
-          .x == "sick",
-          na.rm = TRUE
-        )
-      ) 
-    )
-
-
-  cov_data = cov_data %>%
-    mutate(
-      fully_aware_externalities = case_when(
-        neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
-        # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
-        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
-        # variables use different binary encoding for yes/no and the original 
-        # code corrects this but doesn't correct "don't know" correctly
-        is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,
-        TRUE ~ FALSE
-      ),
-      know_worms_infectious = spread_worms == "yes",
-      externality_omnibus = fully_aware_externalities | know_worms_infectious
-    )
-  
-    treated_past_present = "treated" %in% colnames(data) 
-    if (treated_past_present) {
-      cov_data = cov_data %>%
-        mutate(
-          treated_lgl = case_when(
-            treated == "yes" ~ TRUE, 
-            treated == "no" ~ FALSE, 
-            TRUE ~ NA
-          ),
-      family_treated_lgl = family_treated == "yes",
-      treated_past_year = treated_when %in% c("1-2 mon", "3-5 mon", "6-7 mon", "8-9 mon", "10-11 mon", "1 year")
-        )
-    }
-    return(cov_data)
-}
-
-clean_pretreat_covariates = function(baseline_data, endline_data) {
-  drop_vars = c(
-    "starttime", 
-    "endtime", 
-    "age_census", 
-    "phone_census", 
-    "return",
-    "no_return",
-    "interview",
-    "no_interview",
-    "language_return",
-    "isValidated"
-    )
-  cov_data = bind_rows(
-    # baseline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "baseline"),
-    endline_data %>% select(-any_of(drop_vars)) %>% mutate(sample_type = "endline")
-  ) 
-  cov_data = cov_data %>%
-    mutate(
-      floor_tile_cement = floor == "Cement" | floor == "Tiles"
-    )
-  school_year_df = tribble(
-    ~school, ~years_schooling, 
-    "Never gone to school", 0,
-    "Primary 1", 1,
-    "Primary 2", 2,
-    "Primary 3", 3,
-    "Primary 4", 4,
-    "Primary 5", 5,
-    "Primary 6", 6,
-    "Primary 7", 7,
-    "Primary 8", 8,
-    "Secondary 1", 9,
-    "Secondary 2", 10,
-    "Secondary 3", 11,
-    "Secondary 4", 12,
-    "College", 13,
-    "University", 13
-  ) 
-  cov_data = cov_data %>%
-    mutate(
-      completed_primary = (school == "Primary 8" | str_detect(school, "Secondary|College|University"))
-    ) %>%
-    left_join(school_year_df) %>%
-    mutate(
-      have_phone_lgl = case_when(
-        have_phone == "Yes" ~ TRUE, 
-        have_phone == "No" ~ FALSE, 
-        TRUE ~ NA
-      )
-    )
-
-  # ethnicity and religion
-  cov_data = cov_data %>%
-    mutate(
-      ethnicity_luhya = ethnicity == "Luhya",
-      religion_christianity = religion == 1
-    )
-
-    return(cov_data)
-}
-
-
-baseline_worm = baseline.data %>%
-  clean_worm_covariates()
-clean_takeup_variables = function(data) {
-  data %>%
-    mutate(
-      female = gender == "female",
-      have_phone_lgl = phone_owner
-    )
-}
-analysis_data = analysis_data %>%
-  clean_takeup_variables()
-
-cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))  %>%
-  mutate(
-      treat_dist = paste0(
-      "treat: ", 
-      assigned.treatment,
-      ", dist: ", dist.pot.group
-      ) %>% factor()
-  ) %>%
-  select(cluster.id, treat_dist, cluster.dist.to.pot = dist.to.own.pot) %>%
-  unique()
-
-
-pretreat_data = clean_pretreat_covariates(baseline.data, endline.data) %>%
-  left_join(cluster_treat_df, by = "cluster.id") %>%
-  filter(!is.na(treat_dist))
-
-## Baseline Balance
-baseline_worm_data = baseline_worm %>%
-  inner_join(
-    cluster_treat_df, 
-    by = "cluster.id"
-  ) %>%
-  filter(!is.na(treat_dist))
+source(file.path("scratch", "reduced-form-setup.R"))
+# From running:
+# pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
+# where mu_d is the expected distance to the cluster
+# get the same result using actual distance.
+# using treatment dummies and putting them in the amelioration set includes everything 
+# which seems wrong
+l_cov_vars = c(
+  "female",
+  "age.census"
+)
 
 # monitoring checks
 sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv")
@@ -326,7 +85,6 @@ clean_sens_imp_df = sens_imp_df %>%
   ) 
 
 
-# Add church and add announce
 
 # aggregate to household level (for messages Q)
 # then to community
@@ -371,33 +129,26 @@ lhs_translation_df = tribble(
   ~lhs, ~clean_name, ~sample,
   "lhs: age.census", "Age", "takeup_sample",
   # "lhs: all_can_get_worms", "Know everyone can be infected", "baseline_worm",
+
   "lhs: adults_can_get_worms", "Know adults get worms", "baseline_worm",
   "lhs: know_children_get_worms", "Know children get worms", "baseline_worm",
   "lhs: sick_worms_only", "Believe deworming is for the sick", "baseline_worm",
   "lhs: know_medicine_stops_worms", "Know medication treats worms", "baseline_worm",
-
-
-
   "lhs: treated_lgl", "Dewormed in the past", "baseline_worm",
   "lhs: treated_past_year", "Dewormed in the past year", "baseline_worm",
+  "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
+  "lhs: externality_omnibus", "Know worms impose externality", "baseline_worm",
+
 
   "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
   "lhs: completed_primary", "Completed primary schooling", "pretreat",
-  "lhs: correct_when_treat", "Know bi-yearly treatment recommended", "baseline_worm",
-  "lhs: externality_omnibus", "Know worms impose externality", "baseline_worm",
-  # "lhs: fully_aware_externalities", "Fully understand worms impose externality", "baseline_worm",
-  "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
   "lhs: female", "Female", "takeup_sample",
   "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
-  # "lhs: know_how_stop_worms", "Know how to prevent worms", "baseline_worm",
   "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
   "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
   "lhs: years_schooling", "Years schooling", "pretreat",
   "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
   "lhs: religion_christianity", "Christian", "pretreat",
-  "lhs: family_treated_lgl", "$\\geq 1$ Family member dewormed", "baseline_worm",
-  "lhs: adult_in_family_treated", "Adults in family dewormed", "baseline_worm",
-  # "lhs: know_worms_infectious", "Know worms spread by infected", "baseline_worm",
   "lhs: know_deworm", "Know about community-based MDA?", "implementation",
   "lhs: treat_begin", "Know when MDA starts?", "implementation",
   "lhs: treat_end", "Know about MDA ends?", "implementation",
@@ -413,19 +164,17 @@ lhs_translation_df = tribble(
   "lhs: pct_knowledge_message", "CHV share deworming practices?", "implementation",
   "lhs: pct_avail_message", "CHV share where to get dewormed?", "implementation"
 ) 
+
+
 worm_vars = c(
-  "treated_lgl", 
-  "know_how_stop_worms",
-  "all_can_get_worms",
-  "adults_can_get_worms",
-  "correct_when_treat",
-  "fully_aware_externalities",
-  "know_worms_infectious",
-  "externality_omnibus",
-  "know_medicine_stops_worms",
+  "adults_can_get_worms", 
   "know_children_get_worms",
   "sick_worms_only",
-  "treated_past_year"
+  "know_medicine_stops_worms",
+  "treated_lgl",
+  "treated_past_year",
+  "correct_when_treat",
+  "externality_omnibus"
 )
 
 pretreat_vars = c(
@@ -475,9 +224,15 @@ stigma_vars = c(
   "stigma_dewor"
 )
 
+analysis_data %>%
+  select(cluster.id)
+
+census_data %>%
+  select(cluster.id)
 
 clean_census_data = census_data %>%
   filter(!is.na(assigned.treatment)) %>%
+  mutate(cluster.id = factor(cluster.id)) %>%
   right_join(
     analysis_data %>%
       select(cluster.id, dist.pot.group, cluster.dist.to.pot) %>%
@@ -494,7 +249,7 @@ analysis_data = analysis_data %>%
     group_by(cluster.id) %>%
     mutate(row_id = 1:n()) %>%
     left_join(
-      n_indiv_df %>% mutate(row_id = 1),
+      n_indiv_df %>% mutate(row_id = 1, cluster.id = factor(cluster.id)),
       by = c("cluster.id", "row_id")
     ) %>%
     ungroup() %>%
@@ -524,7 +279,7 @@ clean_census_data = clean_census_data %>%
 
 
 
-social_perception_baseline = baseline.data %>% 
+social_perception_baseline = baseline_data %>% 
   select(assigned.treatment, dist.pot.group, cluster.id, county, matches("^(praise|stigma)_[^_]+$")) %>% 
   gather(key = key, value = response, -assigned.treatment, -dist.pot.group, -cluster.id, -county)  %>%
   separate(key, c("praise.stigma", "topic"), "_") %>% 
@@ -535,6 +290,7 @@ social_perception_baseline = baseline.data %>%
     by = "cluster.id"
   ) %>%
   mutate(response_yes = response == "yes") 
+
 
 
 praise_df = social_perception_baseline %>%
@@ -554,14 +310,29 @@ stigma_df = social_perception_baseline %>%
   unnest(c(stigma_immuniz, stigma_dewor))
 
 #### Endline
-endline_worm_data = endline.data %>%
+
+baseline_data
+
+
+baseline_worm_data = baseline_data %>%
   inner_join(
     cluster_treat_df, 
     by = "cluster.id"
   ) %>%
   clean_worm_covariates()
 
-endline_implementation_data = endline.data %>%
+
+
+
+
+endline_worm_data = endline_data %>%
+  inner_join(
+    cluster_treat_df, 
+    by = "cluster.id"
+  ) %>%
+  clean_worm_covariates()
+
+endline_implementation_data = endline_data %>%
   inner_join(
     cluster_treat_df, 
     by = "cluster.id"
@@ -600,51 +371,32 @@ endline_vars = c(
   "know_worms_infectious"
   )
 
+# Removing list columns as they mess up marginaleffects
+endline_worm_data = endline_worm_data %>%
+  select(where(~!is.list(.)))
+endline_implementation_data = endline_implementation_data %>%
+  select(where(~!is.list(.)))
+baseline_worm_data = baseline_worm_data %>%
+  select(where(~!is.list(.)))
+pretreat_data = pretreat_data %>%
+  select(where(~!is.list(.)))
+clean_sens_imp_df = clean_sens_imp_df %>%
+  select(where(~!is.list(.)))
+praise_df = praise_df %>%
+  select(where(~!is.list(.)))
+stigma_df = stigma_df %>%
+  select(where(~!is.list(.)))
+pretreat_data = pretreat_data %>%
+  select(where(~!is.list(.)))
+clean_census_data = clean_census_data %>%
+  select(where(~!is.list(.)))
+analysis_data = analysis_data %>%
+  select(where(~!is.list(.)))
+
 
 ## If at cluster level, aggregate
-if (script_options$community_level) {
-  baseline_worm_data = baseline_worm_data %>%
-    group_by(cluster.id) %>%
-    summarise(
-      across(c(worm_vars, cluster.dist.to.pot), mean, na.rm = TRUE),
-      treat_dist = unique(treat_dist),
-      county = unique(county)
-      )
-
-
-  endline_worm_data = endline_worm_data %>%
-    group_by(cluster.id) %>%
-    summarise(
-      across(endline_vars, mean, na.rm = TRUE),
-      treat_dist = unique(treat_dist),
-      county = unique(county)
-      )
-
-  endline_implementation_data = endline_implementation_data %>%
-    group_by(cluster.id) %>%
-    summarise(
-      across(implementation_vars, mean, na.rm = TRUE),
-      treat_dist = unique(treat_dist),
-      county = unique(county)
-      )
-
-  clean_census_data = clean_census_data %>%
-    group_by(cluster.id) %>%
-    summarise(
-      across(any_of(unique(census_vars)), mean, na.rm = TRUE),
-      treat_dist = unique(treat_dist),
-      county = unique(county)
-    ) 
-
-  analysis_data = analysis_data %>%
-    group_by(cluster.id) %>%
-    summarise(
-      across(any_of(unique(takeup_vars)), mean, na.rm = TRUE),
-      treat_dist = unique(treat_dist),
-      county = unique(county)
-      )
-}
 ## Fits
+
 endline_worm_fit = feols(
     data = endline_worm_data, 
     .[endline_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
@@ -712,6 +464,7 @@ census_fit = feols(
 
 misc_fit = feols(
     data = analysis_data %>%
+      left_join(n_indiv_df %>% transmute(cluster.id = factor(cluster.id), n_per_cluster), by = "cluster.id") %>%
       select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
       # convert to Km for this table
       mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ), 
@@ -774,9 +527,10 @@ lhs_translation_df %>%
   pull(lhs)
 
 cov_vars = intersect(cov_vars, covariates_we_want)
+
 covariate_df = analysis_data %>%
-  select(cluster.id, all_of(takeup_vars), KEY.individ) %>%
-  select(-n_per_cluster) %>%
+  mutate(cluster.id = as.numeric(levels(cluster.id)[cluster.id])) %>%
+  select(cluster.id, any_of(takeup_vars), KEY.individ) %>%
   left_join(
     clust_n_df,
     by = "cluster.id"
@@ -802,20 +556,20 @@ covariate_df = analysis_data %>%
   )
 
 
-analysis_cov_df = analysis_data %>%
-  select(-all_of(takeup_vars)) %>%
-  left_join(
-    covariate_df,
-    by = "KEY.individ"
-  ) 
+# analysis_cov_df = analysis_data %>%
+#   select(-all_of(takeup_vars)) %>%
+#   left_join(
+#     covariate_df,
+#     by = "KEY.individ"
+#   ) 
 
 
-analysis_cov_df %>%
-  write_csv(
-    "temp-data/analysis-cluster-covariate-data.csv"
-  )
+# analysis_cov_df %>%
+#   write_csv(
+#     "temp-data/analysis-cluster-covariate-data.csv"
+#   )
 
-stop()
+
 
 
 create_balance_comparisons = function(fit) {
@@ -953,7 +707,8 @@ create_balance_comparisons = function(fit) {
 comp_balance_tidy_df = balance_fits %>%
   map_dfr(
     create_balance_comparisons, 
-    .id = "lhs"
+    .id = "lhs",
+    .progress = TRUE
   ) 
 
 balance_tidy_df = balance_fits %>%
@@ -961,7 +716,6 @@ balance_tidy_df = balance_fits %>%
     select(
         lhs, term, estimate, std.error, p.value
     )  
-
 
 
 comp_balance_tidy_df %>%
@@ -1101,7 +855,6 @@ balance_joint_tests = map(
 )
 
 
-
 balance_joint_tests %>%
     saveRDS(
         file.path(
@@ -1118,70 +871,8 @@ comp_endline_vars = endline_vars %>%
   str_remove(., "endline_")
 # comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
 
-endline_and_baseline_worm_data %>%
-  summarise(across(comp_endline_vars, var))
-
-endline_and_baseline_worm_data %>%
-  count(type)
-
-baseline_endline_worm_fit = feols(
-      data = endline_and_baseline_worm_data, 
-      .[comp_endline_vars] ~ 0 + treat_dist:type + i(county, ref = "Busia"), 
-      ~cluster.id
-      ) 
-
-perform_worm_change_test = function(data, var, R) {
-  subset_data = data %>%
-    select(all_of(var), treat_dist, type, cluster.id, county) %>%
-      na.omit()
-
-  fml = as.formula(paste0(var, " ~ 0 + treat_dist:type + i(county, ref = 'Busia')"))
-
-  fit = feols(
-    data = subset_data,
-    fml = fml,
-    ~cluster.id
-  )
-  # n_county = sum(str_detect(names(coef(fit)), "county"))
-  nrow_mat = ifelse(is.matrix(R), nrow(R), 1)
-  # county_0_mat = matrix(
-  #   0,
-  #   nrow = nrow_mat,
-  #   ncol = n_county
-  #   )
-
-  R = matrix(R, nrow = nrow_mat)
-  resid_df = fixest::degrees_freedom(fit, type = "resid")
-  test = car::lht(
-    fit,
-    R,
-    error.df = resid_df,
-    test = "F"
-  )
-  test_pval = test$`Pr(>F)`[2]
-  return(test_pval)
-}
 
 
-
-indiv_worm_comp_test = baseline_endline_worm_fit %>%
-  map(
-    ~comparisons(
-      .x,
-      variable = list(type = "reference"), 
-      newdata = datagrid(
-        treat_dist = unique(cluster_treat_df$treat_dist)
-      )
-    )
-  )
-
-indiv_worm_comp_df = tibble(
-  lhs = names(indiv_worm_comp_test), 
-  p.value = map(indiv_worm_comp_test, "p.value"), 
-  treat_dist = list(unique(cluster_treat_df$treat_dist)) 
-) %>%
-  mutate(lhs = str_remove(lhs, "lhs: ")) %>%
-    unnest(c(p.value, treat_dist))
 
 #' Another way to generate the hypothesis matrix - slightly more general
 generate_joint_worm_hyp_m = function(fit, treat_term, dist_term) {
@@ -1220,35 +911,12 @@ dist_treat_grid = expand_grid(
 ) %>%
   arrange(dist)
 
-worm_joint_hyp_matrix = map2(
-  dist_treat_grid$treat, 
-  dist_treat_grid$dist, 
-  ~generate_joint_worm_hyp_m(fit = baseline_endline_worm_fit[[1]], .x, .y )
-) %>%
-  do.call(rbind, .)
-
-
-joint_worm_p_value =  map_dbl(
-  comp_endline_vars,
-  ~perform_worm_change_test(
-    data = endline_and_baseline_worm_data, 
-    var = .x, 
-    R = worm_joint_hyp_matrix
-  )
-)
-
 gen_close_p_val = function(x){
   map(
       c(split(worm_joint_hyp_matrix[1:4, ], 1:4), list(worm_joint_hyp_matrix[1:4, ])),
       ~perform_worm_change_test(endline_and_baseline_worm_data, x, .x)
   )
 }
-
-
-indiv_close_worm_p_value =  map(
-  comp_endline_vars, 
-  gen_close_p_val
-)
 
 gen_far_p_val = function(x) {
   map(
@@ -1257,13 +925,6 @@ gen_far_p_val = function(x) {
 )
 }
 
-indiv_far_worm_p_value = map(comp_endline_vars, gen_far_p_val)
-
-
-endline_p_val_df = map(
-  1:length(comp_endline_vars), 
-  ~c(comp_endline_vars[.x], indiv_close_worm_p_value[[.x]] %>% unlist(), indiv_far_worm_p_value[[.x]] %>% unlist(), joint_worm_p_value[[.x]]))  %>%
-map_dfr(~data.frame(t(.x)))
 
 treat_levels_c = c("control", "ink", "calendar", "bracelet")
 treat_levels = c("ink", "calendar", "bracelet")
@@ -1276,35 +937,6 @@ col_order = c(
   "joint_p"
 )
 
-colnames(endline_p_val_df) = col_order
-
-endline_p_val_df = endline_p_val_df %>%
-  mutate(across(c(everything(), -lhs), as.numeric)) %>%
-  mutate(fit_type = "pval") 
-
-
-endline_tidy_df = endline_worm_fit %>%
-    map_dfr(tidy, .id = "lhs") %>%
-    select(
-        lhs, term, estimate, std.error, p.value
-    )  
-
-
-endline_tidy_df %>%
-    write_csv(
-        file.path(
-            script_options$output_path,
-            "endline_balance_tidy_df.csv"
-        )
-    )
-
-endline_p_val_df %>%
-    write_csv(
-        file.path(
-            script_options$output_path,
-            "endline_balance_p_val_df.csv"
-        )
-    )
 
 
 #### Social Perception Balanced ####
@@ -1374,6 +1006,7 @@ census_dist_fit = feols(
 
 takeup_dist_fit = feols(
   data = analysis_data %>%
+    left_join(n_indiv_df %>% transmute(cluster.id = factor(cluster.id), n_per_cluster), by = "cluster.id") %>%
     select(any_of(takeup_vars), treat_dist, county, cluster.id), 
   .[takeup_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
   ~cluster.id
@@ -1461,6 +1094,10 @@ ri_fun = function(draw) {
   )
 }
 
+analysis_data = analysis_data %>%
+  left_join(
+    n_indiv_df %>% transmute(cluster.id = factor(cluster.id), n_per_cluster), by = "cluster.id"
+  )
 
 if (script_options$fit_ri) {
   plan(multisession, workers = 12)
@@ -1579,45 +1216,4 @@ saveRDS(
     "saved_balance_data.rds"
   )
 )
-
-
-
-
-baseline.data %>%
-  unnest(when_treat)  %>%
-  count(when_treat) %>%
-  mutate(
-    prop = 100*n/sum(n)
-  ) %>%
-  mutate(ed = cumsum(prop))
-
-baseline.data %>%
-  colnames()
-
-baseline.data %>%
-  count(treated_when) %>%
-  mutate(
-    prop = 100*n/sum(n)
-  ) %>%
-  mutate(ed = cumsum(prop))
-
-
-
-## Rerunning worm fits as discovered a coding error in 
-# neighbour_worms_affect and worms_affect on 2025-08-08
-# just manually editing .tex file here rather than rerunning entire balance
-bl_worm = map_dfr(baseline_worm_fit, create_balance_comparisons, .id = "lhs")
-
-bl_worm %>%
-  filter(str_detect(lhs, "omni")) %>%
-  select(lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, estimate, std.error, p.value) %>%
-  mutate(p.value = round(p.value, 3)) 
-
-  (baseline_worm_fit %>%
-    map(~perform_balance_joint_test(.x, "", joint_R = hyp_matrix, close_R = hyp_matrix_close, far_R = hyp_matrix_far)))$`lhs: externality_omnibus`
-
-  perform_balance_joint_test(baseline_worm_fit, "", 
-    joint_R = hyp_matrix,
-    close_R = hyp_matrix_close,
-    far_R = hyp_matrix_far)
 

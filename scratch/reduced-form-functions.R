@@ -681,8 +681,8 @@ prep_tbl = function(tes, stat = "ci", stars = FALSE) {
             assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet > Calendar, $p$-value" = "Bracelet - Calendar"),
             assigned_treatment = fct_recode(assigned_treatment, "$|Calendar| - |Bracelet|$" = "Abs(Calendar) - Abs(Bracelet)"),
 
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal $\\neq$ No Signal, $p$-value"  = "Signal Two-Side Pval"), 
-            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet $\\neq$ Calendar, $p$-value" = "Bracelet - Calendar Two-Side Pval")
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Any Signal = No Signal, $p$-value"  = "Signal Two-Side Pval"), 
+            assigned_treatment = fct_recode(assigned_treatment, "$H0$: Bracelet = Calendar, $p$-value" = "Bracelet - Calendar Two-Side Pval")
         )  %>%
         filter(
           !(assigned_treatment %in% c("Bracelet - No Signal", "$H0$: Bracelet > Calendar, $p$-value", "$H0$: Any Signal > No Signal, $p$-value"))
