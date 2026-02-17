@@ -56,8 +56,17 @@ unstandardize <- function(standardized, original) standardized * sd(original)
 # Load datasets
 baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
 endline_data = read_rds("data/clean-data/clean-endline-data.rds")
+# all_endline_data = read_rds("data/clean-data/clean-endline-data-long.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
+
+
+# HHs in endline, not in know table
+in_endline_not_know_table = endline_data %>% 
+  select(KEY.individ, KEY) %>%
+  anti_join(summ_endline_know_table, by = c("KEY.individ" )) %>%
+  pull(KEY.individ) %>%
+  unique()
 
 analysis_data = read_rds("data/clean-data/monitored-nosms-takeup-data.rds")  %>%
   mutate(cluster_id_rank = dense_rank(cluster.id))
@@ -70,6 +79,9 @@ baseline_data = baseline_data %>%
   mutate(cluster_id_rank = dense_rank(cluster.id))
 
 # endline data, subset to those with SMS control - 2,659 individuals
+all_endline_data = endline_data %>%
+  mutate(cluster_id_rank = dense_rank(cluster.id))
+
 endline_data = endline_data %>%
   filter(sms.treatment == "sms.control") %>%
   mutate(

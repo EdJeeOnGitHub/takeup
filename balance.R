@@ -7,13 +7,17 @@ Options:
   --output-path=<path>  Where to save output files [default: {file.path('temp-data')}]
   --community-level
   --fit-ri
+  --main
+  --attrition
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --fit-ri
+    --attrition
     " else commandArgs(trailingOnly = TRUE)
 ) 
 
+
+run_all <- !any(script_options$main, script_options$attrition, script_options$continuous_distance)
 
 set.seed(12932)
 
@@ -27,11 +31,8 @@ library(fixest)
 library(magrittr)
 library(furrr)
 
-source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path("dist_structural_util.R"))
-source(file.path("multilvlr", "multilvlr_util.R"))
 source(file.path("scratch", "reduced-form-setup.R"))
+source("balance-functions.R")
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
 # where mu_d is the expected distance to the cluster
@@ -62,7 +63,6 @@ unique_hh_message_df = sens_imp_hh_df %>%
      ),
     availability_message = map_lgl(message_list, ~all(c(6, 7) %in% .x))
     )
-
 
 
 clean_sens_imp_df = sens_imp_df %>%
@@ -339,31 +339,6 @@ endline_implementation_data = endline_data %>%
   ) %>%
   clean_implementation_vars()
 
-endline_and_baseline_worm_data = bind_rows(
-  endline_worm_data %>%
-    select(
-      treat_dist, 
-      any_of(worm_vars),
-      cluster.id, 
-      county,
-      fully_aware_externalities,
-      ) %>%
-    mutate(
-      type = "endline"
-    ),
-  baseline_worm_data %>%
-    select(
-      treat_dist, 
-      any_of(worm_vars),
-      cluster.id,
-      county,
-      fully_aware_externalities
-      ) %>%
-    mutate(
-      type = "baseline"
-    )
-)
-
 endline_vars = c(
   "fully_aware_externalities",
   "all_can_get_worms", 
@@ -372,28 +347,14 @@ endline_vars = c(
   )
 
 # Removing list columns as they mess up marginaleffects
-endline_worm_data = endline_worm_data %>%
-  select(where(~!is.list(.)))
-endline_implementation_data = endline_implementation_data %>%
-  select(where(~!is.list(.)))
-baseline_worm_data = baseline_worm_data %>%
-  select(where(~!is.list(.)))
-pretreat_data = pretreat_data %>%
-  select(where(~!is.list(.)))
-clean_sens_imp_df = clean_sens_imp_df %>%
-  select(where(~!is.list(.)))
-praise_df = praise_df %>%
-  select(where(~!is.list(.)))
-stigma_df = stigma_df %>%
-  select(where(~!is.list(.)))
-pretreat_data = pretreat_data %>%
-  select(where(~!is.list(.)))
-clean_census_data = clean_census_data %>%
-  select(where(~!is.list(.)))
-analysis_data = analysis_data %>%
-  select(where(~!is.list(.)))
+for (nm in c("endline_worm_data", "endline_implementation_data", "baseline_worm_data",
+             "pretreat_data", "clean_sens_imp_df", "praise_df", "stigma_df",
+             "clean_census_data", "analysis_data")) {
+  assign(nm, select(get(nm), where(~!is.list(.))))
+}
 
 
+if (run_all || script_options$main)  {
 ## If at cluster level, aggregate
 ## Fits
 
@@ -430,9 +391,6 @@ sens_fit = feols(
   .[sens_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
   vcov =  "hetero"
 )
-
-
-
 
 praise_fit = feols(
   praise_df,
@@ -485,224 +443,8 @@ balance_fits = c(
   stigma_fit
 )
 
-
-#### Save data so we can use in PDS estimates ----------------------------------
-# takeup_vars
 clust_n_df = n_indiv_df %>%
   select(cluster.id, n_per_cluster)
-# pretreatment vars - pretreat_vars
-clust_pretreat_df = pretreat_data %>%
-  select(cluster.id, all_of(pretreat_vars)) %>%
-  group_by(cluster.id) %>%
-  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
-# baseline knowledge  - worm_vars
-clust_baseline_worm_df = baseline_worm_data %>%
-  select(cluster.id, all_of(worm_vars)) %>%
-  group_by(cluster.id) %>%
-  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
-# social image concerns  - praise_vars & stigma_vars
-clust_praise_df = praise_df %>%
-  select(cluster.id, all_of(praise_vars)) %>%
-  group_by(cluster.id) %>%
-  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
-clust_stigma_df = stigma_df %>%
-  select(cluster.id, all_of(stigma_vars)) %>%
-  group_by(cluster.id) %>%
-  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
-
-cov_vars = c(
-  "n_per_cluster",
-  pretreat_vars,
-  worm_vars,
-  praise_vars,
-  stigma_vars,
-  takeup_vars
-)
-
-covariates_we_want = 
-lhs_translation_df %>%
-  mutate(
-    lhs = str_remove(lhs, "lhs: ")
-  ) %>%
-  pull(lhs)
-
-cov_vars = intersect(cov_vars, covariates_we_want)
-
-covariate_df = analysis_data %>%
-  mutate(cluster.id = as.numeric(levels(cluster.id)[cluster.id])) %>%
-  select(cluster.id, any_of(takeup_vars), KEY.individ) %>%
-  left_join(
-    clust_n_df,
-    by = "cluster.id"
-  ) %>%
-  left_join(
-    clust_pretreat_df,
-    by = "cluster.id"
-  ) %>%
-  left_join(
-    clust_baseline_worm_df,
-    by = "cluster.id"
-  ) %>%
-  left_join(
-    clust_praise_df,
-    by = "cluster.id"
-  ) %>%
-  left_join(
-    clust_stigma_df,
-    by = "cluster.id"
-  ) %>%
-  select(
-    cluster.id, KEY.individ, all_of(cov_vars)
-  )
-
-
-# analysis_cov_df = analysis_data %>%
-#   select(-all_of(takeup_vars)) %>%
-#   left_join(
-#     covariate_df,
-#     by = "KEY.individ"
-#   ) 
-
-
-# analysis_cov_df %>%
-#   write_csv(
-#     "temp-data/analysis-cluster-covariate-data.csv"
-#   )
-
-
-
-
-create_balance_comparisons = function(fit) {
-  comp_df = avg_comparisons(
-    fit,
-    variables = list("treat_dist" = "all")
-  ) %>%
-  as_tibble()
-
-
-  comp_df = comp_df %>%
-    mutate(
-      lhs_treatment = str_extract(contrast, "treat: \\w+") %>% str_remove("treat: "),
-      # remove first treat word and search after it for next treat word
-      sub_str = str_extract(contrast, "(?<=treat).*"),
-      rhs_treatment = str_extract(sub_str, "treat: \\w+") %>% str_remove("treat: "),
-
-      lhs_dist = str_extract(contrast, "(?<=dist: )\\w+"),
-      sub_str_dist = str_extract(contrast, "(?<=dist: ).*"),
-      rhs_dist = str_extract(sub_str_dist, "(?<=dist: )\\w+")
-    )  %>%
-    select(-sub_str, -sub_str_dist)
-
-
-
-  same_dist_subset_comp_df = comp_df  %>%
-    filter(
-      lhs_dist == rhs_dist,
-      rhs_treatment == "control" | lhs_treatment == "control",
-      lhs_treatment != rhs_treatment
-    ) 
-
-  same_dist_bra_cal_comp_df = comp_df %>%
-    filter(lhs_dist == rhs_dist) %>%
-    filter(str_detect(contrast, "bracelet") & str_detect(contrast, "calendar"))
-
-    rhs_control_comp_df = same_dist_subset_comp_df %>%
-      filter(rhs_treatment == "control") %>%
-      bind_rows(
-        same_dist_bra_cal_comp_df %>%
-          filter(rhs_treatment == "calendar")
-      )
-
-    lhs_control_comp_df = same_dist_subset_comp_df %>%
-      filter(rhs_treatment != "control") %>%
-      bind_rows(
-        same_dist_bra_cal_comp_df %>%
-          filter(rhs_treatment == "bracelet")
-      )
-
-    lhs_control_comp_df = lhs_control_comp_df %>%
-      mutate(
-        new_estimate = estimate*-1, 
-        new_statistic = statistic*-1, 
-        new_conf.low = conf.high*-1,
-        new_conf.high = conf.low*-1,
-        new_lhs_treatment = rhs_treatment,
-        new_rhs_treatment = lhs_treatment
-      )  %>%
-      mutate(
-        estimate = new_estimate, 
-        statistic = new_statistic,
-        conf.low = new_conf.low,
-        conf.high = new_conf.high, 
-        lhs_treatment = new_lhs_treatment,
-        rhs_treatment = new_rhs_treatment
-      ) %>%
-      select(-contains('new_'))
-
-    rearranged_comp_df = bind_rows(
-      lhs_control_comp_df, 
-      rhs_control_comp_df
-   ) %>%
-   select(-contrast)
-
-
-    control_mean_df = fit %>%
-      tidy(conf.int = TRUE) %>%
-      filter(str_detect(term, "control")) %>%
-      mutate(
-        lhs_treatment = "control", rhs_treatment = NA, 
-        lhs_dist = if_else(str_detect(term, "close"), "close", "far"), 
-        rhs_dist = lhs_dist
-      ) %>%
-      select(
-        -term
-      )
-    sample_mean_df = tibble(
-      lhs_treatment = "control",
-      rhs_treatment = NA,
-      lhs_dist = "combined",
-      rhs_dist = "combined",
-      estimate = fitstat(fit, type = "my", verbose = FALSE)$my
-    )
-
-  rearranged_comp_df = rearranged_comp_df %>%
-    bind_rows(
-      control_mean_df,
-      sample_mean_df
-    ) %>%
-    mutate(comp_type = "treatment")
-
-    ## Now within treatment across distances
-    dist_control_mean_df = fit %>%
-      tidy(conf.int = TRUE) %>%
-      filter(str_detect(term, "close")) %>%
-      mutate(
-        lhs_treatment = str_extract(
-          term, 
-          "(?<=treat: )\\w+"),
-        rhs_treatment = NA,
-        lhs_dist = "close",
-        rhs_dist = NA
-      )
-
-    dist_comp_df = comp_df %>%
-      filter(
-        rhs_dist != lhs_dist,
-        lhs_treatment == rhs_treatment
-      )  %>%
-      select(-contrast) %>%
-      bind_rows(
-        dist_control_mean_df
-      ) %>%
-      mutate(comp_type = "distance")
-
-    final_clean_comp_df = bind_rows(
-      rearranged_comp_df,
-      dist_comp_df
-    )
-    return(final_clean_comp_df)
-}
-
 
 comp_balance_tidy_df = balance_fits %>%
   map_dfr(
@@ -716,7 +458,6 @@ balance_tidy_df = balance_fits %>%
     select(
         lhs, term, estimate, std.error, p.value
     )  
-
 
 comp_balance_tidy_df %>%
     write_csv(
@@ -872,71 +613,11 @@ comp_endline_vars = endline_vars %>%
 # comp_endline_vars = comp_endline_vars[comp_endline_vars != "know_deworming_stops_worms"]
 
 
-
-
-#' Another way to generate the hypothesis matrix - slightly more general
-generate_joint_worm_hyp_m = function(fit, treat_term, dist_term) {
-  hyp_df = fit %>%
-    tidy() %>%
-    select(term) %>% 
-    mutate(
-      treat = str_extract(term, "(?<=treat: ).*(?=,)"),
-      dist = str_extract(term, "(?<=dist: ).*(?=:)"), 
-      type = str_extract(term, "(?<=type).*$")
-    ) %>%
-    mutate(
-      val = 0,
-      val = if_else(
-        treat == treat_term &
-        dist == dist_term &
-        type == "baseline", 
-        -1, 
-        val
-        ),
-      val = if_else(
-        treat == treat_term &
-        dist == dist_term &
-        type == "endline", 
-        1, 
-        val
-        ),
-      val = if_else(str_detect(term, "county::"), 0, val)
-    )
-  return(hyp_df$val)
-}
-
 dist_treat_grid = expand_grid(
   treat = c("bracelet", "calendar", "ink", "control"), 
   dist = c("close", "far")
 ) %>%
   arrange(dist)
-
-gen_close_p_val = function(x){
-  map(
-      c(split(worm_joint_hyp_matrix[1:4, ], 1:4), list(worm_joint_hyp_matrix[1:4, ])),
-      ~perform_worm_change_test(endline_and_baseline_worm_data, x, .x)
-  )
-}
-
-gen_far_p_val = function(x) {
-  map(
-    c(split(worm_joint_hyp_matrix[5:8, ], 1:4), list(worm_joint_hyp_matrix[5:8, ])),
-    ~perform_worm_change_test(endline_and_baseline_worm_data,x,  .x)
-)
-}
-
-
-treat_levels_c = c("control", "ink", "calendar", "bracelet")
-treat_levels = c("ink", "calendar", "bracelet")
-col_order = c(
-  "lhs", 
-  paste0(treat_levels_c, "_close"),
-  "close_joint_p",
-  paste0(treat_levels_c, "_far"),
-  "far_joint_p",
-  "joint_p"
-)
-
 
 
 #### Social Perception Balanced ####
@@ -981,7 +662,6 @@ saveRDS(
       "praise_stigma_baseline.rds"
   )
 )
-
 
 
 
@@ -1167,7 +847,6 @@ balance_data = lst(
   pretreat_data, 
   baseline_worm_data,
   endline_worm_data,
-  endline_and_baseline_worm_data,
   clean_census_data,
   pretreat_data,
   endline_vars, 
@@ -1216,4 +895,236 @@ saveRDS(
     "saved_balance_data.rds"
   )
 )
+}
 
+#### Knowledge Table Attrition Analysis ####
+if (run_all || script_options$attrition) {
+
+library(fixest)
+endline_data = endline_data %>%
+  mutate(
+    not_in_know_table = KEY.individ %in% in_endline_not_know_table
+  )
+all_endline_data = all_endline_data %>%
+  mutate(
+    not_in_know_table = KEY.individ %in% in_endline_not_know_table
+  )
+
+
+# First attrition table: does treatment predict attrition from the know table?
+# (1) Pooled treatment effect on attrition
+attrition_pooled = endline_data %>%
+  feols(
+    not_in_know_table ~ i(assigned.treatment, ref = "control") | county,
+    cluster = ~cluster.id
+  )
+# (2) Treatment x distance interaction
+attrition_treat_dist = endline_data %>%
+  feols(
+    not_in_know_table ~ i(assigned.treatment, dist.pot.group, ref = "control") | county,
+    cluster = ~cluster.id
+  )
+# (3) Full sample (include SMS treat/control)
+attrition_sms_full = all_endline_data %>%
+  feols(
+    not_in_know_table ~ i(assigned.treatment, dist.pot.group, ref = "control") | county,
+    cluster = ~cluster.id
+  )
+
+# (3) F-test: joint significance of treatment indicators
+attrition_ftest = endline_data %>%
+  feols(
+    not_in_know_table ~ i(assigned.treatment, ref = "control") | county,
+    cluster = ~cluster.id
+  ) %>%
+  wald("assigned.treatment")
+
+setFixest_dict(c(
+  not_in_know_table = "Missing from Know Table",
+  "assigned.treatment::ink" = "Ink",
+  "assigned.treatment::calendar" = "Calendar",
+  "assigned.treatment::bracelet" = "Bracelet",
+  gender_num = "Gender",
+  have_phone_num = "Has Phone",
+  dist.to.pot = "Distance to POT (m)",
+  "dist.pot.group" = "Distance Group",
+  "close" = "Close",
+  "far" = "Far",
+  age = "Age"
+))
+
+tex_postprocessing = function(tex) {
+    tex %>%
+        str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
+        str_remove("\\\\end\\{table\\}") %>%
+        str_replace(
+          .,
+          "Covariate",
+          "\\\\midrule Covariate"
+        )
+}
+# ---- Attrition predicted by treatment status ----
+etable(attrition_pooled, attrition_treat_dist, attrition_sms_full,
+       headers = c("Pooled", "Treat $\\times$ Distance", "SMS Treatment Included"),
+       depvar = FALSE,
+       fitstat = c("n", "r2"),
+       se.below = TRUE,
+       tex = TRUE,
+       title = "Differential Attrition from Knowledge Table by Treatment Assignment",
+       label = "tab:attrition-treatment",
+       notes = "",
+       file = "presentations/tables/attrition-by-treatment.tex",
+       replace = TRUE,
+       postprocess.tex = tex_postprocessing,
+       digits = 3,
+       digits.stats = 3,
+       drop.section = "fixef",
+       style.df = style.df(depvar.title = "", fixef.title = "", var.title = "", stats.title = "")
+)
+
+# Second attrition table: are attrition housholds different on observables
+attrition_endline_data = endline_data %>%
+  select(-female, -age.census, -all_of(implementation_vars)) %>%
+  left_join(
+    select(clean_census_data, KEY.individ, all_of(census_vars)) %>% distinct(),
+    by = "KEY.individ"
+  ) %>%
+  left_join(
+    select(analysis_data, KEY.individ, any_of(takeup_vars)) %>% distinct(),
+    by = "KEY.individ"
+  ) %>%
+  left_join(
+    n_indiv_df %>% transmute(cluster.id, n_per_cluster),
+    by = "cluster.id"
+  ) %>%
+  left_join(
+    select(pretreat_data, KEY.individ, all_of(pretreat_vars)) %>% distinct(),
+    by = "KEY.individ"
+  ) %>%
+  left_join(
+    select(endline_worm_data, KEY.individ, any_of(worm_vars)) %>% distinct(),
+    by = "KEY.individ"
+  ) %>%
+  left_join(
+    select(endline_implementation_data, KEY.individ, all_of(implementation_vars)) %>% distinct(),
+    by = "KEY.individ"
+  ) %>%
+  left_join(
+    select(clean_sens_summ_imp_df, cluster.id, any_of(sens_vars)) %>% distinct()
+  )
+
+attrition_balance_vars = c(
+  age.census = "Age",
+  female = "Female",
+  have_phone_lgl = "Phone owner",
+  n_per_cluster = "Number of individuals per community",
+  cluster.dist.to.pot =  "Distance to PoT", 
+
+  floor_tile_cement = "Floor made of tile/cement",
+  completed_primary = "Completed primary schooling",
+  ethnicity_luhya = "Main ethnicity/Luhya",
+  religion_christianity = "Christian",
+
+  adults_can_get_worms = "Know adults can get worms",
+  know_children_get_worms = "Know children get worms",
+  sick_worms_only = "Believe deworming is for the sick",
+  know_medicine_stops_worms = "Know medication treats worms",
+  correct_when_treat = "Know bi-yearly treatment recommended",
+  externality_omnibus = "Know worms impose externality",
+
+  chv_visit = "Did a CHV visit you?",
+  pct_announce = "Announcement about MDA in your community?",
+  pct_knowledge_message = "CHV share deworming practices?",
+  pct_avail_message = "CHV share where to get dewormed?"
+)
+
+
+attrition_balance_df = map_dfr(names(attrition_balance_vars), function(v) {
+  fit = feols(as.formula(paste0(v, " ~ not_in_know_table | county")),
+              data = attrition_endline_data, cluster = ~cluster.id)
+  ct = coeftable(fit)
+
+  group_means = attrition_endline_data %>%
+    summarise(
+      mean_present = mean(.data[[v]][!not_in_know_table], na.rm = TRUE),
+      mean_missing = mean(.data[[v]][not_in_know_table], na.rm = TRUE),
+      n_present = sum(!is.na(.data[[v]]) & !not_in_know_table),
+      n_missing = sum(!is.na(.data[[v]]) & not_in_know_table)
+    )
+
+  tibble(
+    variable = v,
+    label = attrition_balance_vars[v],
+    mean_present = group_means$mean_present,
+    mean_missing = group_means$mean_missing,
+    diff = ct["not_in_know_tableTRUE", "Estimate"],
+    se = ct["not_in_know_tableTRUE", "Std. Error"],
+    pval = ct["not_in_know_tableTRUE", "Pr(>|t|)"],
+    n_present = group_means$n_present,
+    n_missing = group_means$n_missing
+  )
+})
+
+# Console output
+attrition_balance_df %>%
+  mutate(stars = case_when(pval < 0.01 ~ "***", pval < 0.05 ~ "**", pval < 0.1 ~ "*", TRUE ~ "")) %>%
+  select(label, mean_present, mean_missing, diff, se, pval, stars) %>%
+  print(n = Inf)
+
+# ---- .tex output ----
+fmt = function(x, d = 3) formatC(x, format = "f", digits = d)
+stars_tex = function(p) case_when(p < 0.01 ~ "^{***}", p < 0.05 ~ "^{**}", p < 0.1 ~ "^{*}", TRUE ~ "")
+
+tex_rows = attrition_balance_df %>%
+  mutate(row = paste0(
+    label, " & ",
+    fmt(mean_present), " & ",
+    fmt(mean_missing), " & ",
+    "$", fmt(diff), stars_tex(pval), "$ & ",
+    "$(", fmt(se), ")$ & ",
+    format(n_present + n_missing, big.mark = ","),
+    " \\\\"
+  )) %>%
+  pull(row)
+
+n_present_total = max(attrition_balance_df$n_present)
+n_missing_total = max(attrition_balance_df$n_missing)
+
+att_demo_vars = c("age.census", "female", "phone_owner", "n_per_cluster", "cluster.dist.to.pot", "floor_tile_cement", "completed_primary", "ethnicity_luhya", "religion_christianity")
+
+att_know_vars = c("adults_can_get_worms", "know_children_get_worms", "sick_worms_only", "know_medicine_stops_worms", "correct_when_treat", "externality_omnibus")
+
+att_impl_vars = c("chv_visit", "pct_announce", "pct_knowledge_message", "pct_avail_message")
+
+tex_table = c(
+  "\\centering",
+  "\\begin{tabular}{l ccccc}",
+  "\\hline\\hline",
+  paste0(" & \\multicolumn{1}{c}{Present} & \\multicolumn{1}{c}{Missing} & ",
+         "\\multicolumn{1}{c}{Difference} & \\multicolumn{1}{c}{SE} & \\multicolumn{1}{c}{N} \\\\"),
+  "\\hline",
+  "\\addlinespace",
+  "\\textit{Demographics} \\\\",
+  "\\addlinespace",
+  tex_rows[attrition_balance_df$variable %in% att_demo_vars],
+  "\\addlinespace",
+  "\\textit{Deworming Knowledge} \\\\",
+  "\\addlinespace",
+  tex_rows[attrition_balance_df$variable %in% att_know_vars],
+  "\\addlinespace",
+  "\\textit{Implementation} \\\\",
+  "\\addlinespace",
+  tex_rows[attrition_balance_df$variable %in% att_impl_vars],
+  "\\hline\\hline",
+  "\\end{tabular}"
+)
+
+writeLines(tex_table, "presentations/tables/attrition-covariate-balance.tex")
+
+
+# Finally, are baseline characteristics of attrition HHs in treat different to control
+
+attrition_endline_data %>%
+  filter(not_in_know_table) 
+
+}

@@ -239,12 +239,78 @@ endline_know_table_data = raw_endline_know_table_data %>%
   mutate(actual.other.dewormed.any.either = actual.other.dewormed.any.1 | (fct_match(know.table.type, "table.B") & actual.other.dewormed.any.2)) 
 
 
-# Missing some people in here - let's find from where
-endline_know_table_data %>%
-  filter(is.na(KEY.individ)) %>%
-  summarise(
-    n_parents = n_distinct(PARENT_KEY)
-  )
+analysis.data %>%
+  select(KEY)
+
+census_data %>%
+  select(KEY, KEY.individ) %>%
+  filter(KEY != KEY.individ) %>%
+  head()
+
+raw_endline_know_table_data %>%
+  select(KEY, PARENT_KEY) %>%
+  head()
+
+
+
+unmatched_raw_keys = raw_endline_know_table_data %>%
+  anti_join(
+    raw_endline_df %>% transmute(KEY, in_raw = TRUE),
+    by = c("PARENT_KEY" = "KEY")
+  ) %>%
+  select(PARENT_KEY)  %>%
+  unique()
+
+unmatched_all_keys = raw_endline_know_table_data %>%
+  anti_join(
+    all_endline_data %>% transmute(KEY, in_all = TRUE),
+    by = c("PARENT_KEY" = "KEY")
+  ) %>%
+  select(PARENT_KEY)  %>%
+  unique()
+
+library(magrittr)
+log_n = function(x, label = ""){
+  cat(label, ": ", n_distinct(x$KEY), "\n")
+  return(x)
+}
+
+
+census_data %>%
+  left_join(
+    summ_endline_know_table %>% transmute(KEY.individ, in_know_table = TRUE),
+    by = "KEY.individ"
+  ) %>%
+  select(contains("know"))
+
+
+raw_endline_df %T>%
+  log_n("N unique keys in raw endline data") %>%
+  filter(
+    KEY %in% unmatched_all_keys$PARENT_KEY
+  ) %T>%
+  log_n("N unique keys in raw endline data that are unmatched to know table") %>%
+  filter(deviceid != "(web)", present == 1, SubmissionDate >= "2016-10-18") %>% 
+  log_n("N unique keys after deviceid, present, and date filter") %>%
+  rename(cluster.id = cluster_id, lon = `gps-Longitude`, lat = `gps-Latitude`) %>%
+  filter(!is.na(lon), !is.na(lat)) %T>% 
+  log_n("N unique keys after GPS filter") %>%
+  select(-county) %>% 
+  left_join(cluster_wave_county_data, "cluster.id") %>% 
+    # Data fabricated by enumerators 111
+  filter(cluster.id != 1163 | SubmissionDate >= "2016-11-14", enumerator != 111) %T>%
+  log_n("N unique keys after removing fabricated data") %>%
+  filter(date(SubmissionDate) != "2016-11-7" | test == 1) %>% 
+  log_n("N unique keys after removing data from 2016-11-7 and test") 
+
+
+unmatched_clean_keys = raw_endline_know_table_data %>%
+  anti_join(
+    endline_data %>% transmute(KEY.individ, KEY, in_ana = TRUE),
+    by = c("PARENT_KEY" = "KEY")
+  ) %>%
+  select(PARENT_KEY)  %>%
+  unique()
 
 
 
@@ -254,6 +320,11 @@ in_endline_not_know_table = endline_data %>%
   anti_join(raw_endline_know_table_data, by = c("KEY" = "PARENT_KEY")) %>%
   pull(KEY) %>%
   unique()
+
+in_endline_not_know_table
+
+
+
 
 in_know_table_not_endline = raw_endline_know_table_data %>% 
   select(PARENT_KEY) %>%
@@ -294,8 +365,18 @@ endline_data = endline_data %>%
     in_know_table = KEY %in% raw_endline_know_table_data$PARENT_KEY
   )
 
+endline_know_table_data %>%
+  group_by(know.table.type) %>%
+  filter(is.na(KEY.individ))  %>%
+  summarise(
+    n_parent_keys = n_distinct(PARENT_KEY),
+    n_keys = n_distinct(KEY)
+  )
 
 summ_endline_know_table = endline_know_table_data %>%
+  mutate(
+    KEY.individ = if_else(is.na(KEY.individ), PARENT_KEY, KEY.individ)
+  ) %>%
   filter(!is.na(KEY.individ)) %>%
   mutate(
     # convert table A first person (as only 1 in table A) to yes/no
@@ -333,17 +414,22 @@ summ_endline_know_table = endline_know_table_data %>%
   ungroup()
 
 
+summ_endline_know_table %>%
+  skimr::skim()
+
 summ_know_A_df = summ_endline_know_table %>%
   filter(know.table.type == "table.A") 
 
 summ_know_B_df = summ_endline_know_table %>%
   filter(know.table.type == "table.B")
 
+# 3,596
 summ_endline_know_table %>%
   summarise(
     n_indiv = n_distinct(KEY.individ)
   )
 
+# 3,300
 endline_know_table_data %>%
   summarise(
     n_indiv = n_distinct(KEY.individ)
