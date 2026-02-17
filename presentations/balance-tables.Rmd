@@ -98,22 +98,34 @@ treat_levels_c = c("control", "ink", "calendar", "bracelet")
 treat_levels = c("ink", "calendar", "bracelet")
 dist_levels = c("close", "far")
 
-# load(file.path("data", "takeup_village_pot_dist.RData"))
-# load(file.path("data", "analysis.RData"))
 
-# standardize <- as_mapper(~ (.) / sd(.))
+col_order = c(
+  "lhs",
+  "control_combined",
+  paste0(treat_levels_c, "_close"),
+  "close_joint_p",
+  paste0(treat_levels_c, "_far"),
+  "far_joint_p",
+  "joint_p"
+)
 
-# monitored_nosms_data <- analysis.data %>%
-#   filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>%
-#   left_join(village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
-#             by = "cluster.id") %>%
-#   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>%
-#   group_by(cluster.id) %>%
-#   mutate(cluster_id = cur_group_id()) %>%
-#   ungroup()
+diff_names = c(
+  "con",
+  "ink - con",
+  "cal - con",
+  "bra - con",
+  "bra - cal"
+)
 
-# analysis_data <- monitored_nosms_data
-
+col_diff_order = c(
+  "lhs",
+  "con_combined",
+  paste0(diff_names, "_close"),
+  "close_joint_p",
+  paste0(diff_names, "_far"),
+  "far_joint_p",
+  "joint_p"
+)
 #' Save Latex table
 #'
 #' This function saves a latex table to file whilst removing the table environment
@@ -150,90 +162,6 @@ custom_save_latex_table = function(table, table_name){
 
     return(table)
 }
-```
-
-
-```{r}
-#| balance-reading
-
-balance_tidy_df = read_csv(
-  file.path("temp-data", "balance_tidy_df.csv")
-) %>%
-  filter(
-    !str_detect(term, "county::")
-  )
-
-
-comp_balance_tidy_df = read_csv(
-  file.path("temp-data", "comp_balance_tidy_df.csv")
-)
-
-balance_data = read_rds(
-  file.path(
-    "temp-data",
-    "saved_balance_data.rds"
-  )
-)
-
-balance_analysis_data = balance_data$analysis_data
-baseline_worm_data = balance_data$baseline_worm_data
-endline_vars = balance_data$endline_vars
-endline_and_baseline_worm_data = balance_data$endline_and_baseline_worm_data
-pretreat_data = balance_data$pretreat_data
-clean_census_data = balance_data$clean_census_data
-
-```
-
-
-
-```{r}
-#| joint-tests
-
-boot_fits = read_rds(
-  file.path("temp-data",
-            "cluster_balance_fits.rds")
-)
-
-joint_signif_fstats = map_dbl(
-  boot_fits, "joint_pval"
-) %>% round(4)
-
-close_joint_signif_fstats = map_dbl(
-  boot_fits, "close_pval"
-) %>% round(4)
-
-far_joint_signif_fstats = map_dbl(
-  boot_fits, "far_pval"
-) %>%
-  round(4)
-
-col_order = c(
-  "lhs",
-  "control_combined",
-  paste0(treat_levels_c, "_close"),
-  "close_joint_p",
-  paste0(treat_levels_c, "_far"),
-  "far_joint_p",
-  "joint_p"
-)
-
-diff_names = c(
-  "con",
-  "ink - con",
-  "cal - con",
-  "bra - con",
-  "bra - cal"
-)
-
-col_diff_order = c(
-  "lhs",
-  "con_combined",
-  paste0(diff_names, "_close"),
-  "close_joint_p",
-  paste0(diff_names, "_far"),
-  "far_joint_p",
-  "joint_p"
-)
 
 create_balance_input = function(tidy_df,
                                 col_order,
@@ -342,37 +270,7 @@ create_balance_input = function(tidy_df,
   return(wide_bal_input_df)
 }
 
-
-
-
-
-stratum_map = balance_analysis_data %>%
-  mutate(stratum = county) %>%
-  mutate(stratum_id = as.integer(stratum)) %>%
-  distinct(stratum_id, stratum)
-
-
-N_pretreat = nrow(baseline_worm_data)
-N_census = nrow(clean_census_data)
-N_takeup = nrow(balance_analysis_data)
-N_baseline_worm = nrow(baseline_worm_data)
-N_endline = nrow(balance_data$endline_worm_data)
-
-
-N_baseline_worm_obs  = baseline_worm_data  %>%
-  group_by(treat_dist) %>%
-  summarise(
-    N_indiv = n_distinct(KEY),
-    N_pot = n_distinct(cluster.id)
-  ) %>%
-  mutate(
-    type = "baseline"
-  )
-
-
-
 ```
-
 
 ```{r}
 #| baseline-covariate-naming
@@ -436,6 +334,93 @@ lhs_translation_df = tribble(
 
 
 ```
+
+
+```{r}
+#| balance-reading
+
+balance_tidy_df = read_csv(
+  file.path("temp-data", "balance_tidy_df.csv")
+) %>%
+  filter(
+    !str_detect(term, "county::")
+  )
+
+
+comp_balance_tidy_df = read_csv(
+  file.path("temp-data", "comp_balance_tidy_df.csv")
+)
+
+balance_data = read_rds(
+  file.path(
+    "temp-data",
+    "saved_balance_data.rds"
+  )
+)
+
+balance_analysis_data = balance_data$analysis_data
+baseline_worm_data = balance_data$baseline_worm_data
+endline_vars = balance_data$endline_vars
+endline_and_baseline_worm_data = balance_data$endline_and_baseline_worm_data
+pretreat_data = balance_data$pretreat_data
+clean_census_data = balance_data$clean_census_data
+
+```
+
+
+
+```{r}
+#| joint-tests
+
+boot_fits = read_rds(
+  file.path("temp-data",
+            "cluster_balance_fits.rds")
+)
+
+joint_signif_fstats = map_dbl(
+  boot_fits, "joint_pval"
+) %>% round(4)
+
+close_joint_signif_fstats = map_dbl(
+  boot_fits, "close_pval"
+) %>% round(4)
+
+far_joint_signif_fstats = map_dbl(
+  boot_fits, "far_pval"
+) %>%
+  round(4)
+
+
+
+
+
+stratum_map = balance_analysis_data %>%
+  mutate(stratum = county) %>%
+  mutate(stratum_id = as.integer(stratum)) %>%
+  distinct(stratum_id, stratum)
+
+
+N_pretreat = nrow(baseline_worm_data)
+N_census = nrow(clean_census_data)
+N_takeup = nrow(balance_analysis_data)
+N_baseline_worm = nrow(baseline_worm_data)
+N_endline = nrow(balance_data$endline_worm_data)
+
+
+N_baseline_worm_obs  = baseline_worm_data  %>%
+  group_by(treat_dist) %>%
+  summarise(
+    N_indiv = n_distinct(KEY),
+    N_pot = n_distinct(cluster.id)
+  ) %>%
+  mutate(
+    type = "baseline"
+  )
+
+
+
+```
+
 
 ```{r}
 #| balance-creation, dependson="balance-setup", eval=FALSE
@@ -907,6 +892,110 @@ baseline_perception_tbl %>%
     "baseline-perception-table"
   )
 
+
+```
+
+
+```{r}
+#| attrition-treat-balance
+
+attrition_treat_comp_df = read_csv(
+  file.path("temp-data", "attrition_treat_comp_df.csv")
+)
+
+attrition_treat_data = read_rds(
+  file.path("temp-data", "attrition_treat_joint_tests.rds")
+)
+attrition_treat_joint_tests = attrition_treat_data$joint_tests
+N_attrition = attrition_treat_data$n_attrition
+
+attrition_treat_joint_signif = map_dbl(attrition_treat_joint_tests, "joint_pval") %>% round(4)
+attrition_treat_close_joint = map_dbl(attrition_treat_joint_tests, "close_pval") %>% round(4)
+attrition_treat_far_joint = map_dbl(attrition_treat_joint_tests, "far_pval") %>% round(4)
+
+attrition_treat_wide = create_balance_input(
+  attrition_treat_comp_df %>%
+    filter(comp_type == "treatment" | term == "sample_mean") %>%
+    mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)),
+  col_order = col_order,
+  digits = 3,
+  comp_df = TRUE,
+  show_pval = TRUE
+) %>%
+  mutate(
+    close_joint_p = attrition_treat_close_joint,
+    far_joint_p = attrition_treat_far_joint,
+    joint_p = attrition_treat_joint_signif
+  ) %>%
+  select(all_of(col_diff_order)) %>%
+  mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+  mutate(across(where(is.character), replace_na, "-")) %>%
+  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample, row_num)) %>%
+  mutate(lhs = clean_name) %>%
+  select(-clean_name) %>%
+  arrange(sample, row_num) %>%
+  select(-sample, -row_num)
+
+colnames(attrition_treat_wide) = colnames(attrition_treat_wide) %>%
+  str_replace("_close", "") %>%
+  str_replace("_far", "") %>%
+  str_replace("con_combined", "Sample mean") %>%
+  str_to_title()
+
+att_treat_col_names = colnames(attrition_treat_wide)
+att_treat_col_names[1] = ""
+att_treat_col_names[att_treat_col_names == "Joint_p"] = "Joint Test"
+att_treat_col_names[att_treat_col_names == "Far_joint_p"] = "Joint Test"
+att_treat_col_names[att_treat_col_names == "Close_joint_p"] = "Joint Test"
+
+att_treat_panel_df = lhs_translation_df %>%
+  filter(clean_name %in% attrition_treat_wide$Lhs) %>%
+  count(sample) %>%
+  mutate(sample = factor(
+    sample,
+    levels = c("takeup_sample", "pretreat", "baseline_worm", "social_image_concerns", "census", "implementation")
+  )) %>%
+  arrange(sample) %>%
+  data.table::data.table()
+
+N_att_fmt = format(N_attrition, big.mark = ",")
+att_treat_panel_names = att_treat_panel_df$sample %>%
+  as.character() %>%
+  recode(
+    "takeup_sample" = str_glue("Panel A: Takeup sample, $N={N_att_fmt}$"),
+    "pretreat" = str_glue("Panel B: Baseline demographics, $N={N_att_fmt}$"),
+    "baseline_worm" = str_glue("Panel C: Deworming knowledge, $N={N_att_fmt}$"),
+    # "social_image_concerns" = str_glue("Panel D: Social image concerns, $N={N_att_fmt}$"),
+    "implementation" = str_glue("Panel D: Implementation, $N={N_att_fmt}$")
+  )
+
+att_treat_panel_list = att_treat_panel_df$n
+names(att_treat_panel_list) = att_treat_panel_names
+
+attrition_treat_bal_table = attrition_treat_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = att_treat_col_names,
+    caption = "Attrition Treatment Balance",
+    align = paste0("l", strrep("c", ncol(attrition_treat_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) %>%
+  pack_rows(
+    index = att_treat_panel_list,
+    italic = TRUE,
+    escape = FALSE,
+    hline_after = TRUE,
+    hline_before = TRUE,
+    bold = TRUE
+  )
+
+attrition_treat_bal_table %>%
+  custom_save_latex_table("attrition-treat-balance-table")
 
 ```
 

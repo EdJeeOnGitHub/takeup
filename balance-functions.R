@@ -130,3 +130,104 @@ create_balance_comparisons = function(fit) {
     return(final_clean_comp_df)
 }
 
+
+perform_balance_joint_test = function(fit, var, joint_R, close_R, far_R) {
+  county_0_mat = matrix(
+    0,
+    nrow = max(nrow(joint_R), nrow(close_R), nrow(far_R)),
+    ncol = coef(fit) %>% length() - 8
+    )
+
+  resid_df = fixest::degrees_freedom(fit, type = "resid")
+  close_test = car::lht(
+    fit,
+    cbind(close_R, county_0_mat[1:nrow(close_R), ]),
+    error.df = resid_df,
+    test = "F"
+  )
+
+  far_test = car::lht(
+    fit,
+    cbind(far_R, county_0_mat[1:nrow(far_R), ]),
+    error.df = resid_df,
+    test = "F"
+  )
+
+  joint_test = car::lht(
+    fit,
+    cbind(joint_R, county_0_mat[1:nrow(joint_R),]),
+    error.df = resid_df,
+    test = "F"
+  )
+
+
+  pvals = lst(
+    joint_pval = joint_test$`Pr(>F)`[2],
+    far_pval = far_test$`Pr(>F)`[2],
+    close_pval = close_test$`Pr(>F)`[2]
+  ) 
+
+  return(pvals)
+}
+
+perform_balance_joint_test = function(fit, var, joint_R, close_R, far_R) {
+  county_0_mat = matrix(
+    0,
+    nrow = max(nrow(joint_R), nrow(close_R), nrow(far_R)),
+    ncol = coef(fit) %>% length() - 8
+    )
+
+  resid_df = fixest::degrees_freedom(fit, type = "resid")
+  close_test = car::lht(
+    fit,
+    cbind(close_R, county_0_mat[1:nrow(close_R), ]),
+    error.df = resid_df,
+    test = "F"
+  )
+
+  far_test = car::lht(
+    fit,
+    cbind(far_R, county_0_mat[1:nrow(far_R), ]),
+    error.df = resid_df,
+    test = "F"
+  )
+
+  joint_test = car::lht(
+    fit,
+    cbind(joint_R, county_0_mat[1:nrow(joint_R),]),
+    error.df = resid_df,
+    test = "F"
+  )
+
+
+  pvals = lst(
+    joint_pval = joint_test$`Pr(>F)`[2],
+    far_pval = far_test$`Pr(>F)`[2],
+    close_pval = close_test$`Pr(>F)`[2]
+  ) 
+
+  return(pvals)
+}
+n_variables = 8
+# matrix R for test 
+hyp_matrix = cbind(
+  matrix(-1, nrow = n_variables - 1, ncol = 1 ), 
+  diag(x = 1, nrow = n_variables - 1, ncol = n_variables)[, 1:(n_variables - 1)]
+)
+
+zero_matrix = matrix(0, nrow = 3, ncol = n_variables - 1) 
+part_hyp_matrix = zero_matrix
+for (i in 1:3) {
+  part_hyp_matrix[i, 2*i] = 1
+}
+
+hyp_matrix_close = cbind(
+  matrix(-1, nrow = 3, ncol = 1), 
+  part_hyp_matrix
+)
+
+hyp_matrix_far = cbind(
+  matrix(0, nrow = 3, ncol = 1),
+  matrix(-1, nrow = 3, ncol = 1), 
+  part_hyp_matrix[, 1:(ncol(part_hyp_matrix) - 1)]
+)

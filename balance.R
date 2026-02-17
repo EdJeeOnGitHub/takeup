@@ -522,68 +522,6 @@ construct_joint_test_m = function(object) {
 ## I don't know how to do such a joint test in R easily so we setup the test matrix 
 ## manually for the wald test
 # Number of dist groups x treatment
-n_variables = 8
-# matrix R for test 
-hyp_matrix = cbind(
-  matrix(-1, nrow = n_variables - 1, ncol = 1 ), 
-  diag(x = 1, nrow = n_variables - 1, ncol = n_variables)[, 1:(n_variables - 1)]
-)
-
-zero_matrix = matrix(0, nrow = 3, ncol = n_variables - 1) 
-part_hyp_matrix = zero_matrix
-for (i in 1:3) {
-  part_hyp_matrix[i, 2*i] = 1
-}
-
-hyp_matrix_close = cbind(
-  matrix(-1, nrow = 3, ncol = 1), 
-  part_hyp_matrix
-)
-
-hyp_matrix_far = cbind(
-  matrix(0, nrow = 3, ncol = 1),
-  matrix(-1, nrow = 3, ncol = 1), 
-  part_hyp_matrix[, 1:(ncol(part_hyp_matrix) - 1)]
-)
-
-perform_balance_joint_test = function(fit, var, joint_R, close_R, far_R) {
-  county_0_mat = matrix(
-    0,
-    nrow = max(nrow(joint_R), nrow(close_R), nrow(far_R)),
-    ncol = coef(fit) %>% length() - 8
-    )
-
-  resid_df = fixest::degrees_freedom(fit, type = "resid")
-  close_test = car::lht(
-    fit,
-    cbind(close_R, county_0_mat[1:nrow(close_R), ]),
-    error.df = resid_df,
-    test = "F"
-  )
-
-  far_test = car::lht(
-    fit,
-    cbind(far_R, county_0_mat[1:nrow(far_R), ]),
-    error.df = resid_df,
-    test = "F"
-  )
-
-  joint_test = car::lht(
-    fit,
-    cbind(joint_R, county_0_mat[1:nrow(joint_R),]),
-    error.df = resid_df,
-    test = "F"
-  )
-
-
-  pvals = lst(
-    joint_pval = joint_test$`Pr(>F)`[2],
-    far_pval = far_test$`Pr(>F)`[2],
-    close_pval = close_test$`Pr(>F)`[2]
-  ) 
-
-  return(pvals)
-}
 
 balance_joint_tests = map(
   balance_fits,
@@ -1123,8 +1061,45 @@ writeLines(tex_table, "presentations/tables/attrition-covariate-balance.tex")
 
 
 # Finally, are baseline characteristics of attrition HHs in treat different to control
+# Among attrition HHs: y_vhB = β₀ + β₁ T_vh + ε_vhB, clustered at cluster level
 
-attrition_endline_data %>%
-  filter(not_in_know_table) 
+attrition_treat_data = attrition_endline_data %>%
+  select(-where(is.list)) %>%
+  filter(not_in_know_table) %>%
+  mutate(
+    treat_dist = paste0("treat: ", assigned.treatment, ", dist: ", dist.pot.group) %>% factor()
+  )
+
+n_attrition = nrow(attrition_treat_data)
+
+attrition_treat_fits = feols(
+  data = attrition_treat_data,
+  .[names(attrition_balance_vars)] ~ 0 + treat_dist + i(county, ref = "Busia"),
+  cluster = ~cluster.id
+)
+
+# Pairwise comparisons (control means, ink-con, cal-con, bra-con, bra-cal)
+attrition_treat_comp_df = attrition_treat_fits %>%
+  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+
+attrition_treat_comp_df %>%
+  write_csv(file.path(script_options$output_path, "attrition_treat_comp_df.csv"))
+
+# Joint tests (close, far, overall)
+attrition_treat_joint_tests = map(
+  attrition_treat_fits,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+list(
+  joint_tests = attrition_treat_joint_tests,
+  n_attrition = n_attrition
+) %>%
+  saveRDS(file.path(script_options$output_path, "attrition_treat_joint_tests.rds"))
 
 }
