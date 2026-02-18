@@ -54,6 +54,11 @@ analysis.data %>%
 
 stop()
 
+
+
+load(file.path("data", "analysis.RData"))
+census.data
+
 takeup_df = takeup.data %>%
   as_tibble()
 
@@ -72,6 +77,28 @@ load_census_function = function(){
 census_data = with_env(load_census_function, census_data_env)() %>%
   rename(census.consent = consent) # Rename this to reduce chance of error
 
+anne_census_df = census_data %>%
+  filter(!is.na(cluster.id))
+
+# 1352
+anne_census_df %>%
+  filter(true.monitored) %>%
+  count(sms.treatment)
+# 7155 + 2650 = 9805
+
+
+anne_census_df %>%
+  count(have_phone)
+
+anne_census_df %>%
+  filter(sms.treatment == "sms.control") %>%
+  filter(monitored) %>%
+  filter(have_phone == "No" | have_phone == "Don't know number") 
+
+anne_census_df %>%
+  filter(sms.treatment == "sms.control") %>%
+  filter(true.monitored) %>%
+  filter(have_phone == "No" | have_phone == "Don't know number") 
 
 
 census.data %>%
@@ -112,9 +139,27 @@ mon_truemon_diff_keys = census_data %>%
 monitored_nosms_data %>%
   filter(KEY.individ %in% mon_truemon_diff_keys) 
 
+census_data %>%
+  summarize(n_distinct(cluster.id))
+
+
+
 
 census_data %>%
   filter(is.na(sms.treatment) | sms.treatment == "sms.control")  %>%
+  count(monitored, true.monitored)
+
+
+census.data %>%
+  filter(is.na(sms.treatment) | sms.treatment == "sms.control")  %>%
+  filter(have_phone == "No") %>%
+  filter(monitored == TRUE) %>%
+  count(monitored, true.monitored)
+
+census_data %>%
+  filter(is.na(sms.treatment) | sms.treatment == "sms.control")  %>%
+  filter(have_phone == "No") %>%
+  filter(monitored == TRUE) %>%
   count(monitored, true.monitored)
 
 stop()

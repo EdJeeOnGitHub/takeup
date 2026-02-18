@@ -58,7 +58,7 @@ if (interactive()) {
         rf_models = "REDUCED_FORM_NO_RESTRICT",
         show_probs = FALSE,
         width = 0.95,
-        cache = TRUE
+        cache = FALSE
     )
     # source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
     # source(file.path("analysis_util.R"))
@@ -734,7 +734,7 @@ rename_lhs = function(data, name_var = term) {
 
 
 ```{r}
-#| baseline-perception-balance
+#| baseline-perception-balance, eval=FALSE
 
 baseline_perception_data = read_rds(
   "temp-data/praise_stigma_baseline.rds"
@@ -1000,6 +1000,109 @@ attrition_treat_bal_table %>%
 
 
 ```{r}
+#| non-attrition-treat-balance
+
+non_attrition_treat_comp_df = read_csv(
+  file.path("temp-data", "non_attrition_treat_comp_df.csv")
+)
+
+non_attrition_treat_data = read_rds(
+  file.path("temp-data", "non_attrition_treat_joint_tests.rds")
+)
+non_attrition_treat_joint_tests = non_attrition_treat_data$joint_tests
+N_non_attrition = non_attrition_treat_data$n_non_attrition
+
+non_attrition_treat_joint_signif = map_dbl(non_attrition_treat_joint_tests, "joint_pval") %>% round(4)
+non_attrition_treat_close_joint = map_dbl(non_attrition_treat_joint_tests, "close_pval") %>% round(4)
+non_attrition_treat_far_joint = map_dbl(non_attrition_treat_joint_tests, "far_pval") %>% round(4)
+
+non_attrition_treat_wide = create_balance_input(
+  non_attrition_treat_comp_df %>%
+    filter(comp_type == "treatment" | term == "sample_mean") %>%
+    mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)),
+  col_order = col_order,
+  digits = 3,
+  comp_df = TRUE,
+  show_pval = TRUE
+) %>%
+  mutate(
+    close_joint_p = non_attrition_treat_close_joint,
+    far_joint_p = non_attrition_treat_far_joint,
+    joint_p = non_attrition_treat_joint_signif
+  ) %>%
+  select(all_of(col_diff_order)) %>%
+  mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+  mutate(across(where(is.character), replace_na, "-")) %>%
+  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample, row_num)) %>%
+  mutate(lhs = clean_name) %>%
+  select(-clean_name) %>%
+  arrange(sample, row_num) %>%
+  select(-sample, -row_num)
+
+colnames(non_attrition_treat_wide) = colnames(non_attrition_treat_wide) %>%
+  str_replace("_close", "") %>%
+  str_replace("_far", "") %>%
+  str_replace("con_combined", "Sample mean") %>%
+  str_to_title()
+
+non_att_treat_col_names = colnames(non_attrition_treat_wide)
+non_att_treat_col_names[1] = ""
+non_att_treat_col_names[non_att_treat_col_names == "Joint_p"] = "Joint Test"
+non_att_treat_col_names[non_att_treat_col_names == "Far_joint_p"] = "Joint Test"
+non_att_treat_col_names[non_att_treat_col_names == "Close_joint_p"] = "Joint Test"
+
+non_att_treat_panel_df = lhs_translation_df %>%
+  filter(clean_name %in% non_attrition_treat_wide$Lhs) %>%
+  count(sample) %>%
+  mutate(sample = factor(
+    sample,
+    levels = c("takeup_sample", "pretreat", "baseline_worm", "social_image_concerns", "census", "implementation")
+  )) %>%
+  arrange(sample) %>%
+  data.table::data.table()
+
+N_non_att_fmt = format(N_non_attrition, big.mark = ",")
+non_att_treat_panel_names = non_att_treat_panel_df$sample %>%
+  as.character() %>%
+  recode(
+    "takeup_sample" = str_glue("Panel A: Takeup sample, $N={N_non_att_fmt}$"),
+    "pretreat" = str_glue("Panel B: Baseline demographics, $N={N_non_att_fmt}$"),
+    "baseline_worm" = str_glue("Panel C: Deworming knowledge, $N={N_non_att_fmt}$"),
+    "implementation" = str_glue("Panel D: Implementation, $N={N_non_att_fmt}$")
+  )
+
+non_att_treat_panel_list = non_att_treat_panel_df$n
+names(non_att_treat_panel_list) = non_att_treat_panel_names
+
+non_attrition_treat_bal_table = non_attrition_treat_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = non_att_treat_col_names,
+    caption = "Non-Attrited Treatment Balance",
+    align = paste0("l", strrep("c", ncol(non_attrition_treat_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) %>%
+  pack_rows(
+    index = non_att_treat_panel_list,
+    italic = TRUE,
+    escape = FALSE,
+    hline_after = TRUE,
+    hline_before = TRUE,
+    bold = TRUE
+  )
+
+non_attrition_treat_bal_table %>%
+  custom_save_latex_table("non-attrition-treat-balance-table")
+
+```
+
+
+```{r}
 #| monitoring-attrition-treat-balance
 
 mon_attrition_comp_df = read_csv(
@@ -1087,6 +1190,89 @@ mon_attrition_bal_table = mon_attrition_wide %>%
 
 mon_attrition_bal_table %>%
   custom_save_latex_table("monitoring-attrition-balance-table")
+
+```
+
+
+```{r}
+#| mon-non-attrition-treat-balance
+
+mon_non_attrition_comp_df = read_csv(
+  file.path("temp-data", "mon_non_attrition_comp_df.csv")
+)
+
+mon_non_attrition_data = read_rds(
+  file.path("temp-data", "mon_non_attrition_joint_tests.rds")
+)
+mon_non_attrition_joint_tests = mon_non_attrition_data$joint_tests
+N_mon_non_attrition = mon_non_attrition_data$n_mon_non_attrition
+
+mon_non_attrition_joint_signif = map_dbl(mon_non_attrition_joint_tests, "joint_pval") %>% round(4)
+mon_non_attrition_close_joint = map_dbl(mon_non_attrition_joint_tests, "close_pval") %>% round(4)
+mon_non_attrition_far_joint = map_dbl(mon_non_attrition_joint_tests, "far_pval") %>% round(4)
+
+mon_non_attrition_wide = create_balance_input(
+  mon_non_attrition_comp_df %>%
+    filter(comp_type == "treatment" | term == "sample_mean"),
+  col_order = col_order,
+  digits = 3,
+  comp_df = TRUE,
+  show_pval = TRUE
+) %>%
+  mutate(
+    close_joint_p = mon_non_attrition_close_joint,
+    far_joint_p = mon_non_attrition_far_joint,
+    joint_p = mon_non_attrition_joint_signif
+  ) %>%
+  select(all_of(col_diff_order)) %>%
+  mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+  mutate(across(where(is.character), replace_na, "-")) %>%
+  inner_join(mon_attrition_lhs_df %>% select(lhs, clean_name, sample, row_num)) %>%
+  mutate(lhs = clean_name) %>%
+  select(-clean_name) %>%
+  arrange(sample, row_num) %>%
+  select(-sample, -row_num)
+
+colnames(mon_non_attrition_wide) = colnames(mon_non_attrition_wide) %>%
+  str_replace("_close", "") %>%
+  str_replace("_far", "") %>%
+  str_replace("con_combined", "Sample mean") %>%
+  str_to_title()
+
+mon_non_att_col_names = colnames(mon_non_attrition_wide)
+mon_non_att_col_names[1] = ""
+mon_non_att_col_names[mon_non_att_col_names == "Joint_p"] = "Joint Test"
+mon_non_att_col_names[mon_non_att_col_names == "Far_joint_p"] = "Joint Test"
+mon_non_att_col_names[mon_non_att_col_names == "Close_joint_p"] = "Joint Test"
+
+N_mon_non_att_fmt = format(N_mon_non_attrition, big.mark = ",")
+mon_non_att_panel_list = c(length(unique(mon_attrition_lhs_df$lhs)))
+names(mon_non_att_panel_list) = str_glue("Panel A: Census variables, $N={N_mon_non_att_fmt}$")
+
+mon_non_attrition_bal_table = mon_non_attrition_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = mon_non_att_col_names,
+    caption = "Monitoring Non-Dropped Treatment Balance",
+    align = paste0("l", strrep("c", ncol(mon_non_attrition_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) %>%
+  pack_rows(
+    index = mon_non_att_panel_list,
+    italic = TRUE,
+    escape = FALSE,
+    hline_after = TRUE,
+    hline_before = TRUE,
+    bold = TRUE
+  )
+
+mon_non_attrition_bal_table %>%
+  custom_save_latex_table("mon-non-attrition-balance-table")
 
 ```
 

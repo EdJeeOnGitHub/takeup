@@ -94,6 +94,34 @@ raw_endline_df = read_csv(raw.data.path("Endline Survey.csv"), guess_max = 10000
         )
     )
 
+cat("\033[33mTotal rows in raw endline data: ", nrow(raw_endline_df), "\n\033[0m")
+
+raw_endline_df %>%
+  filter(cluster_id == 476) %>%
+  count(SubmissionDate >= "2016-10-18")
+
+init_endline_df = raw_endline_df %>%
+  # 5,114
+  filter(test != 2 | is.na(test)) %>%
+  # 4,883
+  filter(SubmissionDate >= "2016-10-18") %>%
+  # 4,672
+  # Data fabricated by enumerators 111
+  filter(enumerator != 111)  %>%
+  # 4,628
+  filter(cluster_id != 1163 | SubmissionDate >= "2016-11-14")  %>%
+  # 4,626
+  filter(!is.na(`gps-Longitude`), !is.na(`gps-Latitude`)) 
+  # 4,603
+
+# adjusting consent based on comments for those with missing consent but comments indicating refusal
+init_endline_df = init_endline_df %>%
+  mutate(
+    consent = case_when(
+      is.na(consent) & str_detect(tolower(comments), "refuse|decline|not interest|sent me|time|scared|busy") ~ FALSE,
+      TRUE ~ consent
+    )
+  )
 
 all_endline_data = raw_endline_df %>%
     filter(deviceid != "(web)", present == 1, SubmissionDate >= "2016-10-18") %>% 
@@ -132,12 +160,7 @@ all_endline_data = raw_endline_df %>%
   )
 
 
-all_endline_data %>%
-    filter(consent == 1) %>%
-    group_by(sms_status) %>%
-    summarise(
-        n = n_distinct(KEY.individ)
-    )
+cat("\033[33mTotal rows in all endline data after cleaning 1: ", nrow(all_endline_data), "\n\033[0m")
 
 n_reach_df = all_endline_data %>%
     group_by(sms_status) %>%
@@ -150,15 +173,17 @@ n_reach_df = all_endline_data %>%
     )
 
 
-cat("Reached total: ", n_reach_df %>% filter(sms_status == "total") %>% pull(n), " individuals in endline survey\n")
-cat("Reached SMS control: ", n_reach_df %>% filter(sms_status == "control") %>% pull(n), " individuals in endline survey\n")
-cat("Reached SMS treatment: ", n_reach_df %>% filter(sms_status == "treatment") %>% pull(n), " individuals in endline survey\n")
+# cat("\033[33mReached total: ", n_reach_df %>% filter(sms_status == "total") %>% pull(n), " individuals in endline survey\n\033[0m")
+# cat("\033[33mReached SMS control: ", n_reach_df %>% filter(sms_status == "control") %>% pull(n), " individuals in endline survey\n\033[0m")
+# cat("\033[33mReached SMS treatment: ", n_reach_df %>% filter(sms_status == "treatment") %>% pull(n), " individuals in endline survey\n\033[0m")
+
+cat("\033[33mTotal rows in all endline data after present/consent: ", nrow(all_endline_data), "\n\033[0m")
 
 
 endline_data = all_endline_data %>%
-    filter(consent == 1)  %>%
     prepare_endline_data(census_data, cluster_strat_data)
 
+cat("\033[33mTotal rows in endline data after cleaning 2: ", nrow(endline_data), "\n\033[0m")
 
 n_complete_df = endline_data %>%
     group_by(sms_status) %>%
@@ -169,9 +194,9 @@ n_complete_df = endline_data %>%
         summarise(., n = sum(n)) %>%
             mutate(sms_status = "total")
     )
-cat("Completed total: ", n_complete_df %>% filter(sms_status == "total") %>% pull(n), " individuals in endline survey\n")
-cat("Completed SMS control: ", n_complete_df %>% filter(sms_status == "control") %>% pull(n), " individuals in endline survey\n")
-cat("Completed SMS treatment: ", n_complete_df %>% filter(sms_status == "treatment") %>% pull(n), " individuals in endline survey\n")
+cat("\033[33mCompleted total: ", n_complete_df %>% filter(sms_status == "total") %>% pull(n), " individuals in endline survey\n\033[0m")
+cat("\033[33mCompleted SMS control: ", n_complete_df %>% filter(sms_status == "control") %>% pull(n), " individuals in endline survey\n\033[0m")
+cat("\033[33mCompleted SMS treatment: ", n_complete_df %>% filter(sms_status == "treatment") %>% pull(n), " individuals in endline survey\n\033[0m")
 
 
 
@@ -211,8 +236,6 @@ survey_know_list = file.path("instruments", "SurveyCTO Forms", "Endline Survey",
   mutate(wave = as.integer(wave))  %>%
   filter(wave == 1 | !is.na(survey.type))
 
-endline_data %>%
-    select(contains('treatment'), contains('dist'))
 
 endline_know_table_data = raw_endline_know_table_data %>%
   # Join on actual individuals from the endline
@@ -239,20 +262,6 @@ endline_know_table_data = raw_endline_know_table_data %>%
   mutate(actual.other.dewormed.any.either = actual.other.dewormed.any.1 | (fct_match(know.table.type, "table.B") & actual.other.dewormed.any.2)) 
 
 
-analysis.data %>%
-  select(KEY)
-
-census_data %>%
-  select(KEY, KEY.individ) %>%
-  filter(KEY != KEY.individ) %>%
-  head()
-
-raw_endline_know_table_data %>%
-  select(KEY, PARENT_KEY) %>%
-  head()
-
-
-
 unmatched_raw_keys = raw_endline_know_table_data %>%
   anti_join(
     raw_endline_df %>% transmute(KEY, in_raw = TRUE),
@@ -271,17 +280,10 @@ unmatched_all_keys = raw_endline_know_table_data %>%
 
 library(magrittr)
 log_n = function(x, label = ""){
-  cat(label, ": ", n_distinct(x$KEY), "\n")
+  cat("\033[33m", label, ": ", n_distinct(x$KEY), "\n\033[0m")
   return(x)
 }
 
-
-census_data %>%
-  left_join(
-    summ_endline_know_table %>% transmute(KEY.individ, in_know_table = TRUE),
-    by = "KEY.individ"
-  ) %>%
-  select(contains("know"))
 
 
 raw_endline_df %T>%
@@ -321,11 +323,6 @@ in_endline_not_know_table = endline_data %>%
   pull(KEY) %>%
   unique()
 
-in_endline_not_know_table
-
-
-
-
 in_know_table_not_endline = raw_endline_know_table_data %>% 
   select(PARENT_KEY) %>%
   anti_join(endline_data, by = c("PARENT_KEY" = "KEY")) %>%
@@ -364,6 +361,8 @@ endline_data = endline_data %>%
   mutate(
     in_know_table = KEY %in% raw_endline_know_table_data$PARENT_KEY
   )
+
+
 
 endline_know_table_data %>%
   group_by(know.table.type) %>%
@@ -457,3 +456,5 @@ summ_endline_know_table %>%
 
 endline_know_table_data %>%
     write_rds("data/clean-data/clean-endline-know-table-data-long.rds")
+
+cat("\033[33mTotal rows in endline data after saving: ", nrow(endline_data), "\n\033[0m")

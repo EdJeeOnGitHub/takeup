@@ -64,6 +64,8 @@ prepare_endline_data = function(.data, .census.data, .cluster.strat.data) {
   .data %>% 
     filter(across(c(present, interview, consent), ~ !is.na(.x) & .x == 1)) %>% 
     arrange(KEY.individ, SubmissionDate) %>% 
+    # new method - order early if not NA, otherwise order by date
+    # arrange(KEY.individ, is.na(dworm_rate), SubmissionDate) %>%
     group_by(KEY.individ) %>% 
     filter(row_number() == 1) %>% # If more than one entry for an individual, take first one (there are 22 such individuals)
     ungroup() %>% 

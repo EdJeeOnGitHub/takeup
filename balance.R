@@ -13,7 +13,7 @@ Options:
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --monitored-attrition
+    --attrition 
     " else commandArgs(trailingOnly = TRUE)
 )
 
@@ -838,17 +838,27 @@ saveRDS(
 
 #### Knowledge Table Attrition Analysis ####
 if (run_all || script_options$attrition) {
-
 library(fixest)
+
 endline_data = endline_data %>%
   mutate(
     not_in_know_table = KEY.individ %in% in_endline_not_know_table
   )
+
+endline_data %>%
+  count(not_in_know_table, in_know_table)
+
+
 all_endline_data = all_endline_data %>%
   mutate(
     not_in_know_table = KEY.individ %in% in_endline_not_know_table
   )
 
+
+stop()
+nrow(endline_data)
+nrow(all_endline_data)
+nrow(all_endline_data_frame)
 
 # First attrition table: does treatment predict attrition from the know table?
 # (1) Pooled treatment effect on attrition
@@ -863,6 +873,7 @@ attrition_treat_dist = endline_data %>%
     not_in_know_table ~ i(assigned.treatment, dist.pot.group, ref = "control") | county,
     cluster = ~cluster.id
   )
+
 # (3) Full sample (include SMS treat/control)
 attrition_sms_full = all_endline_data %>%
   feols(
@@ -1103,6 +1114,44 @@ list(
 ) %>%
   saveRDS(file.path(script_options$output_path, "attrition_treat_joint_tests.rds"))
 
+# ---- Non-attrited HHs: are their characteristics balanced across treatment? ----
+non_attrition_treat_data = attrition_endline_data %>%
+  select(-where(is.list)) %>%
+  filter(!not_in_know_table) %>%
+  mutate(
+    treat_dist = paste0("treat: ", assigned.treatment, ", dist: ", dist.pot.group) %>% factor()
+  )
+
+n_non_attrition = nrow(non_attrition_treat_data)
+
+non_attrition_treat_fits = feols(
+  data = non_attrition_treat_data,
+  .[names(attrition_balance_vars)] ~ 0 + treat_dist + i(county, ref = "Busia"),
+  cluster = ~cluster.id
+)
+
+non_attrition_treat_comp_df = non_attrition_treat_fits %>%
+  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+
+non_attrition_treat_comp_df %>%
+  write_csv(file.path(script_options$output_path, "non_attrition_treat_comp_df.csv"))
+
+non_attrition_treat_joint_tests = map(
+  non_attrition_treat_fits,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+list(
+  joint_tests = non_attrition_treat_joint_tests,
+  n_non_attrition = n_non_attrition
+) %>%
+  saveRDS(file.path(script_options$output_path, "non_attrition_treat_joint_tests.rds"))
+
 }
 
 # ============================================================================
@@ -1117,20 +1166,22 @@ if (run_all || script_options$monitored_attrition) {
 
 library(fixest)
 
+census_data = census_data %>%
+  filter(!is.na(cluster.id)) 
+
+
+
+
+
 # Construct survey_cto_dropped from census_data (has monitored & true.monitored)
 # and join onto full_analysis_data for analysis variables
 
 
-census_data %>%
-  count(monitored, true.monitored)
-census_data %>%
-  count(wave)
-
 mon_attrition_data = census_data %>%
-  filter(is.na(sms.treatment) | sms.treatment == "sms.control")  %>%
-  filter(have_phone == "No") %>%
-  filter(monitored == TRUE) %>%
-  filter(wave == 1) %>%
+  filter(!is.na(cluster.id)) %>%
+  filter(sms.treatment == "sms.control") %>%
+  filter(monitored) %>%
+  filter(have_phone == "No" | have_phone == "Don't know number") %>%
   mutate(
     survey_cto_dropped = monitored & !true.monitored
   ) %>%
@@ -1318,4 +1369,150 @@ list(
 ) %>%
   saveRDS(file.path(script_options$output_path, "monitoring_attrition_joint_tests.rds"))
 
+# ---- Monitoring non-dropped: are their characteristics balanced across treatment? ----
+mon_non_attrition_treat_data = mon_attrition_data %>%
+  filter(!survey_cto_dropped) %>%
+  mutate(
+    treat_dist = paste0("treat: ", assigned.treatment, ", dist: ", dist.pot.group) %>% factor()
+  )
+
+n_mon_non_attrition = nrow(mon_non_attrition_treat_data)
+
+mon_non_attrition_treat_fits = feols(
+  data = mon_non_attrition_treat_data,
+  .[names(mon_attrition_balance_vars)] ~ 0 + treat_dist,
+  cluster = ~cluster.id
+)
+
+mon_non_attrition_treat_comp_df = mon_non_attrition_treat_fits %>%
+  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+
+mon_non_attrition_treat_comp_df %>%
+  write_csv(file.path(script_options$output_path, "mon_non_attrition_comp_df.csv"))
+
+mon_non_attrition_treat_joint_tests = map(
+  mon_non_attrition_treat_fits,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+list(
+  joint_tests = mon_non_attrition_treat_joint_tests,
+  n_mon_non_attrition = n_mon_non_attrition
+) %>%
+  saveRDS(file.path(script_options$output_path, "mon_non_attrition_joint_tests.rds"))
+
 }
+
+
+# counts for mermaid diagram
+# census_data = census_data %>%
+#   filter(!is.na(cluster.id))
+
+
+# census_data = census_data %>%
+#   mutate(
+#     non_na_endline_type = !is.na(endline.type),
+#     sms_status = case_when(
+#       sms.treatment == "sms.control" ~ "control",
+#       sms.treatment %in% c("reminder.only", "social.info") ~ "treatment",
+#       TRUE ~ NA_character_
+#     )
+#   )
+
+# # SHould be SMS control 8,144, treat 3,022 
+# census_data %>%
+#   count(non_na_endline_type, sms_status)
+# # 8,144
+
+# census_data %>%
+#   filter(sms.consent & true.monitored) %>%
+#   count(non_na_endline_type, sms_status)
+# #3,022
+
+# # 11,166
+# sub_df = census_data %>%
+#   filter(
+#     (sms.consent & true.monitored) | (non_census_data = census_data %>%
+#   filter(!is.na(cluster.id))
+
+
+# census_data = census_data %>%
+#   mutate(
+#     non_na_endline_type = !is.na(endline.type),
+#     sms_status = case_when(
+#       sms.treatment == "sms.control" ~ "control",
+#       sms.treatment %in% c("reminder.only", "social.info") ~ "treatment",
+#       TRUE ~ NA_character_
+#     )
+#   )
+
+# # SHould be SMS control 8,144, treat 3,022 
+# census_data %>%
+#   count(non_na_endline_type, sms_status)
+# # 8,144
+
+# census_data %>%
+#   filter(sms.consent & true.monitored) %>%
+#   count(non_na_endline_type, sms_status)
+# #3,022
+
+# # 11,166
+# sub_df = census_data %>%
+#   filter(
+#     (sms.consent & true.monitored) | (non_na_endline_type & sms.treatment == "sms.control") 
+#   )
+# # 2,990 control and 1,230 treat
+# sub_df %>%
+#   group_by(endline, sms_status) %>%
+#   summarise(
+#     n_key = n_distinct(KEY),
+#     n_key_individ = n_distinct(KEY.individ)
+#   )
+# # 2,990 control and 1,228 actual treat
+
+
+# # roster selected = 2990 + 1230 -> 4220
+
+# colnames(sub_df)
+# # Reached should be: 3830
+# 2774 + 1056
+# # nrow(all_endline_data) = 3,678
+# nrow(all_endline_data)
+
+# all_endline_data %>%
+#   count(sms_status)
+
+# all_endline_data %>%
+#   filter(!is.na(cluster.id)) %>%
+#   count(sms_status)
+# na_endline_type & sms.treatment == "sms.control") 
+#   )
+# # 2,990 control and 1,230 treat
+# sub_df %>%
+#   group_by(endline, sms_status) %>%
+#   summarise(
+#     n_key = n_distinct(KEY),
+#     n_key_individ = n_distinct(KEY.individ)
+#   )
+# # 2,990 control and 1,228 actual treat
+
+
+# # roster selected = 2990 + 1230 -> 4220
+
+# colnames(sub_df)
+# # Reached should be: 3830
+# 2774 + 1056
+# # nrow(all_endline_data) = 3,678
+# nrow(all_endline_data)
+
+# all_endline_data %>%
+#   count(sms_status)
+
+# all_endline_data %>%
+#   filter(!is.na(cluster.id)) %>%
+#   count(sms_status)
