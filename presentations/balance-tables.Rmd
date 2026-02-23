@@ -163,6 +163,154 @@ custom_save_latex_table = function(table, table_name){
     return(table)
 }
 
+# ── Reusable balance table helpers ──────────────────────────────────────────
+
+# Format column names for kable (strip _close/_far suffixes, title-case, etc.)
+comp_table_col_names = function(wide_df) {
+  nms = colnames(wide_df) %>%
+    str_replace("_close", "") %>%
+    str_replace("_far", "") %>%
+    str_replace("con_combined", "Sample mean") %>%
+    str_to_title()
+  nms[1] = ""
+  nms[nms == "Joint_p"]       = "Joint Test"
+  nms[nms == "Far_joint_p"]   = "Joint Test"
+  nms[nms == "Close_joint_p"] = "Joint Test"
+  nms
+}
+
+# Build the wide comp df for a given set of lhs variables + their joint tests.
+# lhs_df   : rows of lhs_translation_df for the desired sample(s)
+# fits      : named list (boot_fits), keyed by lhs name
+build_comp_wide = function(comp_tidy, lhs_df, fits) {
+  lhs_names = lhs_df$lhs
+
+  get_pval = function(name, field) {
+    f = fits[[name]]
+    if (is.null(f)) NA_real_ else round(f[[field]], 4)
+  }
+
+  joint_pvals = tibble(
+    lhs           = lhs_names,
+    close_joint_p = map_dbl(lhs_names, get_pval, field = "close_pval"),
+    far_joint_p   = map_dbl(lhs_names, get_pval, field = "far_pval"),
+    joint_p       = map_dbl(lhs_names, get_pval, field = "joint_pval")
+  )
+
+  create_balance_input(
+    comp_tidy %>%
+      filter(lhs %in% lhs_names) %>%
+      filter(comp_type == "treatment" | term == "sample_mean") %>%
+      mutate(estimate = if_else(
+        str_detect(lhs, "pct_") & lhs_treatment == "control",
+        pmin(1, estimate), estimate
+      )),
+    col_order = col_order,
+    digits    = 3,
+    comp_df   = TRUE,
+    show_pval = TRUE
+  ) %>%
+    left_join(joint_pvals, by = "lhs") %>%
+    select(all_of(col_diff_order)) %>%
+    mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+    mutate(across(where(is.character), replace_na, "-")) %>%
+    inner_join(lhs_df %>% select(lhs, clean_name, sample, row_num), by = "lhs") %>%
+    mutate(lhs = clean_name) %>%
+    select(-clean_name) %>%
+    arrange(sample, row_num) %>%
+    select(-sample, -row_num)
+}
+
+# Render a wide comp df as a kable and optionally save it.
+render_comp_balance_table = function(wide_df, panel_list, caption, save_name = NULL) {
+  tbl = wide_df %>%
+    knitr::kable(
+      format    = "latex",
+      escape    = FALSE,
+      booktabs  = TRUE,
+      col.names = comp_table_col_names(wide_df),
+      caption   = caption,
+      align     = paste0("l", strrep("c", ncol(wide_df) - 1))
+    ) %>%
+    kable_styling(latex_options = "scale_down") %>%
+    add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) %>%
+    pack_rows(
+      index        = panel_list,
+      italic       = TRUE,
+      escape       = FALSE,
+      hline_after  = TRUE,
+      hline_before = TRUE,
+      bold         = TRUE
+    )
+  if (!is.null(save_name)) tbl = tbl %>% custom_save_latex_table(save_name)
+  tbl
+}
+
+build_dist_comp_wide = function(comp_tidy, lhs_df) {
+  lhs_names = lhs_df$lhs
+
+  levels_df = comp_tidy %>%
+    filter(lhs %in% lhs_names, comp_type == "distance", is.na(rhs_treatment)) %>%
+    mutate(estimate = if_else(
+      str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate
+    )) %>%
+    select(lhs, lhs_treatment, estimate, std.error) %>%
+    mutate(
+      lhs_treatment = factor(lhs_treatment, treat_levels_c),
+      across(c(estimate, std.error), round, 3),
+      lhs_treatment = str_to_title(str_sub(lhs_treatment, 1, 3)),
+      estim_std     = linebreak(paste0(estimate, "\n", str_glue("({std.error})")), align = "c")
+    ) %>%
+    select(-estimate, -std.error) %>%
+    pivot_wider(names_from = lhs_treatment, values_from = estim_std)
+
+  diffs_df = comp_tidy %>%
+    filter(lhs %in% lhs_names, comp_type == "distance", !is.na(rhs_treatment)) %>%
+    select(lhs, lhs_treatment, estimate, p.value) %>%
+    mutate(
+      lhs_treatment = factor(lhs_treatment, treat_levels_c),
+      across(c(estimate, p.value), round, 3),
+      lhs_treatment = paste0(
+        "$\\textrm{", str_to_title(str_sub(lhs_treatment, 1, 3)), "}_{\\text{far - close}}$"
+      ),
+      estim_std = linebreak(paste0(estimate, "\n", str_glue("{{[{p.value}]}}")), align = "c")
+    ) %>%
+    select(-estimate, -p.value) %>%
+    pivot_wider(names_from = lhs_treatment, values_from = estim_std)
+
+  inner_join(levels_df, diffs_df, by = "lhs") %>%
+    select(lhs, contains("Con"), contains("Ink"), contains("Cal"), contains("Bra")) %>%
+    inner_join(lhs_df %>% select(lhs, clean_name, sample, row_num), by = "lhs") %>%
+    mutate(lhs = clean_name) %>%
+    select(-clean_name) %>%
+    arrange(sample, row_num) %>%
+    select(-sample, -row_num)
+}
+
+render_dist_comp_table = function(wide_df, panel_list, caption, save_name = NULL) {
+  tbl = wide_df %>%
+    knitr::kable(
+      format    = "latex",
+      col.names = c("", colnames(wide_df)[2:ncol(wide_df)]),
+      escape    = FALSE,
+      booktabs  = TRUE,
+      align     = paste0("l", strrep("c", ncol(wide_df) - 1)),
+      linesep   = "",
+      caption   = caption
+    ) %>%
+    kable_styling(latex_options = "scale_down") %>%
+    pack_rows(
+      index        = panel_list,
+      italic       = TRUE,
+      escape       = FALSE,
+      hline_after  = TRUE,
+      hline_before = TRUE,
+      bold         = TRUE
+    )
+  if (!is.null(save_name)) tbl = tbl %>% custom_save_latex_table(save_name)
+  tbl
+}
+
 create_balance_input = function(tidy_df,
                                 col_order,
                                 digits = 3,
@@ -276,7 +424,6 @@ create_balance_input = function(tidy_df,
 #| baseline-covariate-naming
 lhs_translation_df = tribble(
   ~lhs, ~clean_name, ~sample,
-  "lhs: age.census", "Age", "takeup_sample",
 
   "lhs: adults_can_get_worms", "Know adults get worms", "baseline_worm",
   "lhs: know_children_get_worms", "Know children get worms", "baseline_worm",
@@ -293,10 +440,22 @@ lhs_translation_df = tribble(
   "lhs: floor_tile_cement", "Floor made of tile/cement", "pretreat",
   "lhs: completed_primary", "Completed primary schooling", "pretreat",
   "lhs: partially_aware_externalities", "Partially understands externalities", "baseline_worm",
+
+  "lhs: age.census", "Age", "takeup_sample",
   "lhs: female", "Female", "takeup_sample",
   "lhs: have_phone_lgl", "Phone owner", "takeup_sample",
   "lhs: n_per_cluster", "Number of individuals per community", "takeup_sample",
   "lhs: cluster.dist.to.pot", "Distance to PoT", "takeup_sample",
+
+
+
+  "lhs: belief_sample_age.census", "Age", "endline_belief_sample",
+  "lhs: belief_sample_female", "Female", "endline_belief_sample",
+  "lhs: belief_sample_have_phone_lgl", "Phone owner", "endline_belief_sample",
+  "lhs: belief_sample_n_per_cluster", "Number of individuals per community", "endline_belief_sample",
+  "lhs: belief_sample_cluster.dist.to.pot", "Distance to PoT", "endline_belief_sample",
+
+
   "lhs: years_schooling", "Years schooling", "pretreat",
   "lhs: ethnicity_luhya", "Main ethnicity/Luhya", "pretreat",
   "lhs: religion_christianity", "Christian", "pretreat",
@@ -329,7 +488,9 @@ lhs_translation_df = tribble(
           "baseline_worm",
           "social_image_concerns",
           "census",
-          "implementation"))) %>%
+          "implementation",
+          "endline_belief_sample"
+          ))) %>%
     arrange(sample, row_num)
 
 
@@ -405,6 +566,7 @@ N_census = nrow(clean_census_data)
 N_takeup = nrow(balance_analysis_data)
 N_baseline_worm = nrow(baseline_worm_data)
 N_endline = nrow(balance_data$endline_worm_data)
+N_endline_belief = balance_data$N_endline_belief
 
 
 N_baseline_worm_obs  = baseline_worm_data  %>%
@@ -460,182 +622,83 @@ comp_wide_indiv_bal_df = create_balance_input(
 
 ```{r, results="asis"}
 #| comp-balance-table,
-#| dependson=c("balance-setup", "balance-creation"), eval=FALSE
+#| dependson=c("balance-setup", "balance-creation")
 
-colnames(comp_wide_indiv_bal_df) = colnames(comp_wide_indiv_bal_df) %>%
-  str_replace(., "_close", "") %>%
-  str_replace(., "_far", "") %>%
-  str_replace(., "con_combined", "Sample mean") %>%
-  str_to_title()
+main_lhs_df = lhs_translation_df %>%
+  filter(!sample %in% c("endline_belief_sample", "social_image_concerns"))
 
+comp_wide_indiv_bal_df = build_comp_wide(comp_balance_tidy_df, main_lhs_df, boot_fits)
 
-bal_table_names = colnames(comp_wide_indiv_bal_df)
-bal_table_names[1] = ""
-bal_table_names[bal_table_names == "Joint_p"] = "Joint Test"
-bal_table_names[bal_table_names == "Far_joint_p"] = "Joint Test"
-bal_table_names[bal_table_names == "Close_joint_p"] = "Joint Test"
-1+1
+main_panel_label_map = c(
+  takeup_sample  = str_glue("Panel A: Takeup sample, $N={format(N_takeup, big.mark = ',')}$"),
+  pretreat       = str_glue("Panel B: Baseline demographics, $N={format(N_pretreat, big.mark = ',')}$"),
+  baseline_worm  = str_glue("Panel C: Deworming knowledge, $N={format(N_baseline_worm, big.mark = ',')}$"),
+  implementation = str_glue("Panel D: Implementation, $N={format(N_endline, big.mark = ',')}$")
+)
 
-n_per_comp_panel_df = lhs_translation_df %>%
-  filter(clean_name %in% comp_wide_indiv_bal_df$Lhs) %>%
+main_panel_list = main_lhs_df %>%
+  filter(clean_name %in% comp_wide_indiv_bal_df$lhs) %>%
   count(sample) %>%
-  mutate(sample = factor(
-    sample,
-    levels = c(
-      "pretreat",
-      "census",
-      "baseline_worm",
-      "social_image_concerns",
-      "takeup_sample"))) %>%
-  data.table::data.table(.)
+  arrange(sample) %>%
+  { setNames(.$n, main_panel_label_map[as.character(.$sample)]) }
 
-
-panel_names = c(
-      str_glue("Panel A: Takeup sample, $N={format(N_takeup, big.mark = ',')}$"),
-      str_glue("Panel B: Baseline demographics, $N={format(N_pretreat, big.mark = ',')}$"),
-      str_glue("Panel C: Baseline knowledge, $N={format(N_baseline_worm, big.mark = ',')}$"),
-      str_glue("Panel D: Social image concerns, $N={format(N_baseline_worm, big.mark = ',')}$"),
-      str_glue("Panel E: Implementation, $N={format(N_endline, big.mark = ',')}$")
+render_comp_balance_table(
+  comp_wide_indiv_bal_df,
+  main_panel_list,
+  caption   = "Balance Table",
+  save_name = "comp-balance-table"
 )
-
-panel_list = n_per_comp_panel_df$n
-names(panel_list) = panel_names
-
-comp_bal_table = comp_wide_indiv_bal_df %>%
-knitr::kable(
-    format = "latex",
-    escape = FALSE,
-    booktabs = TRUE,
-    col.names = bal_table_names,
-    caption = "Balance Table",
-    align = "lcccccccccccccc"
-) %>%
-kable_styling(
-  latex_options = c("scale_down")
-) %>%
-add_header_above(c("", "", "Close" = 6, "Far" = 6, ""))  %>%
-pack_rows(
-    index = panel_list,
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space,
-    hline_after = TRUE,
-    hline_before = TRUE,
-    bold = TRUE
-)
-
-
-comp_wide_indiv_bal_df
-
-comp_bal_table %>%
-  custom_save_latex_table("comp-balance-table")
 
 ```
 
 
-```{r}
-#| eval=FALSE
+```{r, results="asis"}
+#| dist-comp-balance-table
 
+dist_comp_wide = build_dist_comp_wide(comp_balance_tidy_df, main_lhs_df)
 
-dist_comp_df = inner_join(
- comp_balance_tidy_df %>%
-  filter(comp_type == "distance")  %>%
-  mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)) %>%
-  select(
-    lhs,
-    contains('lhs'),
-    contains("rhs"),
-    term,
-    estimate,
-    std.error,
-    p.value
-  ) %>%
-  filter(
-    is.na(rhs_treatment)
-  ) %>%
-  select(lhs, lhs_treatment, estimate, std.error ) %>%
-  mutate(lhs_treatment = factor(lhs_treatment, treat_levels_c)) %>%
-  mutate(
-    across(c(estimate, std.error), round, 3),
-    lhs_treatment = str_to_title(str_sub(lhs_treatment, 1, 3)),
-    estim_std = linebreak(paste0(estimate,"\n", str_glue("({std.error})")), align = "c")
-    ) %>%
-    select(-estimate, -std.error) %>%
-  pivot_wider(
-    names_from = lhs_treatment, values_from = estim_std
-  ) ,
-    # select(1,4, 5, 3, 2 ),
-
- comp_balance_tidy_df %>%
-  filter(comp_type == "distance")  %>%
-  select(
-    lhs,
-    contains('lhs'),
-    contains("rhs"),
-    term,
-    estimate,
-    std.error,
-    p.value
-  ) %>%
-  filter(
-    !is.na(rhs_treatment)
-  ) %>%
-  select(lhs, lhs_treatment, estimate, p.value ) %>%
-  mutate(lhs_treatment = factor(lhs_treatment, treat_levels_c)) %>%
-  mutate(
-    across(c(estimate, p.value), round, 3),
-    lhs_treatment = paste0(
-    "$\\textrm{",
-    str_to_title(str_sub(lhs_treatment, 1, 3)),
-    "}_{\\text{far - close}}",
-    "$"
-     ),
-    estim_std = linebreak(
-      paste0(estimate,"\n", str_glue("{{[{p.value}]}}")), align = "c")
-
-     ) %>%
-     select(-estimate, -p.value) %>%
-  pivot_wider(
-    names_from = lhs_treatment, values_from = estim_std
-  ) ,
-    # select(1,4, 5, 3, 2 ),
-  by = "lhs"
-) %>%
-  select(lhs, contains("Con"), contains("Ink"), contains("Cal"), contains("Bra"))
-
-
-dist_comp_bal_tbl = dist_comp_df %>%
-  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample, row_num)) %>%
-  mutate(lhs = clean_name) %>%
-  select(-clean_name) %>%
-  arrange(sample, row_num) %>%
-  select(-sample, -row_num)  %>%
-  knitr::kable(
-      format = "latex",
-      col.names = c("", colnames(.)[2:ncol(.)]),
-      escape = FALSE,
-      booktabs = TRUE,
-      align = "lcccccccc",
-      linesep = "",
-      caption = "Distance Comparison Balance table"
-  ) %>%
-  kable_styling(
-    latex_options = c("scale_down")
-  )   %>%
-pack_rows(
-    index = panel_list,
-    italic = TRUE,
-    escape = FALSE,
-    # latex_gap_space = latex_group_gap_space,
-    hline_after = TRUE,
-    hline_before = TRUE,
-    bold = TRUE
+render_dist_comp_table(
+  dist_comp_wide,
+  main_panel_list,
+  caption   = "Distance Comparison Balance table",
+  save_name = "dist-comp-balance-table"
 )
 
-dist_comp_bal_tbl %>%
-  custom_save_latex_table("dist-comp-balance-table")
+```
+
+
+
+```{r, results="asis"}
+#| endline-beliefs-table
+
+belief_lhs_df = lhs_translation_df %>%
+  filter(sample == "endline_belief_sample")
+
+belief_wide = build_comp_wide(comp_balance_tidy_df, belief_lhs_df, boot_fits)
+
+belief_panel_list = setNames(
+  nrow(belief_wide),
+  str_glue("Belief sample, $N=1,441$")
+)
+
+render_comp_balance_table(
+  belief_wide,
+  belief_panel_list,
+  caption   = "Belief Sample Balance",
+  save_name = "belief-sample-balance-table"
+)
+
+belief_dist_wide = build_dist_comp_wide(comp_balance_tidy_df, belief_lhs_df)
+
+render_dist_comp_table(
+  belief_dist_wide,
+  belief_panel_list,
+  caption   = "Belief Sample Distance Comparison",
+  save_name = "belief-sample-dist-comp-table"
+)
 
 ```
+
 
 ```{r}
 #| endline-table, eval=FALSE

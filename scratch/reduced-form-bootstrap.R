@@ -21,7 +21,7 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-   --endline 
+   --takeup 
   " else commandArgs(trailingOnly = TRUE)
 )
 # TODO: Fix --sms and --heterogeneity
@@ -328,7 +328,66 @@ etable(
 
 #### Takeup Continuous Distance + LASSO Covs + Cluster Expected Distance
 
+
+# TODO: run balance on these people
+
 if (run_all || script_options$takeup) run_section("Takeup Regressions", {
+
+# First, attrition by treatment
+cto_dropped_df = 
+census_data %>%
+  filter(!is.na(cluster.id)) %>%
+  filter(sms.treatment == "sms.control") %>%
+  filter(monitored) %>%
+  filter(have_phone == "No" | have_phone == "Don't know number") %>%
+  mutate(
+    survey_cto_dropped = monitored & !true.monitored
+  ) %>%
+  filter(survey_cto_dropped)  %>%
+  select(
+    KEY.individ, cluster.id
+  ) %>%
+  left_join(
+    analysis_data %>%
+      transmute(
+        cluster.id = as.numeric(levels(cluster.id)[cluster.id]), 
+        county, assigned_treatment, assigned_dist_group,
+        cluster_id, standard_cluster.dist.to.pot,
+        cluster_id_rank
+      ) %>%
+      distinct(),
+    by = "cluster.id"
+  )
+
+full_cto_dropped_df = bind_rows(
+  cto_dropped_df %>% 
+    mutate(dropped_cto = TRUE),
+  analysis_data %>% mutate(cluster.id = as.numeric(levels(cluster.id))[cluster.id]) %>%
+    mutate(dropped_cto = FALSE)
+)
+
+
+
+att_reg = function(data, weights) {
+  feols(
+    dropped_cto ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+attrition_cto_output = wrapper_function(
+  data = full_cto_dropped_df,
+  regression_spec = att_reg,
+  tidy_summ_path = "temp-data/tidy-rf-tes/attrition-cto-tidy-tes.csv",
+  table_name = "rf_attrition_cto_tbl",
+  table_options = list(
+    dependent_var = "Dependent variable: Dropped from monitored sample"
+  )
+)
+
+
 
 dist_cts_regression = function(data, weights) {
   feols(
@@ -940,7 +999,6 @@ fob_levels %>%
 if (run_all || script_options$endline) run_section("Endline/Incentive/Preference/Travel", {
 
 
-
 ####  Endline Predicted Deworming Takeup
 endline_data = endline_data %>%
   mutate(
@@ -954,17 +1012,37 @@ endline_data = endline_data %>%
     have_ink = ink_visible
   ) 
 
-endline_data %>%
+# Knowledge table attrition
+endline_data = endline_data %>%
   mutate(
-      have_incentive = coalesce(have_bracelet, have_ink, have_cal),
-      have_incentive_phone = coalesce(have_bracelet, have_ink, have_cal, !is.na(have_phone))
-  ) %>%
-  summarise(
-    n_not_na_incentive = sum(!is.na(have_incentive)),
-    n_na_incentive = sum(is.na(have_incentive)),
-    n_not_na_phone = sum(!is.na(have_incentive_phone)),
-    n_na_phone = sum(is.na(have_incentive_phone))
+    attrit_know_table = !in_know_table
   )
+know_table_fit = function(data, weights) {
+  feols(
+    attrit_know_table ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+know_table_attrit_output = wrapper_function(
+  data = endline_data,
+  regression_spec = know_table_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/know-table-attrition-tidy-tes.csv",
+  table_name = "know_table_attrition_spec_tbl",
+  table_options = list(
+    caption = "Knowledge Table Attrition", 
+    dependent_var = "Dependent variable: Not in knowledge table"
+    )
+)
+
+
+know_table_attrit_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
+
 
 
 pred_dworm_fit = function(data, weights) {

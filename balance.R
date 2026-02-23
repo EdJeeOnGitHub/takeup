@@ -10,10 +10,11 @@ Options:
   --main
   --attrition
   --monitored-attrition
+
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --attrition 
+    --main
     " else commandArgs(trailingOnly = TRUE)
 )
 
@@ -163,7 +164,14 @@ lhs_translation_df = tribble(
 
   "lhs: pct_announce", "Announcement about MDA in your community?", "implementation",
   "lhs: pct_knowledge_message", "CHV share deworming practices?", "implementation",
-  "lhs: pct_avail_message", "CHV share where to get dewormed?", "implementation"
+  "lhs: pct_avail_message", "CHV share where to get dewormed?", "implementation",
+
+
+  "lhs: belief_sample_n_per_cluster", "Number of individuals per community", "endline_belief_sample",
+  "lhs: belief_sample_female", "Female", "endline_belief_sample",
+  "lhs: belief_sample_have_phone_lgl", "Phone owner", "endline_belief_sample",
+  "lhs: belief_sample_age.census", "Age", "endline_belief_sample",
+  "lhs: belief_sample_cluster.dist.to.pot", "Distance to PoT", "endline_belief_sample"
 ) 
 
 
@@ -225,12 +233,6 @@ stigma_vars = c(
   "stigma_dewor"
 )
 
-analysis_data %>%
-  select(cluster.id)
-
-census_data %>%
-  select(cluster.id)
-
 clean_census_data = census_data %>%
   filter(!is.na(assigned.treatment)) %>%
   mutate(cluster.id = factor(cluster.id)) %>%
@@ -244,19 +246,6 @@ clean_census_data = census_data %>%
     age = age.census,
     have_phone_lgl = have_phone == "Yes" 
     )
-
-# Adding school (PoT) data to analysis df
-analysis_data = analysis_data %>%
-    group_by(cluster.id) %>%
-    mutate(row_id = 1:n()) %>%
-    left_join(
-      n_indiv_df %>% mutate(row_id = 1, cluster.id = factor(cluster.id)),
-      by = c("cluster.id", "row_id")
-    ) %>%
-    ungroup() %>%
-    select(-row_id) %>%
-    mutate(have_phone_lgl = have_phone == "Yes")
-
 
 
 analysis_data = analysis_data %>%
@@ -277,9 +266,6 @@ clean_census_data = clean_census_data %>%
       ) %>% factor()
   )  
   
-
-
-
 social_perception_baseline = baseline_data %>% 
   select(assigned.treatment, dist.pot.group, cluster.id, county, matches("^(praise|stigma)_[^_]+$")) %>% 
   gather(key = key, value = response, -assigned.treatment, -dist.pot.group, -cluster.id, -county)  %>%
@@ -291,7 +277,6 @@ social_perception_baseline = baseline_data %>%
     by = "cluster.id"
   ) %>%
   mutate(response_yes = response == "yes") 
-
 
 
 praise_df = social_perception_baseline %>%
@@ -311,20 +296,12 @@ stigma_df = social_perception_baseline %>%
   unnest(c(stigma_immuniz, stigma_dewor))
 
 #### Endline
-
-baseline_data
-
-
 baseline_worm_data = baseline_data %>%
   inner_join(
     cluster_treat_df, 
     by = "cluster.id"
   ) %>%
   clean_worm_covariates()
-
-
-
-
 
 endline_worm_data = endline_data %>%
   inner_join(
@@ -358,7 +335,6 @@ for (nm in c("endline_worm_data", "endline_implementation_data", "baseline_worm_
 if (run_all || script_options$main)  {
 ## If at cluster level, aggregate
 ## Fits
-
 endline_worm_fit = feols(
     data = endline_worm_data, 
     .[endline_vars] ~ 0 + treat_dist + i(county, ref = "Busia"), 
@@ -421,9 +397,10 @@ census_fit = feols(
     vcov = if(script_options$community_level) "hetero"
     ) 
 
+
+
 misc_fit = feols(
     data = analysis_data %>%
-      left_join(n_indiv_df %>% transmute(cluster.id = factor(cluster.id), n_per_cluster), by = "cluster.id") %>%
       select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
       # convert to Km for this table
       mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ), 
@@ -431,6 +408,34 @@ misc_fit = feols(
     cluster = if(script_options$community_level) NULL else ~cluster.id,
     vcov = if(script_options$community_level) "hetero"
   )
+
+
+endline_belief_keys = endline_data %>%
+  inner_join(
+    summ_endline_know_table %>% filter(know.table.type == "table.A"), 
+    by = c("KEY.individ")
+  ) %>%
+  filter(obs_know_person > 0)  %>%
+  pull(KEY.individ)
+
+
+endline_misc_vars = paste0("belief_sample_", takeup_vars)
+
+misc_fit_endline_belief_sample = feols(
+    data = analysis_data %>%
+      filter(KEY.individ %in% endline_belief_keys) %>%
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      # convert to Km for this table
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ) %>%
+      rename_with(
+        ~paste0("belief_sample_", .), any_of(takeup_vars)
+      ),
+    .[endline_misc_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+    cluster = if(script_options$community_level) NULL else ~cluster.id,
+    vcov = if(script_options$community_level) "hetero"
+)
+
+
 # put all the baseline balance fits into a list we can map over
 balance_fits = c(
   baseline_worm_fit,
@@ -441,7 +446,8 @@ balance_fits = c(
   misc_fit,
   sens_fit,
   praise_fit,
-  stigma_fit
+  stigma_fit,
+  misc_fit_endline_belief_sample
 )
 
 clust_n_df = n_indiv_df %>%
@@ -625,7 +631,6 @@ census_dist_fit = feols(
 
 takeup_dist_fit = feols(
   data = analysis_data %>%
-    left_join(n_indiv_df %>% transmute(cluster.id = factor(cluster.id), n_per_cluster), by = "cluster.id") %>%
     select(any_of(takeup_vars), treat_dist, county, cluster.id), 
   .[takeup_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
   ~cluster.id
@@ -713,10 +718,6 @@ ri_fun = function(draw) {
   )
 }
 
-analysis_data = analysis_data %>%
-  left_join(
-    n_indiv_df %>% transmute(cluster.id = factor(cluster.id), n_per_cluster), by = "cluster.id"
-  )
 
 if (script_options$fit_ri) {
   plan(multisession, workers = 12)
@@ -781,20 +782,25 @@ ri_p_val_df = plot_perm_fit_df %>%
   ) 
 
 
+N_endline_belief = analysis_data %>%
+  filter(KEY.individ %in% endline_belief_keys) %>%
+  nrow()
+
 balance_data = lst(
-  analysis_data, 
-  pretreat_data, 
+  analysis_data,
+  pretreat_data,
   baseline_worm_data,
   endline_worm_data,
   clean_census_data,
   pretreat_data,
-  endline_vars, 
+  endline_vars,
   worm_vars,
   pretreat_vars,
   census_vars,
   plot_perm_fit_df,
   ri_p_val_df,
-  realised_fit_df
+  realised_fit_df,
+  N_endline_belief
 )
 
 
@@ -855,7 +861,6 @@ all_endline_data = all_endline_data %>%
   )
 
 
-stop()
 nrow(endline_data)
 nrow(all_endline_data)
 nrow(all_endline_data_frame)
@@ -942,10 +947,6 @@ attrition_endline_data = endline_data %>%
   left_join(
     select(analysis_data, KEY.individ, any_of(takeup_vars)) %>% distinct(),
     by = "KEY.individ"
-  ) %>%
-  left_join(
-    n_indiv_df %>% transmute(cluster.id, n_per_cluster),
-    by = "cluster.id"
   ) %>%
   left_join(
     select(pretreat_data, KEY.individ, all_of(pretreat_vars)) %>% distinct(),
@@ -1168,9 +1169,6 @@ library(fixest)
 
 census_data = census_data %>%
   filter(!is.na(cluster.id)) 
-
-
-
 
 
 # Construct survey_cto_dropped from census_data (has monitored & true.monitored)

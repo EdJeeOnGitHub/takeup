@@ -54,11 +54,6 @@ analysis.data %>%
 
 stop()
 
-
-
-load(file.path("data", "analysis.RData"))
-census.data
-
 takeup_df = takeup.data %>%
   as_tibble()
 
@@ -76,6 +71,12 @@ load_census_function = function(){
 }
 census_data = with_env(load_census_function, census_data_env)() %>%
   rename(census.consent = consent) # Rename this to reduce chance of error
+
+
+
+baseline_data %>%
+  select(contains("dist"))
+
 
 anne_census_df = census_data %>%
   filter(!is.na(cluster.id))
