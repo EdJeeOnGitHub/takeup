@@ -56,7 +56,6 @@ unstandardize <- function(standardized, original) standardized * sd(original)
 # Load datasets
 baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
 endline_data = read_rds("data/clean-data/clean-endline-data.rds")
-# all_endline_data = read_rds("data/clean-data/clean-endline-data-long.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
 

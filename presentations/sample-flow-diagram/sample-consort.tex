@@ -32,7 +32,7 @@
 \node[draw, rounded corners=2pt, align=center,
       text width=21cm, inner sep=6pt]
   (census)
-  {\textbf{Census frame:} 144 clusters,\ 39{,}301 adults (18+)};
+  {\textbf{Household census:} 144 clusters,\ 39{,}301 adults (18+)};
 
 %% ═══════════════════════════════════════════════════════════════════
 %% COLUMN A — Baseline
@@ -49,8 +49,9 @@
 \node[box, below=of bl-tgt] (bl-reach)
   {Reached: 2{,}062};
 
-\node[analysis, below=of bl-reach] (bl-comp)
-  {Completed baseline: 1{,}995\\(\emph{Main analysis sample})};
+\node[analysis, dashed, below=of bl-reach] (bl-comp)
+  {\textbf{``Baseline sample''}\\
+  Completed baseline: 1{,}995};
 
 %% Side branch: not completed (exits left from Reached)
 \node[box, left=16mm of bl-reach, anchor=east] (bl-nc)
@@ -66,7 +67,7 @@
 %% ── Column A group box ───────────────────────────────────────────
 \node[colgroup,
       fit=(bl-sel)(bl-tgt)(bl-reach)(bl-comp)(bl-nc),
-      label={[font=\small\bfseries]above:Baseline}] {};
+      label={[font=\small\bfseries]above:Baseline survey}] {};
 
 %% ═══════════════════════════════════════════════════════════════════
 %% COLUMN B — Monitored sample
@@ -77,8 +78,10 @@
 \node[mon, below=40mm of census, anchor=north] (mon-uniq)
   {Total unique\\(deduplicated): 12{,}827};
 
-\node[analysis, dashed, below=of mon-uniq] (mon-ana)
-  {Excl. SMS treatment: 9{,}805\\(\emph{Main analysis sample})};
+\node[analysis, below=of mon-uniq] (mon-ana)
+  {\textbf{``Take-up analysis sample''}\\
+  Excl.\ SMS treatment: 9{,}805};
+  % {Excl. SMS treatment: 9{,}805\\(\emph{``Take-up analysis sample''})};
 
 %% ── Arrows ───────────────────────────────────────────────────────
 % Baseline roster enters from col A
@@ -89,7 +92,7 @@
 %% ── Column B group box ───────────────────────────────────────────
 \node[colgroup,
       fit=(mon-uniq)(mon-ana),
-      label={[font=\small\bfseries, yshift=8mm]above:Monitored takeup sample}] {};
+      label={[font=\small\bfseries, yshift=8mm]above:Administrative take-up data}] {};
 
 %% ═══════════════════════════════════════════════════════════════════
 %% COLUMN C — Endline
@@ -109,8 +112,10 @@
 \node[box, below=of el-reach] (el-comp)
   {Completed endline: 3{,}729};
 
-\node[analysis, below=of el-comp] (el-comp-nosms)
-  {Excl.\ SMS treatment: 2{,}659\\(\emph{Main analysis sample})};
+\node[analysis, dashed, below=of el-comp] (el-comp-nosms)
+  {\textbf{``Endline sample''}\\
+  Excl.\ SMS treatment: 2{,}659};
+  % {Excl.\ SMS treatment: 2{,}659\\(\emph{``Endline sample''})};
 
 %% Side branch: not completed (exits right from Reached)
 \node[box, right=16mm of el-reach, anchor=west] (el-nc)
@@ -120,6 +125,14 @@
 \node[issue, right=16mm of el-comp, anchor=west] (el-miss)
   {Missing knowledge\\module: 255};
 
+%% Node below missing knowledge module
+\node[analysis, below=of el-miss] (el-know)
+  {\textbf{``Endline observability sample''}\\
+  Observability module \& Excl.\ SMS treatment: 1{,}141
+  };
+  % {1{,}141 individuals};
+
+
 %% ── Arrows ───────────────────────────────────────────────────────
 \draw[arrow] (census.south) -- ++(0,-6mm) -| (el-frame.north);
 \draw[arrow] (el-frame) -- (el-sel);
@@ -128,11 +141,12 @@
 \draw[arrow] (el-reach.east) -- (el-nc.west);
 \draw[arrow] (el-comp)  -- (el-comp-nosms);
 \draw[arrow] (el-comp.east) -- (el-miss.west);
+\draw[arrow] (el-miss) -- (el-know);
 
 %% ── Column C group box ───────────────────────────────────────────
 \node[colgroup,
-      fit=(el-frame)(el-sel)(el-reach)(el-comp)(el-comp-nosms)(el-miss)(el-nc),
-      label={[font=\small\bfseries]above:Endline}] {};
+      fit=(el-frame)(el-sel)(el-reach)(el-comp)(el-comp-nosms)(el-miss)(el-nc)(el-know),
+      label={[font=\small\bfseries]above:Endline survey}] {};
 
 %% ── Cross-column: el-frame forks → Total unique and → Dropped ──
 % Split point midway between cols B and C, at el-frame height

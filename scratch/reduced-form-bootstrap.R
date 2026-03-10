@@ -21,7 +21,7 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-   --takeup 
+   --beliefs 
   " else commandArgs(trailingOnly = TRUE)
 )
 # TODO: Fix --sms and --heterogeneity
@@ -589,6 +589,8 @@ endline_belief_df = endline_data %>%
   mutate(cluster_id = cluster.id)
 
 
+
+
 # IDs in summ_know_A_df that aren't in endline_data
 anti_join(summ_know_A_df, endline_data, by = "KEY.individ") %>%
   pull(KEY.individ)  %>% unique() %>% length()
@@ -681,6 +683,133 @@ discrete_fob_output = wrapper_function(
 )
 
 
+
+# ── Lee bounds for discrete_fob_output ───────────────────────────────────────
+# lee_base: full population for computing weighted selection rates per bootstrap draw.
+# Column names aligned to assigned_treatment / assigned_dist_group to match endline_know_A_df.
+
+lee_base = endline_data %>%
+  filter(sms.treatment == "sms.control") %>%
+  filter(!(KEY.individ %in% summ_know_B_df$KEY.individ)) %>%
+  mutate(
+    in_fob_sample       = KEY.individ %in% endline_know_A_df$KEY.individ,
+    assigned_treatment  = assigned.treatment,
+    assigned_dist_group = dist.pot.group
+  )
+
+fob_lee_upper = wrapper_function(
+  data            = endline_know_A_df %>% mutate(prop_knows = prop_know_fob),
+  regression_spec = discrete_f_know,
+  lee_direction   = "upper",
+  lee_base_data   = lee_base,
+  tidy_summ_path  = "temp-data/tidy-rf-tes/fob-lee-upper-tidy-tes.csv",
+  table_name      = "fob_lee_upper_tbl",
+  table_options   = list(dependent_var = "Dependent variable: FOB (Lee upper bound)")
+)
+
+fob_lee_lower = wrapper_function(
+  data            = endline_know_A_df %>% mutate(prop_knows = prop_know_fob),
+  regression_spec = discrete_f_know,
+  lee_direction   = "lower",
+  lee_base_data   = lee_base,
+  tidy_summ_path  = "temp-data/tidy-rf-tes/fob-lee-lower-tidy-tes.csv",
+  table_name      = "fob_lee_lower_tbl",
+  table_options   = list(dependent_var = "Dependent variable: FOB (Lee lower bound)")
+)
+
+
+fob_lee_lower$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+fob_lee_upper$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
+discrete_fob_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
+
+# Build Lee bounds table: same layout as nice_kbl_table but showing [lb, ub] intervals
+lee_bounds_tbl = function(lower_output, upper_output, caption, dependent_var) {
+  tbl_dist_levels     = c("combined", "close", "far", "far - close")
+  tbl_contrast_levels = c("bracelet", "calendar", "ink", "control", "Observations")
+
+  lower_est = lower_output$tidy_summary %>%
+    select(assigned_treatment, assigned_dist_group, lb = estimate, se_lb = std_error, pval, n_obs_line, show_pval_only)
+
+  upper_est = upper_output$tidy_summary %>%
+    select(assigned_treatment, assigned_dist_group, ub = estimate, se_ub = std_error)
+
+  # For close/far/combined: lb from lower model, ub from upper model
+  cell_bounds = lower_est %>%
+    left_join(upper_est, by = c("assigned_treatment", "assigned_dist_group")) %>%
+    filter(assigned_dist_group != "far - close")
+
+  # Far-close: correct interval arithmetic
+  # lb(far - close) = lb(far) - ub(close)
+  # ub(far - close) = ub(far) - lb(close)
+  # SEs combined in quadrature
+  far_close_bounds = lower_est %>%
+    filter(assigned_dist_group %in% c("far", "close")) %>%
+    left_join(upper_est, by = c("assigned_treatment", "assigned_dist_group")) %>%
+    select(assigned_treatment, assigned_dist_group, lb, ub, se_lb, se_ub, pval, n_obs_line, show_pval_only) %>%
+    pivot_wider(names_from = assigned_dist_group, values_from = c(lb, ub, se_lb, se_ub, pval)) %>%
+    mutate(
+      lb      = lb_far - ub_close,
+      ub      = ub_far - lb_close,
+      se_lb   = sqrt(se_lb_far^2 + se_ub_close^2),
+      se_ub   = sqrt(se_ub_far^2 + se_lb_close^2),
+      pval    = pval_far,
+      assigned_dist_group = "far - close"
+    ) %>%
+    select(assigned_treatment, assigned_dist_group, lb, ub, se_lb, se_ub, pval, n_obs_line, show_pval_only)
+
+  tbl = bind_rows(cell_bounds, far_close_bounds) %>%
+    mutate(
+      estim_std = case_when(
+        n_obs_line ~ pval,
+        TRUE       ~ linebreak(
+          paste0("[", round(lb, 3), ", ", round(ub, 3), "]",
+                 "\n", "(", round(se_lb, 3), "), (", round(se_ub, 3), ")"),
+          align = "c")
+      ),
+      assigned_dist_group = factor(assigned_dist_group, tbl_dist_levels),
+      assigned_dist_group = fct_relabel(assigned_dist_group, str_to_title),
+      assigned_treatment  = factor(assigned_treatment, tbl_contrast_levels)
+    ) %>%
+    filter(assigned_treatment %in% tbl_contrast_levels) %>%
+    arrange(assigned_dist_group, assigned_treatment) %>%
+    select(assigned_treatment, assigned_dist_group, estim_std) %>%
+    pivot_wider(names_from = assigned_dist_group, values_from = estim_std) %>%
+    mutate(assigned_treatment = fct_relabel(assigned_treatment, str_to_title))
+
+  tbl %>%
+    kbl(
+      col.names = c(dependent_var, paste0("(", 1:4, ")")),
+      format    = "latex",
+      linesep   = "\\addlinespace",
+      booktabs  = TRUE,
+      escape    = FALSE,
+      align     = "lcccc",
+      caption   = caption
+    ) %>%
+    kable_styling(latex_options = "scale_down") %>%
+    add_header_above(c(" ", "Combined", "Close", "Far", "Far - Close"), line = FALSE) %>%
+    add_header_above(c(" " = 1, "Lee Bounds" = 4)) %>%
+    row_spec(3, hline_after = TRUE)
+}
+
+fob_lee_tbl = lee_bounds_tbl(
+  lower_output  = fob_lee_lower,
+  upper_output  = fob_lee_upper,
+  caption       = "Lee Bounds: First-Order Beliefs",
+  dependent_var = "Dependent variable: Observability"
+)
+
+fob_lee_tbl %>%
+  custom_save_latex_table(table_name = "fob_lee_bounds_tbl")
+stop()
+# ─────────────────────────────────────────────────────────────────────────────
 
 discrete_pct_yesno_output = wrapper_function(
   data = endline_belief_df,
@@ -1012,6 +1141,31 @@ endline_data = endline_data %>%
     have_ink = ink_visible
   ) 
 
+mis_endline_df = endline_data %>%
+left_join(
+  summ_endline_know_table %>% transmute(KEY.individ, know.table.type, obs_know_person),
+  by = "KEY.individ"
+) %>%
+  # filter(obs_know_person > 0 | is.na(obs_know_person))  %>% 
+  filter(know.table.type == "table.A" | is.na(know.table.type)) %>%
+  mutate(attrit_know_table = is.na(know.table.type))
+
+
+mis_endline_df %>%
+  count(attrit_know_table)
+
+summ_know_A_df = summ_endline_know_table %>%
+  filter(fct_match(know.table.type, "table.A"))
+
+endline_data %>%
+  inner_join(
+summ_know_A_df %>%
+  filter(obs_know_person > 0) , by = "KEY.individ"
+
+  )
+
+
+
 # Knowledge table attrition
 endline_data = endline_data %>%
   mutate(
@@ -1026,6 +1180,18 @@ know_table_fit = function(data, weights) {
   )
 }
 
+know_table_A_fit = function(data, weights) {
+  feols(
+    attrit_know_table ~ 0 + assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + is_backup | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+mis_endline_df = mis_endline_df %>%
+  mutate(is_backup = KEY.individ %in% census_data$KEY.individ[census_data$endline.backup == TRUE])
+
 know_table_attrit_output = wrapper_function(
   data = endline_data,
   regression_spec = know_table_fit,
@@ -1037,12 +1203,24 @@ know_table_attrit_output = wrapper_function(
     )
 )
 
-
 know_table_attrit_output$tidy_summary %>%
   select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
   print(n = Inf)
 
+know_table_A_attrit_output = wrapper_function(
+  data = mis_endline_df,
+  regression_spec = know_table_A_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/know-table-A-attrition-tidy-tes.csv",
+  table_name = "know_table_A_attrition_spec_tbl",
+  table_options = list(
+    caption = "Knowledge Table Attrition",
+    dependent_var = "Dependent variable: Not in knowledge table"
+    )
+)
 
+know_table_A_attrit_output$tidy_summary %>%
+  select(assigned_treatment, assigned_dist_group, estimate, std_error, pval) %>%
+  print(n = Inf)
 
 
 pred_dworm_fit = function(data, weights) {

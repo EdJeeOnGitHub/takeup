@@ -450,15 +450,83 @@ add_summ_stats = function(bs_draws, actual_fit, ci_width = 0.95) {
 }
 
 # wrapper function for all of the above
-create_regression_output = function(data, f,  B_draws = 500, 
+# Wrap a regression function f with Lee (2009) sample-trimming.
+# base_data: full population (e.g. endline_data filtered to sms.control) with
+#   columns assigned_treatment, assigned_dist_group, in_fob_sample, cluster.id.
+# direction: "upper" drops lowest outcomes (maximises TE), "lower" drops highest.
+# The outcome used for sorting must be named prop_knows in data.
+make_lee_trim_f = function(f, base_data, direction = c("upper", "lower"), B_draws = NULL) {
+  force(f)  # prevent lazy-eval recursion: without this, f in the closure resolves
+            # to the reassigned (wrapped) f in create_regression_output, not the original
+  direction = match.arg(direction)
+  counter   = new.env(parent = emptyenv())
+  counter$n = 0L
+  function(data, ...) {
+    counter$n = counter$n + 1L
+    message(sprintf("Lee (%s) draw %d", direction, counter$n))
+    # One weight per cluster — use first() to avoid floating-point distinct issues
+    cluster_wt = data %>%
+      group_by(cluster.id) %>%
+      summarise(wt = first(wt), .groups = "drop")
+
+    base_data_w = base_data %>%
+      left_join(cluster_wt, by = "cluster.id", relationship = "many-to-one") %>%
+      mutate(wt = replace_na(wt, 0))
+
+    sel_rates = base_data_w %>%
+      group_by(assigned_treatment, assigned_dist_group) %>%
+      summarise(sel_rate = weighted.mean(in_fob_sample, wt, na.rm = TRUE), .groups = "drop")
+
+    control_sel = sel_rates %>%
+      filter(as.character(assigned_treatment) == "control") %>%
+      select(assigned_dist_group, control_sel_rate = sel_rate)
+
+    trim_fracs = sel_rates %>%
+      left_join(control_sel, by = "assigned_dist_group") %>%
+      mutate(
+        assigned_treatment = as.character(assigned_treatment),
+        assigned_dist_group = as.character(assigned_dist_group),
+        trim_frac = pmax(0, (sel_rate - control_sel_rate) / sel_rate)
+      ) %>%
+      select(assigned_treatment, assigned_dist_group, trim_frac)
+
+
+    data = data %>%
+      select(-any_of("trim_frac")) %>%
+      mutate(
+        assigned_treatment  = as.character(assigned_treatment),
+        assigned_dist_group = as.character(assigned_dist_group)
+      ) %>%
+      left_join(trim_fracs, by = c("assigned_treatment", "assigned_dist_group")) %>%
+      group_by(assigned_treatment, assigned_dist_group) %>%
+      arrange(if (direction == "upper") prop_knows else desc(prop_knows), .by_group = TRUE) %>%
+      mutate(
+        cum_wt_frac = cumsum(wt) / sum(wt),
+        wt          = if_else(cum_wt_frac <= trim_frac, 0, wt)
+      ) %>%
+      ungroup()
+
+    old_opts = options(fixest.notes = FALSE)
+    on.exit(options(old_opts), add = TRUE)
+    suppressWarnings(f(data, ...))
+  }
+}
+
+create_regression_output = function(data, f,  B_draws = 500,
                                     stat = params$stat,
                                     caption = "Average Treatment Effects: Reduced Form",
                                     dependent_var = "Dependent variable: Take-up",
                                     type = "APE",
                                     stars = TRUE,
                                     drop_H0s = FALSE,
-                                    flip_calendar_sign = FALSE
+                                    flip_calendar_sign = FALSE,
+                                    lee_direction = NULL,
+                                    lee_base_data = NULL
                                     ) {
+
+  if (!is.null(lee_direction)) {
+    f = make_lee_trim_f(f, lee_base_data, lee_direction, B_draws = B_draws)
+  }
 
   if (type == "APE") {
     bs_f = bayes_bs_f
@@ -765,8 +833,9 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
     return(table)
 }
 
-wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat, 
-                            flip_calendar_sign = FALSE) {
+wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat,
+                            flip_calendar_sign = FALSE,
+                            lee_direction = NULL, lee_base_data = NULL, B_draws = 500) {
   default_table_options = list(
     caption = "Average Treatment Effects: Reduced Form",
     dependent_var = "Dependent variable: Take-up",
@@ -784,7 +853,10 @@ wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, t
     stars = table_options$stars,
     drop_H0s = table_options$drop_H0s,
     stat = stat,
-    flip_calendar_sign = flip_calendar_sign
+    flip_calendar_sign = flip_calendar_sign,
+    lee_direction = lee_direction,
+    lee_base_data = lee_base_data,
+    B_draws = B_draws
   )
   output$tidy_summary %>%
     write_csv(tidy_summ_path)

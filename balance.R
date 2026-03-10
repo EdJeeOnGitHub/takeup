@@ -7,9 +7,10 @@ Options:
   --output-path=<path>  Where to save output files [default: {file.path('temp-data')}]
   --community-level
   --fit-ri
-  --main
+  --orig
   --attrition
   --monitored-attrition
+  --main
 
 "),
   args = if (interactive()) "
@@ -19,9 +20,21 @@ Options:
 )
 
 
-run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance)
+run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance, script_options$orig)
 
 set.seed(12932)
+
+construct_joint_test_m = function(object) {
+  n_coef = length(coef(object))
+  diag_m = diag(n_coef - 1)
+  neg_1_m = matrix(-1, nrow = n_coef - 1, ncol = 1)
+
+  hyp_m = cbind(neg_1_m, diag_m)
+  return(hyp_m)
+}
+
+
+
 
 library(tidyverse)
 library(marginaleffects)
@@ -331,8 +344,157 @@ for (nm in c("endline_worm_data", "endline_implementation_data", "baseline_worm_
   assign(nm, select(get(nm), where(~!is.list(.))))
 }
 
+summ_know_A_df = summ_endline_know_table %>%
+  filter(fct_match(know.table.type, "table.A"))
 
-if (run_all || script_options$main)  {
+endline_know_A_df = endline_data %>%
+  left_join(
+    summ_know_A_df,
+    by = "KEY.individ"
+  ) %>%
+  filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
+  mutate(
+    assigned_treatment = assigned.treatment,
+    assigned_dist_group = dist.pot.group,
+    prop_know_fob = knows_other_dewormed / obs_know_person,
+    prop_know_sob = thinks_other_knows / obs_know_person
+  ) 
+# Get the keys for the belief sample so we can do balance tests on this sample
+endline_belief_keys = endline_know_A_df$KEY.individ
+
+clust_n_df = n_indiv_df %>%
+  select(cluster.id, n_per_cluster)
+
+endline_know_balance_df = census_data %>%
+  filter(KEY.individ %in% endline_belief_keys) %>%
+  left_join(
+    clust_n_df,
+    by = "cluster.id"
+  ) %>%
+  left_join(
+    cluster_treat_df,
+    by = "cluster.id"
+  ) %>%
+  mutate(
+    female = gender == 2,
+    age = age.census,
+    have_phone_lgl = have_phone == "Yes" 
+  ) 
+
+
+
+if (run_all || script_options$main) {
+
+takeup_bal_fit = feols(
+    data = analysis_data %>%
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      # convert to Km for this table
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ), 
+    .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+    cluster = ~cluster.id
+  )
+
+endline_know_bal_fit = feols(
+  data = endline_know_balance_df %>%
+    select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+    # convert to Km for this table
+    mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ),
+    .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
+    cluster = ~cluster.id
+)
+
+
+takeup_bal_joint_test = map(
+  takeup_bal_fit,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+endline_know_bal_joint_test = map(
+  endline_know_bal_fit,
+  ~perform_balance_joint_test(
+    .x,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+)
+
+simple_balance = list(
+  takeup_bal_fit = takeup_bal_fit,
+  endline_know_bal_fit = endline_know_bal_fit,
+  takeup_bal_joint_test = takeup_bal_joint_test,
+  endline_know_bal_joint_test = endline_know_bal_joint_test
+)
+
+saveRDS(
+  simple_balance,
+  file.path(
+    script_options$output_path,
+    "main-balance-samples.rds"
+  )
+)
+
+
+comp_takeup_balance_tidy_df = takeup_bal_fit %>%
+  map_dfr(
+    create_balance_comparisons, 
+    .id = "lhs",
+    .progress = TRUE
+  )
+comp_endline_know_balance_tidy_df = endline_know_bal_fit %>%
+  map_dfr(
+    create_balance_comparisons, 
+    .id = "lhs",
+    .progress = TRUE
+  )
+
+write_csv(
+  comp_takeup_balance_tidy_df,
+  file.path(
+    script_options$output_path,
+    "comp_takeup_balance_tidy_df.csv"
+  )
+)
+
+write_csv(
+  comp_endline_know_balance_tidy_df,
+  file.path(
+    script_options$output_path,
+    "comp_endline_know_balance_tidy_df.csv"
+  )
+)
+
+takeup_bal_fit %>%
+  map_dfr(tidy, .id = "lhs") %>%
+  select(
+    lhs, term, estimate, std.error, p.value
+  ) %>%
+  write_csv(
+    file.path(
+      script_options$output_path,
+      "takeup_balance_tidy_df.csv"
+    )
+  )
+
+endline_know_bal_fit %>%
+  map_dfr(tidy, .id = "lhs") %>%
+  select(
+    lhs, term, estimate, std.error, p.value
+  ) %>%
+  write_csv(
+    file.path(
+      script_options$output_path,
+      "endline_know_balance_tidy_df.csv"
+    )
+  )
+}
+
+if (run_all || script_options$orig)  {
 ## If at cluster level, aggregate
 ## Fits
 endline_worm_fit = feols(
@@ -410,14 +572,6 @@ misc_fit = feols(
   )
 
 
-endline_belief_keys = endline_data %>%
-  inner_join(
-    summ_endline_know_table %>% filter(know.table.type == "table.A"), 
-    by = c("KEY.individ")
-  ) %>%
-  filter(obs_know_person > 0)  %>%
-  pull(KEY.individ)
-
 
 endline_misc_vars = paste0("belief_sample_", takeup_vars)
 
@@ -450,8 +604,6 @@ balance_fits = c(
   misc_fit_endline_belief_sample
 )
 
-clust_n_df = n_indiv_df %>%
-  select(cluster.id, n_per_cluster)
 
 comp_balance_tidy_df = balance_fits %>%
   map_dfr(
@@ -510,17 +662,6 @@ baseline_worm %>%
       "baseline_worm_means.csv"
     )
   )
-
-construct_joint_test_m = function(object) {
-  n_coef = length(coef(object))
-  diag_m = diag(n_coef - 1)
-  neg_1_m = matrix(-1, nrow = n_coef - 1, ncol = 1)
-
-  hyp_m = cbind(neg_1_m, diag_m)
-  return(hyp_m)
-}
-
-
 
 #### Joint Tests ####
 #| joint-tests

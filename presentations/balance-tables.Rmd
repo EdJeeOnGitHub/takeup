@@ -163,7 +163,6 @@ custom_save_latex_table = function(table, table_name){
     return(table)
 }
 
-# ── Reusable balance table helpers ──────────────────────────────────────────
 
 # Format column names for kable (strip _close/_far suffixes, title-case, etc.)
 comp_table_col_names = function(wide_df) {
@@ -500,14 +499,6 @@ lhs_translation_df = tribble(
 ```{r}
 #| balance-reading
 
-balance_tidy_df = read_csv(
-  file.path("temp-data", "balance_tidy_df.csv")
-) %>%
-  filter(
-    !str_detect(term, "county::")
-  )
-
-
 comp_balance_tidy_df = read_csv(
   file.path("temp-data", "comp_balance_tidy_df.csv")
 )
@@ -651,6 +642,56 @@ render_comp_balance_table(
 
 ```
 
+
+```{r, results="asis"}
+#| pretreat-baseline-balance-table
+#| dependson=c("balance-setup", "balance-creation")
+
+pretreat_baseline_lhs_df = lhs_translation_df %>%
+  filter(sample %in% c("pretreat", "baseline_worm"))
+
+pretreat_baseline_wide = build_comp_wide(comp_balance_tidy_df, pretreat_baseline_lhs_df, boot_fits)
+
+pretreat_baseline_panel_list = pretreat_baseline_lhs_df %>%
+  filter(clean_name %in% pretreat_baseline_wide$lhs) %>%
+  count(sample) %>%
+  arrange(sample) %>%
+  { setNames(.$n, c(
+      pretreat       = str_glue("Panel A: Baseline sample - demographics, $N={format(N_pretreat, big.mark = ',')}$"),
+      baseline_worm  = str_glue("Panel B: Baseline sample - deworming knowledge, $N={format(N_baseline_worm, big.mark = ',')}$")
+    )[as.character(.$sample)]) }
+
+render_comp_balance_table(
+  pretreat_baseline_wide,
+  pretreat_baseline_panel_list,
+  caption   = "Baseline sample demographics and deworming knowledge balance",
+  save_name = "baseline-demo-deworming-knowledge-balance-table"
+)
+
+```
+
+```{r, results="asis"}
+#| implementation-balance-table
+#| dependson=c("balance-setup", "balance-creation")
+
+impl_lhs_df = lhs_translation_df %>%
+  filter(sample == "implementation")
+
+impl_wide = build_comp_wide(comp_balance_tidy_df, impl_lhs_df, boot_fits)
+
+impl_panel_list = setNames(
+  nrow(impl_wide),
+  str_glue("Panel A: Endline sample - implementation, $N={format(N_endline, big.mark = ',')}$")
+)
+
+render_comp_balance_table(
+  impl_wide,
+  impl_panel_list,
+  caption   = "Implementation Balance Table",
+  save_name = "implementation-balance-table"
+)
+
+```
 
 ```{r, results="asis"}
 #| dist-comp-balance-table
@@ -959,6 +1000,188 @@ baseline_perception_tbl %>%
 ```
 
 
+
+```{r}
+#| main-sample-balance
+main_balance_samples = read_rds(
+  file.path(
+    "temp-data",
+    "main-balance-samples.rds"
+  )
+)
+names(main_balance_samples)
+
+takeup_bal_fit = main_balance_samples$takeup_sample
+endline_know_bal_fit = main_balance_samples$endline_know_sample
+
+takeup_bal_jt = main_balance_samples$takeup_bal_joint_test
+endline_know_bal_jt = main_balance_samples$endline_know_bal_joint_test
+
+
+takeup_bal_comp_df = read_csv(
+  file.path("temp-data", 
+    "comp_takeup_balance_tidy_df.csv")
+)
+
+endline_know_comp_df = read_csv(
+  file.path("temp-data", 
+    "comp_endline_know_balance_tidy_df.csv")
+)
+
+endline_know_close_pvals = map_dbl(endline_know_bal_jt, "close_pval") %>% round(4)
+endline_know_far_pvals = map_dbl(endline_know_bal_jt, "far_pval") %>% round(4)
+endline_know_joint_pvals = map_dbl(endline_know_bal_jt, "joint_pval") %>% round(4)
+
+
+takeup_close_pvals = map_dbl(takeup_bal_jt, "close_pval") %>% round(4)
+takeup_far_pvals = map_dbl(takeup_bal_jt, "far_pval") %>% round(4)
+takeup_joint_pvals = map_dbl(takeup_bal_jt, "joint_pval") %>% round(4)
+
+takeup_treat_wide = create_balance_input(
+  takeup_bal_comp_df %>%
+    filter(comp_type == "treatment" | term == "sample_mean") %>%
+    mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)),
+  col_order = col_order,
+  digits = 3,
+  comp_df = TRUE,
+  show_pval = TRUE
+) %>%
+  mutate(
+    close_joint_p = takeup_close_pvals,
+    far_joint_p = takeup_far_pvals,
+    joint_p = takeup_joint_pvals
+  ) %>%
+  select(all_of(col_diff_order)) %>%
+  mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+  mutate(across(where(is.character), replace_na, "-")) %>%
+  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample, row_num)) %>%
+  mutate(lhs = clean_name) %>%
+  select(-clean_name) %>%
+  arrange(sample, row_num) %>%
+  select(-sample, -row_num)
+
+clean_bal_names = function(data) {
+  colnames(data) = colnames(data) %>%
+    str_replace("_close", "") %>%
+    str_replace("_far", "") %>%
+    str_replace("con_combined", "Sample mean") %>%
+    str_to_title()
+  return(data)
+}
+
+create_colnames = function(data) {
+   col_names = colnames(data)
+   col_names[1] = ""
+   col_names[col_names == "Joint_p"] = "Joint Test"
+   col_names[col_names == "Far_joint_p"] = "Joint Test"
+   col_names[col_names == "Close_joint_p"] = "Joint Test"
+   return(col_names)
+}
+
+takeup_treat_wide = clean_bal_names(takeup_treat_wide)
+takeup_col_names = create_colnames(takeup_treat_wide)
+
+
+takeup_bal_tbl = takeup_treat_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = takeup_col_names,
+    caption = "Takeup Sample Balance",
+    align = paste0("l", strrep("c", ncol(takeup_treat_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) 
+
+
+takeup_bal_tbl %>%
+  custom_save_latex_table("takeup-sample-only-balance-table")
+
+# now do the same for endline know sample balance
+endline_treat_wide = create_balance_input(
+  endline_know_comp_df %>%
+    filter(comp_type == "treatment" | term == "sample_mean") %>%
+    mutate(estimate = if_else(str_detect(lhs, "pct_") & lhs_treatment == "control", pmin(1, estimate), estimate)),
+  col_order = col_order,
+  digits = 3,
+  comp_df = TRUE,
+  show_pval = TRUE
+) %>%
+  mutate(
+    close_joint_p = endline_know_close_pvals,
+    far_joint_p = endline_know_far_pvals,
+    joint_p = endline_know_joint_pvals
+  ) %>%
+  select(all_of(col_diff_order)) %>%
+  mutate(across(where(is.character), ~if_else(.x == "", "-", .x))) %>%
+  mutate(across(where(is.character), replace_na, "-")) %>%
+  inner_join(lhs_translation_df %>% select(lhs, clean_name, sample, row_num)) %>%
+  mutate(lhs = clean_name) %>%
+  select(-clean_name) %>%
+  arrange(sample, row_num) %>%
+  select(-sample, -row_num)
+
+endline_treat_wide = clean_bal_names(endline_treat_wide)
+endline_col_names = create_colnames(endline_treat_wide)
+
+endline_bal_tbl = endline_treat_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = endline_col_names,
+    caption = "Endline Sample Balance",
+    align = paste0("l", strrep("c", ncol(endline_treat_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, ""))
+
+endline_bal_tbl %>%
+  custom_save_latex_table("endline-sample-only-balance-table")
+
+
+stacked_sample_wide = rbind(
+  takeup_treat_wide,
+  endline_treat_wide 
+) 
+
+
+stacked_sample_tbl = stacked_sample_wide %>%
+  knitr::kable(
+    format = "latex",
+    escape = FALSE,
+    booktabs = TRUE,
+    col.names = endline_col_names,
+    caption = "Endline Sample Balance",
+    align = paste0("l", strrep("c", ncol(endline_treat_wide) - 1))
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  ) %>%
+  add_header_above(c("", "", "Close" = 6, "Far" = 6, "")) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Take-up analysis sample, $N=9,805$" = nrow(takeup_treat_wide),
+      "Panel B: Endline observability sample, $N=1,141$" = nrow(endline_treat_wide)
+    ),
+    italic = TRUE,
+    escape = FALSE,
+    # latex_gap_space = latex_group_gap_space,
+    hline_after = TRUE,
+    hline_before = TRUE,
+    bold = TRUE
+  )
+
+stacked_sample_tbl %>%
+  custom_save_latex_table("stacked-sample-balance-table")
+
+```
+
 ```{r}
 #| attrition-treat-balance
 
@@ -998,6 +1221,7 @@ attrition_treat_wide = create_balance_input(
   select(-clean_name) %>%
   arrange(sample, row_num) %>%
   select(-sample, -row_num)
+
 
 colnames(attrition_treat_wide) = colnames(attrition_treat_wide) %>%
   str_replace("_close", "") %>%
