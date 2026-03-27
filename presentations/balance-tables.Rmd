@@ -556,6 +556,7 @@ N_pretreat = nrow(baseline_worm_data)
 N_census = nrow(clean_census_data)
 N_takeup = nrow(balance_analysis_data)
 N_baseline_worm = nrow(baseline_worm_data)
+N_social_image = N_pretreat
 N_endline = nrow(balance_data$endline_worm_data)
 N_endline_belief = balance_data$N_endline_belief
 
@@ -648,7 +649,7 @@ render_comp_balance_table(
 #| dependson=c("balance-setup", "balance-creation")
 
 pretreat_baseline_lhs_df = lhs_translation_df %>%
-  filter(sample %in% c("pretreat", "baseline_worm"))
+  filter(sample %in% c("pretreat", "baseline_worm", "social_image_concerns"))
 
 pretreat_baseline_wide = build_comp_wide(comp_balance_tidy_df, pretreat_baseline_lhs_df, boot_fits)
 
@@ -657,8 +658,9 @@ pretreat_baseline_panel_list = pretreat_baseline_lhs_df %>%
   count(sample) %>%
   arrange(sample) %>%
   { setNames(.$n, c(
-      pretreat       = str_glue("Panel A: Baseline sample - demographics, $N={format(N_pretreat, big.mark = ',')}$"),
-      baseline_worm  = str_glue("Panel B: Baseline sample - deworming knowledge, $N={format(N_baseline_worm, big.mark = ',')}$")
+      pretreat              = str_glue("Panel A: Baseline sample - demographics, $N={format(N_pretreat, big.mark = ',')}$"),
+      baseline_worm         = str_glue("Panel B: Baseline sample - deworming knowledge, $N={format(N_baseline_worm, big.mark = ',')}$"),
+      social_image_concerns = str_glue("Panel C: Social image concerns, $N={format(N_social_image, big.mark = ',')}$")
     )[as.character(.$sample)]) }
 
 render_comp_balance_table(
@@ -689,6 +691,26 @@ render_comp_balance_table(
   impl_panel_list,
   caption   = "Implementation Balance Table",
   save_name = "implementation-balance-table"
+)
+
+```
+
+```{r, results="asis"}
+#| implementation-dist-balance-table
+#| dependson=c("balance-setup", "balance-creation")
+
+impl_dist_wide = build_dist_comp_wide(comp_balance_tidy_df, impl_lhs_df)
+
+impl_dist_panel_list = setNames(
+  nrow(impl_dist_wide),
+  str_glue("Panel A: Endline sample - implementation, $N={format(N_endline, big.mark = ',')}$")
+)
+
+render_dist_comp_table(
+  impl_dist_wide,
+  impl_dist_panel_list,
+  caption   = "Implementation Balance Table: Distance Differentials",
+  save_name = "implementation-dist-balance-table"
 )
 
 ```
@@ -1179,6 +1201,48 @@ stacked_sample_tbl = stacked_sample_wide %>%
 
 stacked_sample_tbl %>%
   custom_save_latex_table("stacked-sample-balance-table")
+
+```
+
+```{r, results="asis"}
+#| stacked-sample-dist-balance
+
+takeup_lhs_df = lhs_translation_df %>%
+  filter(lhs %in% unique(takeup_bal_comp_df$lhs))
+
+endline_know_lhs_df = lhs_translation_df %>%
+  filter(lhs %in% unique(endline_know_comp_df$lhs))
+
+takeup_dist_wide = build_dist_comp_wide(takeup_bal_comp_df, takeup_lhs_df)
+endline_know_dist_wide = build_dist_comp_wide(endline_know_comp_df, endline_know_lhs_df)
+
+stacked_dist_wide = rbind(takeup_dist_wide, endline_know_dist_wide)
+
+stacked_dist_tbl = stacked_dist_wide %>%
+  knitr::kable(
+    format    = "latex",
+    col.names = c("", colnames(stacked_dist_wide)[2:ncol(stacked_dist_wide)]),
+    escape    = FALSE,
+    booktabs  = TRUE,
+    linesep   = "",
+    align     = paste0("l", strrep("c", ncol(stacked_dist_wide) - 1)),
+    caption   = "Sample Balance: Distance Differentials"
+  ) %>%
+  kable_styling(latex_options = "scale_down") %>%
+  pack_rows(
+    index = c(
+      "Panel A: Take-up analysis sample, $N=9,805$"       = nrow(takeup_dist_wide),
+      "Panel B: Endline observability sample, $N=1,141$"  = nrow(endline_know_dist_wide)
+    ),
+    italic       = TRUE,
+    escape       = FALSE,
+    hline_after  = TRUE,
+    hline_before = TRUE,
+    bold         = TRUE
+  )
+
+stacked_dist_tbl %>%
+  custom_save_latex_table("stacked-sample-dist-balance-table")
 
 ```
 
