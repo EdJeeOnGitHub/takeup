@@ -30,7 +30,7 @@
 %% ═══════════════════════════════════════════════════════════════════
 
 \node[draw, rounded corners=2pt, align=center,
-      text width=23cm, inner sep=6pt]
+      text width=21cm, inner sep=6pt]
   (census)
   {\textbf{Household census:} 144 clusters,\ 39{,}301 adults (18+)};
 
@@ -39,9 +39,9 @@
 %%   xshift = -6.5 cm keeps this column on the left
 %% ═══════════════════════════════════════════════════════════════════
 
-\node[box, below=5mm of census, anchor=north, xshift=-7.5cm]
+\node[box, below=15mm of census, anchor=north, xshift=-7.5cm]
   (bl-sel)
-  {Baseline roster: 4{,}185};
+  {Sampling frame: 4{,}185};
 
 \node[box, below=of bl-sel] (bl-tgt)
   {Selected: 2{,}160};
@@ -58,7 +58,7 @@
   {Not completed: 67\\(refused 29; unable 38)};
 
 %% ── Arrows ───────────────────────────────────────────────────────
-\draw[arrow] (census.south -| bl-sel.north) -- (bl-sel.north);
+\draw[arrow] (census.south) -- ++(0,-6mm) -| (bl-sel.north);
 \draw[arrow] (bl-sel)   -- (bl-tgt);
 \draw[arrow] (bl-tgt)   -- (bl-reach);
 \draw[arrow] (bl-reach) -- (bl-comp);
@@ -66,8 +66,8 @@
 
 %% ── Column A group box ───────────────────────────────────────────
 \node[colgroup,
-      fit=(bl-tgt)(bl-reach)(bl-comp)(bl-nc),
-      label={[font=\small\bfseries, xshift=-1cm]above:Baseline survey}] {};
+      fit=(bl-sel)(bl-tgt)(bl-reach)(bl-comp)(bl-nc),
+      label={[font=\small\bfseries]above:Baseline survey}] {};
 
 %% ═══════════════════════════════════════════════════════════════════
 %% COLUMN B — Monitored sample
@@ -76,7 +76,7 @@
 
 % Merged totals (fed from bl-sel in A and el-frame in C)
 \node[mon, below=40mm of census, anchor=north] (mon-uniq)
-  {Total unique individuals: 12{,}827};
+  {Total unique\\(deduplicated): 12{,}827};
 
 \node[analysis, below=of mon-uniq] (mon-ana)
   {\textbf{``Take-up analysis sample''}\\
@@ -92,17 +92,16 @@
 %% ── Column B group box ───────────────────────────────────────────
 \node[colgroup,
       fit=(mon-uniq)(mon-ana),
-      label={[font=\small\bfseries, yshift=13mm]above:Administrative take-up data}] {};
+      label={[font=\small\bfseries, yshift=8mm]above:Administrative take-up data}] {};
 
 %% ═══════════════════════════════════════════════════════════════════
 %% COLUMN C — Endline
 %%   xshift = 6.5 cm keeps this column on the right
 %% ═══════════════════════════════════════════════════════════════════
 
-\node[box, below=5mm of census, anchor=north, xshift=11cm]
+\node[box, below=15mm of census, anchor=north, xshift=11cm]
   (el-frame)
-  {Endline roster: 11{,}166
-  };
+  {Sampling frame: 11{,}166};
 
 \node[box, below=of el-frame] (el-sel)
   {Selected: 4{,}220};
@@ -112,12 +111,6 @@
 
 \node[box, below=of el-reach] (el-comp)
   {Completed endline: 3{,}729};
-
-%% PAP deviation note (exits left from Completed)
-\node[note, left=8mm of el-comp, anchor=east, text width=3.5cm] (el-pap-dev)
-  {\textbf{PAP deviation:}\\
-  3{,}600 completions (25/cluster $\times$ 144)\\
-  {\scriptsize Overshoot: $\sim$2 backups/cluster surveyed}};
 
 \node[analysis, dashed, below=of el-comp] (el-comp-nosms)
   {\textbf{``Endline sample''}\\
@@ -141,20 +134,19 @@
 
 
 %% ── Arrows ───────────────────────────────────────────────────────
-\draw[arrow] (census.south -| el-frame.north) -- (el-frame.north);
+\draw[arrow] (census.south) -- ++(0,-6mm) -| (el-frame.north);
 \draw[arrow] (el-frame) -- (el-sel);
 \draw[arrow] (el-sel)   -- (el-reach);
 \draw[arrow] (el-reach) -- (el-comp);
 \draw[arrow] (el-reach.east) -- (el-nc.west);
-\draw[darr] (el-comp.west) -- (el-pap-dev.east);
 \draw[arrow] (el-comp)  -- (el-comp-nosms);
 \draw[arrow] (el-comp.east) -- (el-miss.west);
 \draw[arrow] (el-miss) -- (el-know);
 
 %% ── Column C group box ───────────────────────────────────────────
 \node[colgroup,
-      fit=(el-sel)(el-reach)(el-comp)(el-comp-nosms)(el-miss)(el-nc)(el-know),
-      label={[font=\small\bfseries, xshift=1cm]above:Endline survey}] {};
+      fit=(el-frame)(el-sel)(el-reach)(el-comp)(el-comp-nosms)(el-miss)(el-nc)(el-know),
+      label={[font=\small\bfseries]above:Endline survey}] {};
 
 %% ── Cross-column: el-frame forks → Total unique and → Dropped ──
 % Split point midway between cols B and C, at el-frame height
