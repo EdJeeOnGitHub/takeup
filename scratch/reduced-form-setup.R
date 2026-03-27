@@ -59,6 +59,8 @@ endline_data = read_rds("data/clean-data/clean-endline-data.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
 
+summ_endline_know_table %>%
+  count(know.table.type)
 
 # HHs in endline, not in know table
 in_endline_not_know_table = endline_data %>% 

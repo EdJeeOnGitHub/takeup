@@ -1,4 +1,4 @@
-# Sampling
+# Uploaded Pre-Analysis Plan
 
 ## Baseline
 
@@ -37,7 +37,10 @@ What we said in the PAP:
     - A stratified sample of phone/non-phone owners...
 "
 
-# Registry:
+# Registry
+
+The registry also has information separate to the PAP:
+
 "Sample size: planned number of observations
 9,935 adults of which 2,250 adults are surveyed at baseline, 3,750 adults surveyed at endline and 3,935 adults selected for text messaging intervention."
 

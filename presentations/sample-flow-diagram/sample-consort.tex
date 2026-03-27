@@ -49,7 +49,7 @@
 \node[box, below=of bl-tgt] (bl-reach)
   {Reached: 2{,}062};
 
-\node[analysis, dashed, below=of bl-reach] (bl-comp)
+\node[analysis, below=of bl-reach] (bl-comp)
   {\textbf{``Baseline sample''}\\
   Completed baseline: 1{,}995};
 
@@ -119,7 +119,7 @@
   3{,}600 completions (25/cluster $\times$ 144)\\
   {\scriptsize Overshoot: $\sim$2 backups/cluster surveyed}};
 
-\node[analysis, dashed, below=of el-comp] (el-comp-nosms)
+\node[analysis, below=of el-comp] (el-comp-nosms)
   {\textbf{``Endline sample''}\\
   Excl.\ SMS treatment: 2{,}659};
   % {Excl.\ SMS treatment: 2{,}659\\(\emph{``Endline sample''})};
@@ -132,12 +132,16 @@
 \node[issue, right=16mm of el-comp, anchor=west] (el-miss)
   {Missing knowledge\\module: 255};
 
-%% Node below missing knowledge module
-\node[analysis, below=of el-miss] (el-know)
-  {\textbf{``Endline observability sample''}\\
-  Observability module \& Excl.\ SMS treatment: 1{,}141
+%% Completed knowledge module (complement of el-miss)
+\node[box, below=of el-miss] (el-kmod)
+  {Observability module: 1{,}784 \\
+  (Randomly assigned)
   };
-  % {1{,}141 individuals};
+
+%% Observability analysis sample
+\node[analysis, below=of el-kmod] (el-know)
+  {\textbf{``Endline observability sample''}\\
+  Excl.\ SMS treatment: 1{,}141};
 
 
 %% ── Arrows ───────────────────────────────────────────────────────
@@ -149,11 +153,12 @@
 \draw[darr] (el-comp.west) -- (el-pap-dev.east);
 \draw[arrow] (el-comp)  -- (el-comp-nosms);
 \draw[arrow] (el-comp.east) -- (el-miss.west);
-\draw[arrow] (el-miss) -- (el-know);
+\draw[arrow] (el-comp.east) -- ++(4mm, 0) |- (el-kmod.west);
+\draw[arrow] (el-kmod) -- (el-know);
 
 %% ── Column C group box ───────────────────────────────────────────
 \node[colgroup,
-      fit=(el-sel)(el-reach)(el-comp)(el-comp-nosms)(el-miss)(el-nc)(el-know),
+      fit=(el-sel)(el-reach)(el-comp)(el-comp-nosms)(el-miss)(el-nc)(el-kmod)(el-know),
       label={[font=\small\bfseries, xshift=1cm]above:Endline survey}] {};
 
 %% ── Cross-column: el-frame forks → Total unique and → Dropped ──
