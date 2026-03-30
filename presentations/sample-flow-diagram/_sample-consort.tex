@@ -1,0 +1,178 @@
+\begin{tikzpicture}[
+  node distance = 7mm and 16mm,
+  font          = \small,
+  %
+  % ── Node styles ─────────────────────────────────────────────────
+  box/.style      = {draw, rounded corners=2pt, align=center,
+                     text width=5.2cm, inner sep=5pt},
+  analysis/.style = {box, fill=analysisgreen},
+  mon/.style      = {box, fill=monblue},
+  issue/.style    = {box, fill=issueorange},
+  note/.style     = {box, dashed},
+  arrow/.style    = {-Latex, line width=0.7pt},
+  darr/.style     = {-Latex, line width=0.7pt, dashed},
+  colgroup/.style = {draw, rounded corners=3pt, inner sep=10pt},
+]
+
+%% ═══════════════════════════════════════════════════════════════════
+%% SHARED TOP — Census frame
+%% ═══════════════════════════════════════════════════════════════════
+
+\node[draw, rounded corners=2pt, align=center,
+      text width=23cm, inner sep=6pt]
+  (census)
+  {\textbf{Household census:} 144 clusters,\ 39{,}301 adults (18+)};
+
+%% ═══════════════════════════════════════════════════════════════════
+%% COLUMN A — Baseline
+%%   xshift = -6.5 cm keeps this column on the left
+%% ═══════════════════════════════════════════════════════════════════
+
+\node[box, below=5mm of census, anchor=north, xshift=-7.5cm]
+  (bl-sel)
+  {Baseline roster: 4{,}185};
+
+\node[box, below=of bl-sel] (bl-tgt)
+  {Selected: 2{,}160};
+
+\node[box, below=of bl-tgt] (bl-reach)
+  {Reached: 2{,}062};
+
+\node[analysis, below=of bl-reach] (bl-comp)
+  {\textbf{``Baseline sample''}\\
+  Completed baseline: 1{,}995};
+
+%% Side branch: not completed (exits left from Reached)
+\node[box, left=16mm of bl-reach, anchor=east] (bl-nc)
+  {Not completed: 67\\(refused 29; unable 38)};
+
+%% ── Arrows ───────────────────────────────────────────────────────
+\draw[arrow] (census.south -| bl-sel.north) -- (bl-sel.north);
+\draw[arrow] (bl-sel)   -- (bl-tgt);
+\draw[arrow] (bl-tgt)   -- (bl-reach);
+\draw[arrow] (bl-reach) -- (bl-comp);
+\draw[arrow] (bl-reach.west) -- (bl-nc.east);
+
+%% ── Column A group box ───────────────────────────────────────────
+\node[colgroup,
+      fit=(bl-tgt)(bl-reach)(bl-comp)(bl-nc),
+      label={[font=\small\bfseries, xshift=-1cm]above:Baseline survey}] {};
+
+%% ═══════════════════════════════════════════════════════════════════
+%% COLUMN B — Monitored sample
+%%   xshift = 0 cm (center)
+%% ═══════════════════════════════════════════════════════════════════
+
+% Merged totals (fed from bl-sel in A and el-frame in C)
+\node[mon, below=40mm of census, anchor=north] (mon-uniq)
+  {Total unique individuals: 12{,}827};
+
+\node[analysis, below=of mon-uniq] (mon-ana)
+  {\textbf{``Take-up analysis sample''}\\
+  Excl.\ SMS treatment: 9{,}805};
+
+%% ── Arrows ───────────────────────────────────────────────────────
+% Baseline roster enters from col A
+\draw[arrow] (bl-sel.east) -- (mon-uniq.north);
+
+\draw[arrow] (mon-uniq) -- (mon-ana);
+
+%% ── Column B group box ───────────────────────────────────────────
+\node[colgroup,
+      fit=(mon-uniq)(mon-ana),
+      label={[font=\small\bfseries, yshift=13mm]above:Administrative take-up data}] {};
+
+%% ═══════════════════════════════════════════════════════════════════
+%% COLUMN C — Endline
+%%   xshift = 6.5 cm keeps this column on the right
+%% ═══════════════════════════════════════════════════════════════════
+
+\node[box, below=5mm of census, anchor=north, xshift=11cm]
+  (el-frame)
+  {Endline roster: 11{,}166
+  };
+
+\node[box, below=of el-frame] (el-sel)
+  {Selected: 4{,}220};
+
+\node[box, below=of el-sel] (el-reach)
+  {Reached: 3{,}830};
+
+\node[box, below=of el-reach] (el-comp)
+  {Completed endline: 3{,}729};
+
+%% PAP deviation note (exits left from Completed)
+\node[note, left=8mm of el-comp, anchor=east, text width=3.5cm] (el-pap-dev)
+  {\textbf{PAP deviation:}\\
+  3{,}600 completions (25/cluster $\times$ 144)\\
+  {\scriptsize Overshoot: $\sim$2 backups/cluster surveyed}};
+
+\node[analysis, below=of el-comp] (el-comp-nosms)
+  {\textbf{``Endline sample''}\\
+  Excl.\ SMS treatment: 2{,}659};
+
+%% Side branch: not completed (exits right from Reached)
+\node[box, right=16mm of el-reach, anchor=west] (el-nc)
+  {Not completed: 101\\(refused 23; unable 78)};
+
+%% WTP sample (below endline sample, control only)
+\node[analysis, below=of el-comp-nosms] (wtp)
+  {\textbf{``WTP sample''}\\
+  Control clusters only (24 of 144)\\
+  Targeted: 600, Reached: 474 \\
+  Completed: 467};
+
+%% ── Arrow ────────────────────────────────────────────────────────
+\draw[arrow] (el-comp-nosms) -- (wtp);
+
+%% Side branch: missing knowledge module
+\node[issue, right=16mm of el-comp, anchor=west] (el-miss)
+  {Missing knowledge\\module: 255};
+
+%% Completed knowledge module (complement of el-miss)
+\node[box, below=of el-miss] (el-kmod)
+  {Observability module: 1{,}784 \\
+  (Randomly assigned)
+  };
+
+%% Observability analysis sample
+\node[analysis, below=of el-kmod] (el-know)
+  {\textbf{``Endline observability sample''}\\
+  Excl.\ SMS treatment: 1{,}141};
+
+
+%% ── Arrows ───────────────────────────────────────────────────────
+\draw[arrow] (census.south -| el-frame.north) -- (el-frame.north);
+\draw[arrow] (el-frame) -- (el-sel);
+\draw[arrow] (el-sel)   -- (el-reach);
+\draw[arrow] (el-reach) -- (el-comp);
+\draw[arrow] (el-reach.east) -- (el-nc.west);
+\draw[darr] (el-comp.west) -- (el-pap-dev.east);
+\draw[arrow] (el-comp)  -- (el-comp-nosms);
+\draw[arrow] (el-comp.east) -- (el-miss.west);
+\draw[arrow] (el-comp.east) -- ++(4mm, 0) |- (el-kmod.west);
+\draw[arrow] (el-kmod) -- (el-know);
+
+%% ── Column C group box ───────────────────────────────────────────
+\node[colgroup,
+      fit=(el-sel)(el-reach)(el-comp)(el-comp-nosms)(wtp)(el-miss)(el-nc)(el-kmod)(el-know),
+      label={[font=\small\bfseries, xshift=1cm]above:Endline survey}] {};
+
+%% ── Cross-column: el-frame forks → Total unique and → Dropped ──
+% Split point midway between cols B and C, at el-frame height
+\coordinate (el-split) at ($(mon-uniq.north |- el-frame.west) + (5.5cm, 0)$);
+
+% Dropped box hangs below the split point (between cols B and C)
+\node[issue, anchor=north,
+      text width=2.2cm, inner sep=3pt] (mon-drop)
+  at ($(el-split) + (0, -12mm)$)
+  {Dropped\\(SurveyCTO error): 989};
+
+% Stem: el-frame → split (no arrowhead)
+\draw[line width=0.7pt] (el-frame.west) -- (el-split);
+% Branch 1: left-then-down to Total unique
+\draw[arrow] (el-split) -- (mon-uniq.north);
+% Branch 2: straight down to Dropped
+\draw[arrow] (el-split) -- (mon-drop.north);
+
+\end{tikzpicture}
