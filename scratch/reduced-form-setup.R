@@ -39,6 +39,11 @@ source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
 source(file.path("scratch", "reduced-form-functions.R"))
 
+
+# wtp data
+wtp.data <- read_rds(file.path("data", "takeup_wtp.rds")) # Willingness-to-pay experiment data
+stop()
+
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
 ## Loading Data - these are all intermediate cleaned data files
