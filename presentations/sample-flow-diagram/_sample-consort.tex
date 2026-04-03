@@ -28,7 +28,7 @@
 %%   xshift = -6.5 cm keeps this column on the left
 %% ═══════════════════════════════════════════════════════════════════
 
-\node[box, below=5mm of census, anchor=north, xshift=-7.5cm]
+\node[box, below=5mm of census, anchor=north, xshift=-9cm]
   (bl-sel)
   {Baseline roster: 4{,}185};
 
@@ -64,23 +64,31 @@
 %% ═══════════════════════════════════════════════════════════════════
 
 % Merged totals (fed from bl-sel in A and el-frame in C)
-\node[mon, below=40mm of census, anchor=north] (mon-uniq)
+\node[mon, below=55mm of census, anchor=north] (mon-uniq)
   {Total unique individuals: 12{,}827};
 
-\node[analysis, below=of mon-uniq] (mon-ana)
+\node[analysis, below=30mm of mon-uniq] (mon-ana)
   {\textbf{``Take-up analysis sample''}\\
-  Excl.\ SMS treatment: 9{,}805};
+  9{,}805 (no SMS treatment)};
+
+%% Branch point midway along the mon-uniq → mon-ana arrow
+\coordinate (mon-branch) at ($(mon-uniq.south)!0.5!(mon-ana.north)$);
+
+\node[box, left=12mm of mon-branch, anchor=east, text width=3.5cm,
+      font=\scriptsize] (mon-sms)
+  {SMS treatment: 3{,}022};
 
 %% ── Arrows ───────────────────────────────────────────────────────
 % Baseline roster enters from col A
 \draw[arrow] (bl-sel.east) -- (mon-uniq.north);
 
+% Straight down to Take-up analysis sample
 \draw[arrow] (mon-uniq) -- (mon-ana);
+% Orthogonal branch right to SMS treatment
+\draw[arrow] (mon-branch) -- (mon-sms.east);
 
 %% ── Column B group box ───────────────────────────────────────────
-\node[colgroup,
-      fit=(mon-uniq)(mon-ana),
-      label={[font=\small\bfseries, yshift=13mm]above:Administrative take-up data}] {};
+\node[colgroup, fit=(mon-uniq)(mon-ana)(mon-sms)] (mon-colgroup) {};
 
 %% ═══════════════════════════════════════════════════════════════════
 %% COLUMN C — Endline
@@ -109,7 +117,7 @@
 
 \node[analysis, below=of el-comp] (el-comp-nosms)
   {\textbf{``Endline sample''}\\
-  Excl.\ SMS treatment: 2{,}659};
+  2{,}659 (no SMS treatment)};
 
 %% Side branch: not completed (exits right from Reached)
 \node[box, right=16mm of el-reach, anchor=west] (el-nc)
@@ -118,7 +126,7 @@
 %% WTP sample (below endline sample, control only)
 \node[analysis, below=of el-comp-nosms] (wtp)
   {\textbf{``WTP sample''}\\
-  Control clusters only (24 of 144)\\
+  Control clusters only (34 of 144) \\
   Targeted: 600, Reached: 474 \\
   Completed: 467};
 
@@ -138,7 +146,7 @@
 %% Observability analysis sample
 \node[analysis, below=of el-kmod] (el-know)
   {\textbf{``Endline observability sample''}\\
-  Excl.\ SMS treatment: 1{,}141};
+  1{,}141 (no SMS treatment)};
 
 
 %% ── Arrows ───────────────────────────────────────────────────────
@@ -174,5 +182,11 @@
 \draw[arrow] (el-split) -- (mon-uniq.north);
 % Branch 2: straight down to Dropped
 \draw[arrow] (el-split) -- (mon-drop.north);
+
+%% ── Column B label (drawn last so it renders over all arrows) ────
+\node[font=\small\bfseries, fill=white, inner sep=4pt, anchor=south,
+      yshift=2mm]
+  at (mon-colgroup.north -| mon-uniq.north)
+  {Administrative take-up data};
 
 \end{tikzpicture}
