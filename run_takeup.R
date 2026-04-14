@@ -31,8 +31,8 @@ Options:
   args = if (interactive()) "
     takeup fit \
     --cmdstanr \
-    --outputname=dist_fit001 \
-    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT \
+    --outputname=dist_fitTEST \
+    --models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
     --output-path=data/stan_analysis_data \
     --threads=3 \
     --iter 200 \
@@ -45,7 +45,6 @@ Options:
 library(magrittr)
 library(tidyverse)
 library(furrr)
-library(loo)
 
 script_options %<>% 
   modify_at(c("chains", "iter", "threads", "num_mix_groups", "num_sbc_sims", "parallel_folds"), as.integer) %>% 
@@ -158,6 +157,26 @@ if (str_detect(script_options$models, "NO_OUTLIERS")) {
     ungroup()
 }
 
+# Belief data loading
+load_belief_data = function() {
+  source(file.path("scratch", "reduced-form-setup.R"), local = TRUE)
+  summ_know_A_df = summ_endline_know_table %>%
+    filter(fct_match(know.table.type, "table.A"))
+  # 1,141 Obs
+  endline_know_A_df = endline_data %>%
+    left_join(
+      summ_know_A_df,
+      by = "KEY.individ"
+    ) %>%
+    filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
+    mutate(
+      assigned_treatment = assigned.treatment,
+      assigned_dist_group = dist.pot.group,
+      prop_know_fob = knows_other_dewormed / obs_know_person,
+      prop_know_sob = thinks_other_knows / obs_know_person
+    ) 
+}
+fob_belief_df = load_belief_data()
 # Models ------------------------------------------------------------------
 
 num_treatments <- n_distinct(analysis_data$assigned.treatment)
@@ -622,25 +641,35 @@ beliefs_treatment_map_design_matrix <- cluster_treatment_map %>%
   modelr::model_matrix(beliefs_treatment_formula) %>% 
   distinct()
 
-analysis_data %<>% 
-  nest_join(
-    endline.know.table.data %>% 
-      filter(fct_match(know.table.type, "table.A")),
-    by = "KEY.individ", 
-    name = "knowledge_data"
-  ) %>% 
-  mutate(
-    map_dfr(knowledge_data, ~ {
-      tibble(
-        obs_know_person = sum(.x$num.recognized),
-        obs_know_person_prop = mean(.x$num.recognized),
-        knows_other_dewormed = sum(fct_match(.x$dewormed, c("yes", "no")), na.rm = TRUE),
-        knows_other_dewormed_yes = sum(fct_match(.x$dewormed, "yes"), na.rm = TRUE),
-        thinks_other_knows = sum(fct_match(.x$second.order, c("yes", "no")), na.rm = TRUE),
-        thinks_other_knows_yes = sum(fct_match(.x$second.order, "yes"), na.rm = TRUE),
-      )
-    }
-  ))
+analysis_data %<>%
+  left_join(
+    fob_belief_df %>%
+      select(KEY.individ, obs_know_person, knows_other_dewormed, thinks_other_knows),
+    by = "KEY.individ"
+  ) %>%
+  mutate(across(c(obs_know_person, knows_other_dewormed, thinks_other_knows), ~replace_na(.x, 0L)))
+
+# Map every fob_belief_df row to a representative obs_index in analysis_data via
+# cluster, so unmatched individuals (not in analysis_data) still enter Stan via
+# their cluster's cluster_id / county_id.
+beliefs_cluster_obs_lookup <- analysis_data %>%
+  mutate(obs_index = seq(n())) %>%
+  group_by(cluster.id) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(cluster.id, obs_index)
+
+fob_belief_indexed <- fob_belief_df %>%
+  left_join(beliefs_cluster_obs_lookup, by = "cluster.id")
+
+cat(str_glue(
+  "\n--- Beliefs data join check ---\n",
+  "  fob_belief_df rows (all beliefs obs):          {nrow(fob_belief_df)}\n",
+  "  matched to analysis_data individual:           {sum(analysis_data$obs_know_person > 0)}\n",
+  "  unmatched individual (cluster lookup used):    {nrow(fob_belief_df) - sum(analysis_data$obs_know_person > 0)}\n",
+  "  fob_belief_indexed rows missing cluster match: {sum(is.na(fob_belief_indexed$obs_index))}\n",
+  "-------------------------------\n\n"
+))
 
 beliefs_ate_pairs <- cluster_treatment_map %>% 
   mutate(treatment_id = seq(n())) %>% {
@@ -684,21 +713,19 @@ stan_data <- lst(
   beliefs_use_dist = !(script_options$no_dist %||% FALSE),
   
   know_table_A_sample_size = 10,
-  num_beliefs_obs = filter(analysis_data, obs_know_person > 0) %>% nrow(),
-  beliefs_obs_index = mutate(analysis_data, obs_index = seq(n())) %>% 
-    filter(obs_know_person > 0) %>% 
-    pull(obs_index),
-  
-  num_recognized = filter(analysis_data, obs_know_person > 0) %>% pull(obs_know_person),
-  num_knows_1ord = filter(analysis_data, obs_know_person > 0) %>% pull(knows_other_dewormed),
-  num_knows_2ord = filter(analysis_data, obs_know_person > 0) %>% pull(thinks_other_knows),
+  num_beliefs_obs = nrow(fob_belief_indexed),
+  beliefs_obs_index = fob_belief_indexed$obs_index,
+
+  num_recognized = fob_belief_indexed$obs_know_person,
+  num_knows_1ord = fob_belief_indexed$knows_other_dewormed,
+  num_knows_2ord = fob_belief_indexed$thinks_other_knows,
   
   beliefs_treatment_map_design_matrix,
   
   beliefs_ate_pairs,
   num_beliefs_ate_pairs = nrow(beliefs_ate_pairs),
-  
-  # Take-up Model 
+
+  # Take-up Model
   num_obs = nrow(analysis_data),
   num_treatments,
   is_name_matched = !analysis_data$monitored,
@@ -819,8 +846,16 @@ stan_data <- lst(
   sbc = script_options$sbc
 )  %>%
   # list_modify(!!!map(models, pluck, "model_type") %>% set_names(~ str_c("MODEL_TYPE_", .))) %>% 
-  list_modify(!!!wtp_stan_data) 
+  list_modify(!!!wtp_stan_data)
 
+cat(str_glue(
+  "\n--- Stan data beliefs check ---\n",
+  "  num_beliefs_obs (obs entering Stan): {stan_data$num_beliefs_obs}\n",
+  "  mean num_recognized: {round(mean(stan_data$num_recognized), 2)}\n",
+  "  mean num_knows_1ord: {round(mean(stan_data$num_knows_1ord), 2)}\n",
+  "  mean num_knows_2ord: {round(mean(stan_data$num_knows_2ord), 2)}\n",
+  "-------------------------------\n\n"
+))
 
 if (script_options$sbc & !script_options$takeup) {
   stop("Not yet implemented")

@@ -42,7 +42,6 @@ source(file.path("scratch", "reduced-form-functions.R"))
 
 # wtp data
 wtp.data <- read_rds(file.path("data", "takeup_wtp.rds")) # Willingness-to-pay experiment data
-stop()
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
@@ -63,9 +62,6 @@ baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
 endline_data = read_rds("data/clean-data/clean-endline-data.rds")
 summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
 endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
-
-summ_endline_know_table %>%
-  count(know.table.type)
 
 # HHs in endline, not in know table
 in_endline_not_know_table = endline_data %>% 
