@@ -21,7 +21,6 @@ library(fixest)
 }
 
 # Useful variables/hyperparameters
-ci_width = as.numeric(params$width)
 treat_levels_c = c("control", "ink", "calendar", "bracelet")
 treat_levels = c("ink", "calendar", "bracelet")
 dist_levels = c("close", "far")
@@ -29,10 +28,15 @@ model_level_order = c("reduced form", "structural")
 
 quant_probs <- c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99)
 
-output_basepath = file.path(
-  params$output_path,
-  str_glue("output_dist_fit{params$fit_version}")
-)
+if (exists("params")) {
+  output_basepath = file.path(
+    params$output_path,
+    str_glue("output_dist_fit{params$fit_version}")
+  )
+  ci_width = as.numeric(params$width)
+}
+
+
 
 ## Loading Scripts
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
