@@ -1,0 +1,370 @@
+#!/usr/bin/Rscript
+# structural_tables.R
+# Standalone script: generates structural model tables (overall ATEs,
+# signal/private decomposition, belief ATEs) from quick-postprocess RDS output.
+#
+# Usage:
+#   Rscript --no-save --no-restore structural_tables.R \
+#     --fit-version=104 \
+#     --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+#
+# Outputs (to presentations/tables/):
+#   struct-overall-te-table.tex
+#   private-signal-te-table.tex
+#   fob-beliefs-table.tex
+
+script_options <- docopt::docopt(
+  stringr::str_glue(
+"Usage:
+  structural_tables.R [options]
+
+Options:
+  --fit-version=<v>       Fit version number [default: 104]
+  --model=<m>             Structural model name [default: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP]
+  --input-path=<path>     Path to Stan analysis data [default: data/stan_analysis_data]
+  --output-path=<path>    Path to postprocessed RDS files [default: temp-data/new-tables]
+  --table-output=<path>   Path to write .tex tables [default: presentations/new-tables]
+  --width=<w>             Credible interval width [default: 0.95]
+  "),
+  args = if (interactive()) "" else commandArgs(trailingOnly = TRUE)
+)
+
+library(tidyverse)
+library(posterior)
+library(tidybayes)
+library(knitr)
+library(kableExtra)
+library(magrittr)
+library(stringr)
+
+params <- list(
+  fit_version      = as.integer(script_options$fit_version),
+  struct_models    = script_options$model,
+  input_path       = script_options$input_path,
+  output_path      = script_options$output_path,
+  table_output_path = script_options$table_output,
+  width            = as.numeric(script_options$width)
+)
+
+cat(str_glue("fit_version:   {params$fit_version}\n"))
+cat(str_glue("struct_models: {params$struct_models}\n"))
+cat(str_glue("output_path:   {params$output_path}\n"))
+cat(str_glue("table_output:  {params$table_output_path}\n\n"))
+
+dir.create(params$table_output_path, showWarnings = FALSE, recursive = TRUE)
+dir.create(params$output_path, showWarnings = FALSE, recursive = TRUE)
+
+# ---------------------------------------------------------------------------
+# Load analysis data
+# ---------------------------------------------------------------------------
+source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
+source(file.path("analysis_util.R"))
+source(file.path("dist_structural_util.R"))
+source(file.path("multilvlr", "multilvlr_util.R"))
+
+standardize   <- as_mapper(~ (.) / sd(.))
+unstandardize <- function(standardized, original) standardized * sd(original)
+
+load(file.path("data", "takeup_village_pot_dist.RData"))
+load(file.path("data", "analysis.RData"))
+
+monitored_nosms_data <- analysis.data %>%
+  filter(mon_status == "monitored", sms.treatment.2 == "sms.control") %>%
+  left_join(
+    village.centers %>% select(cluster.id, cluster.dist.to.pot = dist.to.pot),
+    by = "cluster.id"
+  ) %>%
+  mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>%
+  group_by(cluster.id) %>%
+  mutate(cluster_id = cur_group_id()) %>%
+  ungroup()
+
+analysis_data <- monitored_nosms_data
+
+# ---------------------------------------------------------------------------
+# Helper: save latex table (strips \begin{table}...\end{table} wrapper)
+# ---------------------------------------------------------------------------
+custom_save_latex_table <- function(table, table_name) {
+  table_conn <- file(file.path(params$table_output_path, paste0(table_name, ".tex")))
+  attr(table, "kable_meta")$contents <-
+    str_replace_all(attr(table, "kable_meta")$contents, "removeme12345", " ")
+  table[1] <- str_replace_all(table[1], "removeme12345", " ")
+  clean_table <- table %>%
+    str_remove(., fixed("\\begin{table}")) %>%
+    str_remove(., "\\\\caption\\{.*\\}") %>%
+    str_remove(., "\\\\end\\{table\\}")
+  clean_table %>% writeLines(table_conn)
+  close(table_conn)
+  invisible(table)
+}
+
+# ---------------------------------------------------------------------------
+# Load structural ATE RDS (no RF data needed for structural-only tables)
+# ---------------------------------------------------------------------------
+ate_rvar_struct <- read_rds(
+  file.path(
+    params$output_path,
+    str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{params$struct_models}_1-4.rds")
+  )
+)
+
+# ate_rvar_df contains only structural rows; spread_rf() will produce only
+# struct_* columns, and the downstream select(-contains("rf_")) is a no-op.
+ate_rvar_df <- ate_rvar_struct
+
+# ---------------------------------------------------------------------------
+# Helper functions (adapted from tables.Rmd)
+# ---------------------------------------------------------------------------
+create_cis <- function(.data, .width = 0.95) {
+  med_fun <- function(x) {
+    mean_x   <- mean(x) %>% round(3)
+    conf.low  <- quantile(x, (1 - .width) / 2) %>% round(3)
+    conf.high <- quantile(x, 1 - (1 - .width) / 2) %>% round(3)
+    linebreak(
+      paste0(mean_x, "\n", str_glue("({conf.low}, {conf.high})")),
+      align = "c"
+    )
+  }
+  .data %>% mutate(across(where(is_rvar), med_fun))
+}
+
+create_ate_table <- function(.data, .estimand, group_var = treatment) {
+  .data %>%
+    filter(estimand == .estimand) %>%
+    select(model, {{ group_var }}, dist_group, value) %>%
+    pivot_wider(names_from = dist_group, values_from = value) %>%
+    select(model, {{ group_var }}, any_of(c("combined", "close", "far"))) %>%
+    arrange({{ group_var }}) %>%
+    bind_rows(
+      # bracelet minus calendar row
+      .data %>%
+        filter({{ group_var }} %in% c("Bracelet", "Calendar")) %>%
+        filter(estimand == .estimand) %>%
+        pivot_wider(names_from = {{ group_var }}, values_from = value) %>%
+        mutate(bracelet_minus_calendar = Bracelet - Calendar) %>%
+        select(model, dist_group, bracelet_minus_calendar) %>%
+        pivot_wider(names_from = dist_group, values_from = bracelet_minus_calendar) %>%
+        mutate("{{ group_var }}" := "bracelet_minus_calendar"),
+      # signal minus no-signal row
+      .data %>%
+        filter(estimand == .estimand) %>%
+        pivot_wider(names_from = dist_group, values_from = value) %>%
+        select(model, treatment, any_of(c("combined", "close", "far"))) %>%
+        mutate(signal = case_when(
+          treatment %in% c("Bracelet", "Ink") ~ "Signal",
+          treatment %in% c("Calendar")         ~ "No Signal",
+          TRUE ~ NA
+        )) %>%
+        filter(!is.na(signal)) %>%
+        group_by(model, signal) %>%
+        summarise(across(where(is_rvar), rvar_mean)) %>%
+        group_by(model) %>%
+        summarise(
+          across(where(is_rvar), ~ .x[signal == "Signal"] - .x[signal == "No Signal"])
+        ) %>%
+        mutate("{{ group_var }}" := "signal_minus_no_signal")
+    )
+}
+
+ate_tbl_levels <- c(
+  "Bracelet", "Calendar", "Ink", "Control",
+  "signal_minus_no_signal", "bracelet_minus_calendar"
+)
+
+recode_control_mean <- function(data) {
+  data %>% mutate(
+    treatment = fct_recode(
+      treatment,
+      "Control mean"       = "Control",
+      "Bracelet - Calendar" = "bracelet_minus_calendar",
+      "Signal - No Signal"  = "signal_minus_no_signal"
+    )
+  )
+}
+
+spread_rf <- function(data) {
+  data %>%
+    mutate(model_type = case_when(
+      model == params$struct_models ~ "struct",
+      TRUE ~ "rf"
+    )) %>%
+    select(-model) %>%
+    pivot_wider(
+      names_from  = model_type,
+      id_cols     = treatment,
+      names_glue  = "{model_type}_{.value}",
+      values_from = any_of(c("combined", "close", "far", "far_minus_close"))
+    ) %>%
+    select(treatment, starts_with("rf"), starts_with("struct"))
+}
+
+# ---------------------------------------------------------------------------
+# Build ATE data frames
+# ---------------------------------------------------------------------------
+incentive_ate_df <- ate_rvar_df %>%
+  create_ate_table(.estimand = "overall", group_var = treatment)
+
+signal_ate_df <- ate_rvar_df %>%
+  filter(model == params$struct_models) %>%
+  mutate(mu_treatment = str_to_title(mu_treatment)) %>%
+  create_ate_table(.estimand = "signal", group_var = mu_treatment)
+
+private_ate_df <- ate_rvar_df %>%
+  filter(model == params$struct_models) %>%
+  create_ate_table(.estimand = "private", group_var = treatment)
+
+incentive_ate_tbl <- incentive_ate_df %>%
+  mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment) %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  spread_rf() %>%
+  mutate(estimand = "overall")
+
+private_ate_tbl <- private_ate_df %>%
+  mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+  arrange(treatment) %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  spread_rf() %>%
+  mutate(estimand = "private") %>%
+  filter(!(treatment %in% c("Signal - No Signal", "Control mean", "Bracelet - Calendar")))
+
+signal_ate_tbl <- signal_ate_df %>%
+  rename(treatment = mu_treatment) %>%
+  mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment) %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  spread_rf() %>%
+  mutate(estimand = "signal") %>%
+  filter(!(treatment %in% c("Signal - No Signal", "Control mean", "Bracelet - Calendar")))
+
+all_ate_tbl <- bind_rows(incentive_ate_tbl, signal_ate_tbl, private_ate_tbl) %>%
+  mutate(estimand = factor(estimand, levels = c("private", "signal", "overall")) %>% fct_rev) %>%
+  select(estimand, treatment, everything())
+
+# ---------------------------------------------------------------------------
+# Table 1: Structural overall ATEs
+# ---------------------------------------------------------------------------
+cat("Writing struct-overall-te-table.tex ...\n")
+
+struct_overall_tbl <- all_ate_tbl %>%
+  arrange(estimand, treatment) %>%
+  filter(estimand == "overall") %>%
+  select(-estimand) %>%
+  select(-contains("rf_")) %>%
+  kbl(
+    col.names = c("Dependent variable: Take-up", paste0("(", 1:4, ")")),
+    format = "latex",
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    booktabs = TRUE, escape = FALSE, align = "lcccc",
+    caption = "Overall Results"
+  ) %>%
+  kable_styling(latex_options = c("scale_down")) %>%
+  add_header_above(
+    c(" ", "Combined", "Close", "Far", "Far - Close"),
+    line = FALSE
+  ) %>%
+  add_header_above(c(" " = 1, "Structural" = 4)) %>%
+  row_spec(c(3), hline_after = TRUE)
+
+struct_overall_tbl %>% custom_save_latex_table("struct-overall-te-table")
+
+# ---------------------------------------------------------------------------
+# Table 2: Signal + Private decomposition
+# ---------------------------------------------------------------------------
+cat("Writing private-signal-te-table.tex ...\n")
+
+decomposed_te_kbl_df <- all_ate_tbl %>%
+  arrange(estimand, treatment) %>%
+  filter(estimand %in% c("signal", "private")) %>%
+  select(estimand, treatment, contains("struct_")) %>%
+  select(-estimand) %>%
+  kbl(
+    col.names = c("Dependent variable: Take-up", paste0("(", 1:4, ")")),
+    format = "latex",
+    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    booktabs = TRUE, escape = FALSE, align = "lcccc",
+    caption = "Signal and Private Value"
+  ) %>%
+  kable_styling(latex_options = c("scale_down")) %>%
+  add_header_above(
+    c(" ", "Combined", "Close", "Far", "Far - Close"),
+    line = FALSE
+  ) %>%
+  add_header_above(c(" " = 1, "Structural" = 4)) %>%
+  pack_rows(
+    index = c("Panel A: Signal" = 3, "Panel B: Private" = 3),
+    italic = TRUE, escape = FALSE,
+    hline_after = TRUE, hline_before = TRUE, bold = TRUE
+  )
+
+decomposed_te_kbl_df %>% custom_save_latex_table("private-signal-te-table")
+
+# ---------------------------------------------------------------------------
+# Table 3: Belief ATEs (first-order beliefs)
+# ---------------------------------------------------------------------------
+cat("Writing fob-beliefs-table.tex ...\n")
+
+obs_rvar_struct <- read_rds(
+  file.path(
+    params$output_path,
+    str_glue("rvar_processed_dist_fit{params$fit_version}_belief_ates_{params$struct_models}_1-4.rds")
+  )
+)
+
+lvl_obs_rvar_struct <- read_rds(
+  file.path(
+    params$output_path,
+    str_glue("rvar_processed_dist_fit{params$fit_version}_belief_probs_{params$struct_models}_1-4.rds")
+  )
+) %>%
+  as.data.frame() %>%
+  filter(treatment == "Control") %>%
+  filter(variable == "prob_1ord") %>%
+  as_tibble() %>%
+  select(-dist_treat_idx)
+
+obs_rvar_struct <- bind_rows(
+  obs_rvar_struct %>% as.data.frame(),
+  lvl_obs_rvar_struct %>% as.data.frame()
+) %>% as_tibble()
+
+create_ate_kbl <- function(data, y_var_name = "Dependent variable: Observability") {
+  data %>%
+    kbl(
+      col.names = c(y_var_name, paste0("(", 1:4, ")")),
+      format = "latex", booktabs = TRUE, escape = FALSE, align = "lcccc",
+      caption = "Belief Results"
+    ) %>%
+    kable_styling(latex_options = c("scale_down")) %>%
+    add_header_above(
+      c(" ", "Combined", "Close", "Far", "Far - Close"),
+      line = FALSE
+    ) %>%
+    add_header_above(c(" " = 1, "Structural" = 4)) %>%
+    row_spec(c(3), hline_after = TRUE)
+}
+
+obs_rvar_df <- obs_rvar_struct %>%
+  as.data.frame() %>%
+  filter(variable == "ate_1ord" | variable == "prob_1ord") %>%
+  as_tibble() %>%
+  mutate(estimand = "overall") %>%
+  create_ate_table(.estimand = "overall", group_var = treatment)
+
+obs_rvar_tbl <- obs_rvar_df %>%
+  mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+  mutate(far_minus_close = far - close) %>%
+  arrange(treatment) %>%
+  create_cis(.width = params$width) %>%
+  recode_control_mean() %>%
+  select(-model) %>%
+  create_ate_kbl()
+
+obs_rvar_tbl %>% custom_save_latex_table("fob-beliefs-table")
+
+cat("\nDone. Tables written to:", params$table_output_path, "\n")
