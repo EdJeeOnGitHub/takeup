@@ -12,6 +12,9 @@
 #   struct-overall-te-table.tex
 #   private-signal-te-table.tex
 #   fob-beliefs-table.tex
+#   indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table.tex
+#   indiv-dist-indiv-fp-robust-struct-overall-te-table.tex
+#   struct-robustness-nooutliers-overall-te-table.tex
 
 script_options <- docopt::docopt(
   stringr::str_glue(
@@ -25,8 +28,9 @@ Options:
   --output-path=<path>    Path to postprocessed RDS files [default: temp-data/new-tables]
   --table-output=<path>   Path to write .tex tables [default: presentations/new-tables]
   --width=<w>             Credible interval width [default: 0.95]
+  --write-robustness      Also write appendix robustness tables
   "),
-  args = if (interactive()) "" else commandArgs(trailingOnly = TRUE)
+  args = if (interactive()) "--fit-version=105" else commandArgs(trailingOnly = TRUE)
 )
 
 library(tidyverse)
@@ -96,6 +100,25 @@ custom_save_latex_table <- function(table, table_name) {
   clean_table %>% writeLines(table_conn)
   close(table_conn)
   invisible(table)
+}
+
+create_robustness_tbl <- function(data) {
+  data %>%
+    kbl(
+      col.names = c("Dependent variable: Take-up", paste0("(", 1:4, ")")),
+      format = "latex",
+      booktabs = TRUE,
+      escape = FALSE,
+      align = "lcccc",
+      caption = "Overall Results"
+    ) %>%
+    kable_styling(latex_options = c("scale_down")) %>%
+    add_header_above(
+      c(" ", "Combined", "Close", "Far", "Far - Close"),
+      line = FALSE
+    ) %>%
+    add_header_above(c(" " = 1, "Structural" = 4)) %>%
+    row_spec(c(3), hline_after = TRUE)
 }
 
 # ---------------------------------------------------------------------------
@@ -196,6 +219,71 @@ spread_rf <- function(data) {
       values_from = any_of(c("combined", "close", "far", "far_minus_close"))
     ) %>%
     select(treatment, starts_with("rf"), starts_with("struct"))
+}
+
+prep_robustness <- function(data) {
+  data %>%
+    filter(variable != "far_minus_close") %>%
+    filter(treatment != "bracelet_minus_calendar") %>%
+    rename(dist_group = variable) %>%
+    create_ate_table(.estimand = "overall", group_var = treatment) %>%
+    mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+    mutate(far_minus_close = far - close) %>%
+    arrange(treatment) %>%
+    create_cis(.width = params$width) %>%
+    recode_control_mean() %>%
+    mutate(estimand = "overall") %>%
+    select(-model, -estimand)
+}
+
+write_robustness_tables <- function() {
+  cat("Writing robustness appendix tables ...\n")
+
+  robustness_models <- tribble(
+    ~model, ~table_name, ~is_indiv,
+    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS",
+    "indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table",
+    TRUE,
+    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP",
+    "indiv-dist-indiv-fp-robust-struct-overall-te-table",
+    TRUE,
+    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS",
+    "struct-robustness-nooutliers-overall-te-table",
+    FALSE
+  )
+
+  for (i in seq_len(nrow(robustness_models))) {
+    robustness_row <- robustness_models[i, ]
+    rds_name <- if (robustness_row$is_indiv) {
+      str_glue(
+        "rvar_processed_dist_fit{params$fit_version}_INDIV_incentive_tes_{robustness_row$model}_1-4.rds"
+      )
+    } else {
+      str_glue(
+        "rvar_processed_dist_fit{params$fit_version}_ates_{robustness_row$model}_1-4.rds"
+      )
+    }
+
+    robust_rvar <- read_rds(file.path(params$output_path, rds_name))
+
+    robust_tbl <- if (robustness_row$is_indiv) {
+      prep_robustness(robust_rvar)
+    } else {
+      robust_rvar %>%
+        create_ate_table(.estimand = "overall", group_var = treatment) %>%
+        mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+        mutate(far_minus_close = far - close) %>%
+        arrange(treatment) %>%
+        create_cis(.width = params$width) %>%
+        recode_control_mean() %>%
+        mutate(estimand = "overall") %>%
+        select(-model, -estimand)
+    }
+
+    robust_tbl %>%
+      create_robustness_tbl() %>%
+      custom_save_latex_table(robustness_row$table_name)
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -366,5 +454,9 @@ obs_rvar_tbl <- obs_rvar_df %>%
   create_ate_kbl()
 
 obs_rvar_tbl %>% custom_save_latex_table("fob-beliefs-table")
+
+if (isTRUE(script_options$write_robustness)) {
+  write_robustness_tables()
+}
 
 cat("\nDone. Tables written to:", params$table_output_path, "\n")

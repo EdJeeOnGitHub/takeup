@@ -13,19 +13,14 @@
 #SBATCH --error=temp/log/takeup-%j.log
 #SBATCH --export=IN_SLURM=1
 
-LATEST_VERSION=104
+LATEST_VERSION=105
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 SLURM_INOUT_DIR="/project/akaring/takeup-data/"
 
 models=(
-   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FOB"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIER_FIXED_FOB"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL"
-#  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS"
+   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS"
+   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP"
+   "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS"
 )
 
 echo "Version: $VERSION"
@@ -46,34 +41,10 @@ else
   CORES=8
 fi
 
+source quick_postprocess.sh
+
 for model in "${models[@]}"; do
-  Rscript --no-save \
-          --no-restore \
-          --verbose \
-          quick_ate_postprocess.R \
-          ${VERSION} \
-          --model=${model} \
-          ${IN_ARG} \
-          ${OUT_ARG} \
-          1 2 3 4  &
-  Rscript --no-save \
-          --no-restore \
-          --verbose \
-          quick_roc_postprocess.R \
-          ${VERSION} \
-          --model=${model} \
-          ${IN_ARG} \
-          ${OUT_ARG} \
-          1 2 3 4  &
-  Rscript --no-save \
-          --no-restore \
-          --verbose \
-          quick_submodel_postprocess.R \
-          ${VERSION} \
-          --model=${model} \
-          ${IN_ARG} \
-          ${OUT_ARG} \
-          1 2 3 4  &
+  postprocess_struct_models "${model}" "${VERSION}" "${IN_ARG} ${OUT_ARG}" &
 done
 
 wait

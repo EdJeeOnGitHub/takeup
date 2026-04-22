@@ -13,9 +13,9 @@
 #SBATCH --output=temp/log/takeup-%j.log
 #SBATCH --error=temp/log/takeup-%j.log
 #SBATCH --export=IN_SLURM=1
-#SBATCH --array=0-4              # create a job array with 5 tasks
+#SBATCH --array=0-2              # robustness batch: 3 tasks
 
-LATEST_VERSION=96
+LATEST_VERSION=105
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
 SLURM_INOUT_DIR="data/stan_analysis_data"
@@ -38,17 +38,17 @@ else
 fi
 
 models=(
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_SD_WTP_VAL"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_HIGH_MU_WTP_VAL"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_WTP_SUBMODEL"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL"
-  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_SUBMODELS"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP"
+  "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS"
 )
 
 model=${models[$SLURM_ARRAY_TASK_ID]} # get the model for this task
 
 # stan threads equal to number of cores/4
 STAN_THREADS=$((${CORES} / 4))
+
+source quick_postprocess.sh
 
 Rscript --no-save \
   --no-restore \
@@ -64,3 +64,5 @@ Rscript --no-save \
   --chains=4 \
   --iter=${ITER} \
   --sequential > temp/log/output-${model}-fit${VERSION}.txt 2>&1
+
+postprocess_struct_models "${model}" "${VERSION}" "${POSTPROCESS_INOUT_ARGS}"
