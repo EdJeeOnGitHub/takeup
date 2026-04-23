@@ -29,6 +29,8 @@ indiv_community_model = if_else(str_detect(script_options$model, "INDIV_DIST_COM
 indiv_indiv_model = if_else(str_detect(script_options$model, "INDIV_DIST_INDIV_FP"), TRUE, FALSE)
 indiv_model = indiv_community_model | indiv_indiv_model
 source("quick_postprocess_functions.R")
+analysis_data <- prepare_postprocess_analysis_data(script_options$model)
+
 create_tes = function(.data, group_var, levels = FALSE) {
  if (levels == TRUE) {
   levels_mult = 0

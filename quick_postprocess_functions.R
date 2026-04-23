@@ -19,9 +19,52 @@ monitored_nosms_data <- analysis.data %>%
 analysis_data <- monitored_nosms_data %>% 
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group)
 
+cluster_dispersion_df <- analysis_data %>%
+  group_by(
+    assigned_treatment,
+    cluster_id
+  ) %>%
+  summarise(
+    mse_dist_to_cluster = mean(((dist.to.pot - cluster.dist.to.pot) / 1000)^2),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    dispersed_community = mse_dist_to_cluster > 0.5
+  )
+
+analysis_data <- analysis_data %>%
+  left_join(
+    cluster_dispersion_df %>% select(-assigned_treatment),
+    by = "cluster_id"
+  )
+
 sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 
 ## Load Stan output
+prepare_postprocess_analysis_data <- function(model) {
+  postprocess_analysis_data <- analysis_data
+
+  if (str_detect(model, "INDIV_DIST_INDIV_FP")) {
+    postprocess_analysis_data <- postprocess_analysis_data %>%
+      mutate(
+        old_cluster_id = cluster_id,
+        cluster.id = row_number(),
+        cluster_id = row_number(),
+        standard_cluster.dist.to.pot = standardize(dist.to.pot)
+      )
+  }
+
+  if (str_detect(model, "NO_OUTLIERS")) {
+    postprocess_analysis_data <- postprocess_analysis_data %>%
+      filter(!dispersed_community) %>%
+      group_by(cluster.id) %>%
+      mutate(cluster_id = cur_group_id()) %>%
+      ungroup()
+  }
+
+  postprocess_analysis_data
+}
+
 load_param_draws = function(fit_version, 
                             model, 
                             chain, 
