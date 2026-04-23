@@ -606,9 +606,6 @@ summ_know_A_df %>%
     n_indiv = n_distinct(KEY.individ)
   )
 
-      # doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed,
-      # doesnt_think_other_knows = obs_know_person - thinks_other_knows
-
 endline_know_A_df = endline_data %>%
   left_join(
     summ_know_A_df,

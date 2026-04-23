@@ -13,10 +13,10 @@ Options:
 
   "), 
   args = if (interactive()) "
-  95
+  104
   --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
-  1 2 
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+  1 2 3 4
   " else commandArgs(trailingOnly = TRUE)
 )
 library(tidyverse)

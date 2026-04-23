@@ -662,14 +662,25 @@ beliefs_cluster_obs_lookup <- analysis_data %>%
 fob_belief_indexed <- fob_belief_df %>%
   left_join(beliefs_cluster_obs_lookup, by = "cluster.id")
 
+missing_belief_obs_index <- sum(is.na(fob_belief_indexed$obs_index))
+
 cat(str_glue(
   "\n--- Beliefs data join check ---\n",
   "  fob_belief_df rows (all beliefs obs):          {nrow(fob_belief_df)}\n",
   "  matched to analysis_data individual:           {sum(analysis_data$obs_know_person > 0)}\n",
   "  unmatched individual (cluster lookup used):    {nrow(fob_belief_df) - sum(analysis_data$obs_know_person > 0)}\n",
-  "  fob_belief_indexed rows missing cluster match: {sum(is.na(fob_belief_indexed$obs_index))}\n",
+  "  fob_belief_indexed rows missing cluster match: {missing_belief_obs_index}\n",
   "-------------------------------\n\n"
 ))
+
+if (missing_belief_obs_index > 0) {
+  warning(str_glue(
+    "Dropping {missing_belief_obs_index} belief rows that do not map to the active analysis sample."
+  ))
+
+  fob_belief_indexed <- fob_belief_indexed %>%
+    filter(!is.na(obs_index))
+}
 
 beliefs_ate_pairs <- cluster_treatment_map %>% 
   mutate(treatment_id = seq(n())) %>% {

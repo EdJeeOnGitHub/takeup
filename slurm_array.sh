@@ -18,7 +18,7 @@
 LATEST_VERSION=105
 VERSION=${1:-$LATEST_VERSION} # Get version from command line if provided
 CMDSTAN_ARGS="--cmdstanr"
-SLURM_INOUT_DIR="data/stan_analysis_data"
+SLURM_INOUT_DIR="/project/akaring/takeup-data/data/stan_analysis_data"
 ITER=400
 
 if [[ -v IN_SLURM ]]; then
