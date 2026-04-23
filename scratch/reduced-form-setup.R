@@ -386,60 +386,100 @@ baseline_worm_data = baseline_worm %>%
 sens_imp_df = read_csv("data/raw-data/Sensitization Monitoring Form.csv", guess_max = 10000)
 sens_imp_hh_df = read_csv("data/raw-data/Sensitization Monitoring Form-household.csv", guess_max = 10000)
 
-# not sure what this does - inherited from KN
-unique_hh_message_df = sens_imp_hh_df %>%
-  mutate(
-    message_list = str_split(message, " ")
-  ) %>%
-  select(PARENT_KEY, message_list) %>%
-  unnest(message_list) %>%
-  group_by(PARENT_KEY) %>%
-  unique() %>%
-  summarise(message_list = list(as.numeric(message_list))) %>%
-  mutate(
-    knowledge_message = map_lgl(message_list, ~all(c(1, 2, 3, 4, 5) %in% .x)
-     ),
-    availability_message = map_lgl(message_list, ~all(c(6, 7) %in% .x))
+has_valid_sens_files =
+  all(c("KEY", "cluster_id", "enumerator", "announcement", "where") %in% names(sens_imp_df)) &&
+  all(c("PARENT_KEY", "message") %in% names(sens_imp_hh_df))
+
+if (!has_valid_sens_files) {
+  warning(
+    paste(
+      "Sensitization monitoring files are missing expected columns.",
+      "This often means the raw CSVs are Git LFS pointers on the current machine.",
+      "Skipping sensitization-monitoring summaries."
+    )
+  )
+
+  clean_sens_imp_df = tibble(
+    cluster.id = numeric(),
+    announcement = logical(),
+    announce_church = logical(),
+    knowledge_message = logical(),
+    availability_message = logical(),
+    treat_dist = character(),
+    county = character()
+  )
+
+  clean_sens_summ_imp_df = tibble(
+    cluster.id = numeric(),
+    treat_dist = character(),
+    county = character(),
+    n_announce = numeric(),
+    n_announce_church = numeric(),
+    n_knowledge_message = numeric(),
+    n_avail_message = numeric(),
+    n_message = numeric(),
+    n_total = numeric(),
+    pct_announce = numeric(),
+    pct_church = numeric(),
+    pct_knowledge_message = numeric(),
+    pct_avail_message = numeric()
+  )
+} else {
+  # not sure what this does - inherited from KN
+  unique_hh_message_df = sens_imp_hh_df %>%
+    mutate(
+      message_list = str_split(message, " ")
+    ) %>%
+    select(PARENT_KEY, message_list) %>%
+    unnest(message_list) %>%
+    group_by(PARENT_KEY) %>%
+    unique() %>%
+    summarise(message_list = list(as.numeric(message_list))) %>%
+    mutate(
+      knowledge_message = map_lgl(message_list, ~all(c(1, 2, 3, 4, 5) %in% .x)
+       ),
+      availability_message = map_lgl(message_list, ~all(c(6, 7) %in% .x))
+      )
+
+  # Same with this
+  clean_sens_imp_df = sens_imp_df %>%
+    filter(!is.na(enumerator)) %>%
+    filter(!is.na(announcement)) %>%
+    mutate(announce_church = str_detect(where, "1")) %>%
+    left_join(unique_hh_message_df, by = c("KEY" = "PARENT_KEY")) %>%
+    select(
+      cluster.id = cluster_id,
+      announcement,
+      announce_church,
+      knowledge_message,
+      availability_message
+    ) %>%
+    inner_join(cluster_treat_df, by = "cluster.id") %>%
+    filter(!is.na(treat_dist)) %>%
+    left_join(
+      cluster.strat.data %>%
+        select(cluster.id, county)
     )
 
-# Same with this
-clean_sens_imp_df = sens_imp_df %>%
-  filter(!is.na(enumerator)) %>%
-  filter(!is.na(announcement)) %>%
-  mutate(announce_church = str_detect(where, "1")) %>%
-  left_join(unique_hh_message_df, by = c("KEY" = "PARENT_KEY")) %>%
-  select(
-    cluster.id = cluster_id,
-    announcement,
-    announce_church,
-    knowledge_message,
-    availability_message
-  ) %>%
-  inner_join(cluster_treat_df, by = "cluster.id") %>%
-  filter(!is.na(treat_dist)) %>%
-  left_join(
-    cluster.strat.data %>%
-      select(cluster.id, county)
-  ) 
 
-
-# PoT verification monitoring
-clean_sens_summ_imp_df = clean_sens_imp_df %>%
-  group_by(cluster.id, treat_dist, county) %>%
-  summarise(
-    n_announce = sum(announcement, na.rm = TRUE),
-    n_announce_church = sum(announce_church, na.rm = TRUE),
-    n_knowledge_message = sum(knowledge_message, na.rm = TRUE),
-    n_avail_message = sum(availability_message, na.rm = TRUE),
-    n_message = sum(!is.na(knowledge_message) | !is.na(availability_message)),
-    n_total = n()
-  ) %>%
-  mutate(
-    pct_announce = n_announce / n_total,
-    pct_church = n_announce_church / n_total,
-    pct_knowledge_message = n_knowledge_message / n_message,
-    pct_avail_message = n_avail_message / n_message
-  ) 
+  # PoT verification monitoring
+  clean_sens_summ_imp_df = clean_sens_imp_df %>%
+    group_by(cluster.id, treat_dist, county) %>%
+    summarise(
+      n_announce = sum(announcement, na.rm = TRUE),
+      n_announce_church = sum(announce_church, na.rm = TRUE),
+      n_knowledge_message = sum(knowledge_message, na.rm = TRUE),
+      n_avail_message = sum(availability_message, na.rm = TRUE),
+      n_message = sum(!is.na(knowledge_message) | !is.na(availability_message)),
+      n_total = n()
+    ) %>%
+    mutate(
+      pct_announce = n_announce / n_total,
+      pct_church = n_announce_church / n_total,
+      pct_knowledge_message = n_knowledge_message / n_message,
+      pct_avail_message = n_avail_message / n_message
+    )
+}
   
   
 
