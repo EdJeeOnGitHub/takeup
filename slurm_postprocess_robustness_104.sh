@@ -20,7 +20,6 @@ INPUT_PATH="/project/akaring/takeup-data/data/stan_analysis_data"
 OUTPUT_PATH="/project/akaring/takeup-data/temp-data"
 
 if [[ -v IN_SLURM ]]; then
-  module load -f midway2 gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
   module load -f R/4.2.0
 fi
 
