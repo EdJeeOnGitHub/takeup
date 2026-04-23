@@ -381,7 +381,7 @@ all_tes = bind_rows(
 options(width = 120)
 all_tes %>%
   select(
-    estimand, treatment, dist_group, pr_takeup, mu_treatment
+    estimand, treatment, dist_group, pr_takeup, any_of("mu_treatment")
   ) %>%
   print(n = 30)
 
