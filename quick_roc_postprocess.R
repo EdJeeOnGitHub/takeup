@@ -6,7 +6,7 @@ script_options <- docopt::docopt(
   
 Options:
   --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
-  --output-path=<path>  Path to find results [default: temp-data]
+  --output-path=<path>  Path to find results [default: temp-data/struct-postprocess]
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
   --cluster-roc
@@ -18,7 +18,7 @@ Options:
   "), 
   args = if (interactive()) "
   001
-  --output-path=temp-data
+  --output-path=temp-data/struct-postprocess
   --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL
   --sm
   1

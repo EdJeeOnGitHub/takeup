@@ -25,12 +25,12 @@ Options:
   --fit-version=<v>       Fit version number [default: 104]
   --model=<m>             Structural model name [default: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP]
   --input-path=<path>     Path to Stan analysis data [default: data/stan_analysis_data]
-  --output-path=<path>    Path to postprocessed RDS files [default: temp-data/new-tables]
-  --table-output=<path>   Path to write .tex tables [default: presentations/new-tables]
+  --output-path=<path>    Path to postprocessed RDS files [default: temp-data/struct-postprocess]
+  --table-output=<path>   Path to write .tex tables [default: presentations/tables/fit<VERSION>]
   --width=<w>             Credible interval width [default: 0.95]
   --write-robustness      Also write appendix robustness tables
   "),
-  args = if (interactive()) "--fit-version=105" else commandArgs(trailingOnly = TRUE)
+  args = if (interactive()) "--fit-version=105 --write-robustness" else commandArgs(trailingOnly = TRUE)
 )
 
 library(tidyverse)
@@ -41,12 +41,16 @@ library(kableExtra)
 library(magrittr)
 library(stringr)
 
+fit_version_int <- as.integer(script_options$fit_version)
 params <- list(
-  fit_version      = as.integer(script_options$fit_version),
+  fit_version      = fit_version_int,
   struct_models    = script_options$model,
   input_path       = script_options$input_path,
   output_path      = script_options$output_path,
-  table_output_path = script_options$table_output,
+  table_output_path = if (script_options$table_output == "presentations/tables/fit<VERSION>")
+    str_glue("presentations/tables/fit{fit_version_int}")
+  else
+    script_options$table_output,
   width            = as.numeric(script_options$width)
 )
 
