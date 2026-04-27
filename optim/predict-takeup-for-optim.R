@@ -71,7 +71,6 @@ library(posterior)
 library(tidyverse)
 library(tidybayes)
 library(broom)
-library(rstan)
 library(sf)
 library(nleqslv)
 library(cmdstanr)
@@ -539,5 +538,3 @@ sm_df %>%
 
 
  }
-
-sm_df
