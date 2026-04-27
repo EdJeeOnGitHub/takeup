@@ -124,6 +124,11 @@ echo "[$(date +%H:%M:%S)] Step 2b: demand prediction (${PREDICT_PARALLELISM} sce
 predict_demand() {
     local b_z=$1 mu_z=$2 prefix=$3 label=$4
     shift 4
+    local out_csv="${DATA_DIR}/pred-demand-dist-fit${VERSION}-${prefix}cutoff-b-${b_z}-mu-${mu_z}-${MODEL}.csv"
+    if [[ -f "${out_csv}" ]]; then
+        echo "[$(date +%H:%M:%S)] predict-${label} skipped (output exists)"
+        return
+    fi
     Rscript --no-save --no-restore optim/predict-takeup-for-optim.R \
         "${VERSION}" "${b_z}" "${mu_z}" \
         --output-name="${prefix}cutoff-b-${b_z}-mu-${mu_z}-${MODEL}" \
