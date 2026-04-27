@@ -28,6 +28,7 @@ VERSION=105
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 NUM_CORES=12          # used for sequential steps (gurobi, postprocess)
 NUM_CORES_PARALLEL=1  # Step 2b already runs scenarios in parallel; avoid nested R workers
+PREDICT_PARALLELISM="${PREDICT_PARALLELISM:-1}"
 WELFARE="identity"
 CTYPE="agg"
 COUNTY="full"
@@ -117,8 +118,8 @@ else
     echo "[$(date +%H:%M:%S)] Step 2a: param CSV already exists, skipping extraction"
 fi
 
-# ── Step 2b: Demand prediction (5 scenarios, parallel, from pre-extracted CSV) ─
-echo "[$(date +%H:%M:%S)] Step 2b: demand prediction (5 scenarios in parallel)..."
+# ── Step 2b: Demand prediction from pre-extracted CSV ─────────────────────────
+echo "[$(date +%H:%M:%S)] Step 2b: demand prediction (${PREDICT_PARALLELISM} scenario process(es) at a time)..."
 
 predict_demand() {
     local b_z=$1 mu_z=$2 prefix=$3 label=$4
@@ -142,18 +143,31 @@ predict_demand() {
 }
 
 predict_pids=()
+wait_for_predict_slot() {
+    if [[ ${#predict_pids[@]} -lt ${PREDICT_PARALLELISM} ]]; then
+        return
+    fi
 
+    wait "${predict_pids[0]}"
+    predict_pids=("${predict_pids[@]:1}")
+}
+
+wait_for_predict_slot
 predict_demand "control" "control" "" "control-control" &
 predict_pids+=("$!")
 if [[ $SMOKETEST -eq 0 ]]; then
+    wait_for_predict_slot
     predict_demand "control" "bracelet" "" "control-bracelet" &
     predict_pids+=("$!")
+    wait_for_predict_slot
     predict_demand "control" "control"  "static-"     "static-control"  \
         --static-signal-pm --static-signal-distance="${STATIC_DIST}"    &
     predict_pids+=("$!")
+    wait_for_predict_slot
     predict_demand "control" "bracelet" "static-"     "static-bracelet" \
         --static-signal-pm --static-signal-distance="${STATIC_DIST}"    &
     predict_pids+=("$!")
+    wait_for_predict_slot
     predict_demand "control" "control"  "suppress-rep-" "suppress-rep"  \
         --suppress-reputation                                            &
     predict_pids+=("$!")
