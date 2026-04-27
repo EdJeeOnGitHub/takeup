@@ -58,7 +58,7 @@ else
     )
 fi
 
-STAN_INPUT="/project/akaring/takeup-data/data/stan_analysis_data"
+STAN_INPUT="${STAN_INPUT:-/project/akaring/takeup-data/data/stan_analysis_data}"
 DATA_INPUT="${COUNTY}-many-pots-experiment.rds"
 DATA_DIR="optim/data/${MODEL}/${CTYPE}-${COUNTY}-many-pots"
 PLOT_DIR="optim/plots/${MODEL}/${CTYPE}-${COUNTY}-many-pots"
@@ -70,7 +70,7 @@ cd ~/projects/takeup
 module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
 module load gurobi/9.2
 # scratch-midway2 is also noexec at GPFS policy level; home is exec-allowed
-export TMPDIR=~/tmp-rcpp
+export TMPDIR="${TMPDIR:-~/tmp-rcpp}"
 mkdir -p "${TMPDIR}" "${DATA_DIR}" "${PLOT_DIR}" "${PDF_DIR}" "${OPTIM_FIG_DIR}" temp/log
 
 # ── Helper: run an R script, log to file, echo progress ───────────────────────
