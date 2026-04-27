@@ -69,10 +69,11 @@ OPTIM_FIG_DIR="presentations/optim-figures"
 # ── Environment ───────────────────────────────────────────────────────────────
 cd ~/projects/takeup
 module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
-module load gurobi/9.2
-# Gurobi 9.5 R package patched to link libgurobi90.so; stub provides 5 symbols
-# added in 9.5 that are absent from 9.0.2 (all are no-ops or rarely used paths).
-export LD_PRELOAD="${HOME}/projects/takeup/gurobi_stub.so${LD_PRELOAD:+:${LD_PRELOAD}}"
+export GUROBI_HOME="${HOME}/gurobi952/linux64"
+export PATH="${GUROBI_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="${GUROBI_HOME}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+# Use cluster token server license (works on compute nodes; not login node)
+export GRB_LICENSE_FILE=/software/gurobi-9.2-el7-x86_64/gurobi.lic
 # scratch-midway2 is also noexec at GPFS policy level; home is exec-allowed
 export TMPDIR="${TMPDIR:-~/tmp-rcpp}"
 mkdir -p "${TMPDIR}" "${DATA_DIR}" "${PLOT_DIR}" "${PDF_DIR}" "${OPTIM_FIG_DIR}" temp/log
