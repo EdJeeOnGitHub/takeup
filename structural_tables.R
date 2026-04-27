@@ -41,6 +41,8 @@ library(kableExtra)
 library(magrittr)
 library(stringr)
 
+options(knitr.kable.NA = '')  
+
 fit_version_int <- as.integer(script_options$fit_version)
 params <- list(
   fit_version      = fit_version_int,
@@ -203,8 +205,8 @@ recode_control_mean <- function(data) {
     treatment = fct_recode(
       treatment,
       "Control mean"       = "Control",
-      "Bracelet - Calendar" = "bracelet_minus_calendar",
-      "Signal - No Signal"  = "signal_minus_no_signal"
+      "$\\Delta$ (Bracelet - Calendar)" = "bracelet_minus_calendar",
+      "$\\Delta$ (Signal - No Signal)"  = "signal_minus_no_signal"
     )
   )
 }

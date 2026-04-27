@@ -282,10 +282,10 @@ ggsave(
 
 
 control_oa_files = str_glue(
-    "optim/data/{script_options$model}/agg-full-many-pots/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-control-{script_options$model}-median-optimal-allocation.rds"
+    "optim/data/{script_options$model}/agg-full-many-pots/dist-constraint-{script_options$distance_constraint}/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-control-{script_options$model}-median-optimal-allocation.rds"
     )
 bracelet_oa_files = str_glue(
-    "optim/data/{script_options$model}/agg-full-many-pots/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-bracelet-{script_options$model}-median-optimal-allocation.rds"
+    "optim/data/{script_options$model}/agg-full-many-pots/dist-constraint-{script_options$distance_constraint}/target-rep-distconstraint-{script_options$distance_constraint}-util-{script_options$welfare_function}-cutoff-b-control-mu-bracelet-{script_options$model}-median-optimal-allocation.rds"
     )
 
 control_oa_df = read_rds(control_oa_files)
