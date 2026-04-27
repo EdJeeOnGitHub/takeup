@@ -454,7 +454,7 @@ output_path = file.path(
 
 
 saveRDS(
-  tidy_output,
+  tidy_output %>% select(-optim_problem, -optim_fit),
   output_path
 )
 

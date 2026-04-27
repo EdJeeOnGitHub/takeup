@@ -110,7 +110,7 @@ optimisation_df =
         optim_files
     ) %>%
     map_dfr(read_rds) %>%
-    select(-demand_data, -optim_problem, -optim_fit)   
+    select(-demand_data)
 
 optimisation_df[, allocation_type := "policymaker"] 
 
