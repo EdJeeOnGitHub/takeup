@@ -93,8 +93,32 @@ else
     echo "[$(date +%H:%M:%S)] create-distance-data skipped (optim/data/${DATA_INPUT} exists)"
 fi
 
-# ── Step 2: Demand prediction (5 scenarios, parallel) ─────────────────────────
-echo "[$(date +%H:%M:%S)] Step 2: demand prediction (5 scenarios in parallel)..."
+# ── Step 2a: Extract posterior parameter draws once (1.7GB CSV → param CSV) ───
+# Loading as_cmdstan_fit on a 1.7GB chain uses ~15GB RAM; do this once rather
+# than once per scenario to avoid OOM and a write-race on the shared param CSV.
+PARAM_CSV="${STAN_INPUT}/param_posterior_draws_dist_fit${VERSION}_${MODEL}.csv"
+if [[ ! -f "${PARAM_CSV}" ]]; then
+    echo "[$(date +%H:%M:%S)] Step 2a: extracting param draws to CSV..."
+    rrun "extract-params" optim/predict-takeup-for-optim.R \
+        "${VERSION}" "control" "control" \
+        --output-name="cutoff-b-control-mu-control-${MODEL}" \
+        --to-csv \
+        --num-post-draws="${NUM_POST_DRAWS}" \
+        --rep-cutoff=Inf \
+        --dist-cutoff=3500 \
+        --num-cores="${NUM_CORES}" \
+        --type-lb=-Inf --type-ub=Inf \
+        --data-input-name="${DATA_INPUT}" \
+        --output-path="${DATA_DIR}" \
+        --input-path="${STAN_INPUT}" \
+        --model="${MODEL}" \
+        --single-chain
+else
+    echo "[$(date +%H:%M:%S)] Step 2a: param CSV already exists, skipping extraction"
+fi
+
+# ── Step 2b: Demand prediction (5 scenarios, parallel, from pre-extracted CSV) ─
+echo "[$(date +%H:%M:%S)] Step 2b: demand prediction (5 scenarios in parallel)..."
 
 predict_demand() {
     local b_z=$1 mu_z=$2 prefix=$3 label=$4
@@ -102,7 +126,7 @@ predict_demand() {
     Rscript --no-save --no-restore optim/predict-takeup-for-optim.R \
         "${VERSION}" "${b_z}" "${mu_z}" \
         --output-name="${prefix}cutoff-b-${b_z}-mu-${mu_z}-${MODEL}" \
-        --to-csv \
+        --from-csv \
         --num-post-draws="${NUM_POST_DRAWS}" \
         --rep-cutoff=Inf \
         --dist-cutoff=3500 \
@@ -112,7 +136,6 @@ predict_demand() {
         --output-path="${DATA_DIR}" \
         --input-path="${STAN_INPUT}" \
         --model="${MODEL}" \
-        --single-chain \
         --run-estimation \
         "$@" \
         >> "temp/log/optim-105-predict-${label}.log" 2>&1
