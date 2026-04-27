@@ -26,7 +26,8 @@ SMOKETEST=${SMOKETEST:-0}
 # ── Configuration ─────────────────────────────────────────────────────────────
 VERSION=105
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
-NUM_CORES=12
+NUM_CORES=12          # used for sequential steps (gurobi, postprocess)
+NUM_CORES_PARALLEL=3  # used for 5 parallel demand predictions (5×3=15 ≤ 16 CPUs)
 WELFARE="identity"
 CTYPE="agg"
 COUNTY="full"
@@ -68,8 +69,8 @@ OPTIM_FIG_DIR="presentations/optim-figures"
 cd ~/projects/takeup
 module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
 module load gurobi/9.2
-# /tmp on compute nodes has noexec — Rcpp/sourceCpp needs an executable TMPDIR
-export TMPDIR=~/scratch-midway2/tmp
+# scratch-midway2 is also noexec at GPFS policy level; home is exec-allowed
+export TMPDIR=~/tmp-rcpp
 mkdir -p "${TMPDIR}" "${DATA_DIR}" "${PLOT_DIR}" "${PDF_DIR}" "${OPTIM_FIG_DIR}" temp/log
 
 # ── Helper: run an R script, log to file, echo progress ───────────────────────
@@ -105,7 +106,7 @@ predict_demand() {
         --num-post-draws="${NUM_POST_DRAWS}" \
         --rep-cutoff=Inf \
         --dist-cutoff=3500 \
-        --num-cores="${NUM_CORES}" \
+        --num-cores="${NUM_CORES_PARALLEL}" \
         --type-lb=-Inf --type-ub=Inf \
         --data-input-name="${DATA_INPUT}" \
         --output-path="${DATA_DIR}" \
