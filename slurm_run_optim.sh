@@ -27,7 +27,7 @@ SMOKETEST=${SMOKETEST:-0}
 VERSION=105
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 NUM_CORES=12          # used for sequential steps (gurobi, postprocess)
-NUM_CORES_PARALLEL=3  # used for 5 parallel demand predictions (5×3=15 ≤ 16 CPUs)
+NUM_CORES_PARALLEL=1  # Step 2b already runs scenarios in parallel; avoid nested R workers
 WELFARE="identity"
 CTYPE="agg"
 COUNTY="full"
@@ -141,17 +141,26 @@ predict_demand() {
         >> "temp/log/optim-105-predict-${label}.log" 2>&1
 }
 
+predict_pids=()
+
 predict_demand "control" "control" "" "control-control" &
+predict_pids+=("$!")
 if [[ $SMOKETEST -eq 0 ]]; then
     predict_demand "control" "bracelet" "" "control-bracelet" &
+    predict_pids+=("$!")
     predict_demand "control" "control"  "static-"     "static-control"  \
         --static-signal-pm --static-signal-distance="${STATIC_DIST}"    &
+    predict_pids+=("$!")
     predict_demand "control" "bracelet" "static-"     "static-bracelet" \
         --static-signal-pm --static-signal-distance="${STATIC_DIST}"    &
+    predict_pids+=("$!")
     predict_demand "control" "control"  "suppress-rep-" "suppress-rep"  \
         --suppress-reputation                                            &
+    predict_pids+=("$!")
 fi
-wait
+for pid in "${predict_pids[@]}"; do
+    wait "${pid}"
+done
 echo "[$(date +%H:%M:%S)] Demand prediction complete."
 
 # ── Step 3: Experiment target constraint (posterior median, base scenario) ────

@@ -150,9 +150,22 @@ if (script_options$to_csv) {
             regex = str_glue("dist_{script_options$fit_type}{fit_version}_{script_options$model}-.*csv"))
     }
     
-    struct_model_fit = as_cmdstan_fit(struct_model_files)
     # N.B. this is very hardcoded for vanilla structural model
-    struct_param_draws = struct_model_fit %>%
+    struct_param_variables = c(
+        "beta",
+        "dist_beta_v",
+        "centered_cluster_beta_1ord",
+        "centered_cluster_dist_beta_1ord",
+        "base_mu_rep",
+        "total_error_sd",
+        "u_sd"
+    )
+    struct_model_draws = read_cmdstan_csv(
+        struct_model_files,
+        variables = struct_param_variables,
+        format = "draws_array"
+    )
+    struct_param_draws = struct_model_draws %>%
         gather_draws(
             beta[k],
             dist_beta_v[j],
@@ -162,8 +175,8 @@ if (script_options$to_csv) {
             total_error_sd[k],
             u_sd[k]
         )
-    # model_fit is huge so get rid of it asap
-    rm(struct_model_fit) 
+    # model draws are large enough to remove before writing the compact CSV
+    rm(struct_model_draws) 
     gc()
     # N.B. we use input path for `to_csv` output and reserve output_path for 
     # output later in script
