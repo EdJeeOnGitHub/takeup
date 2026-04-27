@@ -178,17 +178,22 @@ done
 echo "[$(date +%H:%M:%S)] Demand prediction complete."
 
 # ── Step 3: Experiment target constraint (posterior median, base scenario) ────
-rrun "experiment-target" optim/create-experiment-target.R \
-    --constraint-type="${CTYPE}" \
-    --welfare-function="${WELFARE}" \
-    --min-cost \
-    --output-path="${DATA_DIR}" \
-    --output-basename="summ-${CTYPE}-${WELFARE}" \
-    --cutoff-type=cutoff \
-    --data-input-name="${DATA_INPUT}" \
-    --posterior-median \
-    --demand-input-path="${DATA_DIR}" \
-    --demand-input-filename="pred-demand-dist-fit${VERSION}-cutoff-b-control-mu-control-${MODEL}.csv"
+EXPERIMENT_TARGET_CSV="${DATA_DIR}/summ-${CTYPE}-${WELFARE}-experiment-target-constraint.csv"
+if [[ ! -f "${EXPERIMENT_TARGET_CSV}" ]]; then
+    rrun "experiment-target" optim/create-experiment-target.R \
+        --constraint-type="${CTYPE}" \
+        --welfare-function="${WELFARE}" \
+        --min-cost \
+        --output-path="${DATA_DIR}" \
+        --output-basename="summ-${CTYPE}-${WELFARE}" \
+        --cutoff-type=cutoff \
+        --data-input-name="${DATA_INPUT}" \
+        --posterior-median \
+        --demand-input-path="${DATA_DIR}" \
+        --demand-input-filename="pred-demand-dist-fit${VERSION}-cutoff-b-control-mu-control-${MODEL}.csv"
+else
+    echo "[$(date +%H:%M:%S)] experiment-target skipped (${EXPERIMENT_TARGET_CSV} exists)"
+fi
 
 # ── Step 4: Optimize + postprocess (full posterior draws) ─────────────────────
 echo "[$(date +%H:%M:%S)] Step 4: Gurobi optimization (post-draws)..."
