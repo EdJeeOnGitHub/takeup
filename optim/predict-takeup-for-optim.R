@@ -221,16 +221,6 @@ if (script_options$from_csv) {
             )
         )
     )
-    if (!script_options$fit_rf) {
-        rf_model_fit = read_rds(
-            file.path(
-                script_options$input_path, 
-                str_interp(
-                    "param_posterior_draws_dist_fit${fit_version}_REDUCED_FORM_NO_RESTRICT.rds"
-                )
-            )
-        )
-    }
 }
 
 ## B(z,d):
