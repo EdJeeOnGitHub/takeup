@@ -66,7 +66,7 @@ OPTIM_FIG_DIR="presentations/optim-figures"
 
 # ── Environment ───────────────────────────────────────────────────────────────
 cd ~/projects/takeup
-module load -f midway2 gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
+module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
 module load gurobi/9.2
 mkdir -p "${DATA_DIR}" "${PLOT_DIR}" "${PDF_DIR}" "${OPTIM_FIG_DIR}" temp/log
 
@@ -80,11 +80,15 @@ rrun() {
 }
 
 # ── Step 1: Village/PoT distance data ─────────────────────────────────────────
-rrun "create-distance-data" optim/create-distance-data.R \
-    --output-name="${DATA_INPUT}" \
-    --num-extra-pots=100 \
-    --county-subset="${COUNTY}" \
-    --distance-cutoff=Inf
+if [[ ! -f "optim/data/${DATA_INPUT}" ]]; then
+    rrun "create-distance-data" optim/create-distance-data.R \
+        --output-name="${DATA_INPUT}" \
+        --num-extra-pots=100 \
+        --county-subset="${COUNTY}" \
+        --distance-cutoff=Inf
+else
+    echo "[$(date +%H:%M:%S)] create-distance-data skipped (optim/data/${DATA_INPUT} exists)"
+fi
 
 # ── Step 2: Demand prediction (5 scenarios, parallel) ─────────────────────────
 echo "[$(date +%H:%M:%S)] Step 2: demand prediction (5 scenarios in parallel)..."
