@@ -1,0 +1,3 @@
+useDynLib(owent, .registration = TRUE)
+importFrom(Rcpp, evalCpp)
+export(owens_t_vec)

@@ -81,19 +81,6 @@
         "Matrix"
       ]
     },
-    "OwenQ": {
-      "Package": "OwenQ",
-      "Version": "1.0.8",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "b79fb9ab2fa3242bc4abb4d41ad1657b",
-      "Requirements": [
-        "BH",
-        "Rcpp",
-        "RcppEigen",
-        "RcppNumerical"
-      ]
-    },
     "R6": {
       "Package": "R6",
       "Version": "2.6.1",
@@ -136,17 +123,6 @@
       "Hash": "4ac8e423216b8b70cb9653d1b3f71eb9",
       "Requirements": [
         "Rcpp"
-      ]
-    },
-    "RcppNumerical": {
-      "Package": "RcppNumerical",
-      "Version": "0.7-0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "c09110bd5501ad877f2d3ff77bad1d4f",
-      "Requirements": [
-        "Rcpp",
-        "RcppEigen"
       ]
     },
     "Rdpack": {
@@ -1379,6 +1355,18 @@
       "Hash": "d5811dade9cd3a34a9038a45f1a59bae",
       "Requirements": [
         "askpass"
+      ]
+    },
+    "owent": {
+      "Package": "owent",
+      "Version": "0.1.0",
+      "Source": "Local",
+      "RemoteType": "local",
+      "RemoteUrl": "./owent",
+      "Hash": "98f14c653d182cfe2c83497c0652b9d0",
+      "Requirements": [
+        "BH",
+        "Rcpp"
       ]
     },
     "parallelly": {
