@@ -1843,6 +1843,14 @@
         "vctrs"
       ]
     },
+    "slam": {
+      "Package": "slam",
+      "Version": "0.1-55",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a2a11fdcb7cf5afbf31aeb0e3828fbf6",
+      "Requirements": []
+    },
     "sp": {
       "Package": "sp",
       "Version": "2.2-0",
@@ -1978,6 +1986,14 @@
         "rlang",
         "vctrs"
       ]
+    },
+    "tictoc": {
+      "Package": "tictoc",
+      "Version": "1.2.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "646895a33d57984ce7534249bd9adf64",
+      "Requirements": []
     },
     "tidybayes": {
       "Package": "tidybayes",
