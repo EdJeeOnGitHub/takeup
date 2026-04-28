@@ -218,6 +218,11 @@ for SCENARIO in "${SCENARIOS[@]}"; do
         mkdir -p "${subdir}"
         cp -n "${DATA_DIR}/${demand_file}" "${subdir}/" 2>/dev/null || true
 
+        if [[ -f "${subdir}/${alloc_base}-post-draws-optimal-allocation.rds" ]]; then
+            echo "[$(date +%H:%M:%S)]   optimize+postprocess ${label} @ ${dist}m skipped (output exists)"
+            continue
+        fi
+
         echo "[$(date +%H:%M:%S)]   optimize ${label} @ ${dist}m"
         Rscript --no-save --no-restore optim/optimal_allocation.R \
             --num-cores="${NUM_CORES}" \
@@ -262,6 +267,11 @@ for SCENARIO in "${MEDIAN_SCENARIOS[@]}"; do
     demand_file="pred-demand-dist-fit${VERSION}-${prefix}cutoff-b-${b_z}-mu-${mu_z}-${MODEL}.csv"
     alloc_base="target-rep-distconstraint-${dist}-util-${WELFARE}-${prefix}cutoff-b-${b_z}-mu-${mu_z}-${MODEL}"
     label="${prefix}b-${b_z}-mu-${mu_z}"
+
+    if [[ -f "${subdir}/${alloc_base}-median-optimal-allocation.rds" ]]; then
+        echo "[$(date +%H:%M:%S)]   median optimize ${label} skipped (output exists)"
+        continue
+    fi
 
     echo "[$(date +%H:%M:%S)]   median optimize ${label}"
     Rscript --no-save --no-restore optim/optimal_allocation.R \
