@@ -366,8 +366,8 @@ tidy_output = tidy_output %>%
     )
   )
 
-summ_output = tidy_output %>% 
-  slice(2) %>%
+summ_output = tidy_output %>%
+  slice(min(2, n())) %>%
   unnest(model_output) %>%
   summarise(
     util = sum(swf(demand)),
