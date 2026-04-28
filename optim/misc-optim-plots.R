@@ -320,29 +320,15 @@ imap(
 
 
 fit_file = str_glue("{script_options$input_path}/dist_fit{script_options$fit_version}_{script_options$model}-1.csv")
-fit = as_cmdstan_fit(fit_file)
-
-
-# # To find fixed point need:
-# # benefit_cost
-# # mu_rep
-# # total_error_sd
-# # u_sd
-
+fit_csv = read_cmdstan_csv(fit_file, variables = c("cluster_roc", "cluster_roc_no_vis"))
 
 bc_draws = spread_rvars(
-    fit,
-    # cluster_rep_return[i,j,k],
-    # cluster_rep_return_dist[i,j,k],
-    # cluster_w_cutoff[i,j,k], 
-    # cluster_w_control_cutoff[i,j,k], 
-    # total_error_sd[1],
-    # dist_beta_v[k]
-    cluster_roc[i,j,k], 
+    fit_csv$post_warmup_draws,
+    cluster_roc[i,j,k],
     cluster_roc_no_vis[i,j,k]
     )
 
-rm(fit)
+rm(fit_csv)
 gc()
 
 summ_bc_draws = bc_draws %>%
