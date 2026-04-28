@@ -13,8 +13,8 @@ set -euo pipefail
 VERSION=105
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 DATA_DIR="optim/data/${MODEL}/agg-full-many-pots"
-TABLE_DIR="presentations/tables"
-CLUSTER="midway2"
+TABLE_DIR="presentations/tables/fit105"
+CLUSTER="midway"
 CLUSTER_ROOT="~/projects/takeup"
 
 # ── Optional sync from cluster ────────────────────────────────────────────────
@@ -74,36 +74,29 @@ if [[ $OK -eq 0 ]]; then
 fi
 
 echo ""
-echo "All cluster outputs present."
+echo "All cluster outputs present. Generating tables..."
+echo ""
+
+Rscript --no-save --no-restore presentations/create-optim-tables.R \
+    --optim-input-path="${DATA_DIR}" \
+    --table-output-path="${TABLE_DIR}" \
+    --model="${MODEL}"
+
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo " Remaining steps to complete the optimization results update"
+echo " Tables written — remaining manual steps"
 echo "══════════════════════════════════════════════════════════════"
 echo ""
-echo "1. Enable the two disabled optim chunks in presentations/tables.Rmd:"
+echo "1. Review/diff the generated fit105 table against the prior TeX-referenced"
+echo "   filename before replacing anything:"
+echo "   ${TABLE_DIR}/optim-summ-table.tex"
+echo "   presentations/tables/manual-optim-summ-table.tex"
 echo ""
-echo "   a) Chunk 'optim-table-main' (~line 1558):"
-echo "      Change:  #| eval=FALSE"
-echo "      To:      #| eval=TRUE"
-echo ""
-echo "   b) Chunk 'optim-summ-table-robust' (~line 1889):"
-echo "      Change:  #| eval=FALSE"
-echo "      To:      #| eval=TRUE"
-echo "      AND uncomment the table-building code inside the chunk."
-echo ""
-echo "2. Run both chunks (RStudio or knitr::knit). They write:"
-echo "     ${TABLE_DIR}/optim-summ-table.tex"
-echo "     ${TABLE_DIR}/optim-summ-robust-table.tex"
-echo ""
-echo "3. Copy the main table to the TeX-referenced filename:"
-echo "   cp ${TABLE_DIR}/optim-summ-table.tex \\"
-echo "      ${TABLE_DIR}/manual-optim-summ-table.tex"
-echo ""
-echo "4. Update 'ECM ReStud.tex' line 1402 — comp-dist-plot fit version:"
+echo "2. Update 'ECM ReStud.tex' line 1402 — comp-dist-plot fit version:"
 echo "   FROM: {misc-figures/comp-dist-plot3-fit86-util-identity-${MODEL}.pdf}"
 echo "   TO:   {misc-figures/comp-dist-plot3-fit${VERSION}-util-identity-${MODEL}.pdf}"
 echo ""
-echo "5. Mark all optimization rows as 'done' in:"
+echo "3. Mark all optimization rows as 'done' in:"
 echo "   recreate_structural_robustness_and_optimization.csv"
 echo ""
 echo "══════════════════════════════════════════════════════════════"

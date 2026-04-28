@@ -24,7 +24,7 @@ script_options <- docopt::docopt(
 Options:
   --fit-version=<v>       Fit version number [default: 104]
   --model=<m>             Structural model name [default: STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP]
-  --input-path=<path>     Path to Stan analysis data [default: data/stan_analysis_data]
+  --input-path=<path>     Path to Stan analysis data [default: temp-data/struct-postprocess]
   --output-path=<path>    Path to postprocessed RDS files [default: temp-data/struct-postprocess]
   --table-output=<path>   Path to write .tex tables [default: presentations/tables/fit<VERSION>]
   --width=<w>             Credible interval width [default: 0.95]
@@ -58,6 +58,7 @@ params <- list(
 
 cat(str_glue("fit_version:   {params$fit_version}\n"))
 cat(str_glue("struct_models: {params$struct_models}\n"))
+cat(str_glue("input_path:    {params$input_path}\n"))
 cat(str_glue("output_path:   {params$output_path}\n"))
 cat(str_glue("table_output:  {params$table_output_path}\n\n"))
 
@@ -132,7 +133,7 @@ create_robustness_tbl <- function(data) {
 # ---------------------------------------------------------------------------
 ate_rvar_struct <- read_rds(
   file.path(
-    params$output_path,
+    params$input_path,
     str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{params$struct_models}_1-4.rds")
   )
 )
@@ -270,7 +271,7 @@ write_robustness_tables <- function() {
       )
     }
 
-    robust_rvar <- read_rds(file.path(params$output_path, rds_name))
+    robust_rvar <- read_rds(file.path(params$input_path, rds_name))
 
     robust_tbl <- if (robustness_row$is_indiv) {
       prep_robustness(robust_rvar)
@@ -323,7 +324,7 @@ private_ate_tbl <- private_ate_df %>%
   recode_control_mean() %>%
   spread_rf() %>%
   mutate(estimand = "private") %>%
-  filter(!(treatment %in% c("Signal - No Signal", "Control mean", "Bracelet - Calendar")))
+  filter(treatment %in% c("Bracelet", "Calendar", "Ink"))
 
 signal_ate_tbl <- signal_ate_df %>%
   rename(treatment = mu_treatment) %>%
@@ -334,7 +335,7 @@ signal_ate_tbl <- signal_ate_df %>%
   recode_control_mean() %>%
   spread_rf() %>%
   mutate(estimand = "signal") %>%
-  filter(!(treatment %in% c("Signal - No Signal", "Control mean", "Bracelet - Calendar")))
+  filter(treatment %in% c("Bracelet", "Calendar", "Ink"))
 
 all_ate_tbl <- bind_rows(incentive_ate_tbl, signal_ate_tbl, private_ate_tbl) %>%
   mutate(estimand = factor(estimand, levels = c("private", "signal", "overall")) %>% fct_rev) %>%
@@ -353,7 +354,7 @@ struct_overall_tbl <- all_ate_tbl %>%
   kbl(
     col.names = c("Dependent variable: Take-up", paste0("(", 1:4, ")")),
     format = "latex",
-    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    linesep = "\\addlinespace ",
     booktabs = TRUE, escape = FALSE, align = "lcccc",
     caption = "Overall Results"
   ) %>%
@@ -380,7 +381,7 @@ decomposed_te_kbl_df <- all_ate_tbl %>%
   kbl(
     col.names = c("Dependent variable: Take-up", paste0("(", 1:4, ")")),
     format = "latex",
-    linesep = "\\addlinespace \\addlinespace \\addlinespace",
+    linesep = "\\addlinespace ",
     booktabs = TRUE, escape = FALSE, align = "lcccc",
     caption = "Signal and Private Value"
   ) %>%
@@ -391,7 +392,7 @@ decomposed_te_kbl_df <- all_ate_tbl %>%
   ) %>%
   add_header_above(c(" " = 1, "Structural" = 4)) %>%
   pack_rows(
-    index = c("Panel A: Signal" = 3, "Panel B: Private" = 3),
+    index = c("Panel A: Social Image" = 3, "Panel B: Private" = 3),
     italic = TRUE, escape = FALSE,
     hline_after = TRUE, hline_before = TRUE, bold = TRUE
   )
@@ -405,14 +406,14 @@ cat("Writing fob-beliefs-table.tex ...\n")
 
 obs_rvar_struct <- read_rds(
   file.path(
-    params$output_path,
+    params$input_path,
     str_glue("rvar_processed_dist_fit{params$fit_version}_belief_ates_{params$struct_models}_1-4.rds")
   )
 )
 
 lvl_obs_rvar_struct <- read_rds(
   file.path(
-    params$output_path,
+    params$input_path,
     str_glue("rvar_processed_dist_fit{params$fit_version}_belief_probs_{params$struct_models}_1-4.rds")
   )
 ) %>%
