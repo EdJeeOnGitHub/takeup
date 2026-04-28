@@ -293,7 +293,25 @@ for SCENARIO in "${MEDIAN_SCENARIOS[@]}"; do
         >> "temp/log/optim-105-median-gurobi-${label}.log" 2>&1
 done
 
-# ── Step 6: Aggregate all scenarios into posterior-clean-summ-optim.csv ───────
+# ── Step 6: Experimental allocation data (needed by compare-optim.R) ──────────
+# Writes experimental-control-allocation-data.rds and comp-dist figure
+rrun "presentation-plots" optim/create-presentation-plots.R \
+    --constraint-type="${CTYPE}" \
+    --welfare-function="${WELFARE}" \
+    --min-cost \
+    --output-path="${DATA_DIR}/dist-constraint-3500" \
+    --output-basename="target-rep-agg-${WELFARE}-cutoff-b-control-mu-control-${MODEL}-median" \
+    --cutoff-type=cutoff \
+    --data-input-name="${DATA_INPUT}" \
+    --posterior-median \
+    --pdf-output-path="${PDF_DIR}" \
+    --demand-input-path="${DATA_DIR}" \
+    --demand-input-filename="pred-demand-dist-fit${VERSION}-cutoff-b-control-mu-control-${MODEL}.csv" \
+    --model="${MODEL}" \
+    --fit-version="${VERSION}" \
+    --distance-constraint=3500
+
+# ── Step 7: Aggregate all scenarios into posterior-clean-summ-optim.csv ───────
 rrun "compare-optim" optim/compare-optim.R \
     --input-path="${DATA_DIR}" \
     --output-path="${DATA_DIR}" \
@@ -301,8 +319,8 @@ rrun "compare-optim" optim/compare-optim.R \
     --model="${MODEL}" \
     --welfare-function="${WELFARE}"
 
-# ── Step 7: Figures ───────────────────────────────────────────────────────────
-echo "[$(date +%H:%M:%S)] Step 7: generating figures..."
+# ── Step 8: Figures ───────────────────────────────────────────────────────────
+echo "[$(date +%H:%M:%S)] Step 8: generating figures..."
 
 # Figure 1: Demand curves under alternative social image assumptions
 # → presentations/figures/plot-scaled-MODEL-agg-identity-full-many-pots-pred-demand-vstar-comp-all.pdf
@@ -320,25 +338,6 @@ rrun "optim-paper-panel" optim/create-optim-paper-panel.R \
     --fit-version="${VERSION}" \
     --welfare-function="${WELFARE}" \
     --input-path="${DATA_DIR}" \
-    --distance-constraint=3500
-
-# Figure 3: Distribution of community-PoT distances under alternative allocations
-# → presentations/misc-figures/comp-dist-plot3-fit105-util-identity-MODEL.pdf
-# Writes experimental-control-allocation-data.rds (needed by compare-optim.R if re-run)
-rrun "presentation-plots" optim/create-presentation-plots.R \
-    --constraint-type="${CTYPE}" \
-    --welfare-function="${WELFARE}" \
-    --min-cost \
-    --output-path="${DATA_DIR}/dist-constraint-3500" \
-    --output-basename="target-rep-agg-${WELFARE}-cutoff-b-control-mu-control-${MODEL}-median" \
-    --cutoff-type=cutoff \
-    --data-input-name="${DATA_INPUT}" \
-    --posterior-median \
-    --pdf-output-path="${PDF_DIR}" \
-    --demand-input-path="${DATA_DIR}" \
-    --demand-input-filename="pred-demand-dist-fit${VERSION}-cutoff-b-control-mu-control-${MODEL}.csv" \
-    --model="${MODEL}" \
-    --fit-version="${VERSION}" \
     --distance-constraint=3500
 
 echo "[$(date +%H:%M:%S)] Done."
