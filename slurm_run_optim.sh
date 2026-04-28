@@ -3,9 +3,9 @@
 #SBATCH --job-name=takeup-optim-105
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=12
 #SBATCH --mem=28G
-#SBATCH --time=36:00:00
+#SBATCH --time=02:00:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=edjee96@gmail.com
