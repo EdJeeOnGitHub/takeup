@@ -3,6 +3,10 @@
 # Run locally after syncing outputs from the cluster (slurm_run_optim.sh).
 # Checks that all cluster outputs are present, then prints the remaining
 # manual steps to regenerate the two optimization tables and update the TeX.
+#
+# Usage:
+#   bash run_optim_tables.sh          # check outputs and print next steps
+#   bash run_optim_tables.sh --sync   # rsync outputs from cluster first
 
 set -euo pipefail
 
@@ -10,6 +14,35 @@ VERSION=105
 MODEL="STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 DATA_DIR="optim/data/${MODEL}/agg-full-many-pots"
 TABLE_DIR="presentations/tables"
+CLUSTER="midway2"
+CLUSTER_ROOT="~/projects/takeup"
+
+# ── Optional sync from cluster ────────────────────────────────────────────────
+if [[ "${1:-}" == "--sync" ]]; then
+    echo "Syncing outputs from ${CLUSTER}..."
+
+    mkdir -p presentations/figures presentations/misc-figures presentations/optim-figures "${DATA_DIR}"
+
+    # Summary CSV
+    rsync -avz "${CLUSTER}:${CLUSTER_ROOT}/${DATA_DIR}/posterior-clean-summ-optim.csv" \
+        "${DATA_DIR}/"
+
+    # Panel figure (written directly to presentations/optim-figures/ on cluster)
+    rsync -avz "${CLUSTER}:${CLUSTER_ROOT}/presentations/optim-figures/" \
+        presentations/optim-figures/
+
+    # Demand-vstar figure (misc-optim-plots writes to DATA_DIR, not presentations/figures/)
+    rsync -avz "${CLUSTER}:${CLUSTER_ROOT}/${DATA_DIR}/plot-scaled-${MODEL}-agg-identity-full-many-pots-pred-demand-vstar-comp-all.pdf" \
+        presentations/figures/
+
+    # Comp-dist figure (create-presentation-plots writes to DATA_DIR with distconstraint in name)
+    rsync -avz \
+        "${CLUSTER}:${CLUSTER_ROOT}/${DATA_DIR}/comp-dist-plot3-fit${VERSION}-distconstraint-3500-util-identity-${MODEL}.pdf" \
+        "presentations/misc-figures/comp-dist-plot3-fit${VERSION}-util-identity-${MODEL}.pdf"
+
+    echo "Sync complete."
+    echo ""
+fi
 
 # ── Check that cluster outputs were synced ────────────────────────────────────
 echo "Checking for synced cluster outputs..."
