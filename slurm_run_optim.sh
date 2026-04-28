@@ -299,7 +299,7 @@ rrun "presentation-plots" optim/create-presentation-plots.R \
     --constraint-type="${CTYPE}" \
     --welfare-function="${WELFARE}" \
     --min-cost \
-    --output-path="${DATA_DIR}/dist-constraint-3500" \
+    --output-path="${DATA_DIR}" \
     --output-basename="target-rep-agg-${WELFARE}-cutoff-b-control-mu-control-${MODEL}-median" \
     --cutoff-type=cutoff \
     --data-input-name="${DATA_INPUT}" \
