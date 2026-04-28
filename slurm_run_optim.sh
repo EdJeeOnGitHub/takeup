@@ -328,7 +328,8 @@ rrun "misc-optim-plots" optim/misc-optim-plots.R \
     --output-path="${DATA_DIR}" \
     --model="${MODEL}" \
     --fit-version="${VERSION}" \
-    --welfare-function="${WELFARE}"
+    --welfare-function="${WELFARE}" \
+    --input-path="${STAN_INPUT}"
 
 # Figure 2: Optimal placement panel
 # → presentations/optim-figures/panel-scenarios-compare-optimal-allocation-plot-distconstraint-3500.pdf

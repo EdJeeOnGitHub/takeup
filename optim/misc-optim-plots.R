@@ -9,12 +9,14 @@ script_options <- docopt::docopt(
         --fit-version=<fit-version>
         --welfare-function=<welfare-function> Which utility function to use [default: log]
         --distance-constraint=<distance-constraint>  Distance constraint, in meters [default: 3500]
+        --input-path=<input-path>  Path to Stan analysis data [default: data/stan_analysis_data]
 "),
   args = if (interactive()) "
                             --output-path=optim/plots/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
                             --fit-version=86 \
-                            --welfare-function=identity
+                            --welfare-function=identity \
+                            --input-path=data/stan_analysis_data
                              " else commandArgs(trailingOnly = TRUE)
 ) 
 library(tidyverse)
@@ -317,7 +319,7 @@ imap(
 
 
 
-fit_file = "data/stan_analysis_data/dist_fit87_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-1.csv"
+fit_file = str_glue("{script_options$input_path}/dist_fit{script_options$fit_version}_{script_options$model}-1.csv")
 fit = as_cmdstan_fit(fit_file)
 
 
