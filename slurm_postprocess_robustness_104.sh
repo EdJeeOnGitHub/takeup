@@ -38,4 +38,15 @@ for model in "${models[@]}"; do
           --input-path="${INPUT_PATH}" \
           --output-path="${OUTPUT_PATH}" \
           1 2 3 4
+
+  Rscript --no-save \
+          --no-restore \
+          --verbose \
+          quick_roc_postprocess.R \
+          "${VERSION}" \
+          --model="${model}" \
+          --sm \
+          --input-path="${INPUT_PATH}" \
+          --output-path="${OUTPUT_PATH}" \
+          1 2 3 4
 done
