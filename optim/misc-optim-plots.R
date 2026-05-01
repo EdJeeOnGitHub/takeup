@@ -182,25 +182,25 @@ p_scaled =
             colour = type, 
             group = type, 
             linetype = v_star_type
-        ), linewidth = 1.5)  +
+        ), size = 1.5)  +
         theme_minimal() +
-        theme( 
+        theme(
             legend.position = "bottom",
             legend.title = element_blank()
         )  +
         labs(
-            x = "Distance (km)", 
-            y = "Estimated Takeup", 
+            x = "Distance (km)",
+            y = "Estimated Takeup",
             colour = ""
         ) +
         guides(
-            fill = "none", 
+            fill = "none",
             linetype = "none"
         ) +
-        ggthemes::scale_color_canva( 
+        ggthemes::scale_color_canva(
             palette = "Primary colors with a vibrant twist"
         ) +
-        ggthemes::scale_fill_canva( 
+        ggthemes::scale_fill_canva(
             palette = "Primary colors with a vibrant twist"
         ) +
         scale_linetype_manual(
@@ -208,21 +208,21 @@ p_scaled =
         )
 p_scaled
 
-p_scaled_all = 
+p_scaled_all =
     plot_summ_subset_demand_df %>%
         mutate(type = case_when(
             type == "Static: Control" ~ "Fixed: Control",
             TRUE ~ type
         )) %>%
         ggplot(aes(
-            x = dist_km, 
+            x = dist_km,
             y = demand
         )) +
         geom_line(aes(
-            colour = type, 
-            group = type, 
+            colour = type,
+            group = type,
             linetype = v_star_type
-        ), linewidth = 1.5)  +
+        ), size = 1.5)  +
         theme_minimal() +
         theme( 
             legend.position = "bottom",

@@ -8,13 +8,18 @@
 #     --fit-version=104 \
 #     --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 #
-# Outputs (to presentations/tables/):
+# Requires quick_roc_postprocess.R --sm to have been run first (for sm-decomp figure).
+#
+# Outputs (to presentations/tables/fit<VERSION>/):
 #   struct-overall-te-table.tex
 #   private-signal-te-table.tex
 #   fob-beliefs-table.tex
-#   indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table.tex
-#   indiv-dist-indiv-fp-robust-struct-overall-te-table.tex
-#   struct-robustness-nooutliers-overall-te-table.tex
+#   indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table.tex  [--write-robustness]
+#   indiv-dist-indiv-fp-robust-struct-overall-te-table.tex                [--write-robustness]
+#   struct-robustness-nooutliers-overall-te-table.tex                     [--write-robustness]
+#
+# Outputs (to presentations/figures/fit<VERSION>/):
+#   sm-decomp-annotated.pdf
 
 script_options <- docopt::docopt(
   stringr::str_glue(
@@ -27,6 +32,7 @@ Options:
   --input-path=<path>     Path to Stan analysis data [default: temp-data/struct-postprocess]
   --output-path=<path>    Path to postprocessed RDS files [default: temp-data/struct-postprocess]
   --table-output=<path>   Path to write .tex tables [default: presentations/tables/fit<VERSION>]
+  --figure-output=<path>  Path to write figures [default: presentations/figures/fit<VERSION>]
   --width=<w>             Credible interval width [default: 0.95]
   --write-robustness      Also write appendix robustness tables
   "),
@@ -40,6 +46,7 @@ library(knitr)
 library(kableExtra)
 library(magrittr)
 library(stringr)
+library(ggthemes)
 
 options(knitr.kable.NA = '')  
 
@@ -53,6 +60,10 @@ params <- list(
     str_glue("presentations/tables/fit{fit_version_int}")
   else
     script_options$table_output,
+  figure_output_path = if (script_options$figure_output == "presentations/figures/fit<VERSION>")
+    str_glue("presentations/figures/fit{fit_version_int}")
+  else
+    script_options$figure_output,
   width            = as.numeric(script_options$width)
 )
 
@@ -63,6 +74,7 @@ cat(str_glue("output_path:   {params$output_path}\n"))
 cat(str_glue("table_output:  {params$table_output_path}\n\n"))
 
 dir.create(params$table_output_path, showWarnings = FALSE, recursive = TRUE)
+dir.create(params$figure_output_path, showWarnings = FALSE, recursive = TRUE)
 dir.create(params$output_path, showWarnings = FALSE, recursive = TRUE)
 
 # ---------------------------------------------------------------------------
@@ -466,4 +478,57 @@ if (isTRUE(script_options$write_robustness)) {
   write_robustness_tables()
 }
 
+# ---------------------------------------------------------------------------
+# Figure: Social Multiplier Decomposition (sm-decomp-annotated)
+# Requires: quick_roc_postprocess.R --sm has been run first.
+# ---------------------------------------------------------------------------
+cat("Writing sm-decomp-annotated.pdf ...\n")
+
+sm_summ_df <- read_rds(
+  file.path(
+    params$input_path,
+    str_glue("rvar_processed_dist_fit{params$fit_version}_sm_summ_{params$struct_models}_1-4.rds")
+  )
+)
+
+col_df <- tibble(
+  variable = c("Social Multiplier", "Social Multiplier - Type Inference Only"),
+  colour   = canva_pal(canva_palette_vibrant)(2)[1:2]
+)
+
+sm_decomp_plot <- sm_summ_df %>%
+  filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
+  mutate(
+    variable_label = case_when(
+      variable == "sm_rescaled"            ~ "Social Multiplier",
+      variable == "sm_delta_part_rescaled" ~ "Social Multiplier - Type Inference Only"
+    ),
+    variable_label = factor(variable_label, levels = col_df$variable),
+    variable       = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
+  ) %>%
+  filter(roc_distance <= 2500) %>%
+  mutate(across(c(value, conf.low, conf.high), ~ . * -1)) %>%
+  ggplot(aes(
+    x        = roc_distance / 1000,
+    y        = value,
+    linetype = variable,
+    colour   = variable_label
+  )) +
+  geom_line(linewidth = 1.5) +
+  facet_wrap(~treatment) +
+  geom_hline(yintercept = 1, linetype = "longdash") +
+  scale_color_manual("", values = col_df$colour, labels = col_df$variable) +
+  guides(linetype = "none") +
+  labs(x = "Distance [km]", y = "Social Multiplier") +
+  annotate("text", x = 0.3,  y = 1.05, label = "Amplification", size = 3, alpha = 0.7) +
+  annotate("text", x = 2.25, y = 0.95, label = "Mitigation",    size = 3, alpha = 0.7)
+
+ggsave(
+  file.path(params$figure_output_path, "sm-decomp-annotated.pdf"),
+  plot   = sm_decomp_plot,
+  width  = 8,
+  height = 6
+)
+
 cat("\nDone. Tables written to:", params$table_output_path, "\n")
+cat("Figures written to:", params$figure_output_path, "\n")
