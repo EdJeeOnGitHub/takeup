@@ -491,12 +491,31 @@ sm_summ_df <- read_rds(
   )
 )
 
+# Reuse fit-95 prior predictive (model identical; no prior run for fit 105).
+# Use tidy_processed (not rvar_processed): sm_rescaled is NA in the rvar file.
+prior_sm_path <- "temp-data/tidy_processed_dist_prior95_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB_1-4.rds"
+if (!file.exists(prior_sm_path)) {
+  warning("Prior predictive tidy sm_draws not found at: ", prior_sm_path,
+          "\nSkipping prior predictive line in sm-decomp plot.")
+  prior_sm_summ_df <- NULL
+} else {
+  prior_tidy <- read_rds(prior_sm_path)
+  prior_sm_summ_df <- prior_tidy[prior_tidy$param == "sm_draws", ]$tidy_draws[[1]] %>%
+    filter(variable == "sm_rescaled", roc_distance <= 2500, .width == 0.95) %>%
+    mutate(across(c(value, conf.low, conf.high), ~ . * -1))
+}
+
+canva_palette_vibrant = "Primary colors with a vibrant twist"
+
+theme_set(theme_minimal() +
+            theme(legend.position = "bottom"))
+
 col_df <- tibble(
-  variable = c("Social Multiplier", "Social Multiplier - Type Inference Only"),
-  colour   = canva_pal(canva_palette_vibrant)(2)[1:2]
+  variable = c("Social Multiplier", "Social Multiplier - Type Inference Only", "Prior Predictive"),
+  colour   = c(canva_pal(canva_palette_vibrant)(2)[1:2], "grey")
 )
 
-sm_decomp_plot <- sm_summ_df %>%
+sm_plot_df <- sm_summ_df %>%
   filter(variable %in% c("sm_rescaled", "sm_delta_part_rescaled")) %>%
   mutate(
     variable_label = case_when(
@@ -507,7 +526,24 @@ sm_decomp_plot <- sm_summ_df %>%
     variable       = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
   ) %>%
   filter(roc_distance <= 2500) %>%
-  mutate(across(c(value, conf.low, conf.high), ~ . * -1)) %>%
+  mutate(across(c(value, conf.low, conf.high), ~ . * -1))
+
+if (!is.null(prior_sm_summ_df)) {
+  sm_plot_df <- bind_rows(
+    sm_plot_df,
+    prior_sm_summ_df %>%
+      mutate(
+        treatment      = as.character(treatment),
+        variable_label = factor("Prior Predictive", levels = col_df$variable),
+        variable       = factor(variable, levels = c("sm_rescaled", "sm_delta_part_rescaled"))
+      )
+  )
+}
+
+sm_plot_df <- sm_plot_df %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Ink", "Calendar", "Bracelet")))
+
+sm_decomp_plot <- sm_plot_df %>%
   ggplot(aes(
     x        = roc_distance / 1000,
     y        = value,
@@ -523,12 +559,13 @@ sm_decomp_plot <- sm_summ_df %>%
   annotate("text", x = 0.3,  y = 1.05, label = "Amplification", size = 3, alpha = 0.7) +
   annotate("text", x = 2.25, y = 0.95, label = "Mitigation",    size = 3, alpha = 0.7)
 
+
 ggsave(
   file.path(params$figure_output_path, "sm-decomp-annotated.pdf"),
   plot   = sm_decomp_plot,
   width  = 8,
   height = 6
 )
-
+sm_decomp_plot
 cat("\nDone. Tables written to:", params$table_output_path, "\n")
 cat("Figures written to:", params$figure_output_path, "\n")
