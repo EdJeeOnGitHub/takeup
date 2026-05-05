@@ -21,7 +21,7 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-   --beliefs 
+   --endline 
   " else commandArgs(trailingOnly = TRUE)
 )
 # TODO: Fix --sms and --heterogeneity
@@ -1124,7 +1124,6 @@ fob_levels %>%
 
 if (run_all || script_options$endline) run_section("Endline/Incentive/Preference/Travel", {
 
-
 ####  Endline Predicted Deworming Takeup
 endline_data = endline_data %>%
   mutate(
@@ -1483,7 +1482,6 @@ long_incentive_check_df %>%
   )
 ### Preference for Gift Fit Not Dewormed ---------------------------------------
 
-# TODO check this sample
 pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
     # 38,019
     filter(!is.na(gift_choice)) %>%
@@ -1584,7 +1582,9 @@ pref_gift_fit_not_dewormed = analysis_data %>%
       dewormed == FALSE
     )  %>%
     ungroup() %>%
-    select(KEY.individ, cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
+    select(
+      KEY.individ, cluster.id, gift_choice, assigned.treatment, dist.pot.group,
+      county, standard_cluster.dist.to.pot, cluster_id_rank) %>%
     mutate(
       want_bracelet = gift_choice == "bracelet"
     )  %>%
@@ -1611,7 +1611,21 @@ pref_gift_fit = function(data, weights) {
 } 
 
 
-wrapper_function(
+pref_fit_flipped = wrapper_function(
+  data = pref_gift_fit_not_dewormed,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-FLIPPED-tidy-tes.csv",
+  table_name = "preference_for_bracelet_FLIPPED_spec_tbl",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Prefer Bracelet", 
+    stars = TRUE
+    ),
+    flip_calendar_sign = TRUE
+)
+
+
+pref_fit_not_flipped = wrapper_function(
   data = pref_gift_fit_not_dewormed,
   regression_spec = pref_gift_fit,
   tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-tidy-tes.csv",
@@ -1622,10 +1636,35 @@ wrapper_function(
     stars = TRUE
     )
 )
+  pref_fit_not_flipped$tidy_summary %>%       
+    filter(                               
+      assigned_treatment %in% c("bracelet", "calendar", "ink", "control", "abs(calendar) - abs(bracelet)") |
+      n_obs_line                                                                                               
+    ) %>%                                 
+    prep_tbl(stat = params$stat, stars = TRUE) %>%                                                             
+    mutate(                                                                                                    
+      assigned_treatment = str_replace(                                                                      
+        as.character(assigned_treatment),                                                                      
+        fixed("$|Calendar| - |Bracelet|$"),                                                                  
+        "$|\\text{Calendar}| - |\\text{Bracelet}|$"                                                          
+      )
+    ) %>%                                                                                                      
+    arrange(factor(assigned_treatment, levels = c(
+      "Bracelet", "Calendar", "Ink", "Control",                                                                
+      "$|\\text{Calendar}| - |\\text{Bracelet}|$",                                                           
+      "Observations"                                                                                         
+    ))) %>%                                                                                                    
+    nice_kbl_table(
+      cap = "...",                                                                                             
+      outcome_var = "Dependent variable: Prefer Bracelet"                                                    
+    ) %>%                                                                                                    
+    custom_save_latex_table(table_name = "preference_for_bracelet_abs_diff_spec_tbl") 
+pref_fit_not_flipped$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
 
 
-
-pref_not_flipped = wrapper_function(
+pref_not_flipped_full = wrapper_function(
   data = pref_gift_fit_not_dewormed_full_sample,
   regression_spec = pref_gift_fit,
   tidy_summ_path = "temp-data/temp.csv",
@@ -1638,9 +1677,9 @@ pref_not_flipped = wrapper_function(
     flip_calendar_sign = FALSE
 )
 
-pref_not_flipped
+pref_not_flipped_full
 
-pref_not_flipped$tidy_summary %>%
+pref_not_flipped_full$tidy_summary %>%
   filter(str_detect(assigned_treatment, "cal|bra")) %>%
   print(n = 100)
 
