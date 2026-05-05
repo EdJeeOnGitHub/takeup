@@ -528,6 +528,20 @@ sm_plot_df <- sm_summ_df %>%
   filter(roc_distance <= 2500) %>%
   mutate(across(c(value, conf.low, conf.high), ~ . * -1))
 
+sm_plot_df %>%
+  filter(fit_type == "fit") %>%
+  select(
+    treatment,
+    distance = roc_distance,
+    variable_label,
+    value
+  ) %>%
+  pivot_wider(
+    names_from = variable_label,
+    values_from = value
+  ) %>%
+  write_csv("temp-data/social-multiplier-decomposition-values.csv")
+
 if (!is.null(prior_sm_summ_df)) {
   sm_plot_df <- bind_rows(
     sm_plot_df,

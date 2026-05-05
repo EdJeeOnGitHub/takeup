@@ -15,12 +15,12 @@ Options:
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --main
+    --fit-ri
     " else commandArgs(trailingOnly = TRUE)
 )
 
 
-run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance, script_options$orig)
+run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance, script_options$orig, script_options$fit_ri)
 
 set.seed(12932)
 
@@ -754,113 +754,115 @@ saveRDS(
 #### Continuous Distance Tests ####
 baseline_worm_dist_fit = feols(
   data = baseline_worm_data,
-  .[worm_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
+  .[worm_vars] ~  cluster.dist.to.pot | county, 
   ~cluster.id
 )
 
 pretreat_dist_fit = feols(
   data = pretreat_data,
-  .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
+  .[pretreat_vars] ~  cluster.dist.to.pot | county, 
   ~cluster.id 
 )
 
 census_dist_fit = feols(
     data = clean_census_data, 
-    .[census_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
+    .[census_vars] ~  cluster.dist.to.pot | county,
     cluster = ~cluster.id
     ) 
 
 takeup_dist_fit = feols(
   data = analysis_data %>%
     select(any_of(takeup_vars), treat_dist, county, cluster.id), 
-  .[takeup_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
-  ~cluster.id
+  .[takeup_vars] ~  cluster.dist.to.pot | county,
+  cluster = ~cluster.id
 )
 
 
 
-resample_cluster_dists = function(data, seed) {
-  set.seed(seed)
-  clust_dist_df = data %>%
-    select(cluster.id, cluster.dist.to.pot) %>%
-    unique()
-  perm_clust_dist_df = clust_dist_df %>%
-    mutate(
-      perm_dist = sample(cluster.dist.to.pot, size = n())
-    ) %>%
-    select(-cluster.dist.to.pot)
-
-    data = data %>%
-      left_join(
-        perm_clust_dist_df,
-        by = "cluster.id"
-      )
-    return(data)
-}
-
-
-ri_fun = function(draw) {
-  set.seed(draw)
-  perm_baseline_worm_data = baseline_worm_data %>%
-    resample_cluster_dists(draw)
-  perm_census_data = clean_census_data %>%
-    resample_cluster_dists(draw)
-
-  perm_pretreat_data = pretreat_data %>%
-    resample_cluster_dists(draw)
-
-  perm_takeup_data = analysis_data %>%
-    select(any_of(takeup_vars), cluster.dist.to.pot, county, cluster.id) %>%
-    resample_cluster_dists(draw)
-
-  perm_baseline_worm_dist_fit = feols(
-    data = perm_baseline_worm_data,
-    .[worm_vars] ~ 0 + perm_dist + i(county, ref = "Busia"), 
-    cluster = ~cluster.id
-  )
-  perm_census_dist_fit = feols(
-      data = perm_census_data, 
-      .[census_vars] ~ 0 + perm_dist + i(county, ref = "Busia"),
-      cluster = ~cluster.id
-      ) 
-  perm_pretreat_dist_fit = feols(
-    data = perm_pretreat_data,
-    .[pretreat_vars] ~ 0 + perm_dist + i(county, ref = "Busia"), 
-    ~cluster.id
-  )
-
-  perm_takeup_dist_fit = feols(
-    data = perm_takeup_data, 
-    .[takeup_vars] ~ 0 + perm_dist + i(county, ref = "Busia"),
-    cluster = ~cluster.id
-  )
-
-  
-  perm_coef_df =  
-    bind_rows(
-      map_dfr(perm_baseline_worm_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist"),
-      map_dfr(perm_census_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist"),
-      map_dfr(perm_pretreat_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist"),
-      map_dfr(
-        perm_takeup_dist_fit, 
-        tidy, 
-        .id = "lhs"
-      ) %>%
-        filter(term == "perm_dist"
-      )
-    ) %>% 
-      mutate(draw = draw)
-
-  return(
-    perm_coef_df
-  )
-}
 
 
 if (script_options$fit_ri) {
+
+  resample_cluster_dists = function(data, seed) {
+    set.seed(seed)
+    clust_dist_df = data %>%
+      select(cluster.id, cluster.dist.to.pot) %>%
+      unique()
+    perm_clust_dist_df = clust_dist_df %>%
+      mutate(
+        perm_dist = sample(cluster.dist.to.pot, size = n())
+      ) %>%
+      select(-cluster.dist.to.pot)
+
+      data = data %>%
+        left_join(
+          perm_clust_dist_df,
+          by = "cluster.id"
+        )
+      return(data)
+  }
+
+  ri_fun = function(draw) {
+    set.seed(draw)
+    perm_baseline_worm_data = baseline_worm_data %>%
+      resample_cluster_dists(draw)
+    perm_census_data = clean_census_data %>%
+      resample_cluster_dists(draw)
+
+    perm_pretreat_data = pretreat_data %>%
+      resample_cluster_dists(draw)
+
+    perm_takeup_data = analysis_data %>%
+      select(any_of(takeup_vars), cluster.dist.to.pot, county, cluster.id) %>%
+      resample_cluster_dists(draw)
+
+    perm_baseline_worm_dist_fit = feols(
+      data = perm_baseline_worm_data,
+      .[worm_vars] ~  perm_dist | county, 
+      cluster = ~cluster.id
+    )
+    perm_census_dist_fit = feols(
+        data = perm_census_data, 
+        .[census_vars] ~  perm_dist | county,
+        cluster = ~cluster.id
+        ) 
+    perm_pretreat_dist_fit = feols(
+      data = perm_pretreat_data,
+      .[pretreat_vars] ~  perm_dist | county, 
+      cluster = ~cluster.id
+    )
+
+    perm_takeup_dist_fit = feols(
+      data = perm_takeup_data, 
+      .[takeup_vars] ~  perm_dist | county,
+      cluster = ~cluster.id
+    )
+
+    
+    perm_coef_df =  
+      bind_rows(
+        map_dfr(perm_baseline_worm_dist_fit, tidy, .id = "lhs") %>%
+          filter(term == "perm_dist"),
+        map_dfr(perm_census_dist_fit, tidy, .id = "lhs") %>%
+          filter(term == "perm_dist"),
+        map_dfr(perm_pretreat_dist_fit, tidy, .id = "lhs") %>%
+          filter(term == "perm_dist"),
+        map_dfr(
+          perm_takeup_dist_fit, 
+          tidy, 
+          .id = "lhs"
+        ) %>%
+          filter(term == "perm_dist"
+        )
+      ) %>% 
+        mutate(draw = draw)
+
+    return(
+      perm_coef_df
+    )
+  }
+
+    
   plan(multisession, workers = 12)
   perm_fit_df = future_map_dfr(
     1:500, 
@@ -871,9 +873,9 @@ if (script_options$fit_ri) {
       packages = c("broom", "fixest")
       )
     )
-  saveRDS(perm_fit_df, "temp-data/balance-cts-dist-ri.rds")
+  saveRDS(perm_fit_df, "temp-data/balance-cts-dist-ri-fe.rds")
 } else {
-  perm_fit_df = read_rds("temp-data/balance-cts-dist-ri.rds")
+  perm_fit_df = read_rds("temp-data/balance-cts-dist-ri-fe.rds")
 }
 
 
@@ -916,12 +918,23 @@ plot_perm_fit_df = perm_fit_df %>%
 ri_p_val_df = plot_perm_fit_df %>%
   group_by(lhs) %>%
   summarise(
-    p_val = paste0("p = ", round(mean(statistic > realised_statistic), 3)),
+    p_val = paste0("p = ", round(mean(abs(statistic) > abs(realised_statistic)), 3)),
     realised_statistic = unique(realised_statistic),
     x = quantile(statistic, 0.95, na.rm = TRUE),
     clean_name = unique(clean_name)
   ) 
 
+saveRDS(
+  list(
+    plot_perm_fit_df = plot_perm_fit_df,
+    ri_p_val_df = ri_p_val_df,
+    realised_fit_df = realised_fit_df
+  ),
+  file.path(
+    script_options$output_path,
+    "balance-ri-fe.rds"
+  )
+)
 
 N_endline_belief = analysis_data %>%
   filter(KEY.individ %in% endline_belief_keys) %>%
