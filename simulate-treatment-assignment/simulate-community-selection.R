@@ -239,11 +239,10 @@ sim_dist_mats = map(simmed_cluster_selection, ~ create_village_dist_mat(cluster.
 
 
 pot_seeds = 1:length(simmed_cluster_selection)
-vill_seeds = 1:100
+vill_seeds = 1:500
 
 seed_grid = expand.grid(pot_seed = pot_seeds, vill_seed =  vill_seeds) %>%
     as_tibble() 
-
 library(furrr)
 plan(multicore)
 sim_df = future_map2_dfr(
@@ -517,13 +516,15 @@ p_assignment_density_dens = clean_sim_df_treat %>%
   ggplot(aes(
     x = dist/1000,
     fill = assigned_dist_group,
+    linetype = assigned_dist_group
   )) +
   geom_density(alpha = 0.5) +
   theme_minimal() +
   labs(
     x = "Distance to PoT (km)",
     y = "Density",
-    fill = "Experimental Assignment"
+    fill = "Experimental Assignment",
+    linetype = "Experimental Assignment",
   ) +
   theme(legend.position = "bottom")
 
