@@ -82,3 +82,88 @@ mismatch_counts = mismatched_clust_df %>%
 cat("\nMismatch summary:\n")
 print(mismatch_counts)
 cat("\nTotal mismatched clusters:", nrow(mismatched_clust_df), "\n")
+
+
+# Total clusters in the design
+total_clusters = nrow(all_clust_df)
+cat("\nTotal clusters in design:", total_clusters, "\n")
+
+
+# Total realised Close/Far
+realised_close_clusters = all_clust_df %>%
+    filter(analysis_cat == "close") %>%
+    nrow()
+
+
+realised_far_clusters = all_clust_df %>%
+    filter(analysis_cat == "far") %>%
+    nrow()
+cat("\nRealised Close clusters:", realised_close_clusters, "\n")
+cat("Realised Far clusters:", realised_far_clusters, "\n")
+
+
+# Feasibility drops (158 -> 144) ------------------------------------------
+# Reasons sourced from:
+#   scratch/distance/distance-recreation-attempt.Rmd (lines 49-53)
+#   rct-design-fieldwork/takeup_rct_target_villages.R (lines 6-7)
+
+drop_reasons = tribble(
+  ~cluster_id, ~reason_group,                    ~reason,
+  277,         "fieldwork",                      "Too close to another cluster (503)",
+  491,         "fieldwork",                      "Problematic urban cluster",
+  492,         "fieldwork",                      "Problematic urban cluster",
+  1,           "fieldwork",                      "Village dispute about PoT",
+  678,         "fieldwork",                      "Hostile community member",
+  737,         "fieldwork",                      "Data fabrication and medication theft",
+  99,          "cluster survey stage",            "Problems at cluster survey stage",
+  691,         "cluster survey stage",            "Problems at cluster survey stage",
+  892,         "cluster survey stage",            "Problems at cluster survey stage",
+  1293,        "cluster survey stage",            "Problems at cluster survey stage",
+  239,         "cluster survey stage",            "Problems at cluster survey stage",
+  201,         "distance to other PoT",           "No longer valid: too close to another PoT",
+  853,         "distance to other PoT",           "No longer valid: too close to another PoT",
+  1402,        "distance to other PoT",           "No longer valid: too close to another PoT"
+)
+
+dropped_clust_df = all_clust_df %>%
+  filter(is.na(analysis_cat)) %>%
+  left_join(drop_reasons, by = c("pot.cluster.id" = "cluster_id"))
+
+cat("\n=== Dropped clusters (158 -> 144) ===\n")
+print(
+  dropped_clust_df %>%
+    select(cluster_id = pot.cluster.id, original_cat = clust_randomization_cat, reason_group, reason) %>%
+    arrange(cluster_id)
+)
+
+cat("\nDropped by original category:\n")
+print(dropped_clust_df %>% count(clust_randomization_cat, name = "n_dropped"))
+
+
+# Count breakdown: design -> drops -> changes -> final --------------------
+
+design_close = sum(all_clust_df$clust_randomization_cat == "close", na.rm = TRUE)
+design_far   = sum(all_clust_df$clust_randomization_cat == "far",   na.rm = TRUE)
+
+retained = all_clust_df %>% filter(!is.na(analysis_cat))
+dropped  = all_clust_df %>% filter( is.na(analysis_cat))
+
+dropped_close = sum(dropped$clust_randomization_cat == "close", na.rm = TRUE)
+dropped_far   = sum(dropped$clust_randomization_cat == "far",   na.rm = TRUE)
+
+changed = retained %>% filter(as.character(analysis_cat) != as.character(clust_randomization_cat))
+close_to_far = sum(changed$clust_randomization_cat == "close")
+far_to_close = sum(changed$clust_randomization_cat == "far")
+
+final_close = sum(retained$analysis_cat == "close")
+final_far   = sum(retained$analysis_cat == "far")
+
+cat("\n=== Count breakdown ===\n")
+cat(sprintf("%-25s  Close  Far\n", "Stage"))
+cat(sprintf("%-25s  %5d  %3d\n", "Design",             design_close, design_far))
+cat(sprintf("%-25s  %5d  %3d\n", "Dropped",            -dropped_close, -dropped_far))
+cat(sprintf("%-25s  %5d  %3d\n", "After drops",        design_close - dropped_close, design_far - dropped_far))
+cat(sprintf("%-25s  %5d  %3d\n", "Changed (->far)",    -close_to_far, +close_to_far))
+cat(sprintf("%-25s  %5d  %3d\n", "Changed (->close)",  +far_to_close, -far_to_close))
+cat(sprintf("%-25s  %5d  %3d\n", "Final analysis",     final_close, final_far))
+
