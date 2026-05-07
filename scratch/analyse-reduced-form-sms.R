@@ -215,6 +215,12 @@ plot_df = bind_rows(
         )
     )
 
+
+plot_df %>%
+    select(-lhs, -rhs) %>%
+    write_csv(file.path(script_options$output_path, "sms-reduced-form-comps.csv"))
+
+
 p_sms_df = plot_df %>%
     ggplot(aes(
         x = estimate,
