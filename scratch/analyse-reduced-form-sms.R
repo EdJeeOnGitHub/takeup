@@ -133,7 +133,6 @@ reminder_fit %>%
     )
 
 
-
 breakdown_sms_comp = comparisons(
     rf_fit, 
     variables = "assigned_treatment",
