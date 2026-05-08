@@ -1651,8 +1651,6 @@ sms_lhs_df = tribble(
 )
 
 fmt3 = function(x) formatC(round(x, 3), format = "f", digits = 3)
-sms_itt_comp_df %>%
-  select(comp_type)
 build_sms_wide = function(comp_df) {
   con_wide = comp_df %>%
     # filter(comp_type == "treatment", lhs_treatment == "smscontrol", is.na(rhs_treatment), is.na(term)) %>%
