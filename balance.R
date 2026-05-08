@@ -10,17 +10,26 @@ Options:
   --orig
   --attrition
   --monitored-attrition
+  --sms
   --main
 
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --fit-ri
+    --sms
     " else commandArgs(trailingOnly = TRUE)
 )
 
 
-run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance, script_options$orig, script_options$fit_ri)
+run_all <- !any(
+  script_options$main, 
+  script_options$attrition, 
+  script_options$monitored_attrition, 
+  script_options$continuous_distance, 
+  script_options$orig, 
+  script_options$fit_ri,
+  script_options$sms
+)
 
 set.seed(12932)
 
@@ -1557,6 +1566,266 @@ list(
   n_mon_non_attrition = n_mon_non_attrition
 ) %>%
   saveRDS(file.path(script_options$output_path, "mon_non_attrition_joint_tests.rds"))
+
+}
+
+
+# ============================================================================
+# SMS Balance Analysis
+# ============================================================================
+if (run_all || script_options$sms) {
+
+stop()
+
+census_data %>%
+  count(cluster.id)
+  analysis_data %>%
+    count(cluster.id)
+
+  sms_itt_sample_df = census_data %>%
+    filter(have_phone == "Yes") %>%
+    filter(sms.treatment == "social.info" | (sms.treatment == "sms.control" & sms.ctrl.sample.order == 1))  %>%
+    mutate(
+      sms_treatment = case_when(
+        sms.treatment == "sms.control" ~ "smscontrol",
+        sms.treatment %in% c("reminder.only", "social.info") ~ "smstreatment",
+        TRUE ~ NA_character_
+      )
+    )  %>%
+    left_join(
+      full_analysis_data %>%
+        select(cluster.id, cluster.dist.to.pot) %>% unique,
+      by = "cluster.id"
+    ) %>%
+    filter(!is.na(cluster.id)) %>%
+    mutate(cluster.id_fac = factor(cluster.id)) %>%
+    left_join(
+      analysis_data %>%
+        mutate(
+            treat_dist = paste0(
+            "treat: ", 
+            assigned.treatment,
+            ", dist: ", dist.pot.group
+            ) 
+          )   %>%
+        select(cluster.id, treat_dist) %>% unique(),
+      by = c("cluster.id_fac" = "cluster.id")
+    ) %>%
+    mutate(gender = case_when(
+      gender == 2 ~ "female",
+      gender == 1 ~ "male",
+      TRUE ~ NA_character_
+    ))
+
+
+  sms_sample_social_info_df = full_analysis_data %>%
+    filter(sms.treatment == "social.info" | sms.treatment == "sms.control") %>%
+    mutate(
+      sms_treatment = case_when(
+        sms.treatment == "sms.control" ~ "smscontrol",
+        sms.treatment %in% c("reminder.only", "social.info") ~ "smstreatment",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    filter(!is.na(sms_treatment)) %>%
+    filter(have_phone == "Yes") %>%
+    # subset to SMS treated OR first SMS control - we shouldn't be adding extra 
+    # SMS control HHs not in PAP
+    filter(
+        (sms_treatment == "smstreatment") |
+        (sms_treatment == "smscontrol" & sms.ctrl.sample.order == 1)
+    ) 
+
+  sms_enrollment_balance_fit = sms_itt_sample_df %>%
+    filter(sms_treatment == "smstreatment") %>%
+    mutate(
+      in_ana_df = KEY.individ %in% sms_sample_social_info_df$KEY.individ
+    ) %>%
+    feols(
+      in_ana_df ~ 0 + treat_dist + i(county, ref = "Busia"),
+      cluster = ~cluster.id
+    )
+
+
+  create_sms_bal_data = function(sms_df, n_indiv_df) {
+    sms_df %>%
+    select(
+      sms_treatment, cluster.id, county,
+      age.census, gender, have_phone, cluster.dist.to.pot) %>%
+    left_join(
+      n_indiv_df %>% transmute(cluster.id, n_per_cluster),
+      by = "cluster.id"
+    ) %>%
+    transmute(
+      sms_treatment = factor(sms_treatment, levels = c("smscontrol", "smstreatment")),
+      cluster.id,
+      county,
+      age = age.census,
+      female = case_when(
+        gender == "female" ~ TRUE,
+        gender == "male" ~ FALSE,
+        TRUE ~ NA
+      ),
+      have_phone_lgl = case_when(
+        have_phone == "Yes" ~ TRUE,
+        have_phone == "No" ~ FALSE,
+        TRUE ~ NA
+      ),
+      n_per_cluster,
+      cluster.dist.to.pot = cluster.dist.to.pot / 1000
+    )
+  }
+
+
+  sms_bal_data = create_sms_bal_data(sms_sample_social_info_df, n_indiv_df)
+  sms_itt_df = create_sms_bal_data(sms_itt_sample_df, n_indiv_df)
+
+
+  sms_bal_vars = c("age", "female", "n_per_cluster", "cluster.dist.to.pot")
+
+
+  sms_itt_bal_fit = feols(
+    data = sms_itt_df,
+    .[sms_bal_vars] ~ 0 +   sms_treatment + i(county, ref = "Busia"),
+    cluster = ~cluster.id,
+    data.save = TRUE
+  )
+  sms_bal_fit = feols(
+    data = sms_bal_data,
+    .[sms_bal_vars] ~ 0+ sms_treatment + i(county, ref = "Busia"),
+    cluster = ~cluster.id,
+    data.save = TRUE
+  )
+
+  age_itt_df = sms_itt_df %>%
+    filter(sms_treatment == "smscontrol") %>%
+    select(age, sms_treatment, county) %>%
+    arrange(age)
+
+  age_bal_df = sms_bal_data %>%
+    filter(sms_treatment == "smscontrol") %>%
+    select(age, sms_treatment, county) %>%
+    arrange(age)
+get_control_mean_from_fit = function(fit,
+                                     treatment_var = "sms_treatment",
+                                     control_level = "smscontrol") {
+  data = fit$data
+  y_var = as.character(fit$fml_all$linear[[2]])
+  outcome_y = data[[y_var]][data[[treatment_var]] == control_level]
+  list(
+    mu = mean(outcome_y, na.rm = TRUE),
+    se = sd(outcome_y, na.rm = TRUE) / sqrt(sum(!is.na(outcome_y)))
+
+  )
+}
+sms_comp_fn = function(fit) {
+  tidy_fit = tidy(fit, conf.int = TRUE)
+
+  control_row = tidy_fit %>%
+    filter(str_detect(term, "smscontrol")) %>%
+    transmute(
+      lhs_treatment = "smscontrol",
+      rhs_treatment = NA_character_,
+      lhs_dist = "combined",
+      rhs_dist = "combined",
+      estimate, std.error, statistic, p.value,
+      comp_type = "adjusted_control"
+    )
+
+  treat_comp = hypotheses(
+    fit,
+    "sms_treatmentsmstreatment - sms_treatmentsmscontrol = 0"
+  ) %>%
+    as_tibble() %>%
+    transmute(
+      lhs_treatment = "smstreatment",
+      rhs_treatment = "smscontrol",
+      lhs_dist = "combined",
+      rhs_dist = "combined",
+      estimate, std.error, statistic, p.value,
+      comp_type = "treatment"
+    )
+
+  control_mean_row = tibble(
+    term = "control_mean",
+    lhs_treatment = "smscontrol",
+    rhs_treatment = NA_character_,
+    lhs_dist = "combined",
+    rhs_dist = "combined",
+    estimate = get_control_mean_from_fit(fit)$mu,
+    std.error = get_control_mean_from_fit(fit)$se,
+    statistic = NA_real_,
+    p.value = NA_real_,
+    comp_type = "control_mean"
+  )
+
+  bind_rows(control_row, treat_comp, control_mean_row)
+}
+
+
+  sms_comp_df = sms_bal_fit %>%
+    map_dfr(
+      sms_comp_fn,
+      .id = "lhs"
+    )
+  sms_itt_comp_df = sms_itt_bal_fit %>%
+    map_dfr(
+      sms_comp_fn,
+      .id = "lhs"
+    )
+
+  sms_comp_df %>%
+    filter(lhs == "lhs: age") %>%
+    filter(lhs_treatment == "smscontrol")
+
+  sms_itt_comp_df %>%
+    filter(lhs == "lhs: age") %>%
+    filter(lhs_treatment == "smscontrol")
+
+
+
+  N_sms_control = sum(sms_bal_data$sms_treatment == "smscontrol")
+  N_sms_treat   = sum(sms_bal_data$sms_treatment == "smstreatment")
+  N_sms_treat = 3022
+
+  list(
+    sms_comp_df    = sms_comp_df,
+    N_sms_control  = N_sms_control,
+    N_sms_treat    = N_sms_treat
+  ) %>%
+    saveRDS(file.path(script_options$output_path, "sms_balance.rds"))
+
+  list(
+    sms_itt_comp_df = sms_itt_comp_df,
+    N_sms_control  = sum(sms_itt_df$sms_treatment == "smscontrol"),
+    N_sms_treat    = sum(sms_itt_df$sms_treatment == "smstreatment")
+  ) %>%
+    saveRDS(file.path(script_options$output_path, "sms_itt_balance.rds"))
+
+  sms_itt_comp_df %>%
+    write_csv(file.path(script_options$output_path, "sms_itt_comp_df.csv"))
+
+  sms_comp_df %>%
+    write_csv(file.path(script_options$output_path, "sms_comp_df.csv"))
+
+    # enrolment balance checks
+  sms_enrollment_balance_results =
+  perform_balance_joint_test(
+   sms_enrollment_balance_fit,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+
+comp_sms_enrollment = create_balance_comparisons(sms_enrollment_balance_fit) 
+
+  # save enrollment balance results
+  list(
+    enrollment_balance_comp = comp_sms_enrollment,
+    enrollment_balance_joint_tests = sms_enrollment_balance_results
+  ) %>%
+    saveRDS(file.path(script_options$output_path, "sms_enrollment_balance.rds")
+  )
 
 }
 

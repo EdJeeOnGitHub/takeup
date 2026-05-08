@@ -1628,6 +1628,136 @@ mon_non_attrition_bal_table %>%
 ```
 
 
+```{r, results="asis"}
+#| sms-balance-table
+
+sms_balance      <- read_rds(file.path("temp-data", "sms_balance.rds"))
+sms_comp_rmd     <- sms_balance$sms_comp_df
+N_sms_control    <- sms_balance$N_sms_control
+N_sms_treat      <- sms_balance$N_sms_treat
+
+sms_itt_balance       <- read_rds(file.path("temp-data", "sms_itt_balance.rds"))
+sms_itt_comp_rmd      <- sms_itt_balance$sms_itt_comp_df
+N_sms_itt_control     <- sms_itt_balance$N_sms_control
+N_sms_itt_treat       <- sms_itt_balance$N_sms_treat
+
+sms_lhs_df = tribble(
+  ~lhs,                             ~clean_name,
+  "lhs: age",                       "Age",
+  "lhs: female",                    "Female",
+  "lhs: have_phone_lgl",            "Phone owner",
+  "lhs: n_per_cluster",             "Individuals per community",
+  "lhs: cluster.dist.to.pot",       "Distance to PoT (km)"
+)
+
+fmt3 = function(x) formatC(round(x, 3), format = "f", digits = 3)
+sms_itt_comp_df %>%
+  select(comp_type)
+build_sms_wide = function(comp_df) {
+  con_wide = comp_df %>%
+    # filter(comp_type == "treatment", lhs_treatment == "smscontrol", is.na(rhs_treatment), is.na(term)) %>%
+    filter(comp_type == "control_mean") %>%
+    mutate(con_cell = linebreak(paste0(fmt3(estimate), "\n(", fmt3(std.error), ")"), align = "c")) %>%
+    select(lhs, con_cell)
+
+  diff_wide = comp_df %>%
+    filter(comp_type == "treatment", lhs_treatment == "smstreatment") %>%
+    mutate(diff_cell = linebreak(paste0(fmt3(estimate), "\n{[", fmt3(p.value), "]}"), align = "c")) %>%
+    select(lhs, diff_cell)
+
+  sms_lhs_df %>%
+    left_join(con_wide,  by = "lhs") %>%
+    left_join(diff_wide, by = "lhs") %>%
+    select(clean_name, con_cell, diff_cell) %>%
+    filter(clean_name != "Phone owner")
+}
+
+sms_itt_table_df  = build_sms_wide(sms_itt_comp_rmd)
+sms_table_df      = build_sms_wide(sms_comp_rmd)
+
+stacked_sms_df = rbind(sms_itt_table_df, sms_table_df)
+
+sms_itt_panel_label = paste0(
+  "Panel A: SMS ITT sample, $N_{\\mathrm{control}}=", format(N_sms_itt_control, big.mark = ","),
+  "$, $N_{\\\\mathrm{treat}}=", format(N_sms_itt_treat, big.mark = ","), "$"
+)
+sms_enrolled_panel_label = paste0(
+  "Panel B: SMS enrolled sample, $N_{\\mathrm{control}}=", format(N_sms_control, big.mark = ","),
+  "$, $N_{\\\\mathrm{treat}}=", format(N_sms_treat, big.mark = ","), "$"
+)
+
+sms_bal_tbl = stacked_sms_df %>%
+  knitr::kable(
+    format    = "latex",
+    escape    = FALSE,
+    booktabs  = TRUE,
+    col.names = c(
+      "",
+      linebreak("Control\n(SE)", align = "c"),
+      linebreak("SMS Treat $-$ Control", align = "c")
+    ),
+    caption   = "SMS Sample Balance",
+    align     = "lcc",
+    linesep   = ""
+  ) %>%
+  kable_styling(latex_options = "scale_down") %>%
+  pack_rows(
+    index        = setNames(
+      c(nrow(sms_itt_table_df), nrow(sms_table_df)),
+      c(sms_itt_panel_label, sms_enrolled_panel_label)
+    ),
+    italic       = TRUE,
+    bold         = TRUE,
+    escape       = FALSE,
+    hline_after  = TRUE,
+    hline_before = TRUE
+  )
+
+sms_bal_tbl %>%
+  custom_save_latex_table("sms-balance-table")
+
+```
+
+
+```{r, results="asis"}
+#| sms-enrollment-balance-table
+
+sms_enrollment_balance <- read_rds(file.path("temp-data", "sms_enrollment_balance.rds"))
+comp_sms_enrollment    <- sms_enrollment_balance$enrollment_balance_comp
+enrollment_jt          <- sms_enrollment_balance$enrollment_balance_joint_tests
+
+enrollment_lhs_df = tribble(
+  ~lhs,                ~clean_name,              ~sample,       ~row_num,
+  "lhs: sms_enrolled", "Enrolled in SMS study",  "enrollment",  1L
+) %>%
+  mutate(sample = factor(sample))
+
+comp_sms_enrollment_lhs = comp_sms_enrollment %>%
+  mutate(
+    lhs  = "lhs: sms_enrolled",
+    term = NA_character_
+  )
+
+enrollment_fits = list("lhs: sms_enrolled" = enrollment_jt)
+
+enrollment_wide = build_comp_wide(comp_sms_enrollment_lhs, enrollment_lhs_df, enrollment_fits)
+
+enrollment_panel_list = setNames(
+  nrow(enrollment_wide),
+  str_glue("Panel A: SMS treatment sample, $N={format(N_sms_itt_treat, big.mark = ',')}$")
+)
+
+sms_enrol_tbl = render_comp_balance_table(
+  enrollment_wide,
+  enrollment_panel_list,
+  caption   = "SMS Enrollment Balance",
+  save_name = "sms-enrollment-balance-table"
+)
+sms_enrol_tbl %>%
+  custom_save_latex_table("sms-enrollment-balance-table")
+```
+
+
 ```{r, sample_n, results="asis"}
 
 # sample_meta_df = N_by_treat_dist_df %>%
