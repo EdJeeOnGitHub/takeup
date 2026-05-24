@@ -457,6 +457,23 @@ discrete_distance_covs_output = wrapper_function(
   table_name = "rf_discrete_dist_covs_tbl"
 )
 
+#### Takeup Discrete Distance + No LASSO Covs + No Cluster Expected Distance
+discrete_distance_no_covs_no_mu_d_regression = function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment*assigned_dist_group | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+discrete_distance_no_covs_no_mu_d_output = wrapper_function(
+  data = cov_analysis_data,
+  regression_spec = discrete_distance_no_covs_no_mu_d_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-no-covs-no-mu-d-tidy-tes.csv",
+  table_name = "rf_discrete_dist_no_covs_no_mu_d_tbl"
+)
+
 ##### Excluding baseline sample
 
 discrete_distance_covs_exclude_baseline_output = wrapper_function(
@@ -646,6 +663,14 @@ discrete_f_know = function(data, weights) {
   )
 }
 
+discrete_f_know_no_covs_no_mu_d = function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    weights = weights
+  )
+}
+
 cts_f_know = function(data, weights) {
   feols(
     prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + .[l_cov_vars] + mu_d | county,
@@ -677,6 +702,18 @@ discrete_fob_output = wrapper_function(
   ),
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
+)
+
+#### FOB Discrete Distance + No LASSO Covs + No Cluster Expected Distance
+discrete_fob_no_covs_no_mu_d_output = wrapper_function(
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_fob),
+  regression_spec = discrete_f_know_no_covs_no_mu_d,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_discrete_fob_no_covs_no_mu_d_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-no-covs-no-mu-d-tidy-tes.csv"
 )
 
 
@@ -1453,6 +1490,146 @@ incentive_check_tbl = wide_incentive_check_input_df %>%
 
 incentive_check_tbl %>%
   custom_save_latex_table("incentive-check-tbl")
+
+bracelet_distance_data = endline_data %>%
+  filter(assigned_treatment == "bracelet") %>%
+  mutate(
+    assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far")),
+    seen_in_community = seen_bracelet == 1,
+    received_bracelet = dewormed.reported == 1 & got_bracelet == 1,
+    still_has_bracelet = if_else(
+      received_bracelet,
+      have_bracelet == 1 | wear_bracelet == 1,
+      NA
+    ),
+    wearing_bracelet = if_else(
+      received_bracelet,
+      wear_bracelet == 1,
+      NA
+    )
+  ) %>%
+  select(
+    cluster_id,
+    assigned_dist_group,
+    seen_in_community,
+    still_has_bracelet,
+    wearing_bracelet
+  ) %>%
+  pivot_longer(
+    cols = c(seen_in_community, still_has_bracelet, wearing_bracelet),
+    names_to = "outcome",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    outcome = factor(
+      outcome,
+      levels = c("seen_in_community", "still_has_bracelet", "wearing_bracelet"),
+      labels = c("Seen in community", "Still has bracelet", "Wearing bracelet")
+    )
+  )
+
+bracelet_distance_level_fit = feols(
+  value ~ 0 + assigned_dist_group,
+  split = ~outcome,
+  data = bracelet_distance_data,
+  cluster = ~cluster_id
+)
+
+bracelet_distance_diff_fit = feols(
+  value ~ i(assigned_dist_group, ref = "close"),
+  split = ~outcome,
+  data = bracelet_distance_data,
+  cluster = ~cluster_id
+)
+
+bracelet_distance_levels = bracelet_distance_level_fit %>%
+  map_dfr(
+    ~tidy(.x) %>%
+      select(term, estimate, std.error, p.value),
+    .id = "outcome"
+  ) %>%
+  mutate(
+    dist_group = case_when(
+      term == "assigned_dist_groupclose" ~ "Close",
+      term == "assigned_dist_groupfar" ~ "Far"
+    )
+  )
+
+bracelet_distance_diff = bracelet_distance_diff_fit %>%
+  map_dfr(
+    ~tidy(.x) %>%
+      filter(term == "assigned_dist_group::far") %>%
+      select(estimate, std.error, p.value),
+    .id = "outcome"
+  ) %>%
+  mutate(dist_group = "Far--Close")
+
+bracelet_distance_tbl_input = bind_rows(
+  bracelet_distance_levels,
+  bracelet_distance_diff
+) %>%
+  mutate(
+    stars = case_when(
+      dist_group != "Far--Close" ~ "",
+      p.value < 0.01 ~ "***",
+      p.value < 0.05 ~ "**",
+      p.value < 0.1 ~ "*",
+      TRUE ~ ""
+    ),
+    estimate_se = linebreak(
+      paste0(round(estimate, 3), stars, "\n", "(", round(std.error, 3), ")"),
+      align = "c"
+    ),
+    dist_group = factor(dist_group, levels = c("Close", "Far", "Far--Close"))
+  ) %>%
+  select(outcome, dist_group, estimate_se) %>%
+  pivot_wider(
+    names_from = dist_group,
+    values_from = estimate_se
+  ) %>%
+  mutate(
+    outcome = str_remove(outcome, "^sample\\.var: outcome; sample: "),
+    outcome = factor(
+      outcome,
+      levels = c(
+        "Seen in community",
+        "Still has bracelet",
+        "Wearing bracelet"
+      ),
+      labels = c("Seen in community", "Still has bracelet", "Wearing bracelet")
+    )
+  ) %>%
+  arrange(outcome)
+
+bracelet_distance_tbl = bracelet_distance_tbl_input %>%
+  knitr::kable(
+    format = "latex",
+    col.names = c("", "Close", "Far", "Far--Close"),
+    escape = FALSE,
+    booktabs = TRUE,
+    align = "lccc",
+    caption = "Bracelet Visibility, Retention, and Wearing by Distance\\label{tab:bracelet-distance-display}"
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  )
+
+bracelet_distance_tbl %>%
+  custom_save_latex_table("bracelet-distance-display-tbl")
+
+bracelet_distance_tbl_path = file.path(
+  params$table_output_path,
+  "bracelet-distance-display-tbl.tex"
+)
+bracelet_distance_tbl_tex = readLines(bracelet_distance_tbl_path, warn = FALSE)
+bracelet_distance_tbl_tex = c(
+  "\\caption{Bracelet Visibility, Retention, and Wearing by Distance}",
+  "\\label{tab:bracelet-distance-display}",
+  bracelet_distance_tbl_tex,
+  "\\floatfoot{\\textit{Notes:} The table reports endline measures of bracelet visibility, possession, and wearing among respondents assigned to the Bracelet arm. Outcomes are reported separately for Close and Far communities, along with Far--Close differences. ``Seen in community'' equals one if the respondent reports having seen the bracelet in the community. ``Still has bracelet'' and ``Wearing bracelet'' are defined among respondents who dewormed and report receiving the bracelet. Standard errors are clustered at the community level.}"
+)
+writeLines(bracelet_distance_tbl_tex, bracelet_distance_tbl_path)
 
 # incentive drawbacks
 incentive_drawback_tbl = wide_incentive_check_input_df %>%
