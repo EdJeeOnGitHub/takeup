@@ -1,5 +1,69 @@
 
-create_balance_comparisons = function(fit) {
+raw_mean_se = function(data, lhs_var) {
+  outcome_y = data[[lhs_var]]
+  n_non_missing = sum(!is.na(outcome_y))
+  if (n_non_missing <= 1) {
+    return(NA_real_)
+  }
+
+  if ("cluster.id" %in% names(data) && dplyr::n_distinct(data$cluster.id[!is.na(outcome_y)]) > 1) {
+    cluster_se = tryCatch(
+      {
+        fml = stats::as.formula(sprintf("`%s` ~ 1", lhs_var))
+        fixest::coeftable(fixest::feols(fml, data = data, cluster = ~cluster.id))[1, "Std. Error"]
+      },
+      error = function(e) NA_real_
+    )
+    if (!is.na(cluster_se)) {
+      return(cluster_se)
+    }
+  }
+
+  stats::sd(outcome_y, na.rm = TRUE) / sqrt(n_non_missing)
+}
+
+raw_treat_dist_means = function(data, lhs_var, control_only = FALSE, close_only = FALSE) {
+  if (is.null(data) || !all(c(lhs_var, "treat_dist") %in% names(data))) {
+    return(NULL)
+  }
+
+  raw_data = data %>%
+    mutate(
+      treat_dist_chr = as.character(treat_dist),
+      lhs_treatment = stringr::str_extract(treat_dist_chr, "(?<=treat: )\\w+"),
+      lhs_dist = stringr::str_extract(treat_dist_chr, "(?<=dist: )\\w+")
+    ) %>%
+    filter(!is.na(lhs_treatment), !is.na(lhs_dist))
+
+  if (control_only) {
+    raw_data = raw_data %>% filter(lhs_treatment == "control")
+  }
+  if (close_only) {
+    raw_data = raw_data %>% filter(lhs_dist == "close")
+  }
+
+  raw_data %>%
+    group_by(lhs_treatment, lhs_dist) %>%
+    group_modify(~{
+      tibble(
+        estimate = mean(.x[[lhs_var]], na.rm = TRUE),
+        std.error = raw_mean_se(.x, lhs_var)
+      )
+    }) %>%
+    ungroup() %>%
+    mutate(
+      rhs_treatment = NA_character_,
+      rhs_dist = lhs_dist,
+      statistic = NA_real_,
+      p.value = NA_real_,
+      conf.low = NA_real_,
+      conf.high = NA_real_
+    )
+}
+
+create_balance_comparisons = function(fit, data = NULL) {
+  lhs_var = all.vars(fit$fml)[1]
+
   comp_df = avg_comparisons(
     fit,
     variables = list("treat_dist" = "all")
@@ -71,19 +135,20 @@ create_balance_comparisons = function(fit) {
       rhs_control_comp_df
    ) %>%
    select(-contrast)
-
-
-    control_mean_df = fit %>%
-      tidy(conf.int = TRUE) %>%
-      filter(str_detect(term, "control")) %>%
-      mutate(
-        lhs_treatment = "control", rhs_treatment = NA, 
-        lhs_dist = if_else(str_detect(term, "close"), "close", "far"), 
-        rhs_dist = lhs_dist
-      ) %>%
-      select(
-        -term
-      )
+    control_mean_df = raw_treat_dist_means(data, lhs_var, control_only = TRUE)
+    if (is.null(control_mean_df) || nrow(control_mean_df) == 0) {
+      control_mean_df = fit %>%
+        tidy(conf.int = TRUE) %>%
+        filter(str_detect(term, "control")) %>%
+        mutate(
+          lhs_treatment = "control", rhs_treatment = NA,
+          lhs_dist = if_else(str_detect(term, "close"), "close", "far"),
+          rhs_dist = lhs_dist
+        ) %>%
+        select(
+          -term
+        )
+    }
     sample_mean_df = tibble(
       lhs_treatment = "control",
       rhs_treatment = NA,
@@ -100,17 +165,23 @@ create_balance_comparisons = function(fit) {
     mutate(comp_type = "treatment")
 
     ## Now within treatment across distances
-    dist_control_mean_df = fit %>%
-      tidy(conf.int = TRUE) %>%
-      filter(str_detect(term, "close")) %>%
-      mutate(
-        lhs_treatment = str_extract(
-          term, 
-          "(?<=treat: )\\w+"),
-        rhs_treatment = NA,
-        lhs_dist = "close",
-        rhs_dist = NA
-      )
+    dist_control_mean_df = raw_treat_dist_means(data, lhs_var, close_only = TRUE)
+    if (is.null(dist_control_mean_df) || nrow(dist_control_mean_df) == 0) {
+      dist_control_mean_df = fit %>%
+        tidy(conf.int = TRUE) %>%
+        filter(str_detect(term, "close")) %>%
+        mutate(
+          lhs_treatment = str_extract(
+            term,
+            "(?<=treat: )\\w+"),
+          rhs_treatment = NA,
+          lhs_dist = "close",
+          rhs_dist = NA
+        )
+    } else {
+      dist_control_mean_df = dist_control_mean_df %>%
+        mutate(rhs_dist = NA_character_)
+    }
 
     dist_comp_df = comp_df %>%
       filter(
