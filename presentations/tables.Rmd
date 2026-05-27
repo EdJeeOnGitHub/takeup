@@ -1515,7 +1515,7 @@ wtp_input_df = tidy_param_df %>%
   arrange(variable) %>%
   mutate(val_diff = if_else(variable == "hyper_wtp_mu", NA_real_, val_diff)) %>%
   mutate(name = str_glue("Pr(Prefer calendar), offered {val_diff}KSh")) %>%
-  mutate(name = if_else(variable == "hyper_wtp_mu", str_glue("Valuation difference (KSh), mean"), name)) %>%
+  mutate(name = if_else(variable == "hyper_wtp_mu", str_glue("Valuation difference (USD), mean"), name)) %>%
   select(name, estim_std) 
   
 wtp_summ_tbl = wtp_input_df %>%
