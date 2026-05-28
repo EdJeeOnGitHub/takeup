@@ -792,38 +792,73 @@ takeup_dist_fit = feols(
 
 if (script_options$fit_ri) {
 
-  resample_cluster_dists = function(data, seed) {
-    set.seed(seed)
-    clust_dist_df = data %>%
-      select(cluster.id, cluster.dist.to.pot) %>%
-      unique()
-    perm_clust_dist_df = clust_dist_df %>%
+  load_counterfactual_distance_pools = function() {
+    counterfactual_distance_df = read_csv(
+      file.path("data", "simulated-counterfactual-treatment-assignment.csv"),
+      col_types = cols(
+        .default = col_skip(),
+        cluster.id = col_character(),
+        dist = col_double()
+      )
+    ) %>%
+      filter(!is.na(cluster.id)) %>%
       mutate(
-        perm_dist = sample(cluster.dist.to.pot, size = n())
+        cluster.id = as.character(as.integer(cluster.id)),
+        perm_dist = dist / 1000
       ) %>%
-      select(-cluster.dist.to.pot)
+      select(cluster.id, perm_dist)
+
+    split(counterfactual_distance_df$perm_dist, counterfactual_distance_df$cluster.id)
+  }
+
+  assign_counterfactual_cluster_dists = function(data, seed, distance_pools) {
+    set.seed(seed)
+    cluster_ids = data %>%
+      mutate(cluster.id = as.character(cluster.id)) %>%
+      pull(cluster.id) %>%
+      unique()
+
+    missing_clusters = setdiff(cluster_ids, names(distance_pools))
+    if (length(missing_clusters) > 0) {
+      stop(
+        "Missing counterfactual distance simulations for clusters: ",
+        paste(missing_clusters, collapse = ", ")
+      )
+    }
+
+    counterfactual_cluster_dist_df = tibble(
+      cluster.id = cluster_ids,
+      perm_dist = vapply(
+        cluster_ids,
+        function(cluster_id) sample(distance_pools[[cluster_id]], 1),
+        numeric(1)
+      )
+    )
 
       data = data %>%
+        mutate(cluster.id = as.character(cluster.id)) %>%
         left_join(
-          perm_clust_dist_df,
+          counterfactual_cluster_dist_df,
           by = "cluster.id"
         )
       return(data)
   }
 
+  counterfactual_distance_pools = load_counterfactual_distance_pools()
+
   ri_fun = function(draw) {
     set.seed(draw)
     perm_baseline_worm_data = baseline_worm_data %>%
-      resample_cluster_dists(draw)
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
     perm_census_data = clean_census_data %>%
-      resample_cluster_dists(draw)
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
 
     perm_pretreat_data = pretreat_data %>%
-      resample_cluster_dists(draw)
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
 
     perm_takeup_data = analysis_data %>%
       select(any_of(takeup_vars), cluster.dist.to.pot, county, cluster.id) %>%
-      resample_cluster_dists(draw)
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
 
     perm_baseline_worm_dist_fit = feols(
       data = perm_baseline_worm_data,
@@ -876,10 +911,10 @@ if (script_options$fit_ri) {
   perm_fit_df = future_map_dfr(
     1:500, 
     ri_fun, 
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(
       seed = TRUE,
-      packages = c("broom", "fixest")
+      packages = c("broom", "dplyr", "fixest", "tibble")
       )
     )
   saveRDS(perm_fit_df, "temp-data/balance-cts-dist-ri-fe.rds")
