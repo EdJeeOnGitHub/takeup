@@ -394,20 +394,24 @@ endline_know_balance_df = census_data %>%
 
 if (run_all || script_options$main) {
 
+takeup_balance_input = analysis_data %>%
+  select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+  # convert to Km for this table
+  mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 )
+
+endline_know_balance_input = endline_know_balance_df %>%
+  select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+  # convert to Km for this table
+  mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 )
+
 takeup_bal_fit = feols(
-    data = analysis_data %>%
-      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
-      # convert to Km for this table
-      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ), 
+    data = takeup_balance_input,
     .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = ~cluster.id
   )
 
 endline_know_bal_fit = feols(
-  data = endline_know_balance_df %>%
-    select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
-    # convert to Km for this table
-    mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ),
+  data = endline_know_balance_input,
     .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = ~cluster.id
 )
@@ -451,13 +455,13 @@ saveRDS(
 
 comp_takeup_balance_tidy_df = takeup_bal_fit %>%
   map_dfr(
-    create_balance_comparisons, 
+    ~create_balance_comparisons(.x, data = takeup_balance_input),
     .id = "lhs",
     .progress = TRUE
   )
 comp_endline_know_balance_tidy_df = endline_know_bal_fit %>%
   map_dfr(
-    create_balance_comparisons, 
+    ~create_balance_comparisons(.x, data = endline_know_balance_input),
     .id = "lhs",
     .progress = TRUE
   )
@@ -613,12 +617,33 @@ balance_fits = c(
   misc_fit_endline_belief_sample
 )
 
+balance_fit_data = c(
+  rep(list(baseline_worm_data), length(baseline_worm_fit)),
+  rep(list(pretreat_data), length(pretreat_fit)),
+  list(pretreat_data),
+  rep(list(clean_census_data), length(census_fit)),
+  rep(list(endline_implementation_data), length(endline_implementation_fit)),
+  rep(list(analysis_data %>%
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000)), length(misc_fit)),
+  rep(list(clean_sens_summ_imp_df), length(sens_fit)),
+  rep(list(praise_df), length(praise_fit)),
+  rep(list(stigma_df), length(stigma_fit)),
+  rep(list(analysis_data %>%
+      filter(KEY.individ %in% endline_belief_keys) %>%
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000) %>%
+      rename_with(
+        ~paste0("belief_sample_", .), any_of(takeup_vars)
+      )), length(misc_fit_endline_belief_sample))
+)
+
 
 comp_balance_tidy_df = balance_fits %>%
-  map_dfr(
-    create_balance_comparisons, 
-    .id = "lhs",
-    .progress = TRUE
+  map2_dfr(
+    balance_fit_data,
+    ~create_balance_comparisons(.x, data = .y),
+    .id = "lhs"
   ) 
 
 balance_tidy_df = balance_fits %>%
@@ -1291,7 +1316,7 @@ attrition_treat_fits = feols(
 
 # Pairwise comparisons (control means, ink-con, cal-con, bra-con, bra-cal)
 attrition_treat_comp_df = attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "attrition_treat_comp_df.csv"))
@@ -1330,7 +1355,7 @@ non_attrition_treat_fits = feols(
 )
 
 non_attrition_treat_comp_df = non_attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = non_attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 non_attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "non_attrition_treat_comp_df.csv"))
@@ -1543,7 +1568,7 @@ mon_attrition_treat_fits = feols(
 
 # Pairwise comparisons
 mon_attrition_treat_comp_df = mon_attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = mon_attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 mon_attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "monitoring_attrition_comp_df.csv"))
@@ -1581,7 +1606,7 @@ mon_non_attrition_treat_fits = feols(
 )
 
 mon_non_attrition_treat_comp_df = mon_non_attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = mon_non_attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 mon_non_attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "mon_non_attrition_comp_df.csv"))
@@ -1852,7 +1877,14 @@ sms_comp_fn = function(fit) {
     far_R = hyp_matrix_far
   )
 
-comp_sms_enrollment = create_balance_comparisons(sms_enrollment_balance_fit) 
+comp_sms_enrollment = create_balance_comparisons(
+  sms_enrollment_balance_fit,
+  data = sms_itt_sample_df %>%
+    filter(sms_treatment == "smstreatment") %>%
+    mutate(
+      in_ana_df = KEY.individ %in% sms_sample_social_info_df$KEY.individ
+    )
+)
 
   # save enrollment balance results
   list(
