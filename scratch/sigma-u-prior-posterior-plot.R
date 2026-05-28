@@ -3,6 +3,7 @@
 library(tidyverse)
 library(cmdstanr)
 library(posterior)
+library(ggthemes)
 
 script_options <- docopt::docopt(
   "Usage:
@@ -61,8 +62,10 @@ dir.create(script_options$output_path, recursive = TRUE, showWarnings = FALSE)
 plot_file <- file.path(script_options$output_path, "sigma-u-prior-posterior.pdf")
 summary_file <- file.path(script_options$output_path, "sigma-u-prior-posterior-summary.csv")
 
+canva_palette_vibrant <- "Primary colors with a vibrant twist"
+
 sigma_u_plot <- ggplot(sigma_u_draws, aes(x = sigma_u, color = distribution, fill = distribution)) +
-  geom_density(alpha = 0.18, linewidth = 0.9, adjust = 1.1) +
+  geom_density(alpha = 0.28, linewidth = 0.9, adjust = 1.1) +
   geom_vline(
     data = summary_df,
     aes(xintercept = median, color = distribution),
@@ -70,8 +73,8 @@ sigma_u_plot <- ggplot(sigma_u_draws, aes(x = sigma_u, color = distribution, fil
     linewidth = 0.5,
     show.legend = FALSE
   ) +
-  scale_color_manual(values = c("Prior" = "#6B7280", "Posterior" = "#0F766E")) +
-  scale_fill_manual(values = c("Prior" = "#6B7280", "Posterior" = "#0F766E")) +
+  ggthemes::scale_color_canva(palette = canva_palette_vibrant) +
+  ggthemes::scale_fill_canva(palette = canva_palette_vibrant) +
   coord_cartesian(xlim = quantile(sigma_u_draws$sigma_u, c(0, 0.995), na.rm = TRUE)) +
   labs(
     x = expression(sigma[u]),

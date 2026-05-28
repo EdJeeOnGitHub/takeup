@@ -8,7 +8,7 @@ Paper source: the `.tex` paper files are in `../overleaf/overleaf-takeup`; the c
 
 All paper-text commits below are on the Overleaf branch `ed-refine-todos`. The commit diff is the coauthor-facing `.tex` diff for that ToDo.
 
-- **ToDo 1, prior deworming**: Analysis `54fa50d` adds the generator script; `7cfa8f3` removes the generated RF table output from tracking so the table remains reproducible rather than source-controlled. Overleaf `b78969a` adds the Calendar-placebo/prior-deworming discussion, defines the baseline prior-deworming variables, and inputs `tables/prior-deworming-robustness`.
+- **ToDo 1, prior deworming**: Analysis `54fa50d` adds the generator script; follow-up edits revise it to report the full Bracelet/Calendar/Ink/Control by Close/Far specification with prior-deworming covariates shown at the bottom; `7cfa8f3` removes generated RF table output from tracking so the table remains reproducible rather than source-controlled. Overleaf `b78969a` adds the Calendar-placebo/prior-deworming discussion, defines the baseline prior-deworming variables, and inputs `tables/prior-deworming-robustness`.
 - **ToDo 2, balance control means**: Analysis `f9d733e` changes balance table generation to report raw Control means from the relevant estimation sample. No `.tex` paper edit.
 - **ToDo 4, \(\psi\) units**: Analysis `219dc73` labels generated WTP/structural output in USD. Overleaf `15fc692` changes the Section 4.2.2/Appendix WTP wording, WTP table note, and structural parameter table row so \(\psi\) is reported as USD.
 - **ToDo 5 and 8, potential-distance/continuous-distance support**: Overleaf `9f5df01` clarifies that simulations condition on realized surveyed communities and rerun PoT selection, Close/Far assignment, targeted-community pairing, and feasibility screening. No separate analysis commit beyond the existing simulated-assignment inputs.
@@ -18,7 +18,7 @@ All paper-text commits below are on the Overleaf branch `ed-refine-todos`. The c
 - **ToDo 12, E3 continuous-distance RI**: Analysis `41873f6` replaces free within-county distance shuffles with feasible counterfactual distance pools from the constrained assignment simulations. Overleaf `90a16d5` updates the E3 text/note and figure.
 - **ToDo 17, Figure M1 parameters**: Overleaf `7df4781` updates Section M and the Figure M1 note to match the plotted Gaussian and bimodal distributions and clarify that \(V^\ast\) is the \(w^\ast\) cutoff scale.
 - **ToDo 18, closest PoT and original-distance ITT check**: Overleaf `9195391` corrects the closest-PoT/candidate-center language. Analysis `fe26587` adds `--itt` reduced-form generation and merge checks for original distance assignment; `a22d7eb` fixes LaTeX escaping for small p-values in generated RF tables. Generated RF tables are intentionally untracked.
-- **ToDo 24, terminology**: Overleaf `0dbc7bb` replaces "normal mixture" with "additive-normal specification." No analysis code change.
+- **ToDo 24, terminology**: Overleaf `0dbc7bb` replaces "normal mixture" with "normal-sum specification." No analysis code change.
 - **ToDo 25, SMS control-mean SE and custom table style**: Analysis `b59c86b` changes the SMS control mean parenthetical to a clustered standard error and adds compact table postprocessing for SMS/heterogeneity table generation. Generated RF tables are intentionally untracked. No `.tex` paper edit.
 
 ---
@@ -35,7 +35,7 @@ Use calendar as argument against:
 
 >Before you move to your second step of bounding the treatment effect, you have a very powerful conceptual defense already in the paper: the Calendar arm. The baseline data shows that the Calendar arm has largely the same Far-Close imbalance in past deworming as the Bracelet and Ink arms. Yet, in the main results, the Calendar arm yields completely flat take-up across distance (it acts as a clean placebo). If the reviewer were correct that this specific baseline imbalance mechanically drives the take-up gap, the Calendar arm should have shown the same attenuated distance gradient as the public-signal arms. It did not.
 
-**Implemented**: Checked the baseline prior-deworming variables. `treated_lgl` is prior/ever dewormed (`treated == "yes"`), and `treated_past_year` is treatment reported in the previous 1--12 months. The baseline survey IDs are not directly linkable to monitored take-up outcomes, so the predictive check uses cluster-level baseline shares merged to the full take-up sample. Added `scratch/prior-deworming-robustness-table.R`, which generates `presentations/rf-tables/main-specs/prior-deworming-robustness.tex`; copied the table to the paper tables directory and added Appendix Table `tab:prior-deworming-robustness` in `ECM ReStud.tex`. The generated table shows that adding cluster shares ever dewormed and dewormed in the past year increases the pooled public-signal distance interaction from 7.2 pp to 10.2 pp for monitored take-up, and from 5.9 pp to 8.6 pp for endline self-reported take-up, rather than attenuating it. Added text in `ECM ReStud.tex` defining the variables, using the Calendar placebo logic, and reporting this robustness check, so no bounding exercise is needed.
+**Implemented**: Checked the baseline prior-deworming variables. `treated_lgl` is prior/ever dewormed (`treated == "yes"`), and `treated_past_year` is treatment reported in the previous 1--12 months. The baseline survey IDs are not directly linkable to monitored take-up outcomes, so the predictive check uses cluster-level baseline shares merged to the full take-up sample. Added `scratch/prior-deworming-robustness-table.R`, which generates `presentations/rf-tables/main-specs/prior-deworming-robustness.tex`; copied the table to the paper tables directory and added Appendix Table `tab:prior-deworming-robustness` in `ECM ReStud.tex`. The generated table now reports the full Bracelet/Calendar/Ink/Control by Combined/Close/Far/Far--Close specification and shows the cluster shares ever dewormed and dewormed in the past year as covariates at the bottom. With those controls, the monitored Bracelet and Ink Far--Close interactions are 11.8 and 10.5 pp while Calendar is 2.7 pp; the endline self-reported specification shows the same qualitative pattern. Added text in `ECM ReStud.tex` defining the variables, using the Calendar placebo logic, and reporting this robustness check, so no bounding exercise is needed.
 
 **Quote**:
 > The baseline sample is broadly balanced across item/signal arms. Statistically significant differences are sparse relative to the number of reported comparisons and do not reveal a systematic pattern across treatment arms. In particular, the social image measures in Panel C are balanced across arms.
@@ -119,7 +119,7 @@ Appendix E’s potential-distance diagnostic is difficult to reconstruct from th
 
 **ToDo**: it's the first two (curvature in takeup across cells + nonlinear normal specification). Plot prior and posterior for \sigma_u.
 
-**Implemented**: Updated the identification paragraph in `ECM ReStud.tex` to state that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells plus the nonlinear additive-normal signal-extraction restriction. Added `scratch/sigma-u-prior-posterior-plot.R`, which reads only the `u_sd` Stan variable, generates `presentations/figures/sigma-u-prior-posterior.pdf`, and writes `presentations/figures/sigma-u-prior-posterior-summary.csv`. Copied the figure to the paper figures directory and added Appendix Figure `fig:sigma-u-prior-posterior` in the priors subsection. The generated summary gives prior median \(0.374\) and posterior median \(0.278\).
+**Implemented**: Updated the identification paragraph in `ECM ReStud.tex` to state that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells plus the nonlinear normal-sum signal-extraction restriction. Added `scratch/sigma-u-prior-posterior-plot.R`, which reads only the `u_sd` Stan variable, generates `presentations/figures/sigma-u-prior-posterior.pdf`, and writes `presentations/figures/sigma-u-prior-posterior-summary.csv`. Copied the figure to the paper figures directory and added Appendix Figure `fig:sigma-u-prior-posterior` in the priors subsection. The generated summary gives prior median \(0.374\) and posterior median \(0.278\).
 
 **Quote**:
 > Because latent utility is normalized by $\operatorname{Var}\left(v_{i}\right)=1, \sigma_{u}$ is interpreted as idiosyncratic decision noise relative to intrinsic motivation. The joint likelihood pins down the implied social image return, $\lambda p_{\text {Observed }}(z, d) \Delta\left(w^{*}\right)$, and how it changes with distance. These are the objects needed for the unitless social multiplier.
@@ -241,13 +241,13 @@ The 0.5 km separation statement appears to refer to the candidate PoT centers us
 
 **ToDo**: Ed edit the term.
 
-**Implemented**: Replaced “normal mixture” with “additive-normal specification” in `ECM ReStud.tex`.
+**Implemented**: Replaced “normal mixture” with “normal-sum specification” in `ECM ReStud.tex`.
 
 **Quote**:
 > We normalize $v_{i} \sim N(0,1)$ and assume $u_{i} \sim N\left(0, \sigma_{u}^{2}\right)$, so $w_{i}=v_{i}+u_{i} \sim N\left(0,1+\sigma_{u}^{2}\right)$. For the normal mixture, the type inference term is
 
 **Feedback**:
-The phrase “normal mixture” is statistically imprecise here. Since $w_i=v_i+u_i$ is defined as the sum of independent normal variables and is immediately stated to be normal, this is an additive-normal/convolution specification rather than a mixture distribution.
+The phrase “normal mixture” is statistically imprecise here. Since $w_i=v_i+u_i$ is defined as the sum of independent normal variables and is immediately stated to be normal, this is a normal-sum/convolution specification rather than a mixture distribution.
 
 ---
 
