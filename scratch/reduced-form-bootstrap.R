@@ -37,8 +37,20 @@ tex_postprocessing = function(tex) {
         str_replace(
           .,
           "Covariate",
-          "\\\\midrule Covariate"
+          "\\\\midrule\n   Covariate"
         )
+}
+
+drop_fixest_footer = function(tex) {
+  tex %>%
+    str_remove_all("(?m)^\\s*\\\\multicolumn\\{\\d+\\}\\{l\\}\\{\\\\emph\\{Clustered.*\\}\\}\\\\\\\\\\s*\n") %>%
+    str_remove_all("(?m)^\\s*\\\\multicolumn\\{\\d+\\}\\{l\\}\\{\\\\emph\\{Signif\\. Codes:.*\\}\\}\\\\\\\\\\s*\n")
+}
+
+compact_fixest_postprocessing = function(tex) {
+  tex %>%
+    tex_postprocessing() %>%
+    drop_fixest_footer()
 }
 # Prefix all messages/output with current section and report errors
 current_section <- "(setup)"
@@ -2114,15 +2126,18 @@ sms_control_reg = sms_analysis_data_control %>%
 fitstat_register(
   "control_mean_sms_control",
   function(est) {
-    d = model.matrix(est, type = "lhs")
-    base_idx = est$obs_selection$obsRemoved == FALSE
-    # Use the model's data to find control obs
     ctrl = sms_analysis_data_control %>% filter(sms_treatment == "smscontrol")
-    ctrl_sd = sd(ctrl$dewormed, na.rm = TRUE)
-    list(mean = mean(ctrl$dewormed, na.rm = TRUE), sd = sprintf("(%.3f)", ctrl_sd))
+    ctrl_mean_se = feols(
+      dewormed ~ 1,
+      data = ctrl,
+      cluster = ~cluster_id
+    ) %>%
+      coeftable() %>%
+      .[1, "Std. Error"]
+    list(mean = mean(ctrl$dewormed, na.rm = TRUE), se = sprintf("(%.3f)", ctrl_mean_se))
   },
-  alias = c("control_mean_sms_control.mean" = "Control mean", "control_mean_sms_control.sd" = ""),
-  subtypes = c("mean", "sd")
+  alias = c("control_mean_sms_control.mean" = "Control mean", "control_mean_sms_control.se" = ""),
+  subtypes = c("mean", "se")
 )
 
 etable(
@@ -2135,12 +2150,12 @@ etable(
     sms_treatmentreminderonly = "Reminder Only"
   ),
   keep = c("Social Info", "Reminder Only"),
-  fitstat = ~control_mean_sms_control.mean + control_mean_sms_control.sd + n,
+  fitstat = ~control_mean_sms_control.mean + control_mean_sms_control.se + n,
   depvar = FALSE,
   digits = 3,
   digits.stats = 3,
   drop.section = "fixef",
-  postprocess.tex = tex_postprocessing,
+  postprocess.tex = compact_fixest_postprocessing,
   replace = TRUE,
   style.df = style.df(depvar.title = "", fixef.title = ""),
   notes = "",
@@ -2162,7 +2177,7 @@ etable(
 #    \midrule
 #    \emph{Fit statistics}\\
 #    Control mean  & 0.330\\  
-#                  & (0.470)\\  
+#                  & (0.032)\\
 #    Observations  & 1,705\\  
 #    \midrule \midrule
 #    \multicolumn{2}{l}{\emph{Clustered (cluster\_id) standard-errors in parentheses}}\\
@@ -2592,7 +2607,7 @@ gender_het_fit = het_fits$gender_fit
       "Previously Dewormed" = prevdeworm_het_fit,
       "Externality Knowledge" = externality_het_fit
     ),
-    drop = "dist",
+    drop = "dist|Constant|factor\\(county\\)",
     dict = c(
       frac_externality_gt_mean = "Covariate",
       frac_externality_gt_meanTRUE = "Covariate",
@@ -2644,7 +2659,7 @@ gender_het_fit = het_fits$gender_fit
     ),
     drop.section = "fixef",
     tex = TRUE, 
-    postprocess.tex = tex_postprocessing,
+    postprocess.tex = compact_fixest_postprocessing,
     replace = TRUE,
     style.df = style.df(
       depvar.title = "", 
@@ -2653,10 +2668,25 @@ gender_het_fit = het_fits$gender_fit
 
 # WTP Checks
 
+wtp_choice_data <- wtp.data %>%
+  select(-any_of("county")) %>%
+  left_join(
+    cluster.strat.data %>% select(cluster.id, county),
+    by = "cluster.id"
+  )
+if (!"second_choice" %in% names(wtp_choice_data)) {
+  wtp_choice_data <- wtp_choice_data %>%
+    mutate(
+      first_choice = factor(first_choice, levels = 1:2, labels = c("bracelet", "calendar")),
+      second_choice = if_else(first_choice == "bracelet", cal_plus_ksh, bra_plus_ksh) %>%
+        factor(levels = 1:2, labels = c("switch", "keep"))
+    )
+}
+
 wtp_out = full_analysis_data %>%
   mutate(stratum = county) %>%
   prepare_bayes_wtp_data(
-    wtp.data,
+    wtp_choice_data,
     
     preference_value_diff = seq(-100, 100, 10), 
     num_preference_value_diff = length(preference_value_diff), 
@@ -2691,6 +2721,7 @@ wtp_out = full_analysis_data %>%
     ) %>%
     select(-neither)
 
+ full_analysis_data %>%
     count(
       wtp_samp = !is.na(gift_choice), 
       sms_control = sms.treatment.2 == "sms.control",
@@ -2712,7 +2743,7 @@ origin_prepared_analysis_data %>%
     mutate(offer = 0,
            response = "keep")
 
-  incentive_choice_data <- wtp.data %>%
+  incentive_choice_data <- wtp_choice_data %>%
     semi_join(origin_prepared_analysis_data, "cluster.id") %>% # Make sure we have the same clusters
     filter(!is.na(first_choice)) %>%
     transmute(county, cluster.id,
@@ -2726,7 +2757,7 @@ origin_prepared_analysis_data %>%
 incentive_choice_data
 
 
-wtp.data %>%
+wtp_choice_data %>%
   select(first_choice, price)
 
 }) # end heterogeneity
