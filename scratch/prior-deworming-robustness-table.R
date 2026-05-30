@@ -47,8 +47,7 @@ analysis_for_prior <- analysis_data %>%
       levels = c("control", "calendar", "bracelet", "ink")
     ),
     assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far")),
-    dewormed_monitored = as.numeric(dewormed),
-    dewormed_self_reported = as.numeric(dewormed.reported)
+    dewormed_monitored = as.numeric(dewormed)
   ) %>%
   left_join(baseline_prior_deworming, by = "cluster.id") %>%
   left_join(cluster_expected_dist, by = "cluster.id") %>%
@@ -95,8 +94,7 @@ fit_bundle <- function(data, outcome) {
 }
 
 fits <- list(
-  "Monitored take-up" = fit_bundle(analysis_for_prior, "dewormed_monitored"),
-  "Self-reported deworming" = fit_bundle(analysis_for_prior, "dewormed_self_reported")
+  "Monitored take-up" = fit_bundle(analysis_for_prior, "dewormed_monitored")
 )
 
 format_count <- function(x) {
@@ -243,7 +241,6 @@ make_panel <- function(panel_name, fit_set, outcome) {
   )
 
   c(
-    "\\midrule",
     paste0("\\multicolumn{5}{l}{\\textbf{", panel_name, "}} \\\\"),
     "\\addlinespace[0.2em]",
     treatment_rows,
@@ -256,8 +253,7 @@ table_lines <- c(
   "\\begin{tabular}{lcccc}",
   "\\toprule",
   " & Combined & Close & Far & Far--Close \\\\",
-  make_panel("Panel A: Monitored take-up", fits[["Monitored take-up"]], "dewormed_monitored"),
-  make_panel("Panel B: Endline self-reported deworming", fits[["Self-reported deworming"]], "dewormed_self_reported"),
+  make_panel("Monitored take-up", fits[["Monitored take-up"]], "dewormed_monitored"),
   "\\bottomrule",
   "\\end{tabular}"
 )
