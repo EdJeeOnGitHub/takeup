@@ -104,6 +104,38 @@ assert_true <- function(x, message) {
   }
 }
 
+clean_cluster_id <- function(x, label = "cluster ID") {
+  x_chr <- str_trim(as.character(x))
+  bad <- is.na(x_chr) | x_chr == "" | !str_detect(x_chr, "^[0-9]+$")
+  if (any(bad)) {
+    bad_examples <- unique(x_chr[bad])
+    bad_examples <- bad_examples[seq_len(min(length(bad_examples), 5))]
+    stop(
+      sprintf(
+        "%s contains non-integer or missing values: %s",
+        label,
+        paste(bad_examples, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  as.integer(x_chr)
+}
+
+assert_no_cluster_id_collapse <- function(data, raw_col, clean_col, source_name) {
+  id_map <- data %>%
+    distinct(raw_id = .data[[raw_col]], clean_id = .data[[clean_col]])
+
+  assert_true(
+    !any(is.na(id_map$raw_id)) && !any(is.na(id_map$clean_id)),
+    paste(source_name, "has missing cluster IDs after cleaning.")
+  )
+  assert_true(
+    id_map %>% count(clean_id) %>% filter(n > 1) %>% nrow() == 0,
+    paste(source_name, "has multiple raw cluster IDs mapping to one cleaned cluster ID.")
+  )
+}
+
 
 
 #### Original Distance Assignment ITT ------------------------------------------
@@ -113,19 +145,48 @@ if (script_options$itt) run_section("Original Distance Assignment ITT", {
 original_distance_df <- read_rds("data/rct_targetable_schools_2.0.rds") %>%
   as_tibble() %>%
   transmute(
-    original_cluster_id = as.numeric(pot.cluster.id),
+    original_cluster_id_raw = as.character(pot.cluster.id),
+    original_cluster_id = clean_cluster_id(pot.cluster.id, "rct_targetable_schools_2.0$pot.cluster.id"),
     original_dist_group = factor(assigned.dist.cat, levels = c("close", "far"))
   ) %>%
   distinct()
 
+assert_no_cluster_id_collapse(
+  original_distance_df,
+  "original_cluster_id_raw",
+  "original_cluster_id",
+  "Original distance assignment data"
+)
 assert_true(
   nrow(original_distance_df) == n_distinct(original_distance_df$original_cluster_id),
   "Original distance assignments are not unique by original cluster ID."
 )
+assert_true(!any(is.na(original_distance_df$original_dist_group)), "Original distance assignments contain labels other than close/far.")
+
+target_village_distance_df <- read_rds("data/rct_target_villages_2.0.rds") %>%
+  as_tibble() %>%
+  transmute(
+    target_village_cluster_id_raw = as.character(cluster.id),
+    original_cluster_id = clean_cluster_id(cluster.id, "rct_target_villages_2.0$cluster.id"),
+    target_village_dist_group = factor(village.dist.cat, levels = c("close", "far"))
+  ) %>%
+  distinct()
+
+assert_no_cluster_id_collapse(
+  target_village_distance_df,
+  "target_village_cluster_id_raw",
+  "original_cluster_id",
+  "Target-village distance data"
+)
+assert_true(
+  nrow(target_village_distance_df) == n_distinct(target_village_distance_df$original_cluster_id),
+  "Target-village distance assignments are not unique by original cluster ID."
+)
 
 original_distance_itt_data <- cov_analysis_data %>%
   mutate(
-    original_cluster_id = as.numeric(cluster.id.x),
+    analysis_cluster_id_raw = as.character(cluster.id.x),
+    original_cluster_id = clean_cluster_id(cluster.id.x, "analysis cluster.id.x"),
     final_dist_group = factor(dist.pot.group, levels = c("close", "far")),
     cluster_id_rank = dense_rank(cluster_id)
   ) %>%
@@ -152,11 +213,18 @@ assert_true(
   original_distance_itt_data %>% distinct(original_cluster_id, cluster_id) %>% count(cluster_id) %>% filter(n > 1) %>% nrow() == 0,
   "A sequential cluster ID maps to multiple original cluster IDs."
 )
+assert_no_cluster_id_collapse(
+  original_distance_itt_data,
+  "analysis_cluster_id_raw",
+  "original_cluster_id",
+  "Analysis data"
+)
 
 monitored_source <- read_rds("data/clean-data/monitored-nosms-takeup-data.rds") %>%
   transmute(
     KEY.individ,
-    source_cluster_id = as.numeric(as.character(cluster.id)),
+    monitored_cluster_id_raw = as.character(cluster.id),
+    source_cluster_id = clean_cluster_id(cluster.id, "monitored-nosms-takeup-data$cluster.id"),
     source_treatment = as.character(assigned.treatment),
     source_dist_group = as.character(dist.pot.group),
     source_dist_to_pot = dist.to.pot,
@@ -186,7 +254,8 @@ processed_check <- original_distance_itt_data %>%
   left_join(
     read_rds("data/takeup_processed_cluster_strat.rds") %>%
       transmute(
-        original_cluster_id = as.numeric(cluster.id),
+        processed_cluster_id_raw = as.character(cluster.id),
+        original_cluster_id = clean_cluster_id(cluster.id, "takeup_processed_cluster_strat$cluster.id"),
         processed_treatment = as.character(assigned.treatment),
         processed_dist_group = as.character(dist.pot.group)
       ) %>%
@@ -198,6 +267,49 @@ processed_check <- original_distance_itt_data %>%
 assert_true(!any(is.na(processed_check$processed_treatment)), "Some clusters did not match processed randomization data.")
 assert_true(all(as.character(processed_check$assigned.treatment) == processed_check$processed_treatment), "Treatment assignments differ from processed randomization data.")
 assert_true(all(as.character(processed_check$dist.pot.group) == processed_check$processed_dist_group), "Current distance groups differ from processed randomization data.")
+
+cluster_audit <- original_distance_itt_data %>%
+  distinct(
+    original_cluster_id,
+    analysis_cluster_id_raw,
+    cluster_id,
+    assigned.treatment,
+    final_dist_group,
+    original_dist_group
+  ) %>%
+  left_join(
+    original_distance_df %>% select(original_cluster_id, original_cluster_id_raw),
+    by = "original_cluster_id",
+    relationship = "many-to-one"
+  ) %>%
+  left_join(
+    target_village_distance_df,
+    by = "original_cluster_id",
+    relationship = "many-to-one"
+  ) %>%
+  left_join(
+    processed_check %>%
+      distinct(original_cluster_id, processed_cluster_id_raw, processed_treatment, processed_dist_group),
+    by = "original_cluster_id",
+    relationship = "one-to-one"
+  ) %>%
+  mutate(
+    target_matches_original = as.character(target_village_dist_group) == as.character(original_dist_group),
+    processed_matches_analysis = processed_treatment == as.character(assigned.treatment) &
+      processed_dist_group == as.character(final_dist_group),
+    final_matches_original = as.character(final_dist_group) == as.character(original_dist_group),
+    switch_direction = case_when(
+      final_matches_original ~ "unchanged",
+      TRUE ~ paste(original_dist_group, "to", final_dist_group)
+    )
+  ) %>%
+  arrange(original_cluster_id)
+
+write_csv(cluster_audit, "temp-data/original-distance-cluster-audit.csv")
+
+assert_true(!any(is.na(cluster_audit$target_village_dist_group)), "Some analysis clusters did not match target-village data.")
+assert_true(all(cluster_audit$target_matches_original), "Target-village distance assignments differ from original randomization assignments.")
+assert_true(all(cluster_audit$processed_matches_analysis), "Processed randomization data differs from analysis data.")
 
 merge_checks <- tibble(
   check = c(
@@ -235,6 +347,46 @@ original_distance_switches <- original_distance_itt_data %>%
 
 write_csv(original_distance_switches, "temp-data/original-distance-switch-counts.csv")
 
+expected_original_distance_switches <- tribble(
+  ~original_dist_group, ~final_dist_group, ~clusters,
+  factor("close", levels = c("close", "far")), factor("close", levels = c("close", "far")), 64L,
+  factor("close", levels = c("close", "far")), factor("far", levels = c("close", "far")), 10L,
+  factor("far", levels = c("close", "far")), factor("close", levels = c("close", "far")), 16L,
+  factor("far", levels = c("close", "far")), factor("far", levels = c("close", "far")), 54L
+)
+
+assert_true(
+  setequal(
+    original_distance_switches %>% mutate(across(c(original_dist_group, final_dist_group), as.character)),
+    expected_original_distance_switches %>% mutate(across(c(original_dist_group, final_dist_group), as.character))
+  ),
+  "Original-distance switch counts differ from the documented 64/10/16/54 cluster split."
+)
+
+if (file.exists("docs/randomization-mismatches.csv")) {
+  documented_switches <- read_csv("docs/randomization-mismatches.csv", show_col_types = FALSE) %>%
+    transmute(
+      original_cluster_id = clean_cluster_id(pot.cluster.id, "docs/randomization-mismatches.csv$pot.cluster.id"),
+      documented_original_dist_group = as.character(clust_randomization_cat),
+      documented_final_dist_group = as.character(processed_cat)
+    ) %>%
+    arrange(original_cluster_id)
+
+  generated_switches <- cluster_audit %>%
+    filter(!final_matches_original) %>%
+    transmute(
+      original_cluster_id,
+      documented_original_dist_group = as.character(original_dist_group),
+      documented_final_dist_group = as.character(final_dist_group)
+    ) %>%
+    arrange(original_cluster_id)
+
+  assert_true(
+    setequal(documented_switches, generated_switches),
+    "Generated original-distance switches differ from docs/randomization-mismatches.csv."
+  )
+}
+
 original_distance_discrete_regression <- function(data, weights) {
   feols(
     dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d | county,
@@ -266,7 +418,8 @@ endline_know_A_itt_data <- endline_data %>%
   ) %>%
   filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
   mutate(
-    original_cluster_id = as.numeric(cluster.id),
+    observability_cluster_id_raw = as.character(cluster.id),
+    original_cluster_id = clean_cluster_id(cluster.id, "endline_data$cluster.id"),
     final_dist_group = factor(dist.pot.group, levels = c("close", "far")),
     cluster_id_rank = dense_rank(original_cluster_id),
     prop_know_fob = knows_other_dewormed / obs_know_person,
@@ -305,7 +458,8 @@ observability_source_check <- endline_know_A_itt_data %>%
     endline_data %>%
       transmute(
         KEY.individ,
-        source_cluster_id = as.numeric(cluster.id),
+        endline_cluster_id_raw = as.character(cluster.id),
+        source_cluster_id = clean_cluster_id(cluster.id, "endline source cluster.id"),
         source_treatment = as.character(assigned.treatment),
         source_dist_group = as.character(dist.pot.group),
         source_dist_to_pot = dist.to.pot,
