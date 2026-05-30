@@ -1956,7 +1956,7 @@ bracelet_distance_data = endline_data %>%
     received_bracelet = dewormed.reported == 1 & got_bracelet == 1,
     still_has_bracelet = if_else(
       received_bracelet,
-      have_bracelet == 1 | wear_bracelet == 1,
+      have_bracelet == 1,
       NA
     ),
     wearing_bracelet = if_else(
