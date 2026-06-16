@@ -72,8 +72,7 @@ diagnostic_summary <- tibble(
   max_rhat = max(draw_summary$rhat),
   min_bulk_ess = min(draw_summary$ess_bulk),
   min_tail_ess = min(draw_summary$ess_tail),
-  divergences = sum(sampler_draws$divergent__, na.rm = TRUE),
-  max_treedepth = max(sampler_draws$treedepth__, na.rm = TRUE)
+  divergences = sum(sampler_draws$divergent__, na.rm = TRUE)
 )
 
 dir.create(script_options$output_path, recursive = TRUE, showWarnings = FALSE)
@@ -96,8 +95,7 @@ cat(str_glue(
   "max split Rhat={round(diagnostic_summary$max_rhat, 3)}, ",
   "min bulk ESS={round(diagnostic_summary$min_bulk_ess)}, ",
   "min tail ESS={round(diagnostic_summary$min_tail_ess)}, ",
-  "divergences={diagnostic_summary$divergences}, ",
-  "max treedepth={diagnostic_summary$max_treedepth}\n"
+  "divergences={diagnostic_summary$divergences}\n"
 ))
 cat("Wrote ", summary_path, "\n", sep = "")
 cat("Wrote ", parameter_path, "\n", sep = "")

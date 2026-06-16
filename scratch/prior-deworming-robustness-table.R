@@ -20,6 +20,12 @@ dir.create(table_output_path, recursive = TRUE, showWarnings = FALSE)
 
 sd_of_dist <- sd(analysis_data$cluster.dist.to.pot, na.rm = TRUE)
 
+baseline_balance_terms <- c(
+  "baseline_medicine_treats_worms",
+  "baseline_past_year_dewormed",
+  "baseline_biyearly_treatment_recommended"
+)
+
 cluster_expected_dist <- readr::read_csv(
   file.path("data", "cluster_expected_dist.csv"),
   show_col_types = FALSE
@@ -33,8 +39,9 @@ baseline_prior_deworming <- baseline_worm %>%
   mutate(cluster.id = as.character(cluster.id)) %>%
   group_by(cluster.id) %>%
   summarise(
-    baseline_ever_dewormed = mean(treated_lgl, na.rm = TRUE),
+    baseline_medicine_treats_worms = mean(know_medicine_stops_worms, na.rm = TRUE),
     baseline_past_year_dewormed = mean(treated_past_year, na.rm = TRUE),
+    baseline_biyearly_treatment_recommended = mean(correct_when_treat, na.rm = TRUE),
     baseline_n = n(),
     .groups = "drop"
   )
@@ -52,13 +59,35 @@ analysis_for_prior <- analysis_data %>%
   left_join(baseline_prior_deworming, by = "cluster.id") %>%
   left_join(cluster_expected_dist, by = "cluster.id") %>%
   filter(
-    !is.na(baseline_ever_dewormed),
-    !is.na(baseline_past_year_dewormed),
+    if_all(all_of(baseline_balance_terms), ~ !is.na(.x)),
     !is.na(mu_d)
   )
 
-prior_terms <- c("baseline_ever_dewormed", "baseline_past_year_dewormed")
-base_controls <- c("female", "age.census", "mu_d", prior_terms)
+summ_know_A_df <- summ_endline_know_table %>%
+  filter(fct_match(know.table.type, "table.A"))
+
+fob_for_prior <- endline_data %>%
+  left_join(
+    summ_know_A_df,
+    by = "KEY.individ"
+  ) %>%
+  filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
+  mutate(
+    cluster.id = as.character(cluster.id),
+    assigned_treatment = factor(
+      assigned.treatment,
+      levels = c("control", "calendar", "bracelet", "ink")
+    ),
+    assigned_dist_group = factor(dist.pot.group, levels = c("close", "far")),
+    prop_know_fob = knows_other_dewormed / obs_know_person
+  ) %>%
+  left_join(baseline_prior_deworming, by = "cluster.id") %>%
+  filter(
+    if_all(all_of(baseline_balance_terms), ~ !is.na(.x)),
+    !is.na(mu_d)
+  )
+
+base_controls <- c("female", "age.census", "mu_d", baseline_balance_terms)
 
 fit_arm_model <- function(data, outcome, distance_group = NULL) {
   model_data <- data %>% filter(!is.na(.data[[outcome]]))
@@ -94,7 +123,8 @@ fit_bundle <- function(data, outcome) {
 }
 
 fits <- list(
-  "Monitored take-up" = fit_bundle(analysis_for_prior, "dewormed_monitored")
+  "Monitored take-up" = fit_bundle(analysis_for_prior, "dewormed_monitored"),
+  "First-order beliefs" = fit_bundle(fob_for_prior, "prop_know_fob")
 )
 
 format_count <- function(x) {
@@ -180,7 +210,7 @@ make_body_row <- function(label, values) {
   paste0(label, " & ", paste(values, collapse = " & "), " \\\\")
 }
 
-make_panel <- function(panel_name, fit_set, outcome) {
+make_panel <- function(panel_name, fit_set, data, outcome) {
   columns <- c("combined", "close", "far", "distance")
   arm_labels <- c(
     bracelet = "Bracelet",
@@ -192,7 +222,7 @@ make_panel <- function(panel_name, fit_set, outcome) {
   treatment_rows <- imap(arm_labels, function(label, arm) {
     make_body_row(
       label,
-      map_chr(columns, ~ cell_for_arm(fit_set, analysis_for_prior, outcome, arm, .x))
+      map_chr(columns, ~ cell_for_arm(fit_set, data, outcome, arm, .x))
     )
   }) %>%
     unlist(use.names = FALSE)
@@ -200,12 +230,12 @@ make_panel <- function(panel_name, fit_set, outcome) {
   covariate_rows <- c(
     "\\addlinespace[0.3em]",
     make_body_row(
-      "Baseline ever dewormed share",
+      "Baseline knows medicine treats worms share",
       c(
-        format_estimate(fit_set$combined, "baseline_ever_dewormed"),
-        format_estimate(fit_set$close, "baseline_ever_dewormed"),
-        format_estimate(fit_set$far, "baseline_ever_dewormed"),
-        format_estimate(fit_set$distance, "baseline_ever_dewormed")
+        format_estimate(fit_set$combined, "baseline_medicine_treats_worms"),
+        format_estimate(fit_set$close, "baseline_medicine_treats_worms"),
+        format_estimate(fit_set$far, "baseline_medicine_treats_worms"),
+        format_estimate(fit_set$distance, "baseline_medicine_treats_worms")
       )
     ),
     make_body_row(
@@ -215,6 +245,15 @@ make_panel <- function(panel_name, fit_set, outcome) {
         format_estimate(fit_set$close, "baseline_past_year_dewormed"),
         format_estimate(fit_set$far, "baseline_past_year_dewormed"),
         format_estimate(fit_set$distance, "baseline_past_year_dewormed")
+      )
+    ),
+    make_body_row(
+      "Baseline knows bi-yearly treatment share",
+      c(
+        format_estimate(fit_set$combined, "baseline_biyearly_treatment_recommended"),
+        format_estimate(fit_set$close, "baseline_biyearly_treatment_recommended"),
+        format_estimate(fit_set$far, "baseline_biyearly_treatment_recommended"),
+        format_estimate(fit_set$distance, "baseline_biyearly_treatment_recommended")
       )
     )
   )
@@ -227,7 +266,7 @@ make_panel <- function(panel_name, fit_set, outcome) {
       map_chr(
         list(NULL, "close", "far", NULL),
         function(distance_group) {
-          model_data <- analysis_for_prior %>% filter(!is.na(.data[[outcome]]))
+          model_data <- data %>% filter(!is.na(.data[[outcome]]))
           if (!is.null(distance_group)) {
             model_data <- model_data %>% filter(assigned_dist_group == distance_group)
           }
@@ -237,7 +276,7 @@ make_panel <- function(panel_name, fit_set, outcome) {
     ),
     make_body_row("County fixed effects", rep("Yes", length(columns))),
     make_body_row("Main covariates", rep("Yes", length(columns))),
-    make_body_row("Baseline prior-deworming covariates", rep("Yes", length(columns)))
+    make_body_row("Unbalanced baseline covariates", rep("Yes", length(columns)))
   )
 
   c(
@@ -249,18 +288,33 @@ make_panel <- function(panel_name, fit_set, outcome) {
   )
 }
 
-table_lines <- c(
+takeup_table_lines <- c(
   "\\begin{tabular}{lcccc}",
   "\\toprule",
   " & Combined & Close & Far & Far--Close \\\\",
-  make_panel("Monitored take-up", fits[["Monitored take-up"]], "dewormed_monitored"),
+  make_panel("Monitored take-up", fits[["Monitored take-up"]], analysis_for_prior, "dewormed_monitored"),
+  "\\bottomrule",
+  "\\end{tabular}"
+)
+
+fob_table_lines <- c(
+  "\\begin{tabular}{lcccc}",
+  "\\toprule",
+  " & Combined & Close & Far & Far--Close \\\\",
+  make_panel("First-order beliefs", fits[["First-order beliefs"]], fob_for_prior, "prop_know_fob"),
   "\\bottomrule",
   "\\end{tabular}"
 )
 
 writeLines(
-  table_lines,
+  takeup_table_lines,
   file.path(table_output_path, "prior-deworming-robustness.tex")
 )
 
+writeLines(
+  fob_table_lines,
+  file.path(table_output_path, "fob-baseline-imbalance-robustness.tex")
+)
+
 message("Wrote ", file.path(table_output_path, "prior-deworming-robustness.tex"))
+message("Wrote ", file.path(table_output_path, "fob-baseline-imbalance-robustness.tex"))

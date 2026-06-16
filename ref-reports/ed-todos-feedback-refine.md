@@ -165,7 +165,7 @@ Figure 3(b) appears to show the social-image-return curves crossing so that, for
 
 **ToDo**: Check whatever latest value is and verify we reach.
 
-**Implemented**: Replaced the loose \(\hat R<1.1\) statement in `ECM ReStud.tex` with checked diagnostics for the reported parameters in `tab:struct-model-params`: max split \(\hat R=1.011\), min bulk ESS 465, min tail ESS 602, and zero divergent transitions. Added reusable script `scratch/stan-hmc-diagnostics.R` for model-specific diagnostics with Stan variable filtering. Running it on the no-outlier robustness fit (`fit105`, `STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS`) gives max split \(\hat R=1.018\), min bulk ESS 355, min tail ESS 309, zero divergent transitions, and max treedepth 11. Main-fit downstream tables inherit the main structural diagnostics rather than needing repeated table-note Rhats. The individual-distance appendix model diagnostics were computed on Midway: community-FP has max split \(\hat R=1.022\), min bulk ESS 221, min tail ESS 212, zero divergences, and max treedepth 10; full-info individual-FP has max split \(\hat R=1.022\), min bulk ESS 142, min tail ESS 132, two divergences, and max treedepth 12. Structural-table audit:
+**Implemented**: Replaced the loose \(\hat R<1.1\) statement in `ECM ReStud.tex` with checked diagnostics for the reported parameters in `tab:struct-model-params`: max split \(\hat R=1.011\), min bulk ESS 465, min tail ESS 602, and zero divergent transitions. Added reusable script `scratch/stan-hmc-diagnostics.R` for model-specific diagnostics with Stan variable filtering. Running it on the no-outlier robustness fit (`fit105`, `STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS`) gives max split \(\hat R=1.018\), min bulk ESS 355, min tail ESS 309, and zero divergent transitions. Main-fit downstream tables inherit the main structural diagnostics rather than needing repeated table-note Rhats. The individual-distance appendix model diagnostics were computed on Midway: community-FP has max split \(\hat R=1.022\), min bulk ESS 221, min tail ESS 212, and zero divergences; full-info individual-FP has max split \(\hat R=1.022\), min bulk ESS 142, min tail ESS 132, and two divergences. Structural-table audit:
 
 | Paper table / figure | Table input in `.tex` | Producing model or fit | Found locally? | \(\hat R\) stats added? |
 |---|---|---|---|---|
@@ -208,7 +208,7 @@ Appendix E.1’s permutation exercise is useful as a descriptive balance check, 
 
 **ToDo**: Add correct numerical figures to text.
 
-**Implemented**: Updated Section M in `ECM ReStud.tex` to describe the simulation parameters shown in Figure M1: the plotted Gaussian benchmark is approximately \(N(0.4,0.2^2)\), and the bimodal case is approximately \(0.25N(-2,0.2^2)+0.75N(0.4,0.2^2)\). The figure note now also clarifies that the plotted \(V^\ast\) label corresponds to the cutoff/type-index scale \(w^\ast\) used in the text.
+**Implemented**: Updated Section M in `ECM ReStud.tex` to describe the simulation parameters shown in Figure M1: the plotted Gaussian benchmark is approximately \(N(0.4,0.2^2)\), and the bimodal case is approximately \(0.25N(-2,0.2^2)+0.75N(0.4,0.2^2)\). The figure note now also clarifies that the plotted \(V^\ast\) label corresponds to the cutoff/type index scale \(w^\ast\) used in the text.
 
 **Quote**:
 > ![](/documents/b1b14a42-0216-4727-8e8b-e1392684c111/images/image_021.jpg)
