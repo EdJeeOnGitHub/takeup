@@ -5,7 +5,12 @@ library(tidybayes)
 
 
 ## Load analysis data
-load(file.path("data", "analysis.RData"))
+takeup_data_dir <- if (exists("script_options") && !is.null(script_options$data_path)) {
+  script_options$data_path
+} else {
+  "data"
+}
+load(file.path(takeup_data_dir, "analysis.RData"))
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 monitored_nosms_data <- analysis.data %>% 

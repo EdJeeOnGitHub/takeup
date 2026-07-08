@@ -15,7 +15,7 @@ mpirun -n 1 -machinefile $PBS_NODEFILE Rscript \
 	--no-save \
 	--no-restore \
 	--verbose \
-	takeup_reduced_sbc.R sbc  \
+	archive/legacy/takeup_reduced_sbc.R sbc  \
 	--models=REDUCED_FORM_NO_RESTRICT \
 	${CMDSTAN_ARGS} \
 	${OUTPUT_ARGS} \
