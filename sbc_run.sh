@@ -34,7 +34,7 @@ STAN_THREADS=1
 
 
 # SBC
-Rscript ./takeup_reduced_sbc.R sbc --cmdstanr \
+Rscript ./archive/legacy/takeup_reduced_sbc.R sbc --cmdstanr \
                                    --num-sbc-draws=200 \
                                    --iter=2000 \
                                    --chains=1 \

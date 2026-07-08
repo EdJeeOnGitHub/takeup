@@ -3,19 +3,20 @@ script_options <- docopt::docopt(
   stringr::str_glue(
 "Usage:
   quick_submodel_postprocess.R <fit-version> [options] [<chain>...]
-  
+
 Options:
   --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
   --output-path=<path>  Path to find results [default: temp-data/struct-postprocess]
+  --data-path=<path>  Path to analysis data [default: data]
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
-  
-  "), 
+
+  "),
   args = if (interactive()) "
   001
   --output-path=temp-data/struct-postprocess
   --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_BELIEFS_SUBMODEL
-  1 2 3 4 
+  1 2 3 4
   " else commandArgs(trailingOnly = TRUE)
 )
 
@@ -55,7 +56,7 @@ prob_draws_raw = load_param_draws(
 )
 
 prob_draws = prob_draws_raw %>%
-    left_join(dist_idx_mapper, by = "dist_treat_idx") 
+    left_join(dist_idx_mapper, by = "dist_treat_idx")
 
 prob_draws = bind_rows(
   prob_draws,
@@ -75,26 +76,26 @@ prob_draws %>%
       str_glue(
         "rvar_processed_dist_{fit_type_str}{script_options$fit_version}_belief_probs_{script_options$model}_{chain_str}.rds"
       )
-    ) 
+    )
   )
 
 
-cluster_treatment_map = distinct(analysis_data, assigned_treatment, assigned_dist_group) %>% 
+cluster_treatment_map = distinct(analysis_data, assigned_treatment, assigned_dist_group) %>%
   arrange(assigned_dist_group, assigned_treatment) # We must arrange by distance first
 
-beliefs_ate_pairs <- cluster_treatment_map %>% 
+beliefs_ate_pairs <- cluster_treatment_map %>%
   mutate(treatment_id = seq(n())) %>% {
       bind_rows(
-        left_join(., filter(., fct_match(assigned_treatment, "control")), by = c("assigned_dist_group"), suffix = c("", "_control")) %>% 
-          filter(assigned_treatment != assigned_treatment_control) %>% 
+        left_join(., filter(., fct_match(assigned_treatment, "control")), by = c("assigned_dist_group"), suffix = c("", "_control")) %>%
+          filter(assigned_treatment != assigned_treatment_control) %>%
           select(treatment_id, treatment_id_control),
-        
-        left_join(., filter(., fct_match(assigned_dist_group, "close")), by = c("assigned_treatment"), suffix = c("", "_control")) %>% 
-          filter(assigned_dist_group != assigned_dist_group_control) %>% 
+
+        left_join(., filter(., fct_match(assigned_dist_group, "close")), by = c("assigned_treatment"), suffix = c("", "_control")) %>%
+          filter(assigned_dist_group != assigned_dist_group_control) %>%
           select(treatment_id, treatment_id_control),
       )
 } %>%
-  arrange(treatment_id, treatment_id_control) 
+  arrange(treatment_id, treatment_id_control)
 
 
 
@@ -107,7 +108,7 @@ belief_ate_idx_mapper = beliefs_ate_pairs %>%
     filter(assigned_dist_group_left == assigned_dist_group_right) %>%
     select(
         belief_ate_idx,
-        treatment = assigned_treatment_left, 
+        treatment = assigned_treatment_left,
         dist_group = assigned_dist_group_left
     )  %>%
     mutate(
@@ -158,7 +159,7 @@ ate_draws %>%
       str_glue(
         "rvar_processed_dist_{fit_type_str}{script_options$fit_version}_belief_ates_{script_options$model}_{chain_str}.rds"
       )
-    ) 
+    )
   )
 
 
@@ -181,20 +182,5 @@ wtp_draws_raw %>%
       str_glue(
         "rvar_processed_dist_{fit_type_str}{script_options$fit_version}_wtp_params_{script_options$model}_{chain_str}.rds"
       )
-    ) 
+    )
   )
-
-
-
-
-cl_mu_rep = load_param_draws(
-    fit_version = script_options$fit_version,
-    model = script_options$model,
-    chain = script_options$chain,
-    prior_predictive = script_options$prior,
-    input_path = script_options$input_path,
-    curr_cluster_mu_rep[i]
-) 
-
-
-cl_mu_rep

@@ -25,3 +25,55 @@ Here are the main files:
 * [takeup_workingpaper.pdf](takeup_workingpaper.pdf) this is the latest version of the working paper.
 * [takeup_pap.Rmd](takeup_pap.Rmd) this is the R markdown file used to generate the pre-analysis plan PDF.
 
+## Local storage on limiting-factor
+
+On `limiting-factor`, keep large private data and generated outputs outside this
+repo:
+
+* private input data: `/data/projects/takeup/data`
+* intermediate output: `/scratch/$USER/takeup`
+
+Set up the private data checkout and public code submodule with:
+
+```sh
+mkdir -p /data/projects/takeup /scratch/$USER/takeup/stan_analysis_data /scratch/$USER/takeup/temp-data /scratch/$USER/takeup/optim-data
+git clone git@github.com:karimn/takeup-data.git /data/projects/takeup/data
+git -C /data/projects/takeup/data lfs pull
+git submodule update --init multilvlr
+```
+
+Most long-running scripts already expose output/input flags, so pass scratch
+paths explicitly:
+
+```sh
+Rscript run_takeup.R takeup fit \
+  --cmdstanr \
+  --output-path=/scratch/$USER/takeup/stan_analysis_data
+
+Rscript postprocess_dist_fit.R 87 \
+  --input-path=/scratch/$USER/takeup/stan_analysis_data \
+  --output-path=/scratch/$USER/takeup/temp-data
+```
+
+Optimization scripts have similar flags:
+
+```sh
+Rscript optim/predict-takeup-for-optim.R \
+  --input-path=/scratch/$USER/takeup/stan_analysis_data \
+  --output-path=/scratch/$USER/takeup/optim-data \
+  --data-input-path=/scratch/$USER/takeup/optim-data
+```
+
+One caveat: several scripts still directly read core input files from `data/...`
+for example `data/analysis.RData`. Those scripts either need the data submodule
+checked out at `data/` or a small code change to use a configurable data root
+such as `/data/projects/takeup/data`.
+
+The quick postprocess helper follows the same `docopt` pattern:
+
+```sh
+Rscript quick_ate_postprocess.R \
+  --data-path=/data/projects/takeup/data \
+  --input-path=/scratch/$USER/takeup/stan_analysis_data \
+  --output-path=/scratch/$USER/takeup/temp-data
+```
