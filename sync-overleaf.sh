@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # sync-overleaf.sh
-# Copy fit105 tables and optim figures into ../overleaf-takeup/.
+# Copy fit tables and figures into ../overleaf/overleaf-takeup/.
 #
 # Usage (from project root):
 #   bash sync-overleaf.sh
+#   bash sync-overleaf.sh 106
 
 set -euo pipefail
 
-VERSION=105
-OVERLEAF="../overleaf-takeup"
+VERSION="${1:-105}"
+OVERLEAF="../overleaf/overleaf-takeup"
 
 TABLE_SRC="presentations/tables/fit${VERSION}"
 TABLE_DST="${OVERLEAF}/tables/fit${VERSION}"
