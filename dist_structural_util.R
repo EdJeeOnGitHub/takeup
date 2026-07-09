@@ -567,9 +567,13 @@ stan_list <- function(models_info, stan_data, script_options, use_cmdstanr = FAL
   
   if (script_options$fit || script_options$prior) {
     inner_sampler <- function(curr_model, stan_data) {
-      curr_stan_data <- stan_data %>%
+      stan_data_preprocess <- curr_model$stan_data_preprocess %||% identity
+      curr_model_for_stan <- curr_model
+      curr_model_for_stan$stan_data_preprocess <- NULL
+
+      curr_stan_data <- stan_data_preprocess(stan_data) %>%
         map_at(c("cluster_treatment_map", "beliefs_ate_pairs"), ~ mutate(.x, across(.fns = as.integer)) %>% as.matrix()) %>%  # A tibble of factors no longer gets converted into an "array[,] int" in Stan.
-        list_modify(!!!curr_model) %>%
+        list_modify(!!!curr_model_for_stan) %>%
         map_if(is.factor, as.integer)
         
       iter <- if (script_options$force_iter) iter else (curr_stan_data$iter %||% iter)
@@ -611,9 +615,13 @@ stan_list <- function(models_info, stan_data, script_options, use_cmdstanr = FAL
         
         log_lik_list <- map(seq(folds), ~ which(kfold_groups == .)) %>% 
           pbmclapply(function(excluded_clusters, model_name, dist_model, stan_data, use_cmdstanr) {
-            curr_stan_data <- stan_data %>%
+            stan_data_preprocess <- curr_model$stan_data_preprocess %||% identity
+            curr_model_for_stan <- curr_model
+            curr_model_for_stan$stan_data_preprocess <- NULL
+
+            curr_stan_data <- stan_data_preprocess(stan_data) %>%
               map_at(c("cluster_treatment_map", "beliefs_ate_pairs"), ~ mutate(.x, across(.fns = as.integer)) %>% as.matrix()) %>%  # A tibble of factors no longer gets converted into an "array[,] int" in Stan.
-              list_modify(!!!curr_model,
+              list_modify(!!!curr_model_for_stan,
                           excluded_clusters = excluded_clusters,
                           num_excluded_clusters = length(excluded_clusters)) %>% 
               map_if(is.factor, as.integer) 

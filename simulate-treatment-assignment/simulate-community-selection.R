@@ -476,7 +476,10 @@ ggsave(
   width = 8,
   height = 6
 )
-stop()
+
+if (identical(Sys.getenv("TAKEUP_STOP_AFTER_COUNTERFACTUAL_DENSITY"), "1")) {
+  stop("Stopped after counterfactual assignment density by request.")
+}
 
 
 

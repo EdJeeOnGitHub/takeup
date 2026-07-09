@@ -13,6 +13,7 @@ Options:
   --plots              Run NP fit plots section
   --externality        Run externality knowledge section
   --takeup             Run takeup regressions + levels section
+  --itt                Run original-distance-assignment take-up ITT robustness
   --beliefs            Run beliefs (FOB/SOB) regressions + levels section
   --endline            Run endline/incentive/preference/travel section
   --sms                Run SMS heterogeneity section
@@ -27,6 +28,7 @@ Options:
 # TODO: Fix --sms and --heterogeneity
 
 run_all <- !any(script_options$plots, script_options$externality, script_options$takeup,
+                script_options$itt,
                 script_options$beliefs, script_options$endline, script_options$sms,
                 script_options$heterogeneity)
 
@@ -95,6 +97,449 @@ l_cov_vars = c(
   "female",
   "age.census"
 )
+
+assert_true <- function(x, message) {
+  if (!isTRUE(x)) {
+    stop(message, call. = FALSE)
+  }
+}
+
+clean_cluster_id <- function(x, label = "cluster ID") {
+  x_chr <- str_trim(as.character(x))
+  bad <- is.na(x_chr) | x_chr == "" | !str_detect(x_chr, "^[0-9]+$")
+  if (any(bad)) {
+    bad_examples <- unique(x_chr[bad])
+    bad_examples <- bad_examples[seq_len(min(length(bad_examples), 5))]
+    stop(
+      sprintf(
+        "%s contains non-integer or missing values: %s",
+        label,
+        paste(bad_examples, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  as.integer(x_chr)
+}
+
+assert_no_cluster_id_collapse <- function(data, raw_col, clean_col, source_name) {
+  id_map <- data %>%
+    distinct(raw_id = .data[[raw_col]], clean_id = .data[[clean_col]])
+
+  assert_true(
+    !any(is.na(id_map$raw_id)) && !any(is.na(id_map$clean_id)),
+    paste(source_name, "has missing cluster IDs after cleaning.")
+  )
+  assert_true(
+    id_map %>% count(clean_id) %>% filter(n > 1) %>% nrow() == 0,
+    paste(source_name, "has multiple raw cluster IDs mapping to one cleaned cluster ID.")
+  )
+}
+
+
+
+#### Original Distance Assignment ITT ------------------------------------------
+
+if (script_options$itt) run_section("Original Distance Assignment ITT", {
+
+original_distance_df <- read_rds("data/rct_targetable_schools_2.0.rds") %>%
+  as_tibble() %>%
+  transmute(
+    original_cluster_id_raw = as.character(pot.cluster.id),
+    original_cluster_id = clean_cluster_id(pot.cluster.id, "rct_targetable_schools_2.0$pot.cluster.id"),
+    original_dist_group = factor(assigned.dist.cat, levels = c("close", "far"))
+  ) %>%
+  distinct()
+
+assert_no_cluster_id_collapse(
+  original_distance_df,
+  "original_cluster_id_raw",
+  "original_cluster_id",
+  "Original distance assignment data"
+)
+assert_true(
+  nrow(original_distance_df) == n_distinct(original_distance_df$original_cluster_id),
+  "Original distance assignments are not unique by original cluster ID."
+)
+assert_true(!any(is.na(original_distance_df$original_dist_group)), "Original distance assignments contain labels other than close/far.")
+
+target_village_distance_df <- read_rds("data/rct_target_villages_2.0.rds") %>%
+  as_tibble() %>%
+  transmute(
+    target_village_cluster_id_raw = as.character(cluster.id),
+    original_cluster_id = clean_cluster_id(cluster.id, "rct_target_villages_2.0$cluster.id"),
+    target_village_dist_group = factor(village.dist.cat, levels = c("close", "far"))
+  ) %>%
+  distinct()
+
+assert_no_cluster_id_collapse(
+  target_village_distance_df,
+  "target_village_cluster_id_raw",
+  "original_cluster_id",
+  "Target-village distance data"
+)
+assert_true(
+  nrow(target_village_distance_df) == n_distinct(target_village_distance_df$original_cluster_id),
+  "Target-village distance assignments are not unique by original cluster ID."
+)
+
+original_distance_itt_data <- cov_analysis_data %>%
+  mutate(
+    analysis_cluster_id_raw = as.character(cluster.id.x),
+    original_cluster_id = clean_cluster_id(cluster.id.x, "analysis cluster.id.x"),
+    final_dist_group = factor(dist.pot.group, levels = c("close", "far")),
+    cluster_id_rank = dense_rank(cluster_id)
+  ) %>%
+  left_join(
+    original_distance_df,
+    by = "original_cluster_id",
+    relationship = "many-to-one"
+  ) %>%
+  mutate(
+    assigned_dist_group = factor(original_dist_group, levels = c("close", "far")),
+    signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+    signal = factor(signal, levels = c("no signal", "signal"))
+  )
+
+assert_true(nrow(original_distance_itt_data) == nrow(cov_analysis_data), "Joining original distance assignments changed the row count.")
+assert_true(!anyDuplicated(original_distance_itt_data$KEY.individ), "KEY.individ is duplicated after joining original distance assignments.")
+assert_true(!any(is.na(original_distance_itt_data$assigned_dist_group)), "Missing original distance assignments for analysis clusters.")
+assert_true(!any(is.na(original_distance_itt_data$mu_d)), "Missing expected-distance controls in original-distance ITT data.")
+assert_true(
+  original_distance_itt_data %>% distinct(original_cluster_id, cluster_id) %>% count(original_cluster_id) %>% filter(n > 1) %>% nrow() == 0,
+  "An original cluster ID maps to multiple sequential cluster IDs."
+)
+assert_true(
+  original_distance_itt_data %>% distinct(original_cluster_id, cluster_id) %>% count(cluster_id) %>% filter(n > 1) %>% nrow() == 0,
+  "A sequential cluster ID maps to multiple original cluster IDs."
+)
+assert_no_cluster_id_collapse(
+  original_distance_itt_data,
+  "analysis_cluster_id_raw",
+  "original_cluster_id",
+  "Analysis data"
+)
+
+monitored_source <- read_rds("data/clean-data/monitored-nosms-takeup-data.rds") %>%
+  transmute(
+    KEY.individ,
+    monitored_cluster_id_raw = as.character(cluster.id),
+    source_cluster_id = clean_cluster_id(cluster.id, "monitored-nosms-takeup-data$cluster.id"),
+    source_treatment = as.character(assigned.treatment),
+    source_dist_group = as.character(dist.pot.group),
+    source_dist_to_pot = dist.to.pot,
+    source_cluster_dist_to_pot = cluster.dist.to.pot
+  )
+
+monitored_check <- original_distance_itt_data %>%
+  select(
+    KEY.individ,
+    original_cluster_id,
+    assigned.treatment,
+    dist.pot.group,
+    dist.to.pot,
+    cluster.dist.to.pot
+  ) %>%
+  left_join(monitored_source, by = "KEY.individ", relationship = "one-to-one")
+
+assert_true(!any(is.na(monitored_check$source_cluster_id)), "Some analysis rows did not match monitored source data.")
+assert_true(all(monitored_check$original_cluster_id == monitored_check$source_cluster_id), "Original cluster IDs differ from monitored source cluster IDs.")
+assert_true(all(as.character(monitored_check$assigned.treatment) == monitored_check$source_treatment), "Treatment assignments differ from monitored source data.")
+assert_true(all(as.character(monitored_check$dist.pot.group) == monitored_check$source_dist_group), "Current distance groups differ from monitored source data.")
+assert_true(max(abs(monitored_check$dist.to.pot - monitored_check$source_dist_to_pot), na.rm = TRUE) < 1e-8, "Individual PoT distances differ from monitored source data.")
+assert_true(max(abs(monitored_check$cluster.dist.to.pot - monitored_check$source_cluster_dist_to_pot), na.rm = TRUE) < 1e-8, "Cluster PoT distances differ from monitored source data.")
+
+processed_check <- original_distance_itt_data %>%
+  distinct(original_cluster_id, assigned.treatment, dist.pot.group) %>%
+  left_join(
+    read_rds("data/takeup_processed_cluster_strat.rds") %>%
+      transmute(
+        processed_cluster_id_raw = as.character(cluster.id),
+        original_cluster_id = clean_cluster_id(cluster.id, "takeup_processed_cluster_strat$cluster.id"),
+        processed_treatment = as.character(assigned.treatment),
+        processed_dist_group = as.character(dist.pot.group)
+      ) %>%
+      distinct(),
+    by = "original_cluster_id",
+    relationship = "one-to-one"
+  )
+
+assert_true(!any(is.na(processed_check$processed_treatment)), "Some clusters did not match processed randomization data.")
+assert_true(all(as.character(processed_check$assigned.treatment) == processed_check$processed_treatment), "Treatment assignments differ from processed randomization data.")
+assert_true(all(as.character(processed_check$dist.pot.group) == processed_check$processed_dist_group), "Current distance groups differ from processed randomization data.")
+
+cluster_audit <- original_distance_itt_data %>%
+  distinct(
+    original_cluster_id,
+    analysis_cluster_id_raw,
+    cluster_id,
+    assigned.treatment,
+    final_dist_group,
+    original_dist_group
+  ) %>%
+  left_join(
+    original_distance_df %>% select(original_cluster_id, original_cluster_id_raw),
+    by = "original_cluster_id",
+    relationship = "many-to-one"
+  ) %>%
+  left_join(
+    target_village_distance_df,
+    by = "original_cluster_id",
+    relationship = "many-to-one"
+  ) %>%
+  left_join(
+    processed_check %>%
+      distinct(original_cluster_id, processed_cluster_id_raw, processed_treatment, processed_dist_group),
+    by = "original_cluster_id",
+    relationship = "one-to-one"
+  ) %>%
+  mutate(
+    target_matches_original = as.character(target_village_dist_group) == as.character(original_dist_group),
+    processed_matches_analysis = processed_treatment == as.character(assigned.treatment) &
+      processed_dist_group == as.character(final_dist_group),
+    final_matches_original = as.character(final_dist_group) == as.character(original_dist_group),
+    switch_direction = case_when(
+      final_matches_original ~ "unchanged",
+      TRUE ~ paste(original_dist_group, "to", final_dist_group)
+    )
+  ) %>%
+  arrange(original_cluster_id)
+
+write_csv(cluster_audit, "temp-data/original-distance-cluster-audit.csv")
+
+assert_true(!any(is.na(cluster_audit$target_village_dist_group)), "Some analysis clusters did not match target-village data.")
+assert_true(all(cluster_audit$target_matches_original), "Target-village distance assignments differ from original randomization assignments.")
+assert_true(all(cluster_audit$processed_matches_analysis), "Processed randomization data differs from analysis data.")
+
+merge_checks <- tibble(
+  check = c(
+    "analysis_rows",
+    "analysis_clusters",
+    "missing_original_distance_assignments",
+    "missing_expected_distance_controls",
+    "treatment_mismatches_monitored",
+    "distance_group_mismatches_monitored",
+    "max_abs_dist_to_pot_diff_monitored",
+    "max_abs_cluster_dist_to_pot_diff_monitored",
+    "treatment_mismatches_processed",
+    "distance_group_mismatches_processed"
+  ),
+  value = c(
+    nrow(original_distance_itt_data),
+    n_distinct(original_distance_itt_data$original_cluster_id),
+    sum(is.na(original_distance_itt_data$assigned_dist_group)),
+    sum(is.na(original_distance_itt_data$mu_d)),
+    sum(as.character(monitored_check$assigned.treatment) != monitored_check$source_treatment),
+    sum(as.character(monitored_check$dist.pot.group) != monitored_check$source_dist_group),
+    max(abs(monitored_check$dist.to.pot - monitored_check$source_dist_to_pot), na.rm = TRUE),
+    max(abs(monitored_check$cluster.dist.to.pot - monitored_check$source_cluster_dist_to_pot), na.rm = TRUE),
+    sum(as.character(processed_check$assigned.treatment) != processed_check$processed_treatment),
+    sum(as.character(processed_check$dist.pot.group) != processed_check$processed_dist_group)
+  )
+)
+
+write_csv(merge_checks, "temp-data/original-distance-merge-checks.csv")
+
+original_distance_switches <- original_distance_itt_data %>%
+  distinct(original_cluster_id, final_dist_group, original_dist_group) %>%
+  count(original_dist_group, final_dist_group, name = "clusters") %>%
+  arrange(original_dist_group, final_dist_group)
+
+write_csv(original_distance_switches, "temp-data/original-distance-switch-counts.csv")
+
+expected_original_distance_switches <- tribble(
+  ~original_dist_group, ~final_dist_group, ~clusters,
+  factor("close", levels = c("close", "far")), factor("close", levels = c("close", "far")), 64L,
+  factor("close", levels = c("close", "far")), factor("far", levels = c("close", "far")), 10L,
+  factor("far", levels = c("close", "far")), factor("close", levels = c("close", "far")), 16L,
+  factor("far", levels = c("close", "far")), factor("far", levels = c("close", "far")), 54L
+)
+
+assert_true(
+  setequal(
+    original_distance_switches %>% mutate(across(c(original_dist_group, final_dist_group), as.character)),
+    expected_original_distance_switches %>% mutate(across(c(original_dist_group, final_dist_group), as.character))
+  ),
+  "Original-distance switch counts differ from the documented 64/10/16/54 cluster split."
+)
+
+if (file.exists("docs/randomization-mismatches.csv")) {
+  documented_switches <- read_csv("docs/randomization-mismatches.csv", show_col_types = FALSE) %>%
+    transmute(
+      original_cluster_id = clean_cluster_id(pot.cluster.id, "docs/randomization-mismatches.csv$pot.cluster.id"),
+      documented_original_dist_group = as.character(clust_randomization_cat),
+      documented_final_dist_group = as.character(processed_cat)
+    ) %>%
+    arrange(original_cluster_id)
+
+  generated_switches <- cluster_audit %>%
+    filter(!final_matches_original) %>%
+    transmute(
+      original_cluster_id,
+      documented_original_dist_group = as.character(original_dist_group),
+      documented_final_dist_group = as.character(final_dist_group)
+    ) %>%
+    arrange(original_cluster_id)
+
+  assert_true(
+    setequal(documented_switches, generated_switches),
+    "Generated original-distance switches differ from docs/randomization-mismatches.csv."
+  )
+}
+
+original_distance_discrete_regression <- function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment*assigned_dist_group + .[l_cov_vars] + mu_d | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+original_distance_itt_output <- wrapper_function(
+  data = original_distance_itt_data,
+  regression_spec = original_distance_discrete_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/original-distance-itt-tidy-tes.csv",
+  table_name = "rf_original_distance_itt_tbl"
+)
+
+print(original_distance_switches)
+original_distance_itt_output$tidy_summary %>%
+  filter(assigned_dist_group == "far - close") %>%
+  print(n = Inf)
+
+summ_know_A_itt_df <- summ_endline_know_table %>%
+  filter(fct_match(know.table.type, "table.A"))
+
+endline_know_A_itt_data <- endline_data %>%
+  left_join(
+    summ_know_A_itt_df,
+    by = "KEY.individ"
+  ) %>%
+  filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
+  mutate(
+    observability_cluster_id_raw = as.character(cluster.id),
+    original_cluster_id = clean_cluster_id(cluster.id, "endline_data$cluster.id"),
+    final_dist_group = factor(dist.pot.group, levels = c("close", "far")),
+    cluster_id_rank = dense_rank(original_cluster_id),
+    prop_know_fob = knows_other_dewormed / obs_know_person,
+    prop_know_sob = thinks_other_knows / obs_know_person
+  ) %>%
+  left_join(
+    original_distance_df,
+    by = "original_cluster_id",
+    relationship = "many-to-one"
+  ) %>%
+  mutate(
+    assigned_treatment = assigned.treatment,
+    assigned_dist_group = factor(original_dist_group, levels = c("close", "far")),
+    signal = if_else(assigned_treatment %in% c("ink", "bracelet"), "signal", "no signal"),
+    signal = factor(signal, levels = c("no signal", "signal"))
+  )
+
+assert_true(!anyDuplicated(endline_know_A_itt_data$KEY.individ), "KEY.individ is duplicated in original-distance observability ITT data.")
+assert_true(!any(is.na(endline_know_A_itt_data$assigned_dist_group)), "Missing original distance assignments for observability ITT clusters.")
+assert_true(!any(is.na(endline_know_A_itt_data$mu_d)), "Missing expected-distance controls in original-distance observability ITT data.")
+assert_true(
+  endline_know_A_itt_data %>% distinct(original_cluster_id, cluster_id_rank) %>% count(original_cluster_id) %>% filter(n > 1) %>% nrow() == 0,
+  "An observability original cluster ID maps to multiple bootstrap cluster ranks."
+)
+
+observability_source_check <- endline_know_A_itt_data %>%
+  select(
+    KEY.individ,
+    original_cluster_id,
+    assigned.treatment,
+    dist.pot.group,
+    dist.to.pot,
+    standard_cluster.dist.to.pot
+  ) %>%
+  left_join(
+    endline_data %>%
+      transmute(
+        KEY.individ,
+        endline_cluster_id_raw = as.character(cluster.id),
+        source_cluster_id = clean_cluster_id(cluster.id, "endline source cluster.id"),
+        source_treatment = as.character(assigned.treatment),
+        source_dist_group = as.character(dist.pot.group),
+        source_dist_to_pot = dist.to.pot,
+        source_standard_cluster_dist_to_pot = standard_cluster.dist.to.pot
+      ),
+    by = "KEY.individ",
+    relationship = "one-to-one"
+  )
+
+assert_true(!any(is.na(observability_source_check$source_cluster_id)), "Some observability rows did not match endline source data.")
+assert_true(all(observability_source_check$original_cluster_id == observability_source_check$source_cluster_id), "Observability cluster IDs differ from endline source data.")
+assert_true(all(as.character(observability_source_check$assigned.treatment) == observability_source_check$source_treatment), "Observability treatment assignments differ from endline source data.")
+assert_true(all(as.character(observability_source_check$dist.pot.group) == observability_source_check$source_dist_group), "Observability current distance groups differ from endline source data.")
+assert_true(max(abs(observability_source_check$dist.to.pot - observability_source_check$source_dist_to_pot), na.rm = TRUE) < 1e-8, "Observability individual PoT distances differ from endline source data.")
+assert_true(max(abs(observability_source_check$standard_cluster.dist.to.pot - observability_source_check$source_standard_cluster_dist_to_pot), na.rm = TRUE) < 1e-8, "Observability standardized cluster PoT distances differ from endline source data.")
+
+observability_merge_checks <- tibble(
+  check = c(
+    "observability_rows",
+    "observability_clusters",
+    "missing_original_distance_assignments",
+    "missing_expected_distance_controls",
+    "treatment_mismatches_endline",
+    "distance_group_mismatches_endline",
+    "max_abs_dist_to_pot_diff_endline",
+    "max_abs_standard_cluster_dist_to_pot_diff_endline"
+  ),
+  value = c(
+    nrow(endline_know_A_itt_data),
+    n_distinct(endline_know_A_itt_data$original_cluster_id),
+    sum(is.na(endline_know_A_itt_data$assigned_dist_group)),
+    sum(is.na(endline_know_A_itt_data$mu_d)),
+    sum(as.character(observability_source_check$assigned.treatment) != observability_source_check$source_treatment),
+    sum(as.character(observability_source_check$dist.pot.group) != observability_source_check$source_dist_group),
+    max(abs(observability_source_check$dist.to.pot - observability_source_check$source_dist_to_pot), na.rm = TRUE),
+    max(abs(observability_source_check$standard_cluster.dist.to.pot - observability_source_check$source_standard_cluster_dist_to_pot), na.rm = TRUE)
+  )
+)
+
+write_csv(observability_merge_checks, "temp-data/original-distance-observability-merge-checks.csv")
+
+original_distance_discrete_observability_regression <- function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") + .[l_cov_vars] +  mu_d | county,
+    data = data,
+    weights = weights
+  )
+}
+
+original_distance_fob_output <- wrapper_function(
+  data = endline_know_A_itt_data %>%
+    mutate(prop_knows = prop_know_fob),
+  regression_spec = original_distance_discrete_observability_regression,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_original_distance_itt_fob_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/original-distance-itt-fob-tidy-tes.csv"
+)
+
+original_distance_sob_output <- wrapper_function(
+  data = endline_know_A_itt_data %>%
+    mutate(prop_knows = prop_know_sob),
+  regression_spec = original_distance_discrete_observability_regression,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability Beliefs"
+  ),
+  table_name = "rf_original_distance_itt_sob_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/original-distance-itt-sob-tidy-tes.csv"
+)
+
+original_distance_fob_output$tidy_summary %>%
+  filter(assigned_dist_group == "far - close") %>%
+  print(n = Inf)
+
+original_distance_sob_output$tidy_summary %>%
+  filter(assigned_dist_group == "far - close") %>%
+  print(n = Inf)
+
+}) # end original-distance ITT
 
 
 
@@ -645,8 +1090,16 @@ endline_know_A_df = endline_data %>%
     assigned_treatment = assigned.treatment,
     assigned_dist_group = dist.pot.group,
     prop_know_fob = knows_other_dewormed / obs_know_person,
-    prop_know_sob = thinks_other_knows / obs_know_person
+    prop_know_sob = thinks_other_knows / obs_know_person,
+    is_backup = KEY.individ %in% census_data$KEY.individ[census_data$endline.backup == TRUE],
+    is_first_responder = !is_backup
   ) 
+
+dir.create("temp-data/tidy-rf-tes", showWarnings = FALSE, recursive = TRUE)
+
+endline_know_A_df %>%
+  count(assigned_treatment, assigned_dist_group, is_backup, is_first_responder) %>%
+  write_csv("temp-data/tidy-rf-tes/fob-first-responder-sample-counts.csv")
 
 
 
@@ -714,6 +1167,19 @@ discrete_fob_output = wrapper_function(
   ),
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
+)
+
+#### FOB Discrete Distance + LASSO Covs + Cluster Expected Distance, First Responders Only
+discrete_fob_first_responder_output = wrapper_function(
+  data = endline_know_A_df %>%
+    filter(is_first_responder) %>%
+    mutate(prop_knows = prop_know_fob),
+  regression_spec = discrete_f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability (first responders only)"
+  ),
+  table_name = "rf_discrete_fob_first_responder_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-first-responder-tidy-tes.csv"
 )
 
 #### FOB Discrete Distance + No LASSO Covs + No Cluster Expected Distance
@@ -854,7 +1320,6 @@ fob_lee_tbl = lee_bounds_tbl(
 
 fob_lee_tbl %>%
   custom_save_latex_table(table_name = "fob_lee_bounds_tbl")
-stop()
 # ─────────────────────────────────────────────────────────────────────────────
 
 discrete_pct_yesno_output = wrapper_function(
@@ -1511,7 +1976,7 @@ bracelet_distance_data = endline_data %>%
     received_bracelet = dewormed.reported == 1 & got_bracelet == 1,
     still_has_bracelet = if_else(
       received_bracelet,
-      have_bracelet == 1 | wear_bracelet == 1,
+      have_bracelet == 1,
       NA
     ),
     wearing_bracelet = if_else(

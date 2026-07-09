@@ -7,6 +7,7 @@ script_options <- docopt::docopt(
 Options:
   --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
   --output-path=<path>  Path to find results [default: temp-data/struct-postprocess]
+  --data-path=<path>  Path to analysis data [default: data]
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
   --save-error-draws  Save the entire posterior w/ each cluster's w^* draws

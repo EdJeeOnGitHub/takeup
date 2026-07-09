@@ -2,9 +2,9 @@
 print(commandArgs(trailingOnly = TRUE))
 script_options <- docopt::docopt(
   stringr::str_glue("Usage:
-  run_takeup.R takeup prior [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds]
-  run_takeup.R takeup fit [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --sbc --num-sbc-sims=<num-sbc-sims> --gen-optim --save-rds]
-  run_takeup.R takeup cv [--folds=<number of folds> --parallel-folds=<parallel-folds> --no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --age --save-rds]
+  run_takeup.R takeup prior [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
+  run_takeup.R takeup fit [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --sbc --num-sbc-sims=<num-sbc-sims> --gen-optim --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
+  run_takeup.R takeup cv [--folds=<number of folds> --parallel-folds=<parallel-folds> --no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --age --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
   
   run_takeup.R beliefs prior [--chains=<chains> --iter=<iter> --outputname=<output file name> --include-paths=<paths> --output-path=<path> --multilevel --no-dist]
   run_takeup.R beliefs fit [--chains=<chains> --iter=<iter> --outputname=<output file name> --include-paths=<paths> --output-path=<path> --multilevel --no-dist]
@@ -25,6 +25,8 @@ Options:
   --include-paths=<paths>  Includes path for cmdstanr [default: stan_models]
   --output-path=<path>  Where to save output files [default: {file.path('data', 'stan_analysis_data')}]
   --num-mix-groups=<num>  Number of finite mixtures in distance model [default: 2]
+  --beliefs-outcome=<outcome>  Beliefs outcome for structural observability input: fob, sob, or correct-observability [default: fob]
+  --beliefs-missing=<mode>  Missing beliefs handling: drop or latent [default: drop]
   --save-rds  Save RDS object (default is to save cmdstanr files to csv)
 "),
 
@@ -49,6 +51,19 @@ library(furrr)
 script_options %<>% 
   modify_at(c("chains", "iter", "threads", "num_mix_groups", "num_sbc_sims", "parallel_folds"), as.integer) %>% 
   modify_at(c("models"), ~ c(str_split(script_options$models, ",", simplify = TRUE)))
+
+allowed_beliefs_outcomes <- c("fob", "sob", "correct-observability")
+allowed_beliefs_missing <- c("drop", "latent")
+if (!script_options$beliefs_outcome %in% allowed_beliefs_outcomes) {
+  stop(str_glue(
+    "--beliefs-outcome must be one of {str_c(allowed_beliefs_outcomes, collapse = ', ')}; got {script_options$beliefs_outcome}"
+  ))
+}
+if (!script_options$beliefs_missing %in% allowed_beliefs_missing) {
+  stop(str_glue(
+    "--beliefs-missing must be one of {str_c(allowed_beliefs_missing, collapse = ', ')}; got {script_options$beliefs_missing}"
+  ))
+}
 
 if (script_options$cmdstanr || script_options$beliefs || script_options$dist || script_options$wtp) {
   library(cmdstanr)
@@ -158,25 +173,159 @@ if (str_detect(script_options$models, "NO_OUTLIERS")) {
 }
 
 # Belief data loading
-load_belief_data = function() {
+load_belief_data = function(outcome = "fob", missing = "drop") {
   source(file.path("scratch", "reduced-form-setup.R"), local = TRUE)
   summ_know_A_df = summ_endline_know_table %>%
     filter(fct_match(know.table.type, "table.A"))
-  # 1,141 Obs
-  endline_know_A_df = endline_data %>%
+  summ_know_B_df = summ_endline_know_table %>%
+    filter(fct_match(know.table.type, "table.B"))
+
+  table_a_correct_counts = endline_know_table_data %>%
+    filter(fct_match(know.table.type, "table.A")) %>%
+    mutate(
+      KEY.individ = if_else(is.na(KEY.individ), PARENT_KEY, KEY.individ),
+      actual_other_dewormed_1_lgl = case_when(
+        actual.other.dewormed.any.1 == TRUE ~ "yes",
+        actual.other.dewormed.any.1 == FALSE ~ "no",
+        TRUE ~ NA_character_
+      ),
+      correct_classification_yesnodk = case_when(
+        dewormed == "don't know" ~ FALSE,
+        dewormed != "don't know" ~ actual_other_dewormed_1_lgl == as.character(dewormed),
+        TRUE ~ NA
+      )
+    ) %>%
+    group_by(KEY.individ) %>%
+    summarise(
+      correct_obs_denominator = sum(!is.na(correct_classification_yesnodk)),
+      correct_obs_numerator = sum(correct_classification_yesnodk, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  base_endline_df = endline_data %>%
+    filter(sms.treatment == "sms.control") %>%
+    filter(missing != "latent" | !(KEY.individ %in% summ_know_B_df$KEY.individ))
+
+  belief_df = base_endline_df %>%
     left_join(
       summ_know_A_df,
       by = "KEY.individ"
     ) %>%
-    filter(sms.treatment == "sms.control", obs_know_person > 0) %>%
+    left_join(table_a_correct_counts, by = "KEY.individ") %>%
     mutate(
       assigned_treatment = assigned.treatment,
       assigned_dist_group = dist.pot.group,
-      prop_know_fob = knows_other_dewormed / obs_know_person,
-      prop_know_sob = thinks_other_knows / obs_know_person
-    ) 
+      belief_denominator = case_when(
+        outcome %in% c("fob", "sob") ~ obs_know_person,
+        outcome == "correct-observability" ~ correct_obs_denominator
+      ),
+      belief_numerator_1ord = case_when(
+        outcome == "fob" ~ knows_other_dewormed,
+        outcome == "sob" ~ knows_other_dewormed,
+        outcome == "correct-observability" ~ correct_obs_numerator
+      ),
+      belief_numerator_2ord = case_when(
+        outcome == "fob" ~ thinks_other_knows,
+        outcome == "sob" ~ thinks_other_knows,
+        outcome == "correct-observability" ~ correct_obs_numerator
+      ),
+      belief_observed = !is.na(belief_denominator) & belief_denominator > 0 &
+        !is.na(belief_numerator_1ord) & !is.na(belief_numerator_2ord),
+      belief_denominator = if_else(
+        missing == "latent" & !belief_observed & is.na(belief_denominator),
+        10L,
+        as.integer(replace_na(belief_denominator, 0L))
+      ),
+      belief_numerator_1ord = as.integer(replace_na(belief_numerator_1ord, 0L)),
+      belief_numerator_2ord = as.integer(replace_na(belief_numerator_2ord, 0L)),
+      belief_observed = as.integer(belief_observed)
+    ) %>%
+    filter(missing == "latent" | belief_observed == 1)
+
+  if (any(belief_df$belief_numerator_1ord > belief_df$belief_denominator) ||
+      any(belief_df$belief_numerator_2ord > belief_df$belief_denominator)) {
+    stop(str_glue("Beliefs outcome {outcome} produced numerator counts larger than denominators."))
+  }
+
+  belief_df
 }
-fob_belief_df = load_belief_data()
+
+prepare_belief_stan_inputs = function(belief_df, variant_label) {
+  beliefs_cluster_obs_lookup <- analysis_data %>%
+    mutate(obs_index = seq(n())) %>%
+    group_by(cluster.id) %>%
+    slice(1) %>%
+    ungroup() %>%
+    select(cluster.id, obs_index, cluster_id)
+
+  belief_indexed <- belief_df %>%
+    left_join(beliefs_cluster_obs_lookup, by = "cluster.id")
+
+  missing_belief_obs_index <- sum(is.na(belief_indexed$obs_index))
+
+  cat(str_glue(
+    "\n--- Beliefs data join check ({variant_label}) ---\n",
+    "  belief rows before cluster lookup:             {nrow(belief_df)}\n",
+    "  observed belief rows:                          {sum(belief_df$belief_observed == 1)}\n",
+    "  latent/missing belief rows:                    {sum(belief_df$belief_observed == 0)}\n",
+    "  rows missing active-sample cluster lookup:     {missing_belief_obs_index}\n",
+    "-------------------------------\n\n"
+  ))
+
+  if (missing_belief_obs_index > 0) {
+    warning(str_glue(
+      "Dropping {missing_belief_obs_index} belief rows from {variant_label} that do not map to the active analysis sample."
+    ))
+
+    belief_indexed <- belief_indexed %>%
+      filter(!is.na(obs_index))
+  }
+
+  num_active_clusters <- n_distinct(analysis_data$cluster_id)
+  belief_rows_by_cluster <- belief_indexed %>%
+    count(cluster_id, name = "num_belief_rows") %>%
+    right_join(
+      tibble(cluster_id = seq_len(num_active_clusters)),
+      by = "cluster_id"
+    ) %>%
+    arrange(cluster_id) %>%
+    mutate(num_belief_rows = replace_na(num_belief_rows, 0L))
+
+  lst(
+    num_beliefs_obs = nrow(belief_indexed),
+    beliefs_obs_index = belief_indexed$obs_index,
+    num_belief_rows_by_cluster = belief_rows_by_cluster$num_belief_rows,
+    num_recognized = belief_indexed$belief_denominator,
+    num_knows_1ord = belief_indexed$belief_numerator_1ord,
+    num_knows_2ord = belief_indexed$belief_numerator_2ord,
+    belief_observed = belief_indexed$belief_observed
+  )
+}
+
+belief_variant_data <- lst(
+  fob_drop = load_belief_data("fob", "drop"),
+  sob_drop = load_belief_data("sob", "drop"),
+  correct_observability_drop = load_belief_data("correct-observability", "drop"),
+  fob_latent = load_belief_data("fob", "latent")
+)
+
+belief_variant_inputs <- imap(
+  belief_variant_data,
+  ~ prepare_belief_stan_inputs(.x, .y)
+)
+
+default_belief_variant = case_when(
+  script_options$beliefs_missing == "latent" & script_options$beliefs_outcome == "fob" ~ "fob_latent",
+  script_options$beliefs_outcome == "sob" ~ "sob_drop",
+  script_options$beliefs_outcome == "correct-observability" ~ "correct_observability_drop",
+  TRUE ~ "fob_drop"
+)
+
+set_belief_stan_data = function(stan_data, variant_name) {
+  stan_data %>% list_modify(!!!belief_variant_inputs[[variant_name]])
+}
+
+fob_belief_df = belief_variant_data[[default_belief_variant]]
 # Models ------------------------------------------------------------------
 
 num_treatments <- n_distinct(analysis_data$assigned.treatment)
@@ -217,6 +366,7 @@ models <- lst(
     use_homoskedastic_shocks = TRUE,
     use_strata_levels = use_county_effects, # WTP
     suppress_reputation = FALSE,
+    use_belief_row_cluster_mu_rep = 0,
     generate_sim = FALSE,
     iter = script_options$iter,
     thin = 1,
@@ -596,7 +746,8 @@ models <- lst(
         BELIEFS_ORDER = 2,
         mu_rep_type = 4,
         use_cluster_effects = FALSE,
-        use_county_effects = FALSE
+        use_county_effects = FALSE,
+        stan_data_preprocess = function(stan_data) set_belief_stan_data(stan_data, "sob_drop")
       ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
@@ -604,6 +755,23 @@ models <- lst(
         mu_rep_type = 4,
         use_cluster_effects = FALSE,
         use_county_effects = FALSE
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_CORRECT_OBS = .$STRUCTURAL_LINEAR_U_SHOCKS %>%
+      list_modify(
+        BELIEFS_ORDER = 1,
+        mu_rep_type = 4,
+        use_cluster_effects = FALSE,
+        use_county_effects = FALSE,
+        stan_data_preprocess = function(stan_data) set_belief_stan_data(stan_data, "correct_observability_drop")
+      ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB_MISSING_MARGINALIZED = .$STRUCTURAL_LINEAR_U_SHOCKS %>%
+      list_modify(
+        BELIEFS_ORDER = 1,
+        mu_rep_type = 4,
+        use_cluster_effects = FALSE,
+        use_county_effects = FALSE,
+        use_belief_row_cluster_mu_rep = 1,
+        stan_data_preprocess = function(stan_data) set_belief_stan_data(stan_data, "fob_latent")
       )
 )
 
@@ -644,43 +812,10 @@ beliefs_treatment_map_design_matrix <- cluster_treatment_map %>%
 analysis_data %<>%
   left_join(
     fob_belief_df %>%
-      select(KEY.individ, obs_know_person, knows_other_dewormed, thinks_other_knows),
+      select(KEY.individ, belief_denominator, belief_numerator_1ord, belief_numerator_2ord, belief_observed),
     by = "KEY.individ"
   ) %>%
-  mutate(across(c(obs_know_person, knows_other_dewormed, thinks_other_knows), ~replace_na(.x, 0L)))
-
-# Map every fob_belief_df row to a representative obs_index in analysis_data via
-# cluster, so unmatched individuals (not in analysis_data) still enter Stan via
-# their cluster's cluster_id / county_id.
-beliefs_cluster_obs_lookup <- analysis_data %>%
-  mutate(obs_index = seq(n())) %>%
-  group_by(cluster.id) %>%
-  slice(1) %>%
-  ungroup() %>%
-  select(cluster.id, obs_index)
-
-fob_belief_indexed <- fob_belief_df %>%
-  left_join(beliefs_cluster_obs_lookup, by = "cluster.id")
-
-missing_belief_obs_index <- sum(is.na(fob_belief_indexed$obs_index))
-
-cat(str_glue(
-  "\n--- Beliefs data join check ---\n",
-  "  fob_belief_df rows (all beliefs obs):          {nrow(fob_belief_df)}\n",
-  "  matched to analysis_data individual:           {sum(analysis_data$obs_know_person > 0)}\n",
-  "  unmatched individual (cluster lookup used):    {nrow(fob_belief_df) - sum(analysis_data$obs_know_person > 0)}\n",
-  "  fob_belief_indexed rows missing cluster match: {missing_belief_obs_index}\n",
-  "-------------------------------\n\n"
-))
-
-if (missing_belief_obs_index > 0) {
-  warning(str_glue(
-    "Dropping {missing_belief_obs_index} belief rows that do not map to the active analysis sample."
-  ))
-
-  fob_belief_indexed <- fob_belief_indexed %>%
-    filter(!is.na(obs_index))
-}
+  mutate(across(c(belief_denominator, belief_numerator_1ord, belief_numerator_2ord, belief_observed), ~replace_na(.x, 0L)))
 
 beliefs_ate_pairs <- cluster_treatment_map %>% 
   mutate(treatment_id = seq(n())) %>% {
@@ -722,14 +857,10 @@ stan_data <- lst(
   beliefs_use_obs_level = FALSE, # script_options$multilevel
   beliefs_use_indiv_intercept = FALSE, #script_options$multilevel,
   beliefs_use_dist = !(script_options$no_dist %||% FALSE),
+  use_belief_row_cluster_mu_rep = 0,
   
   know_table_A_sample_size = 10,
-  num_beliefs_obs = nrow(fob_belief_indexed),
-  beliefs_obs_index = fob_belief_indexed$obs_index,
-
-  num_recognized = fob_belief_indexed$obs_know_person,
-  num_knows_1ord = fob_belief_indexed$knows_other_dewormed,
-  num_knows_2ord = fob_belief_indexed$thinks_other_knows,
+  !!!belief_variant_inputs[[default_belief_variant]],
   
   beliefs_treatment_map_design_matrix,
   
@@ -861,8 +992,11 @@ stan_data <- lst(
 
 cat(str_glue(
   "\n--- Stan data beliefs check ---\n",
+  "  selected belief variant: {default_belief_variant}\n",
   "  num_beliefs_obs (obs entering Stan): {stan_data$num_beliefs_obs}\n",
-  "  mean num_recognized: {round(mean(stan_data$num_recognized), 2)}\n",
+  "  observed rows entering Stan: {sum(stan_data$belief_observed == 1)}\n",
+  "  latent/missing rows entering Stan: {sum(stan_data$belief_observed == 0)}\n",
+  "  mean denominator: {round(mean(stan_data$num_recognized), 2)}\n",
   "  mean num_knows_1ord: {round(mean(stan_data$num_knows_1ord), 2)}\n",
   "  mean num_knows_2ord: {round(mean(stan_data$num_knows_2ord), 2)}\n",
   "-------------------------------\n\n"
@@ -933,11 +1067,15 @@ if (script_options$takeup) {
           imap(~ file.path(script_options$output_path, str_c(output_name, "_", .y, ".rds")))
 
         print(str_glue("Dist Fit Path: {dist_fit}"))
-        dist_fit_obj %>% 
-          iwalk(~ {
-            cat(.y, "Diagnosis ---------------------------------\n")
-            .x$cmdstan_diagnose()
-          })
+        if (!identical(Sys.getenv("SKIP_CMDSTAN_DIAGNOSE"), "1")) {
+          dist_fit_obj %>%
+            iwalk(~ {
+              cat(.y, "Diagnosis ---------------------------------\n")
+              .x$cmdstan_diagnose()
+            })
+        } else {
+          cat("Skipping cmdstan_diagnose because SKIP_CMDSTAN_DIAGNOSE=1\n")
+        }
       }
       if (script_options$update_output) {
         new_dist_fit <- dist_fit
@@ -1090,7 +1228,9 @@ if (script_options$takeup) {
 
 
 cat(str_glue("All done. Saved results to output ID '{output_name}'\n\n"))
-stop()
+if (!interactive()) {
+  quit(save = "no", status = 0)
+}
 
 bmr_df = dist_fit_obj$STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT$summary(
   variables = c(

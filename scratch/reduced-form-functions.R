@@ -409,7 +409,7 @@ clean_te_draws = function(draws, ...) {
 
 round_pval = function(pvals, digits = 3) {
     pvals = round(pvals, digits)
-    pvals = if_else(pvals == 0, "<0.001", as.character(pvals))
+    pvals = if_else(pvals == 0, "$<$0.001", as.character(pvals))
     return(pvals)
 }
 

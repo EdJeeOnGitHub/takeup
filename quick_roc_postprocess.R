@@ -7,6 +7,7 @@ script_options <- docopt::docopt(
 Options:
   --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
   --output-path=<path>  Path to find results [default: temp-data/struct-postprocess]
+  --data-path=<path>  Path to analysis data [default: data]
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
   --cluster-roc
@@ -360,26 +361,3 @@ if (script_options$sm) {
       )
 
 }
-
-
-summ_sm_draws %>%
-filter(str_detect(variable, "sm")) %>%
-filter(variable == "sm_rescaled") %>%
-  ggplot(aes(
-    x = roc_distance,
-    y = value,
-    colour = treatment
-  )) +
-  geom_point()  +
-  geom_line()
-
-summ_sm_draws %>%
-filter(str_detect(variable, "sm_mu")) %>%
-  ggplot(aes(
-    x = roc_distance,
-    y = value,
-    colour = variable
-  )) +
-  geom_point()  +
-  geom_line() +
-  facet_wrap(~treatment)
