@@ -67,11 +67,53 @@
   
   // Levels: control ink calendar bracelet
  
-  if (!suppress_reputation) { 
+  if (!suppress_reputation) {
     obs_cluster_mu_rep = calculate_mu_rep(
       cluster_incentive_treatment_id, cluster_standard_dist, 
       base_mu_rep, 1, beliefs_treatment_map_design_matrix, centered_cluster_beta_beliefs, centered_cluster_dist_beta_beliefs,
       mu_rep_type);
+
+    if (use_belief_row_cluster_mu_rep) {
+      vector[num_beliefs_obs] belief_row_prob;
+      vector[num_clusters] cluster_belief_prob = rep_vector(0, num_clusters);
+
+      if (mu_rep_type != 4) {
+        reject("use_belief_row_cluster_mu_rep is only defined for mu_rep_type == 4.");
+      }
+
+      if (BELIEFS_ORDER == 1) {
+        belief_row_prob = inv_logit(
+          calculate_beliefs_latent_predictor(
+            beliefs_treatment_design_matrix,
+            centered_obs_beta_1ord,
+            centered_obs_dist_beta_1ord,
+            cluster_standard_dist[beliefs_cluster_index]
+          )
+        );
+      }
+      if (BELIEFS_ORDER == 2) {
+        belief_row_prob = inv_logit(
+          calculate_beliefs_latent_predictor(
+            beliefs_treatment_design_matrix,
+            centered_obs_beta_2ord,
+            centered_obs_dist_beta_2ord,
+            cluster_standard_dist[beliefs_cluster_index]
+          )
+        );
+      }
+
+      for (belief_index in 1:num_beliefs_obs) {
+        cluster_belief_prob[beliefs_cluster_index[belief_index]] += belief_row_prob[belief_index];
+      }
+
+      for (cluster_index in 1:num_clusters) {
+        if (num_belief_rows_by_cluster[cluster_index] > 0) {
+          obs_cluster_mu_rep[cluster_index] = base_mu_rep * (
+            cluster_belief_prob[cluster_index] / num_belief_rows_by_cluster[cluster_index]
+          );
+        }
+      }
+    }
   }
 
   linear_dist_cost = rep_vector(dist_beta_v[1], num_dist_group_treatments);

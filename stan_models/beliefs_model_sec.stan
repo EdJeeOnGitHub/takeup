@@ -45,10 +45,21 @@ if (beliefs_use_stratum_level) {
 }
 
 if (fit_beliefs_model_to_data) {
-  num_knows_1ord ~ binomial_logit(
-    num_recognized, 
-    calculate_beliefs_latent_predictor(beliefs_treatment_design_matrix, centered_obs_beta_1ord, centered_obs_dist_beta_1ord, cluster_standard_dist[beliefs_cluster_index])
-  ); 
+  vector[num_beliefs_obs] beliefs_latent_predictor_1ord = calculate_beliefs_latent_predictor(
+    beliefs_treatment_design_matrix,
+    centered_obs_beta_1ord,
+    centered_obs_dist_beta_1ord,
+    cluster_standard_dist[beliefs_cluster_index]
+  );
+
+  for (belief_index in 1:num_beliefs_obs) {
+    if (belief_observed[belief_index]) {
+      num_knows_1ord[belief_index] ~ binomial_logit(
+        num_recognized[belief_index],
+        beliefs_latent_predictor_1ord[belief_index]
+      );
+    }
+  }
 }
 
 hyper_beta_2ord[1] ~ normal(0, 1);
@@ -90,8 +101,19 @@ if (beliefs_use_stratum_level) {
 }
 
 if (fit_beliefs_model_to_data) {
-  num_knows_2ord ~ binomial_logit(
-    num_recognized, 
-    calculate_beliefs_latent_predictor(beliefs_treatment_design_matrix, centered_obs_beta_2ord, centered_obs_dist_beta_2ord, cluster_standard_dist[beliefs_cluster_index])
+  vector[num_beliefs_obs] beliefs_latent_predictor_2ord = calculate_beliefs_latent_predictor(
+    beliefs_treatment_design_matrix,
+    centered_obs_beta_2ord,
+    centered_obs_dist_beta_2ord,
+    cluster_standard_dist[beliefs_cluster_index]
   );
+
+  for (belief_index in 1:num_beliefs_obs) {
+    if (belief_observed[belief_index]) {
+      num_knows_2ord[belief_index] ~ binomial_logit(
+        num_recognized[belief_index],
+        beliefs_latent_predictor_2ord[belief_index]
+      );
+    }
+  }
 }

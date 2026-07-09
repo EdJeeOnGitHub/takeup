@@ -35,6 +35,8 @@ Options:
   --figure-output=<path>  Path to write figures [default: presentations/figures/fit<VERSION>]
   --width=<w>             Credible interval width [default: 0.95]
   --write-robustness      Also write appendix robustness tables
+  --write-beliefs-robustness  Also write belief/observability robustness table
+  --only-beliefs-robustness   Only write belief/observability robustness table
   "),
   args = if (interactive()) "--fit-version=105 --write-robustness" else commandArgs(trailingOnly = TRUE)
 )
@@ -139,20 +141,6 @@ create_robustness_tbl <- function(data) {
     add_header_above(c(" " = 1, "Structural" = 4)) %>%
     row_spec(c(3), hline_after = TRUE)
 }
-
-# ---------------------------------------------------------------------------
-# Load structural ATE RDS (no RF data needed for structural-only tables)
-# ---------------------------------------------------------------------------
-ate_rvar_struct <- read_rds(
-  file.path(
-    params$input_path,
-    str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{params$struct_models}_1-4.rds")
-  )
-)
-
-# ate_rvar_df contains only structural rows; spread_rf() will produce only
-# struct_* columns, and the downstream select(-contains("rf_")) is a no-op.
-ate_rvar_df <- ate_rvar_struct
 
 # ---------------------------------------------------------------------------
 # Helper functions (adapted from tables.Rmd)
@@ -304,6 +292,89 @@ write_robustness_tables <- function() {
       custom_save_latex_table(robustness_row$table_name)
   }
 }
+
+write_beliefs_robustness_table <- function() {
+  cat("Writing struct-observability-robustness-overall-te-table.tex ...\n")
+
+  robustness_models <- tribble(
+    ~model, ~panel,
+    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_CORRECT_OBS",
+    "Panel A: Correct Observability",
+    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB",
+    "Panel B: Perceived Observability",
+    "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB_MISSING_MARGINALIZED",
+    "Panel C: First-Order Observability, Missing Data Marginalized"
+  )
+
+  panel_tbl <- robustness_models %>%
+    pmap_dfr(function(model, panel) {
+      read_rds(
+        file.path(
+          params$input_path,
+          str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{model}_1-4.rds")
+        )
+      ) %>%
+        create_ate_table(.estimand = "overall", group_var = treatment) %>%
+        mutate(treatment = factor(treatment, levels = ate_tbl_levels)) %>%
+        mutate(far_minus_close = far - close) %>%
+        arrange(treatment) %>%
+        create_cis(.width = params$width) %>%
+        recode_control_mean() %>%
+        mutate(panel = panel) %>%
+        select(panel, treatment, combined, close, far, far_minus_close)
+    })
+
+  panel_sizes <- panel_tbl %>%
+    count(panel) %>%
+    deframe()
+
+  panel_tbl %>%
+    select(-panel) %>%
+    kbl(
+      col.names = c("Dependent variable: Take-up", paste0("(", 1:4, ")")),
+      format = "latex",
+      linesep = "\\addlinespace ",
+      booktabs = TRUE,
+      escape = FALSE,
+      align = "lcccc",
+      caption = "Overall Results"
+    ) %>%
+    kable_styling(latex_options = c("scale_down")) %>%
+    add_header_above(
+      c(" ", "Combined", "Close", "Far", "Far - Close"),
+      line = FALSE
+    ) %>%
+    add_header_above(c(" " = 1, "Structural" = 4)) %>%
+    pack_rows(
+      index = panel_sizes,
+      italic = TRUE,
+      escape = FALSE,
+      hline_after = TRUE,
+      hline_before = TRUE,
+      bold = TRUE
+    ) %>%
+    row_spec(c(3, 9, 15), hline_after = TRUE) %>%
+    custom_save_latex_table("struct-observability-robustness-overall-te-table")
+}
+
+if (isTRUE(script_options$only_beliefs_robustness)) {
+  write_beliefs_robustness_table()
+  quit(save = "no", status = 0)
+}
+
+# ---------------------------------------------------------------------------
+# Load structural ATE RDS (no RF data needed for structural-only tables)
+# ---------------------------------------------------------------------------
+ate_rvar_struct <- read_rds(
+  file.path(
+    params$input_path,
+    str_glue("rvar_processed_dist_fit{params$fit_version}_ates_{params$struct_models}_1-4.rds")
+  )
+)
+
+# ate_rvar_df contains only structural rows; spread_rf() will produce only
+# struct_* columns, and the downstream select(-contains("rf_")) is a no-op.
+ate_rvar_df <- ate_rvar_struct
 
 # ---------------------------------------------------------------------------
 # Build ATE data frames
@@ -476,6 +547,10 @@ obs_rvar_tbl %>% custom_save_latex_table("fob-beliefs-table")
 
 if (isTRUE(script_options$write_robustness)) {
   write_robustness_tables()
+}
+
+if (isTRUE(script_options$write_beliefs_robustness)) {
+  write_beliefs_robustness_table()
 }
 
 # ---------------------------------------------------------------------------
