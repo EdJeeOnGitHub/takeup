@@ -1090,8 +1090,16 @@ endline_know_A_df = endline_data %>%
     assigned_treatment = assigned.treatment,
     assigned_dist_group = dist.pot.group,
     prop_know_fob = knows_other_dewormed / obs_know_person,
-    prop_know_sob = thinks_other_knows / obs_know_person
+    prop_know_sob = thinks_other_knows / obs_know_person,
+    is_backup = KEY.individ %in% census_data$KEY.individ[census_data$endline.backup == TRUE],
+    is_first_responder = !is_backup
   ) 
+
+dir.create("temp-data/tidy-rf-tes", showWarnings = FALSE, recursive = TRUE)
+
+endline_know_A_df %>%
+  count(assigned_treatment, assigned_dist_group, is_backup, is_first_responder) %>%
+  write_csv("temp-data/tidy-rf-tes/fob-first-responder-sample-counts.csv")
 
 
 
@@ -1159,6 +1167,19 @@ discrete_fob_output = wrapper_function(
   ),
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
+)
+
+#### FOB Discrete Distance + LASSO Covs + Cluster Expected Distance, First Responders Only
+discrete_fob_first_responder_output = wrapper_function(
+  data = endline_know_A_df %>%
+    filter(is_first_responder) %>%
+    mutate(prop_knows = prop_know_fob),
+  regression_spec = discrete_f_know,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability (first responders only)"
+  ),
+  table_name = "rf_discrete_fob_first_responder_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-first-responder-tidy-tes.csv"
 )
 
 #### FOB Discrete Distance + No LASSO Covs + No Cluster Expected Distance
@@ -1299,7 +1320,6 @@ fob_lee_tbl = lee_bounds_tbl(
 
 fob_lee_tbl %>%
   custom_save_latex_table(table_name = "fob_lee_bounds_tbl")
-stop()
 # ─────────────────────────────────────────────────────────────────────────────
 
 discrete_pct_yesno_output = wrapper_function(
