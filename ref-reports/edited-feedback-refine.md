@@ -3,9 +3,19 @@
 
 
 
+0. We ran `conservative-table-a-attrition-regression-preview.pdf` - update to show with full endline sample (from limiting-factor claude) + summary is: the difference is only significant at 10pct when we do by treatment status and not significant overall, only on this random subsample.
+
+
 Immediate ed todo: 
 1. share w/ Anne this doc.
 2. run selection fits into missing.
+    -> knowledge table missingness by treatment assignment. Take 1,141 who are table A knowledge not SMS and find the number who should have been in there. Make balance more targeted. Make comparison as clean as possible. Display using Table 1 format of the pdf I created.
+    -> TODO: reconcile observability-missingness count in prose/sample-flow. Current cleaned analysis data gives 252 missing knowledge-table observations in the SMS-control endline sample, not 255. The 255 appears to be stale sample-flow/prose text; replace or explain before finalizing.
+    -> maybe people are not different across treatment arms however. observables different by treatment arm. Table B1 and B2 show that individuals seem to be 
+    similar across arms + we control for covariates.
+    -> Is table 5 actually useful for judging selection into sample driven by treatment.
+    -> Add table A missing checks where we randomly sample half assigned to table A so we mimic actual procedure. 
+    -> check anne comment about missing rates w/ SMS control.
 3. run structural model robustness w/ beliefs change.
 
 
