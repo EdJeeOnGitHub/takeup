@@ -1,0 +1,30 @@
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcc}
+\toprule
+ & Treatment & Treatment $\times$ Distance \\
+Dependent variable: Missing from observability module & (1) & (2) \\
+\midrule
+Ink & \makecell[c]{-0.038\\{(0.036)}} & \makecell[c]{} \\
+Calendar & \makecell[c]{-0.030\\{(0.037)}} & \makecell[c]{} \\
+Bracelet & \makecell[c]{-0.058\\{(0.037)}} & \makecell[c]{} \\
+Far & \makecell[c]{} & \makecell[c]{0.005\\{(0.066)}} \\
+Ink $\times$ Close & \makecell[c]{} & \makecell[c]{-0.046\\{(0.041)}} \\
+Ink $\times$ Far & \makecell[c]{} & \makecell[c]{-0.025\\{(0.064)}} \\
+Calendar $\times$ Close & \makecell[c]{} & \makecell[c]{-0.017\\{(0.046)}} \\
+Calendar $\times$ Far & \makecell[c]{} & \makecell[c]{-0.044\\{(0.062)}} \\
+Bracelet $\times$ Close & \makecell[c]{} & \makecell[c]{-0.088$^{**}$\\{(0.039)}} \\
+Bracelet $\times$ Far & \makecell[c]{} & \makecell[c]{-0.026\\{(0.065)}} \\
+\addlinespace[0.4em]
+Female & \makecell[c]{0.035$^{*}$\\{(0.020)}} & \makecell[c]{0.037$^{*}$\\{(0.020)}} \\
+Age & \makecell[c]{0.000\\{(0.001)}} & \makecell[c]{0.000\\{(0.001)}} \\
+Expected distance to PoT & \makecell[c]{0.018\\{(0.033)}} & \makecell[c]{0.014\\{(0.034)}} \\
+\midrule
+Control mean & 0.135 & 0.135 \\
+County FEs & Yes & Yes \\
+RF controls & Yes & Yes \\
+$H_0$: all displayed treatment coefficients = 0, $p$-value & 0.431 & 0.220 \\
+Observations & 1,267 & 1,267 \\
+Simulations & 1,000 & 1,000 \\
+\bottomrule
+\end{tabular}}
