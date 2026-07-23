@@ -1,0 +1,9 @@
+Package: owent
+Type: Package
+Title: Vectorized Owen's T Function via Boost Math
+Version: 0.1.0
+Description: Vectorized Owen's T using boost::math::owens_t — the same
+    algorithm used by Stan Math. Accepts two numeric vectors (h, a).
+Imports: Rcpp
+LinkingTo: Rcpp, BH
+Encoding: UTF-8

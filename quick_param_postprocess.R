@@ -187,7 +187,7 @@ summ_param_df = clean_param_df %>%
       str_detect(name, "beta_\\d") ~ str_glue("\\beta_{{{treatment}}}"),
       str_detect(name, "centered_cluster_beta_beliefs") ~ str_glue("\\beta^O_{{{treatment}}}"),
       str_detect(name, "centered_cluster_dist_beta_beliefs") ~ str_glue("\\gamma^O_{{{treatment}}}"),
-      name == "hyper_wtp_mu" ~ "\\psi",
+      name == "hyper_wtp_mu" ~ "\\psi \\text{ (USD)}",
       name == "wtp_value_utility" ~ "\\rho"
     )
   ) %>%

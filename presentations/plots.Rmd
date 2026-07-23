@@ -3332,9 +3332,16 @@ balance_data = read_rds(
   )
 )
 
-plot_perm_fit_df = balance_data$plot_perm_fit_df
-ri_p_val_df = balance_data$ri_p_val_df
-realised_fit_df = balance_data$realised_fit_df
+ri_balance_data = read_rds(
+  file.path(
+    "temp-data",
+    "balance-ri-fe.rds"
+  )
+)
+
+plot_perm_fit_df = ri_balance_data$plot_perm_fit_df
+ri_p_val_df = ri_balance_data$ri_p_val_df
+realised_fit_df = ri_balance_data$realised_fit_df
 
 
 
@@ -3364,6 +3371,10 @@ ri_p_val_df = ri_p_val_df %>%
 
 p_ri = plot_perm_fit_df %>%
   filter(!is.na(clean_name)) %>%
+  filter(
+    !(clean_name %in% c("Distance to PoT", "Dewormed in the past year")
+    )
+  ) %>%
   ggplot(aes(
     x = statistic
   )) +
@@ -3375,13 +3386,19 @@ p_ri = plot_perm_fit_df %>%
     ) +
   geom_vline(
     data = ri_p_val_df %>%
-      filter(!is.na(clean_name)),
+      filter(!is.na(clean_name)) %>%
+      filter(
+        !(clean_name %in% c("Distance to PoT", "Dewormed in the past year")
+        )),
     aes(xintercept = realised_statistic)
   ) +
   theme_bw() +
   geom_label(
     data = ri_p_val_df %>%
-      filter(!is.na(clean_name)),
+      filter(!is.na(clean_name)) %>%
+      filter(
+        !(clean_name %in% c("Distance to PoT", "Dewormed in the past year")
+        )),
     aes(
     x = x,
     y = 40,
@@ -3391,7 +3408,7 @@ p_ri = plot_perm_fit_df %>%
     x = "t statistic",
     y = "count"
   )
-
+p_ri
 ggsave(
   plot = p_ri,
   filename = "temp-data/dist-ri-plot.pdf",

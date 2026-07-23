@@ -6,17 +6,17 @@ script_options <- docopt::docopt(
   
 Options:
   --input-path=<path>  Path to find results [default: {file.path('data', 'stan_analysis_data')}]
-  --output-path=<path>  Path to find results [default: temp-data]
+  --output-path=<path>  Path to find results [default: temp-data/struct-postprocess]
   --model=<model>  Which model to postprocess
   --prior  Postprocess the prior predictive
   --save-error-draws  Save the entire posterior w/ each cluster's w^* draws
 
   "), 
   args = if (interactive()) "
-  95
-  --output-path=temp-data
-  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB
-  1 2 
+  104
+  --output-path=temp-data/struct-postprocess
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
+  1 2 3 4
   " else commandArgs(trailingOnly = TRUE)
 )
 library(tidyverse)
@@ -29,6 +29,8 @@ indiv_community_model = if_else(str_detect(script_options$model, "INDIV_DIST_COM
 indiv_indiv_model = if_else(str_detect(script_options$model, "INDIV_DIST_INDIV_FP"), TRUE, FALSE)
 indiv_model = indiv_community_model | indiv_indiv_model
 source("quick_postprocess_functions.R")
+analysis_data <- prepare_postprocess_analysis_data(script_options$model)
+
 create_tes = function(.data, group_var, levels = FALSE) {
  if (levels == TRUE) {
   levels_mult = 0
@@ -381,7 +383,7 @@ all_tes = bind_rows(
 options(width = 120)
 all_tes %>%
   select(
-    estimand, treatment, dist_group, pr_takeup, mu_treatment
+    estimand, treatment, dist_group, pr_takeup, any_of("mu_treatment")
   ) %>%
   print(n = 30)
 

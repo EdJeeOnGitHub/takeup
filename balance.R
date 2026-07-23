@@ -10,17 +10,26 @@ Options:
   --orig
   --attrition
   --monitored-attrition
+  --sms
   --main
 
 "),
   args = if (interactive()) "
     --output-path=temp-data \
-    --main
+    --sms
     " else commandArgs(trailingOnly = TRUE)
 )
 
 
-run_all <- !any(script_options$main, script_options$attrition, script_options$monitored_attrition, script_options$continuous_distance, script_options$orig)
+run_all <- !any(
+  script_options$main, 
+  script_options$attrition, 
+  script_options$monitored_attrition, 
+  script_options$continuous_distance, 
+  script_options$orig, 
+  script_options$fit_ri,
+  script_options$sms
+)
 
 set.seed(12932)
 
@@ -385,20 +394,24 @@ endline_know_balance_df = census_data %>%
 
 if (run_all || script_options$main) {
 
+takeup_balance_input = analysis_data %>%
+  select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+  # convert to Km for this table
+  mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 )
+
+endline_know_balance_input = endline_know_balance_df %>%
+  select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+  # convert to Km for this table
+  mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 )
+
 takeup_bal_fit = feols(
-    data = analysis_data %>%
-      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
-      # convert to Km for this table
-      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ), 
+    data = takeup_balance_input,
     .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = ~cluster.id
   )
 
 endline_know_bal_fit = feols(
-  data = endline_know_balance_df %>%
-    select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
-    # convert to Km for this table
-    mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000 ),
+  data = endline_know_balance_input,
     .[takeup_vars] ~ 0 + treat_dist + i(county, ref = "Busia"),
     cluster = ~cluster.id
 )
@@ -442,13 +455,13 @@ saveRDS(
 
 comp_takeup_balance_tidy_df = takeup_bal_fit %>%
   map_dfr(
-    create_balance_comparisons, 
+    ~create_balance_comparisons(.x, data = takeup_balance_input),
     .id = "lhs",
     .progress = TRUE
   )
 comp_endline_know_balance_tidy_df = endline_know_bal_fit %>%
   map_dfr(
-    create_balance_comparisons, 
+    ~create_balance_comparisons(.x, data = endline_know_balance_input),
     .id = "lhs",
     .progress = TRUE
   )
@@ -604,12 +617,33 @@ balance_fits = c(
   misc_fit_endline_belief_sample
 )
 
+balance_fit_data = c(
+  rep(list(baseline_worm_data), length(baseline_worm_fit)),
+  rep(list(pretreat_data), length(pretreat_fit)),
+  list(pretreat_data),
+  rep(list(clean_census_data), length(census_fit)),
+  rep(list(endline_implementation_data), length(endline_implementation_fit)),
+  rep(list(analysis_data %>%
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000)), length(misc_fit)),
+  rep(list(clean_sens_summ_imp_df), length(sens_fit)),
+  rep(list(praise_df), length(praise_fit)),
+  rep(list(stigma_df), length(stigma_fit)),
+  rep(list(analysis_data %>%
+      filter(KEY.individ %in% endline_belief_keys) %>%
+      select(any_of(takeup_vars), treat_dist, county, cluster.id) %>%
+      mutate(cluster.dist.to.pot = cluster.dist.to.pot / 1000) %>%
+      rename_with(
+        ~paste0("belief_sample_", .), any_of(takeup_vars)
+      )), length(misc_fit_endline_belief_sample))
+)
+
 
 comp_balance_tidy_df = balance_fits %>%
-  map_dfr(
-    create_balance_comparisons, 
-    .id = "lhs",
-    .progress = TRUE
+  map2_dfr(
+    balance_fit_data,
+    ~create_balance_comparisons(.x, data = .y),
+    .id = "lhs"
   ) 
 
 balance_tidy_df = balance_fits %>%
@@ -754,126 +788,163 @@ saveRDS(
 #### Continuous Distance Tests ####
 baseline_worm_dist_fit = feols(
   data = baseline_worm_data,
-  .[worm_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
+  .[worm_vars] ~  cluster.dist.to.pot | county, 
   ~cluster.id
 )
 
 pretreat_dist_fit = feols(
   data = pretreat_data,
-  .[pretreat_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"), 
+  .[pretreat_vars] ~  cluster.dist.to.pot | county, 
   ~cluster.id 
 )
 
 census_dist_fit = feols(
     data = clean_census_data, 
-    .[census_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
+    .[census_vars] ~  cluster.dist.to.pot | county,
     cluster = ~cluster.id
     ) 
 
 takeup_dist_fit = feols(
   data = analysis_data %>%
     select(any_of(takeup_vars), treat_dist, county, cluster.id), 
-  .[takeup_vars] ~ 0 + cluster.dist.to.pot + i(county, ref = "Busia"),
-  ~cluster.id
+  .[takeup_vars] ~  cluster.dist.to.pot | county,
+  cluster = ~cluster.id
 )
 
 
 
-resample_cluster_dists = function(data, seed) {
-  set.seed(seed)
-  clust_dist_df = data %>%
-    select(cluster.id, cluster.dist.to.pot) %>%
-    unique()
-  perm_clust_dist_df = clust_dist_df %>%
-    mutate(
-      perm_dist = sample(cluster.dist.to.pot, size = n())
-    ) %>%
-    select(-cluster.dist.to.pot)
-
-    data = data %>%
-      left_join(
-        perm_clust_dist_df,
-        by = "cluster.id"
-      )
-    return(data)
-}
-
-
-ri_fun = function(draw) {
-  set.seed(draw)
-  perm_baseline_worm_data = baseline_worm_data %>%
-    resample_cluster_dists(draw)
-  perm_census_data = clean_census_data %>%
-    resample_cluster_dists(draw)
-
-  perm_pretreat_data = pretreat_data %>%
-    resample_cluster_dists(draw)
-
-  perm_takeup_data = analysis_data %>%
-    select(any_of(takeup_vars), cluster.dist.to.pot, county, cluster.id) %>%
-    resample_cluster_dists(draw)
-
-  perm_baseline_worm_dist_fit = feols(
-    data = perm_baseline_worm_data,
-    .[worm_vars] ~ 0 + perm_dist + i(county, ref = "Busia"), 
-    cluster = ~cluster.id
-  )
-  perm_census_dist_fit = feols(
-      data = perm_census_data, 
-      .[census_vars] ~ 0 + perm_dist + i(county, ref = "Busia"),
-      cluster = ~cluster.id
-      ) 
-  perm_pretreat_dist_fit = feols(
-    data = perm_pretreat_data,
-    .[pretreat_vars] ~ 0 + perm_dist + i(county, ref = "Busia"), 
-    ~cluster.id
-  )
-
-  perm_takeup_dist_fit = feols(
-    data = perm_takeup_data, 
-    .[takeup_vars] ~ 0 + perm_dist + i(county, ref = "Busia"),
-    cluster = ~cluster.id
-  )
-
-  
-  perm_coef_df =  
-    bind_rows(
-      map_dfr(perm_baseline_worm_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist"),
-      map_dfr(perm_census_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist"),
-      map_dfr(perm_pretreat_dist_fit, tidy, .id = "lhs") %>%
-        filter(term == "perm_dist"),
-      map_dfr(
-        perm_takeup_dist_fit, 
-        tidy, 
-        .id = "lhs"
-      ) %>%
-        filter(term == "perm_dist"
-      )
-    ) %>% 
-      mutate(draw = draw)
-
-  return(
-    perm_coef_df
-  )
-}
 
 
 if (script_options$fit_ri) {
+
+  load_counterfactual_distance_pools = function() {
+    counterfactual_distance_df = read_csv(
+      file.path("data", "simulated-counterfactual-treatment-assignment.csv"),
+      col_types = cols(
+        .default = col_skip(),
+        cluster.id = col_character(),
+        dist = col_double()
+      )
+    ) %>%
+      filter(!is.na(cluster.id)) %>%
+      mutate(
+        cluster.id = as.character(as.integer(cluster.id)),
+        perm_dist = dist / 1000
+      ) %>%
+      select(cluster.id, perm_dist)
+
+    split(counterfactual_distance_df$perm_dist, counterfactual_distance_df$cluster.id)
+  }
+
+  assign_counterfactual_cluster_dists = function(data, seed, distance_pools) {
+    set.seed(seed)
+    cluster_ids = data %>%
+      mutate(cluster.id = as.character(cluster.id)) %>%
+      pull(cluster.id) %>%
+      unique()
+
+    missing_clusters = setdiff(cluster_ids, names(distance_pools))
+    if (length(missing_clusters) > 0) {
+      stop(
+        "Missing counterfactual distance simulations for clusters: ",
+        paste(missing_clusters, collapse = ", ")
+      )
+    }
+
+    counterfactual_cluster_dist_df = tibble(
+      cluster.id = cluster_ids,
+      perm_dist = vapply(
+        cluster_ids,
+        function(cluster_id) sample(distance_pools[[cluster_id]], 1),
+        numeric(1)
+      )
+    )
+
+      data = data %>%
+        mutate(cluster.id = as.character(cluster.id)) %>%
+        left_join(
+          counterfactual_cluster_dist_df,
+          by = "cluster.id"
+        )
+      return(data)
+  }
+
+  counterfactual_distance_pools = load_counterfactual_distance_pools()
+
+  ri_fun = function(draw) {
+    set.seed(draw)
+    perm_baseline_worm_data = baseline_worm_data %>%
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
+    perm_census_data = clean_census_data %>%
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
+
+    perm_pretreat_data = pretreat_data %>%
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
+
+    perm_takeup_data = analysis_data %>%
+      select(any_of(takeup_vars), cluster.dist.to.pot, county, cluster.id) %>%
+      assign_counterfactual_cluster_dists(draw, counterfactual_distance_pools)
+
+    perm_baseline_worm_dist_fit = feols(
+      data = perm_baseline_worm_data,
+      .[worm_vars] ~  perm_dist | county, 
+      cluster = ~cluster.id
+    )
+    perm_census_dist_fit = feols(
+        data = perm_census_data, 
+        .[census_vars] ~  perm_dist | county,
+        cluster = ~cluster.id
+        ) 
+    perm_pretreat_dist_fit = feols(
+      data = perm_pretreat_data,
+      .[pretreat_vars] ~  perm_dist | county, 
+      cluster = ~cluster.id
+    )
+
+    perm_takeup_dist_fit = feols(
+      data = perm_takeup_data, 
+      .[takeup_vars] ~  perm_dist | county,
+      cluster = ~cluster.id
+    )
+
+    
+    perm_coef_df =  
+      bind_rows(
+        map_dfr(perm_baseline_worm_dist_fit, tidy, .id = "lhs") %>%
+          filter(term == "perm_dist"),
+        map_dfr(perm_census_dist_fit, tidy, .id = "lhs") %>%
+          filter(term == "perm_dist"),
+        map_dfr(perm_pretreat_dist_fit, tidy, .id = "lhs") %>%
+          filter(term == "perm_dist"),
+        map_dfr(
+          perm_takeup_dist_fit, 
+          tidy, 
+          .id = "lhs"
+        ) %>%
+          filter(term == "perm_dist"
+        )
+      ) %>% 
+        mutate(draw = draw)
+
+    return(
+      perm_coef_df
+    )
+  }
+
+    
   plan(multisession, workers = 12)
   perm_fit_df = future_map_dfr(
     1:500, 
     ri_fun, 
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(
       seed = TRUE,
-      packages = c("broom", "fixest")
+      packages = c("broom", "dplyr", "fixest", "tibble")
       )
     )
-  saveRDS(perm_fit_df, "temp-data/balance-cts-dist-ri.rds")
+  saveRDS(perm_fit_df, "temp-data/balance-cts-dist-ri-fe.rds")
 } else {
-  perm_fit_df = read_rds("temp-data/balance-cts-dist-ri.rds")
+  perm_fit_df = read_rds("temp-data/balance-cts-dist-ri-fe.rds")
 }
 
 
@@ -916,12 +987,23 @@ plot_perm_fit_df = perm_fit_df %>%
 ri_p_val_df = plot_perm_fit_df %>%
   group_by(lhs) %>%
   summarise(
-    p_val = paste0("p = ", round(mean(statistic > realised_statistic), 3)),
+    p_val = paste0("p = ", round(mean(abs(statistic) > abs(realised_statistic)), 3)),
     realised_statistic = unique(realised_statistic),
     x = quantile(statistic, 0.95, na.rm = TRUE),
     clean_name = unique(clean_name)
   ) 
 
+saveRDS(
+  list(
+    plot_perm_fit_df = plot_perm_fit_df,
+    ri_p_val_df = ri_p_val_df,
+    realised_fit_df = realised_fit_df
+  ),
+  file.path(
+    script_options$output_path,
+    "balance-ri-fe.rds"
+  )
+)
 
 N_endline_belief = analysis_data %>%
   filter(KEY.individ %in% endline_belief_keys) %>%
@@ -1234,7 +1316,7 @@ attrition_treat_fits = feols(
 
 # Pairwise comparisons (control means, ink-con, cal-con, bra-con, bra-cal)
 attrition_treat_comp_df = attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "attrition_treat_comp_df.csv"))
@@ -1273,7 +1355,7 @@ non_attrition_treat_fits = feols(
 )
 
 non_attrition_treat_comp_df = non_attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = non_attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 non_attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "non_attrition_treat_comp_df.csv"))
@@ -1486,7 +1568,7 @@ mon_attrition_treat_fits = feols(
 
 # Pairwise comparisons
 mon_attrition_treat_comp_df = mon_attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = mon_attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 mon_attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "monitoring_attrition_comp_df.csv"))
@@ -1524,7 +1606,7 @@ mon_non_attrition_treat_fits = feols(
 )
 
 mon_non_attrition_treat_comp_df = mon_non_attrition_treat_fits %>%
-  map_dfr(create_balance_comparisons, .id = "lhs", .progress = TRUE)
+  map_dfr(~create_balance_comparisons(.x, data = mon_non_attrition_treat_data), .id = "lhs", .progress = TRUE)
 
 mon_non_attrition_treat_comp_df %>%
   write_csv(file.path(script_options$output_path, "mon_non_attrition_comp_df.csv"))
@@ -1544,6 +1626,273 @@ list(
   n_mon_non_attrition = n_mon_non_attrition
 ) %>%
   saveRDS(file.path(script_options$output_path, "mon_non_attrition_joint_tests.rds"))
+
+}
+
+
+# ============================================================================
+# SMS Balance Analysis
+# ============================================================================
+if (run_all || script_options$sms) {
+
+stop()
+
+census_data %>%
+  count(cluster.id)
+  analysis_data %>%
+    count(cluster.id)
+
+  sms_itt_sample_df = census_data %>%
+    filter(have_phone == "Yes") %>%
+    filter(sms.treatment == "social.info" | (sms.treatment == "sms.control" & sms.ctrl.sample.order == 1))  %>%
+    mutate(
+      sms_treatment = case_when(
+        sms.treatment == "sms.control" ~ "smscontrol",
+        sms.treatment %in% c("reminder.only", "social.info") ~ "smstreatment",
+        TRUE ~ NA_character_
+      )
+    )  %>%
+    left_join(
+      full_analysis_data %>%
+        select(cluster.id, cluster.dist.to.pot) %>% unique,
+      by = "cluster.id"
+    ) %>%
+    filter(!is.na(cluster.id)) %>%
+    mutate(cluster.id_fac = factor(cluster.id)) %>%
+    left_join(
+      analysis_data %>%
+        mutate(
+            treat_dist = paste0(
+            "treat: ", 
+            assigned.treatment,
+            ", dist: ", dist.pot.group
+            ) 
+          )   %>%
+        select(cluster.id, treat_dist) %>% unique(),
+      by = c("cluster.id_fac" = "cluster.id")
+    ) %>%
+    mutate(gender = case_when(
+      gender == 2 ~ "female",
+      gender == 1 ~ "male",
+      TRUE ~ NA_character_
+    ))
+
+
+  sms_sample_social_info_df = full_analysis_data %>%
+    filter(sms.treatment == "social.info" | sms.treatment == "sms.control") %>%
+    mutate(
+      sms_treatment = case_when(
+        sms.treatment == "sms.control" ~ "smscontrol",
+        sms.treatment %in% c("reminder.only", "social.info") ~ "smstreatment",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    filter(!is.na(sms_treatment)) %>%
+    filter(have_phone == "Yes") %>%
+    # subset to SMS treated OR first SMS control - we shouldn't be adding extra 
+    # SMS control HHs not in PAP
+    filter(
+        (sms_treatment == "smstreatment") |
+        (sms_treatment == "smscontrol" & sms.ctrl.sample.order == 1)
+    ) 
+
+  sms_enrollment_balance_fit = sms_itt_sample_df %>%
+    filter(sms_treatment == "smstreatment") %>%
+    mutate(
+      in_ana_df = KEY.individ %in% sms_sample_social_info_df$KEY.individ
+    ) %>%
+    feols(
+      in_ana_df ~ 0 + treat_dist + i(county, ref = "Busia"),
+      cluster = ~cluster.id
+    )
+
+
+  create_sms_bal_data = function(sms_df, n_indiv_df) {
+    sms_df %>%
+    select(
+      sms_treatment, cluster.id, county,
+      age.census, gender, have_phone, cluster.dist.to.pot) %>%
+    left_join(
+      n_indiv_df %>% transmute(cluster.id, n_per_cluster),
+      by = "cluster.id"
+    ) %>%
+    transmute(
+      sms_treatment = factor(sms_treatment, levels = c("smscontrol", "smstreatment")),
+      cluster.id,
+      county,
+      age = age.census,
+      female = case_when(
+        gender == "female" ~ TRUE,
+        gender == "male" ~ FALSE,
+        TRUE ~ NA
+      ),
+      have_phone_lgl = case_when(
+        have_phone == "Yes" ~ TRUE,
+        have_phone == "No" ~ FALSE,
+        TRUE ~ NA
+      ),
+      n_per_cluster,
+      cluster.dist.to.pot = cluster.dist.to.pot / 1000
+    )
+  }
+
+
+  sms_bal_data = create_sms_bal_data(sms_sample_social_info_df, n_indiv_df)
+  sms_itt_df = create_sms_bal_data(sms_itt_sample_df, n_indiv_df)
+
+
+  sms_bal_vars = c("age", "female", "n_per_cluster", "cluster.dist.to.pot")
+
+
+  sms_itt_bal_fit = feols(
+    data = sms_itt_df,
+    .[sms_bal_vars] ~ 0 +   sms_treatment + i(county, ref = "Busia"),
+    cluster = ~cluster.id,
+    data.save = TRUE
+  )
+  sms_bal_fit = feols(
+    data = sms_bal_data,
+    .[sms_bal_vars] ~ 0+ sms_treatment + i(county, ref = "Busia"),
+    cluster = ~cluster.id,
+    data.save = TRUE
+  )
+
+  age_itt_df = sms_itt_df %>%
+    filter(sms_treatment == "smscontrol") %>%
+    select(age, sms_treatment, county) %>%
+    arrange(age)
+
+  age_bal_df = sms_bal_data %>%
+    filter(sms_treatment == "smscontrol") %>%
+    select(age, sms_treatment, county) %>%
+    arrange(age)
+get_control_mean_from_fit = function(fit,
+                                     treatment_var = "sms_treatment",
+                                     control_level = "smscontrol") {
+  data = fit$data
+  y_var = as.character(fit$fml_all$linear[[2]])
+  outcome_y = data[[y_var]][data[[treatment_var]] == control_level]
+  list(
+    mu = mean(outcome_y, na.rm = TRUE),
+    se = sd(outcome_y, na.rm = TRUE) / sqrt(sum(!is.na(outcome_y)))
+
+  )
+}
+sms_comp_fn = function(fit) {
+  tidy_fit = tidy(fit, conf.int = TRUE)
+
+  control_row = tidy_fit %>%
+    filter(str_detect(term, "smscontrol")) %>%
+    transmute(
+      lhs_treatment = "smscontrol",
+      rhs_treatment = NA_character_,
+      lhs_dist = "combined",
+      rhs_dist = "combined",
+      estimate, std.error, statistic, p.value,
+      comp_type = "adjusted_control"
+    )
+
+  treat_comp = hypotheses(
+    fit,
+    "sms_treatmentsmstreatment - sms_treatmentsmscontrol = 0"
+  ) %>%
+    as_tibble() %>%
+    transmute(
+      lhs_treatment = "smstreatment",
+      rhs_treatment = "smscontrol",
+      lhs_dist = "combined",
+      rhs_dist = "combined",
+      estimate, std.error, statistic, p.value,
+      comp_type = "treatment"
+    )
+
+  control_mean_row = tibble(
+    term = "control_mean",
+    lhs_treatment = "smscontrol",
+    rhs_treatment = NA_character_,
+    lhs_dist = "combined",
+    rhs_dist = "combined",
+    estimate = get_control_mean_from_fit(fit)$mu,
+    std.error = get_control_mean_from_fit(fit)$se,
+    statistic = NA_real_,
+    p.value = NA_real_,
+    comp_type = "control_mean"
+  )
+
+  bind_rows(control_row, treat_comp, control_mean_row)
+}
+
+
+  sms_comp_df = sms_bal_fit %>%
+    map_dfr(
+      sms_comp_fn,
+      .id = "lhs"
+    )
+  sms_itt_comp_df = sms_itt_bal_fit %>%
+    map_dfr(
+      sms_comp_fn,
+      .id = "lhs"
+    )
+
+  sms_comp_df %>%
+    filter(lhs == "lhs: age") %>%
+    filter(lhs_treatment == "smscontrol")
+
+  sms_itt_comp_df %>%
+    filter(lhs == "lhs: age") %>%
+    filter(lhs_treatment == "smscontrol")
+
+
+
+  N_sms_control = sum(sms_bal_data$sms_treatment == "smscontrol")
+  N_sms_treat   = sum(sms_bal_data$sms_treatment == "smstreatment")
+  N_sms_treat = 3022
+
+  list(
+    sms_comp_df    = sms_comp_df,
+    N_sms_control  = N_sms_control,
+    N_sms_treat    = N_sms_treat
+  ) %>%
+    saveRDS(file.path(script_options$output_path, "sms_balance.rds"))
+
+  list(
+    sms_itt_comp_df = sms_itt_comp_df,
+    N_sms_control  = sum(sms_itt_df$sms_treatment == "smscontrol"),
+    N_sms_treat    = sum(sms_itt_df$sms_treatment == "smstreatment")
+  ) %>%
+    saveRDS(file.path(script_options$output_path, "sms_itt_balance.rds"))
+
+  sms_itt_comp_df %>%
+    write_csv(file.path(script_options$output_path, "sms_itt_comp_df.csv"))
+
+  sms_comp_df %>%
+    write_csv(file.path(script_options$output_path, "sms_comp_df.csv"))
+
+    # enrolment balance checks
+  sms_enrollment_balance_results =
+  perform_balance_joint_test(
+   sms_enrollment_balance_fit,
+    joint_R = hyp_matrix,
+    close_R = hyp_matrix_close,
+    far_R = hyp_matrix_far
+  )
+
+comp_sms_enrollment = create_balance_comparisons(
+  sms_enrollment_balance_fit,
+  data = sms_itt_sample_df %>%
+    filter(sms_treatment == "smstreatment") %>%
+    mutate(
+      in_ana_df = KEY.individ %in% sms_sample_social_info_df$KEY.individ
+    )
+)
+
+  # save enrollment balance results
+  list(
+    enrollment_balance_comp = comp_sms_enrollment,
+    enrollment_balance_joint_tests = sms_enrollment_balance_results
+  ) %>%
+    saveRDS(file.path(script_options$output_path, "sms_enrollment_balance.rds")
+  )
 
 }
 

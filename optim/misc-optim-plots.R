@@ -9,12 +9,14 @@ script_options <- docopt::docopt(
         --fit-version=<fit-version>
         --welfare-function=<welfare-function> Which utility function to use [default: log]
         --distance-constraint=<distance-constraint>  Distance constraint, in meters [default: 3500]
+        --input-path=<input-path>  Path to Stan analysis data [default: data/stan_analysis_data]
 "),
   args = if (interactive()) "
                             --output-path=optim/plots/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots \
                             --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
                             --fit-version=86 \
-                            --welfare-function=identity
+                            --welfare-function=identity \
+                            --input-path=data/stan_analysis_data
                              " else commandArgs(trailingOnly = TRUE)
 ) 
 library(tidyverse)
@@ -180,25 +182,25 @@ p_scaled =
             colour = type, 
             group = type, 
             linetype = v_star_type
-        ), linewidth = 1.5)  +
+        ), size = 1.5)  +
         theme_minimal() +
-        theme( 
+        theme(
             legend.position = "bottom",
             legend.title = element_blank()
         )  +
         labs(
-            x = "Distance (km)", 
-            y = "Estimated Takeup", 
+            x = "Distance (km)",
+            y = "Estimated Takeup",
             colour = ""
         ) +
         guides(
-            fill = "none", 
+            fill = "none",
             linetype = "none"
         ) +
-        ggthemes::scale_color_canva( 
+        ggthemes::scale_color_canva(
             palette = "Primary colors with a vibrant twist"
         ) +
-        ggthemes::scale_fill_canva( 
+        ggthemes::scale_fill_canva(
             palette = "Primary colors with a vibrant twist"
         ) +
         scale_linetype_manual(
@@ -206,21 +208,21 @@ p_scaled =
         )
 p_scaled
 
-p_scaled_all = 
+p_scaled_all =
     plot_summ_subset_demand_df %>%
         mutate(type = case_when(
             type == "Static: Control" ~ "Fixed: Control",
             TRUE ~ type
         )) %>%
         ggplot(aes(
-            x = dist_km, 
+            x = dist_km,
             y = demand
         )) +
         geom_line(aes(
-            colour = type, 
-            group = type, 
+            colour = type,
+            group = type,
             linetype = v_star_type
-        ), linewidth = 1.5)  +
+        ), size = 1.5)  +
         theme_minimal() +
         theme( 
             legend.position = "bottom",
@@ -317,30 +319,16 @@ imap(
 
 
 
-fit_file = "data/stan_analysis_data/dist_fit87_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-1.csv"
-fit = as_cmdstan_fit(fit_file)
-
-
-# # To find fixed point need:
-# # benefit_cost
-# # mu_rep
-# # total_error_sd
-# # u_sd
-
+fit_file = str_glue("{script_options$input_path}/dist_fit{script_options$fit_version}_{script_options$model}-1.csv")
+fit_csv = read_cmdstan_csv(fit_file, variables = c("cluster_roc", "cluster_roc_no_vis"))
 
 bc_draws = spread_rvars(
-    fit,
-    # cluster_rep_return[i,j,k],
-    # cluster_rep_return_dist[i,j,k],
-    # cluster_w_cutoff[i,j,k], 
-    # cluster_w_control_cutoff[i,j,k], 
-    # total_error_sd[1],
-    # dist_beta_v[k]
-    cluster_roc[i,j,k], 
+    fit_csv$post_warmup_draws,
+    cluster_roc[i,j,k],
     cluster_roc_no_vis[i,j,k]
     )
 
-rm(fit)
+rm(fit_csv)
 gc()
 
 summ_bc_draws = bc_draws %>%

@@ -21,7 +21,7 @@ Options:
   --stat=<stat>        Statistic to show [default: std.error]
 ",
   args = if (interactive()) "
-   --beliefs 
+   --endline 
   " else commandArgs(trailingOnly = TRUE)
 )
 # TODO: Fix --sms and --heterogeneity
@@ -37,8 +37,20 @@ tex_postprocessing = function(tex) {
         str_replace(
           .,
           "Covariate",
-          "\\\\midrule Covariate"
+          "\\\\midrule\n   Covariate"
         )
+}
+
+drop_fixest_footer = function(tex) {
+  tex %>%
+    str_remove_all("(?m)^\\s*\\\\multicolumn\\{\\d+\\}\\{l\\}\\{\\\\emph\\{Clustered.*\\}\\}\\\\\\\\\\s*\n") %>%
+    str_remove_all("(?m)^\\s*\\\\multicolumn\\{\\d+\\}\\{l\\}\\{\\\\emph\\{Signif\\. Codes:.*\\}\\}\\\\\\\\\\s*\n")
+}
+
+compact_fixest_postprocessing = function(tex) {
+  tex %>%
+    tex_postprocessing() %>%
+    drop_fixest_footer()
 }
 # Prefix all messages/output with current section and report errors
 current_section <- "(setup)"
@@ -457,6 +469,23 @@ discrete_distance_covs_output = wrapper_function(
   table_name = "rf_discrete_dist_covs_tbl"
 )
 
+#### Takeup Discrete Distance + No LASSO Covs + No Cluster Expected Distance
+discrete_distance_no_covs_no_mu_d_regression = function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment*assigned_dist_group | county,
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+discrete_distance_no_covs_no_mu_d_output = wrapper_function(
+  data = cov_analysis_data,
+  regression_spec = discrete_distance_no_covs_no_mu_d_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/discrete-dist-no-covs-no-mu-d-tidy-tes.csv",
+  table_name = "rf_discrete_dist_no_covs_no_mu_d_tbl"
+)
+
 ##### Excluding baseline sample
 
 discrete_distance_covs_exclude_baseline_output = wrapper_function(
@@ -606,9 +635,6 @@ summ_know_A_df %>%
     n_indiv = n_distinct(KEY.individ)
   )
 
-      # doesnt_know_other_dewormed = obs_know_person - knows_other_dewormed,
-      # doesnt_think_other_knows = obs_know_person - thinks_other_knows
-
 endline_know_A_df = endline_data %>%
   left_join(
     summ_know_A_df,
@@ -649,6 +675,14 @@ discrete_f_know = function(data, weights) {
   )
 }
 
+discrete_f_know_no_covs_no_mu_d = function(data, weights) {
+  feols(
+    prop_knows ~ assigned_treatment + assigned_dist_group + i(assigned_treatment, assigned_dist_group, "control") | county,
+    data = data,
+    weights = weights
+  )
+}
+
 cts_f_know = function(data, weights) {
   feols(
     prop_knows ~ assigned_treatment + standard_cluster.dist.to.pot + i(assigned_treatment, standard_cluster.dist.to.pot, "control") + .[l_cov_vars] + mu_d | county,
@@ -680,6 +714,18 @@ discrete_fob_output = wrapper_function(
   ),
   table_name = "rf_discrete_fob_spec_tbl",
   tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv"
+)
+
+#### FOB Discrete Distance + No LASSO Covs + No Cluster Expected Distance
+discrete_fob_no_covs_no_mu_d_output = wrapper_function(
+  data = endline_know_A_df %>%
+    mutate(prop_knows = prop_know_fob),
+  regression_spec = discrete_f_know_no_covs_no_mu_d,
+  table_options = list(
+    dependent_var = "Dependent variable: Observability"
+  ),
+  table_name = "rf_discrete_fob_no_covs_no_mu_d_spec_tbl",
+  tidy_summ_path = "temp-data/tidy-rf-tes/reducedform-discrete-fob-no-covs-no-mu-d-tidy-tes.csv"
 )
 
 
@@ -1127,7 +1173,6 @@ fob_levels %>%
 
 if (run_all || script_options$endline) run_section("Endline/Incentive/Preference/Travel", {
 
-
 ####  Endline Predicted Deworming Takeup
 endline_data = endline_data %>%
   mutate(
@@ -1458,6 +1503,146 @@ incentive_check_tbl = wide_incentive_check_input_df %>%
 incentive_check_tbl %>%
   custom_save_latex_table("incentive-check-tbl")
 
+bracelet_distance_data = endline_data %>%
+  filter(assigned_treatment == "bracelet") %>%
+  mutate(
+    assigned_dist_group = factor(assigned_dist_group, levels = c("close", "far")),
+    seen_in_community = seen_bracelet == 1,
+    received_bracelet = dewormed.reported == 1 & got_bracelet == 1,
+    still_has_bracelet = if_else(
+      received_bracelet,
+      have_bracelet == 1 | wear_bracelet == 1,
+      NA
+    ),
+    wearing_bracelet = if_else(
+      received_bracelet,
+      wear_bracelet == 1,
+      NA
+    )
+  ) %>%
+  select(
+    cluster_id,
+    assigned_dist_group,
+    seen_in_community,
+    still_has_bracelet,
+    wearing_bracelet
+  ) %>%
+  pivot_longer(
+    cols = c(seen_in_community, still_has_bracelet, wearing_bracelet),
+    names_to = "outcome",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    outcome = factor(
+      outcome,
+      levels = c("seen_in_community", "still_has_bracelet", "wearing_bracelet"),
+      labels = c("Seen in community", "Still has bracelet", "Wearing bracelet")
+    )
+  )
+
+bracelet_distance_level_fit = feols(
+  value ~ 0 + assigned_dist_group,
+  split = ~outcome,
+  data = bracelet_distance_data,
+  cluster = ~cluster_id
+)
+
+bracelet_distance_diff_fit = feols(
+  value ~ i(assigned_dist_group, ref = "close"),
+  split = ~outcome,
+  data = bracelet_distance_data,
+  cluster = ~cluster_id
+)
+
+bracelet_distance_levels = bracelet_distance_level_fit %>%
+  map_dfr(
+    ~tidy(.x) %>%
+      select(term, estimate, std.error, p.value),
+    .id = "outcome"
+  ) %>%
+  mutate(
+    dist_group = case_when(
+      term == "assigned_dist_groupclose" ~ "Close",
+      term == "assigned_dist_groupfar" ~ "Far"
+    )
+  )
+
+bracelet_distance_diff = bracelet_distance_diff_fit %>%
+  map_dfr(
+    ~tidy(.x) %>%
+      filter(term == "assigned_dist_group::far") %>%
+      select(estimate, std.error, p.value),
+    .id = "outcome"
+  ) %>%
+  mutate(dist_group = "Far--Close")
+
+bracelet_distance_tbl_input = bind_rows(
+  bracelet_distance_levels,
+  bracelet_distance_diff
+) %>%
+  mutate(
+    stars = case_when(
+      dist_group != "Far--Close" ~ "",
+      p.value < 0.01 ~ "***",
+      p.value < 0.05 ~ "**",
+      p.value < 0.1 ~ "*",
+      TRUE ~ ""
+    ),
+    estimate_se = linebreak(
+      paste0(round(estimate, 3), stars, "\n", "(", round(std.error, 3), ")"),
+      align = "c"
+    ),
+    dist_group = factor(dist_group, levels = c("Close", "Far", "Far--Close"))
+  ) %>%
+  select(outcome, dist_group, estimate_se) %>%
+  pivot_wider(
+    names_from = dist_group,
+    values_from = estimate_se
+  ) %>%
+  mutate(
+    outcome = str_remove(outcome, "^sample\\.var: outcome; sample: "),
+    outcome = factor(
+      outcome,
+      levels = c(
+        "Seen in community",
+        "Still has bracelet",
+        "Wearing bracelet"
+      ),
+      labels = c("Seen in community", "Still has bracelet", "Wearing bracelet")
+    )
+  ) %>%
+  arrange(outcome)
+
+bracelet_distance_tbl = bracelet_distance_tbl_input %>%
+  knitr::kable(
+    format = "latex",
+    col.names = c("", "Close", "Far", "Far--Close"),
+    escape = FALSE,
+    booktabs = TRUE,
+    align = "lccc",
+    caption = "Bracelet Visibility, Retention, and Wearing by Distance\\label{tab:bracelet-distance-display}"
+  ) %>%
+  kable_styling(
+    latex_options = c("scale_down")
+  )
+
+bracelet_distance_tbl %>%
+  custom_save_latex_table("bracelet-distance-display-tbl")
+
+bracelet_distance_tbl_path = file.path(
+  params$table_output_path,
+  "bracelet-distance-display-tbl.tex"
+)
+bracelet_distance_tbl_tex = readLines(bracelet_distance_tbl_path, warn = FALSE)
+bracelet_distance_tbl_tex = c(
+  "\\caption{Bracelet Visibility, Retention, and Wearing by Distance}",
+  "\\label{tab:bracelet-distance-display}",
+  bracelet_distance_tbl_tex,
+  "\\floatfoot{\\textit{Notes:} The table reports endline measures of bracelet visibility, possession, and wearing among respondents assigned to the Bracelet arm. Outcomes are reported separately for Close and Far communities, along with Far--Close differences. ``Seen in community'' equals one if the respondent reports having seen the bracelet in the community. ``Still has bracelet'' and ``Wearing bracelet'' are defined among respondents who dewormed and report receiving the bracelet. Standard errors are clustered at the community level.}"
+)
+writeLines(bracelet_distance_tbl_tex, bracelet_distance_tbl_path)
+
 # incentive drawbacks
 incentive_drawback_tbl = wide_incentive_check_input_df %>%
   select(treatment, bad) %>%
@@ -1486,7 +1671,6 @@ long_incentive_check_df %>%
   )
 ### Preference for Gift Fit Not Dewormed ---------------------------------------
 
-# TODO check this sample
 pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
     # 38,019
     filter(!is.na(gift_choice)) %>%
@@ -1587,7 +1771,9 @@ pref_gift_fit_not_dewormed = analysis_data %>%
       dewormed == FALSE
     )  %>%
     ungroup() %>%
-    select(KEY.individ, cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
+    select(
+      KEY.individ, cluster.id, gift_choice, assigned.treatment, dist.pot.group,
+      county, standard_cluster.dist.to.pot, cluster_id_rank) %>%
     mutate(
       want_bracelet = gift_choice == "bracelet"
     )  %>%
@@ -1614,7 +1800,21 @@ pref_gift_fit = function(data, weights) {
 } 
 
 
-wrapper_function(
+pref_fit_flipped = wrapper_function(
+  data = pref_gift_fit_not_dewormed,
+  regression_spec = pref_gift_fit,
+  tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-FLIPPED-tidy-tes.csv",
+  table_name = "preference_for_bracelet_FLIPPED_spec_tbl",
+  table_options = list(
+    caption = "Average Treatment Effects: Reduced Form", 
+    dependent_var = "Dependent variable: Prefer Bracelet", 
+    stars = TRUE
+    ),
+    flip_calendar_sign = TRUE
+)
+
+
+pref_fit_not_flipped = wrapper_function(
   data = pref_gift_fit_not_dewormed,
   regression_spec = pref_gift_fit,
   tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-tidy-tes.csv",
@@ -1625,10 +1825,35 @@ wrapper_function(
     stars = TRUE
     )
 )
+  pref_fit_not_flipped$tidy_summary %>%       
+    filter(                               
+      assigned_treatment %in% c("bracelet", "calendar", "ink", "control", "abs(calendar) - abs(bracelet)") |
+      n_obs_line                                                                                               
+    ) %>%                                 
+    prep_tbl(stat = params$stat, stars = TRUE) %>%                                                             
+    mutate(                                                                                                    
+      assigned_treatment = str_replace(                                                                      
+        as.character(assigned_treatment),                                                                      
+        fixed("$|Calendar| - |Bracelet|$"),                                                                  
+        "$|\\text{Calendar}| - |\\text{Bracelet}|$"                                                          
+      )
+    ) %>%                                                                                                      
+    arrange(factor(assigned_treatment, levels = c(
+      "Bracelet", "Calendar", "Ink", "Control",                                                                
+      "$|\\text{Calendar}| - |\\text{Bracelet}|$",                                                           
+      "Observations"                                                                                         
+    ))) %>%                                                                                                    
+    nice_kbl_table(
+      cap = "...",                                                                                             
+      outcome_var = "Dependent variable: Prefer Bracelet"                                                    
+    ) %>%                                                                                                    
+    custom_save_latex_table(table_name = "preference_for_bracelet_abs_diff_spec_tbl") 
+pref_fit_not_flipped$tidy_summary %>%
+  filter(str_detect(assigned_treatment, "cal|bra")) %>%
+  print(n = 100)
 
 
-
-pref_not_flipped = wrapper_function(
+pref_not_flipped_full = wrapper_function(
   data = pref_gift_fit_not_dewormed_full_sample,
   regression_spec = pref_gift_fit,
   tidy_summ_path = "temp-data/temp.csv",
@@ -1641,9 +1866,9 @@ pref_not_flipped = wrapper_function(
     flip_calendar_sign = FALSE
 )
 
-pref_not_flipped
+pref_not_flipped_full
 
-pref_not_flipped$tidy_summary %>%
+pref_not_flipped_full$tidy_summary %>%
   filter(str_detect(assigned_treatment, "cal|bra")) %>%
   print(n = 100)
 
@@ -1901,15 +2126,18 @@ sms_control_reg = sms_analysis_data_control %>%
 fitstat_register(
   "control_mean_sms_control",
   function(est) {
-    d = model.matrix(est, type = "lhs")
-    base_idx = est$obs_selection$obsRemoved == FALSE
-    # Use the model's data to find control obs
     ctrl = sms_analysis_data_control %>% filter(sms_treatment == "smscontrol")
-    ctrl_sd = sd(ctrl$dewormed, na.rm = TRUE)
-    list(mean = mean(ctrl$dewormed, na.rm = TRUE), sd = sprintf("(%.3f)", ctrl_sd))
+    ctrl_mean_se = feols(
+      dewormed ~ 1,
+      data = ctrl,
+      cluster = ~cluster_id
+    ) %>%
+      coeftable() %>%
+      .[1, "Std. Error"]
+    list(mean = mean(ctrl$dewormed, na.rm = TRUE), se = sprintf("(%.3f)", ctrl_mean_se))
   },
-  alias = c("control_mean_sms_control.mean" = "Control mean", "control_mean_sms_control.sd" = ""),
-  subtypes = c("mean", "sd")
+  alias = c("control_mean_sms_control.mean" = "Control mean", "control_mean_sms_control.se" = ""),
+  subtypes = c("mean", "se")
 )
 
 etable(
@@ -1922,12 +2150,12 @@ etable(
     sms_treatmentreminderonly = "Reminder Only"
   ),
   keep = c("Social Info", "Reminder Only"),
-  fitstat = ~control_mean_sms_control.mean + control_mean_sms_control.sd + n,
+  fitstat = ~control_mean_sms_control.mean + control_mean_sms_control.se + n,
   depvar = FALSE,
   digits = 3,
   digits.stats = 3,
   drop.section = "fixef",
-  postprocess.tex = tex_postprocessing,
+  postprocess.tex = compact_fixest_postprocessing,
   replace = TRUE,
   style.df = style.df(depvar.title = "", fixef.title = ""),
   notes = "",
@@ -1949,7 +2177,7 @@ etable(
 #    \midrule
 #    \emph{Fit statistics}\\
 #    Control mean  & 0.330\\  
-#                  & (0.470)\\  
+#                  & (0.032)\\
 #    Observations  & 1,705\\  
 #    \midrule \midrule
 #    \multicolumn{2}{l}{\emph{Clustered (cluster\_id) standard-errors in parentheses}}\\
@@ -2379,7 +2607,7 @@ gender_het_fit = het_fits$gender_fit
       "Previously Dewormed" = prevdeworm_het_fit,
       "Externality Knowledge" = externality_het_fit
     ),
-    drop = "dist",
+    drop = "dist|Constant|factor\\(county\\)",
     dict = c(
       frac_externality_gt_mean = "Covariate",
       frac_externality_gt_meanTRUE = "Covariate",
@@ -2431,7 +2659,7 @@ gender_het_fit = het_fits$gender_fit
     ),
     drop.section = "fixef",
     tex = TRUE, 
-    postprocess.tex = tex_postprocessing,
+    postprocess.tex = compact_fixest_postprocessing,
     replace = TRUE,
     style.df = style.df(
       depvar.title = "", 
@@ -2440,10 +2668,25 @@ gender_het_fit = het_fits$gender_fit
 
 # WTP Checks
 
+wtp_choice_data <- wtp.data %>%
+  select(-any_of("county")) %>%
+  left_join(
+    cluster.strat.data %>% select(cluster.id, county),
+    by = "cluster.id"
+  )
+if (!"second_choice" %in% names(wtp_choice_data)) {
+  wtp_choice_data <- wtp_choice_data %>%
+    mutate(
+      first_choice = factor(first_choice, levels = 1:2, labels = c("bracelet", "calendar")),
+      second_choice = if_else(first_choice == "bracelet", cal_plus_ksh, bra_plus_ksh) %>%
+        factor(levels = 1:2, labels = c("switch", "keep"))
+    )
+}
+
 wtp_out = full_analysis_data %>%
   mutate(stratum = county) %>%
   prepare_bayes_wtp_data(
-    wtp.data,
+    wtp_choice_data,
     
     preference_value_diff = seq(-100, 100, 10), 
     num_preference_value_diff = length(preference_value_diff), 
@@ -2478,6 +2721,7 @@ wtp_out = full_analysis_data %>%
     ) %>%
     select(-neither)
 
+ full_analysis_data %>%
     count(
       wtp_samp = !is.na(gift_choice), 
       sms_control = sms.treatment.2 == "sms.control",
@@ -2499,7 +2743,7 @@ origin_prepared_analysis_data %>%
     mutate(offer = 0,
            response = "keep")
 
-  incentive_choice_data <- wtp.data %>%
+  incentive_choice_data <- wtp_choice_data %>%
     semi_join(origin_prepared_analysis_data, "cluster.id") %>% # Make sure we have the same clusters
     filter(!is.na(first_choice)) %>%
     transmute(county, cluster.id,
@@ -2513,7 +2757,7 @@ origin_prepared_analysis_data %>%
 incentive_choice_data
 
 
-wtp.data %>%
+wtp_choice_data %>%
   select(first_choice, price)
 
 }) # end heterogeneity

@@ -29,8 +29,7 @@ output_path = script_options$output_path
 dir.create(output_path)
 many_pots = script_options$many_pots
 
-# dist_paths = paste0("/dist-constraint-", c(2500, 3500, 4500, 5500, 10000))
-dist_paths = paste0("/dist-constraint-", c(3500))
+dist_paths = paste0("/dist-constraint-", c(2500, 3500, 4500, 5500, 10000))
 
 if (script_options$posterior_median) {
     oa_files = fs::dir_ls(

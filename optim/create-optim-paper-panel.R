@@ -110,7 +110,7 @@ optimisation_df =
         optim_files
     ) %>%
     map_dfr(read_rds) %>%
-    select(-demand_data, -optim_problem, -optim_fit)   
+    select(-demand_data)
 
 optimisation_df[, allocation_type := "policymaker"] 
 
@@ -390,8 +390,6 @@ plot_comp_function = function(meta_df, long_df){
     return(p_grid)
 }
 
-stop()
-
 subset_optimisation_df = optimisation_df %>%
     filter(
         file %in% c(
@@ -420,11 +418,11 @@ comp_plot
 save_plot(
     plot = comp_plot,
     filename = file.path(
-        str_glue("presentations/optim-takeup-{script_options$model}-fig"), 
+        script_options$output_path,
         str_glue(
             "panel-scenarios-compare-optimal-allocation-plot-distconstraint-{script_options$distance_constraint}.pdf"
         )
-    ), 
-    base_width = 20, 
+    ),
+    base_width = 20,
     base_height = 10
 )

@@ -15,14 +15,15 @@ script_options = docopt::docopt(
         --fit-path=data/stan_analysis_data
         --fit-file=SMS_BRMS_reminder_fit.rds
         --output-path=temp-data/sms-noreminder
-        --include-reminder
     " else commandArgs(trailingOnly = TRUE)
-    # args = if (interactive()) "takeup cv --models=REDUCED_FORM_NO_RESTRICT --cmdstanr --include-paths=stan_models --update --output-path=data/stan_analysis_data --outputname=test --folds=2 --sequential" else commandArgs(trailingOnly = TRUE)
 ) 
 
 library(tidyverse)
 library(marginaleffects)
 library(ggthemes)
+
+# 3,813 current SMS control phone owner sample.
+# HHs who have phone but do not get treatment.
 
 options(mc.cores = 4)
 
@@ -49,20 +50,6 @@ monitored_sms_data <- analysis.data %>%
   mutate(cluster_id = cur_group_id()) %>% 
   ungroup()
 
-analysis.data %>%
-    select(contains("consent"))
-
-analysis.data %>%
-    count(sms.consent)
-
-analysis.data %>%
-    count(census.consent)
-
-analysis.data %>%
-    count(monitor.consent)
-
-
-
 
 analysis_data <- monitored_sms_data %>% 
     filter(have_phone == "Yes") %>%
@@ -76,6 +63,12 @@ analysis_data <- monitored_sms_data %>%
     ) %>%
     # reminder.only only present in control condition
     filter(phone_owner == "phone") %>%
+    # subset to SMS treated OR first SMS control - we shouldn't be adding extra 
+    # SMS control HHs not in PAP
+    filter(
+        (sms_treatment %in% c("socialinfo", "reminderonly")) |
+        (sms_treatment == "smscontrol" & sms.ctrl.sample.order == 1)
+    ) %>%
     mutate(sms_treatment = factor(sms_treatment))
 
 cluster_expected_dist_df = read_csv(here::here("data", "cluster_expected_dist.csv")) %>%
@@ -93,19 +86,10 @@ l_cov_vars = c(
   "age.census"
 )
 
-analysis_data %>%
-    group_by(
-        sms_treatment
-    ) %>%
-    summarise(
-        n = n()
-    )
-# stop()
-
-
 library(fixest)
 rf_fit = feols(
-    data = analysis_data,
+    data = analysis_data %>%
+        filter(sms_treatment != "reminderonly"),
     dewormed ~ assigned_treatment*assigned_dist_group*sms_treatment + .[l_cov_vars] + clust_expected_dist | county, 
     cluster =  ~cluster.id
     )
@@ -146,18 +130,6 @@ reminder_fit %>%
         title = "SMS Reminder Treatment Effects"
         # file = "temp-data/sms-reminder-fit.tex",
         # replace = TRUE
-    )
-
-
-analysis_data %>%
-    count(assigned_treatment, sms_treatment)
-
-
-nobs(rf_fit)
-
-analysis_data %>%
-    count(
-        sms_treatment
     )
 
 
@@ -243,6 +215,12 @@ plot_df = bind_rows(
         )
     )
 
+
+plot_df %>%
+    select(-lhs, -rhs) %>%
+    write_csv(file.path(script_options$output_path, "sms-reduced-form-comps.csv"))
+
+
 p_sms_df = plot_df %>%
     ggplot(aes(
         x = estimate,
@@ -268,3 +246,18 @@ p_sms_df = plot_df %>%
 p_sms_df
 
 ggsave(plot = p_sms_df, filename = file.path(script_options$output_path, "sms-TE-by-dist-incentive.pdf"), width = 8, height = 6)
+
+
+rf_fit
+
+analysis_data %>%
+    mutate(sms_t_combined = case_when(
+        sms_treatment == "socialinfo" ~ "SMS Treatment", 
+        sms_treatment == "smscontrol" ~ "SMS Control",
+        sms_treatment == "reminderonly" ~ "SMS Treatment",
+    )) %>%
+    count(sms_t_combined)
+
+analysis_data %>%
+    filter(sms_treatment != "reminderonly") %>%
+    count(sms_treatment)

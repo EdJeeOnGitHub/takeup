@@ -86,20 +86,7 @@ create_te_table = function(data, var) {
 }
 
 
-
-# These are no longer used 
-endline_and_baseline_worm_data %>%
-  create_te_table(
-    know_worms_infectious
-  )
-
-# These are no longer used 
-endline_and_baseline_worm_data %>%
-  create_te_table(
-    fully_aware_externalities
-  )
-
-externality_data = endline.data %>%
+externality_data = endline_data %>%
     mutate(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
@@ -117,7 +104,7 @@ externality_data = endline.data %>%
 
 # Just the baseline data, with cluster level covariates joined on
 # Not used in paper, but for checking
-solo_baseline_data = baseline.data  %>%
+solo_baseline_data = baseline_data  %>%
     transmute(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
@@ -142,7 +129,7 @@ solo_baseline_data = baseline.data  %>%
 
 # Just the endline data, with cluster level covariates joined on
 # Not used in paper, but for checking
-solo_endline_data = endline.data %>%
+solo_endline_data = endline_data %>%
     transmute(
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
@@ -199,12 +186,13 @@ externality_knowledge_df = cov_analysis_data %>%
     inner_join(
       externality_data %>% select(-cluster.id),
       by = "KEY.individ"
-    ) 
+    ) %>%
+    mutate(cluster_id_rank = dense_rank(cluster.id)) 
 
 
 
 # Wider sample externality knowledge data, not main analysis sample
-full_externality_knowledge_df = analysis.data  %>%
+full_externality_knowledge_df = full_analysis_data  %>%
   mutate(
     female = gender == "female",
     cluster_id = dense_rank(cluster.id)
@@ -217,6 +205,7 @@ full_externality_knowledge_df = analysis.data  %>%
     county,
     all_of(l_cov_vars),
     KEY.individ,
+    cluster_id_rank,
     everything()
     )  %>%
     inner_join(
@@ -242,6 +231,7 @@ externality_knowledge_regression = function(data, weights) {
     weights = ~wt
   )
 }
+
 
 # Wrapper function runs regression, calculates SEs, and saves output
 externality_knowledge_output = wrapper_function(
@@ -271,7 +261,7 @@ full_externality_knowledge_output = wrapper_function(
 ###### 3. Generating know/don't know beliefs -----------------------------------
 
 # Summary table of beliefs by relationship type
-endline.know.table.data %>%
+endline_know_table_data %>%
   filter(fct_match(know.table.type, "table.A"))  %>%
   filter(num.recognized > 0) %>%
   group_by(
@@ -329,7 +319,7 @@ endline.know.table.data %>%
 belief_ana_df = analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
-    endline.know.table.data %>% 
+    endline_know_table_data %>% 
       filter(fct_match(know.table.type, "table.A")),
     by = "KEY.individ", 
     name = "knowledge_data"
@@ -375,7 +365,7 @@ disagg_belief_all_df = all_data %>%
   ) %>% 
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
-    endline.know.table.data %>% 
+    endline_know_table_data %>% 
       filter(fct_match(know.table.type, "table.A")) %>%
       mutate(ed_in_endline_flag = TRUE),
     by = "KEY.individ", 
@@ -486,7 +476,7 @@ disagg_belief_all_df %>%
 disagg_base_belief_data = cov_analysis_data %>%
   mutate(assigned_treatment = assigned.treatment, assigned_dist_group = dist.pot.group) %>%
   nest_join(
-    endline.know.table.data %>% 
+    endline_know_table_data %>% 
       filter(fct_match(know.table.type, "table.A")),
     by = "KEY.individ", 
     name = "knowledge_data"
@@ -1050,7 +1040,7 @@ incentive_check_tbl %>%
 
 ###### 7. Gift preferences  ----------------------------------------------------
 # Preference for Gift Fit Not Dewormed 
-pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
+pref_gift_fit_not_dewormed_full_sample = full_analysis_data %>%
     # 38,019
     filter(!is.na(gift_choice)) %>%
     # 3,676
@@ -1066,7 +1056,8 @@ pref_gift_fit_not_dewormed_full_sample = analysis.data %>%
     ungroup() %>%
     select(KEY.individ, cluster.id, gift_choice, 
       assigned.treatment, dist.pot.group, county, gender,
-      age.census
+      age.census,
+      cluster_id_rank
       ) %>%
     mutate(
       want_bracelet = gift_choice == "bracelet"
@@ -1199,7 +1190,8 @@ pref_gift_fit_not_dewormed = analysis_data %>%
       dewormed == FALSE
     )  %>%
     ungroup() %>%
-    select(KEY.individ, cluster.id, gift_choice, assigned.treatment, dist.pot.group, county, standard_cluster.dist.to.pot) %>%
+    select(KEY.individ, cluster.id, gift_choice, assigned.treatment,
+           dist.pot.group, county, standard_cluster.dist.to.pot, cluster_id_rank) %>%
     mutate(
       want_bracelet = gift_choice == "bracelet"
     )  %>%
@@ -1215,69 +1207,6 @@ pref_gift_fit_not_dewormed = analysis_data %>%
       )
 
 
-
-pref_gift_fit = function(data, weights) {
-  feols(
-    want_bracelet ~  assigned_treatment*assigned_dist_group  + .[l_cov_vars] + mu_d | county,
-    data = data,
-    nthreads = 1,
-    weights = ~wt
-  )
-} 
-
-
-wrapper_function(
-  data = pref_gift_fit_not_dewormed,
-  regression_spec = pref_gift_fit,
-  tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-tidy-tes.csv",
-  table_name = "preference_for_bracelet_spec_tbl",
-  table_options = list(
-    caption = "Average Treatment Effects: Reduced Form", 
-    dependent_var = "Dependent variable: Prefer Bracelet", 
-    stars = TRUE
-    )
-)
-
-
-
-pref_not_flipped = wrapper_function(
-  data = pref_gift_fit_not_dewormed_full_sample,
-  regression_spec = pref_gift_fit,
-  tidy_summ_path = "temp-data/temp.csv",
-  table_name = "temp-pref-bra",
-  table_options = list(
-    caption = "Average Treatment Effects: Reduced Form", 
-    dependent_var = "Dependent variable: Prefer Bracelet", 
-    stars = TRUE
-    ),
-    flip_calendar_sign = FALSE
-)
-
-pref_not_flipped$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "cal|bra")) %>%
-  print(n = 100)
-
-
-pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "cal|bra")) %>%
-  print(n = 100)
-
-pref_gift_not_dewormed_full_sample_fit = wrapper_function(
-  data = pref_gift_fit_not_dewormed_full_sample,
-  regression_spec = pref_gift_fit,
-  tidy_summ_path = "temp-data/tidy-rf-tes/preference-for-bracelet-full-sample-FLIPPED-tidy-tes.csv",
-  table_name = "preference_for_bracelet_full_sample_FLIPPED_spec_tbl",
-  table_options = list(
-    caption = "Average Treatment Effects: Reduced Form", 
-    dependent_var = "Dependent variable: Prefer Bracelet", 
-    stars = TRUE
-    ),
-    flip_calendar_sign = TRUE
-)
-
-pref_gift_not_dewormed_full_sample_fit$tidy_summary %>%
-  filter(str_detect(assigned_treatment, "- cal")) %>%
-  print(n = 100)
 
 
 
