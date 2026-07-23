@@ -2,8 +2,8 @@
 # Extra ToDos June 16th
 
 
-
-0. We ran `conservative-table-a-attrition-regression-preview.pdf` - update to show with full endline sample (from limiting-factor claude) + summary is: the difference is only significant at 10pct when we do by treatment status and not significant overall, only on this random subsample.
+- [ ] Robustness todo: Show social multiplier exists across all robustness checks.
+- [ ] Identification grid.
 
 
 Immediate ed todo: 
@@ -110,10 +110,11 @@ The headline contribution features an estimated social-image multiplier of 0.8�
 A central question for the structural decomposition is how the direct travel-cost denominator is experimentally anchored. In the experiment, Control communities do not represent a pure private-information environment; Table 1 shows that reported observability remains high in Close communities and falls with distance. Consequently, the direct travel-cost slope appears to be recovered via the joint structural restrictions on distance costs, observability, the social-image weight, the type distribution, and idiosyncratic noise, rather than from a transparent experimental setup with zero observability. Presenting explicit evidence on which moments independently pin down the direct distance slope versus the reputational feedback will substantiate the multiplier claim.
 
 
-**TODO**: 1. explain why/how we need the structural model even if we don't have a zero obs arm. I.e. if we have more clusters we would hav emore distance points and we  could nonparametrically get the overall 
+**TODO**: 
+- [ ] 1. explain why/how we need the structural model even if we don't have a zero obs arm. I.e. if we have more clusters we would hav emore distance points and we  could nonparametrically get the overall 
 multiplier by \partial takeup / \partial distance - but with more clusters we're never really observing more observability points - we'd need continuous variation in visibility. Even w/ "pseudo continuous variation in visibility" suppose we have 8 arms - we could do semi-parametrics. But we'd never see anyone at 0 observability - even in control there's observability.
 
-**TODO**: 2., create the table people use to show which data maps to which moments.
+- [ ] 2., create the table people use to show which data maps to which moments.
 
 
 ## Overall: 2 **Mapping the observability measure to social image payoffs**
@@ -123,11 +124,14 @@ Section 6 maps $p_{Observed}(z,d)$ to the probability that an individual's parti
 An apparent empirical tension is that the structural model treats this measure as the exact object required for social-image payoffs, yet the measurement captures a noisier construct. Table B15 shows that public signals increase definite classifications while simultaneously lowering conditional accuracy in certain cells. Furthermore, the structural posterior does not presently propagate either misclassification or the differential missingness in the observability module documented in Tables B4–B6. Showcasing that the multiplier estimates survive alternative observability inputs—such as unconditional correct classification, perceived own observability, or explicit bounds for missing data—will cement confidence in this parameter.
 
 
-**TODO**: 1. Structural Model w/ robustness checks w/: 
+**TODO**: 
+- [ ]  Structural Model w/ robustness checks w/: 
     - a) sample over missing data for the people we're missing beliefs for in structural model (ideally w/o building selection model. CHECK in RF if we find selection).
     - b) SOB 
     - c) Definite classification (panel C of our FOB RF table)
     - reverse order of importance c > b > a
+    - Show social multiplier persists.
+    - Add to robustness section.
 
 
 
@@ -165,7 +169,7 @@ The site-allocation counterfactual in Section 7 forms the basis for the paper's 
 Applying the estimated demand function $T(z,d;\theta)$ directly to the planner's assignment introduces two strong assumptions. First, it requires extrapolating distance behavior up to 3.5 km, resting outside the experimental support limit of 2.5 km. Second, it assumes that the Control or Bracelet observability schedules depend solely on distance and signal regime, remaining fully invariant to the actual consolidation of sites, pooling of communities, and altered traffic patterns resulting from reducing the number of PoTs. Presenting sensitivity analyses that incorporate more pessimistic observability schedules under facility consolidation, and enforcing distance-cost caps strictly within experimental support, will ensure the site-count reductions carry the appropriate weight.
 
 
-**TODO**: Footnote saying this could go either way: on one hand see less people you know as it's busy. On other hand, see more people overall so obs goes up.
+- [ ] Footnote saying this could go either way: on one hand see less people you know as it's busy. On other hand, see more people overall so obs goes up.
 
 
 ---
@@ -183,6 +187,14 @@ Within 1,995 check if predictive within that sample.
 Use calendar as argument against:
 
 >Before you move to your second step of bounding the treatment effect, you have a very powerful conceptual defense already in the paper: the Calendar arm. The baseline data shows that the Calendar arm has largely the same Far-Close imbalance in past deworming as the Bracelet and Ink arms. Yet, in the main results, the Calendar arm yields completely flat take-up across distance (it acts as a clean placebo). If the reviewer were correct that this specific baseline imbalance mechanically drives the take-up gap, the Calendar arm should have shown the same attenuated distance gradient as the public-signal arms. It did not.
+
+
+- [ ] Move Section 4.2.2 text about severe baseline imbalance to appendix (it's already there)
+- [ ] Add link in balance main text discussion to appendix C, currently it's not discussed.
+
+
+
+
 
 **Status**: [DONE]
 
@@ -210,6 +222,9 @@ Table C1 appears to undercut the statement that baseline differences do not reve
   Table~\ref{tab:fob-baseline-imbalance-robustness}). These checks suggest that the
   take-up and observability patterns are not driven by pre-existing differences in
   deworming knowledge or prior deworming experience across communities.
+
+
+
 
 
 ---
@@ -309,6 +324,9 @@ There seems to be an issue with the identification account for $\sigma_u$: the s
 **OUTPUT**:
 Tweaked writeup, added plots comparing prior and posterior:
 Appendix~\ref{priors} shows that the data are informative about this parameter by comparing the prior and posterior distributions for \(\sigma_u\).
+
+
+- [ ] Add link directly to figure. Rewrite prior appendix to remove many lines, add a small p.g. on what K1 figure is in the appendix.
 
 ---
 
@@ -444,10 +462,8 @@ In Section 3.5, the text notes that item/signal assignment does not predict omis
 
 ### 15. Confusing description of re-randomization
 
-TODO: "reframe the text strictly as correcting baseline spatial measurement error"
-Edit in main text, appendix, and PAP.
 
-**Status**: [Pending]
+**Status**: [DONE]
 
 **Quote**:
 > Eligibility is then verified using the distance between the selected community's centroid and the finalized PoT. If the finalized PoT location or initially selected community made the assigned distance band infeasible, the PoT-community pairing was re-randomized before implementation using the same protocol and eligibility criteria.
