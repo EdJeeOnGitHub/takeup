@@ -3,7 +3,7 @@
 
 
 - [ ] Robustness todo: Show social multiplier exists across all robustness checks.
-- [ ] Identification grid.
+- [x] Identification grid.
 
 
 Immediate ed todo: 
@@ -66,13 +66,13 @@ Checks:
 
 Suggested framing: "We had a harder time following up with control group, we had lower follow-up rates, and therefore had to use more backups." Discuss potential follow-up bias using Lee bounds, clarify which paper conclusions are sensitive to it, and present calendar as an active control.
 
-- [ ] endline observability module: Add calendar p-value -> for endline observability
+- [x] endline observability module: Add calendar p-value -> for endline observability
 	- "pooled" isn't used currently.
 	- Not an exception, "there's one significant difference" or something
 	- Our comparisons rely on bra-cal double difference, there's no significant difference.
 	- Not completion -> it's missing from being there in the beginning. Reword (it's recruitment into the sample).
 
-- [ ] monitored takeup sample, same structure as endline (joint and then individual)
+- [x] monitored takeup sample, same structure as endline (joint and then individual)
 	- calendar comparison for both
 
 Spell out the conclusion.

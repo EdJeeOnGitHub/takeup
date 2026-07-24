@@ -310,6 +310,35 @@ model_test_terms <- list(
   dist_controls = dist_treat_terms
 )
 
+model_equality_tests <- list(
+  treat_controls = list(
+    bracelet_calendar = c(
+      "assigned_treatment::bracelet",
+      "assigned_treatment::calendar"
+    )
+  ),
+  dist_controls = list(
+    bracelet_calendar = rbind(
+      c(
+        "assigned_treatment::bracelet:assigned_dist_group::close",
+        "assigned_treatment::calendar:assigned_dist_group::close"
+      ),
+      c(
+        "assigned_treatment::bracelet:assigned_dist_group::far",
+        "assigned_treatment::calendar:assigned_dist_group::far"
+      )
+    ),
+    bracelet_calendar_close = c(
+      "assigned_treatment::bracelet:assigned_dist_group::close",
+      "assigned_treatment::calendar:assigned_dist_group::close"
+    ),
+    bracelet_calendar_far = c(
+      "assigned_treatment::bracelet:assigned_dist_group::far",
+      "assigned_treatment::calendar:assigned_dist_group::far"
+    )
+  )
+)
+
 fit_sim_models <- function(sim_df) {
   list(
     treat_controls = feols(
@@ -426,7 +455,7 @@ combine_model <- function(model_name) {
   b <- stats::cov(q)
   total_v <- u_bar + (1 + 1 / m) * b
 
-  tibble(
+  combined_coefs <- tibble(
     model = model_name,
     term = present,
     estimate = unname(q_bar[present]),
@@ -448,6 +477,37 @@ combine_model <- function(model_name) {
         }
       )
     )
+
+  equality_rows <- imap_dfr(model_equality_tests[[model_name]], function(terms, test_name) {
+    term_pairs <- if (is.matrix(terms)) terms else matrix(terms, nrow = 1)
+    if (!all(term_pairs %in% present)) return(tibble())
+
+    restriction_matrix <- matrix(
+      0,
+      nrow = nrow(term_pairs),
+      ncol = length(present),
+      dimnames = list(NULL, present)
+    )
+    for (i in seq_len(nrow(term_pairs))) {
+      restriction_matrix[i, term_pairs[i, 1]] <- 1
+      restriction_matrix[i, term_pairs[i, 2]] <- -1
+    }
+    restriction_estimate <- drop(restriction_matrix %*% q_bar[present])
+    restriction_vcov <- restriction_matrix %*% total_v %*% t(restriction_matrix)
+    statistic <- drop(
+      t(restriction_estimate) %*% solve(restriction_vcov) %*% restriction_estimate
+    )
+
+    tibble(
+      model = model_name,
+      term = test_name,
+      estimate = NA_real_,
+      se = NA_real_,
+      pval = pchisq(statistic, df = nrow(term_pairs), lower.tail = FALSE)
+    )
+  })
+
+  bind_rows(combined_coefs, equality_rows)
 }
 
 sim_combined <- map_dfr(names(model_terms), combine_model)
@@ -462,8 +522,8 @@ sim_cell <- function(model, term) {
   coef_cell(row$estimate, row$se, row$pval)
 }
 
-sim_pval_cell <- function(model) {
-  row <- sim_combined %>% filter(model == !!model, term == "joint_treatment_p")
+sim_pval_cell <- function(model, term = "joint_treatment_p") {
+  row <- sim_combined %>% filter(model == !!model, term == !!term)
   if (nrow(row) == 0) return("")
   pval_fmt(row$pval)
 }
@@ -517,6 +577,13 @@ sim_tex_table <- c(
   "RF controls & Yes & Yes \\\\",
   paste0("$H_0$: all displayed treatment coefficients = 0, $p$-value & ",
          sim_pval_cell("treat_controls"), " & ", sim_pval_cell("dist_controls"), " \\\\"),
+  paste0("$H_0$: Bracelet = Calendar, $p$-value & ",
+         sim_pval_cell("treat_controls", "bracelet_calendar"), " & ",
+         sim_pval_cell("dist_controls", "bracelet_calendar"), " \\\\"),
+  paste0("$H_0$: Bracelet $\\times$ Close = Calendar $\\times$ Close, $p$-value &  & ",
+         sim_pval_cell("dist_controls", "bracelet_calendar_close"), " \\\\"),
+  paste0("$H_0$: Bracelet $\\times$ Far = Calendar $\\times$ Far, $p$-value &  & ",
+         sim_pval_cell("dist_controls", "bracelet_calendar_far"), " \\\\"),
   "Observations & 1,267 & 1,267 \\\\",
   "Simulations & 1,000 & 1,000 \\\\",
   "\\bottomrule",

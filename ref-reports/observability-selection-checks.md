@@ -55,9 +55,10 @@ What it is: rerun the main FOB/observability treatment-effect table after exclud
 How it helps: directly targets the reviewer concern that control households required more backups. If the observability effects are stable when backups are excluded, then the results are not driven by replacing unreachable control respondents with different backup respondents.
 
 Existing code/table:
-- Not yet cleanly implemented as a main robustness table.
-- Related code: `scratch/reduced-form-bootstrap.R:1673` includes an attrition regression with `is_backup` as a control for the Table A/missingness sample.
-- Needed addition: a first-responder-only version of the main FOB/observability reduced-form table, likely near the existing beliefs regressions in `scratch/reduced-form-bootstrap.R`.
+- Implemented in `scratch/reduced-form-bootstrap.R` in the beliefs regressions section. The code defines `is_backup` from `census_data$endline.backup`, sets `is_first_responder = !is_backup`, writes backup/first-responder sample counts, then reruns the main FOB/observability reduced-form table after `filter(is_first_responder)`.
+- Code locations: `scratch/reduced-form-bootstrap.R:1094` for the first-responder flag and sample counts; `scratch/reduced-form-bootstrap.R:1173` for the first-responder-only FOB regression.
+- Outputs generated on July 9, 2026 with `devcontainer exec --workspace-folder /home/ed/projects/takeup Rscript scratch/reduced-form-bootstrap.R --beliefs`: `temp-data/tidy-rf-tes/fob-first-responder-sample-counts.csv`, `temp-data/tidy-rf-tes/reducedform-discrete-fob-first-responder-tidy-tes.csv`, `presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl.tex`, and `presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl_weird_order.tex`.
+- Main first-responder-only estimates are qualitatively similar to the full FOB table: the signal effect is 0.105 for combined, 0.051 for close, 0.176 for far, and 0.125 for far-minus-close. The bracelet-calendar contrast is 0.104 for combined and 0.127 for far-minus-close.
 
 ## 6. Lee Bounds for FOB Observability
 

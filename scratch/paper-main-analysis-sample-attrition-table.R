@@ -44,6 +44,39 @@ wald_p <- function(model, terms) {
   pval_fmt(wald(model, keep = paste(terms, collapse = "|"))$p)
 }
 
+equality_p <- function(model, term1, term2) {
+  if (!all(c(term1, term2) %in% names(coef(model)))) return("")
+  contrast <- setNames(c(1, -1), c(term1, term2))
+  estimate <- sum(coef(model)[names(contrast)] * contrast)
+  contrast_vcov <- drop(
+    t(contrast) %*% vcov(model)[names(contrast), names(contrast), drop = FALSE] %*% contrast
+  )
+  pval_fmt(pchisq(estimate^2 / contrast_vcov, df = 1, lower.tail = FALSE))
+}
+
+joint_equality_p <- function(model, term_pairs) {
+  terms <- unique(as.vector(t(term_pairs)))
+  if (!all(terms %in% names(coef(model)))) return("")
+
+  restriction_matrix <- matrix(
+    0,
+    nrow = nrow(term_pairs),
+    ncol = length(coef(model)),
+    dimnames = list(NULL, names(coef(model)))
+  )
+  for (i in seq_len(nrow(term_pairs))) {
+    restriction_matrix[i, term_pairs[i, 1]] <- 1
+    restriction_matrix[i, term_pairs[i, 2]] <- -1
+  }
+
+  restriction_estimate <- drop(restriction_matrix %*% coef(model))
+  restriction_vcov <- restriction_matrix %*% vcov(model) %*% t(restriction_matrix)
+  statistic <- drop(
+    t(restriction_estimate) %*% solve(restriction_vcov) %*% restriction_estimate
+  )
+  pval_fmt(pchisq(statistic, df = nrow(term_pairs), lower.tail = FALSE))
+}
+
 tex_postprocessing <- function(tex) {
   tex <- tex %>%
     str_remove("\\\\begin\\{table\\}\\[htbp\\]") %>%
@@ -304,6 +337,42 @@ etable(
     "$H_0$: all displayed treatment coefficients = 0, $p$-value" = c(
       wald_p(fit_treat, treat_terms),
       wald_p(fit_dist_controls, dist_treat_terms)
+    ),
+    "$H_0$: Bracelet = Calendar, $p$-value" = c(
+      equality_p(
+        fit_treat,
+        "assigned_treatment::bracelet",
+        "assigned_treatment::calendar"
+      ),
+      joint_equality_p(
+        fit_dist_controls,
+        rbind(
+          c(
+            "assigned_treatment::bracelet:assigned_dist_group::close",
+            "assigned_treatment::calendar:assigned_dist_group::close"
+          ),
+          c(
+            "assigned_treatment::bracelet:assigned_dist_group::far",
+            "assigned_treatment::calendar:assigned_dist_group::far"
+          )
+        )
+      )
+    ),
+    "$H_0$: Bracelet $\\times$ Close = Calendar $\\times$ Close, $p$-value" = c(
+      "",
+      equality_p(
+        fit_dist_controls,
+        "assigned_treatment::bracelet:assigned_dist_group::close",
+        "assigned_treatment::calendar:assigned_dist_group::close"
+      )
+    ),
+    "$H_0$: Bracelet $\\times$ Far = Calendar $\\times$ Far, $p$-value" = c(
+      "",
+      equality_p(
+        fit_dist_controls,
+        "assigned_treatment::bracelet:assigned_dist_group::far",
+        "assigned_treatment::calendar:assigned_dist_group::far"
+      )
     )
   )
 )

@@ -619,6 +619,27 @@ models <- lst(
       list_modify(
         mu_rep_type = 4
       ),
+    STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_CLOSE_FAR_ONLY = .$STRUCTURAL_LINEAR_U_SHOCKS %>%
+      list_modify(
+        mu_rep_type = 4,
+        # Remove within-Close/Far continuous-distance information while
+        # preserving the observed mean distance contrast between the two
+        # randomized distance groups. This changes the distance input in both
+        # take-up and beliefs and disables the now-irrelevant marginal
+        # continuous-distance likelihood.
+        fit_dist_model_to_data = FALSE,
+        stan_data_preprocess = function(stan_data) {
+          distance_group <- stan_data$cluster_assigned_dist_group
+          group_mean_distance <- tapply(
+            stan_data$cluster_standard_dist,
+            distance_group,
+            mean
+          )
+          stan_data$cluster_standard_dist <-
+            unname(group_mean_distance[as.character(distance_group)])
+          stan_data
+        }
+      ),
     STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_BELIEFS_CONSTANT = .$STRUCTURAL_LINEAR_U_SHOCKS %>% 
       list_modify(
         mu_rep_type = 4,

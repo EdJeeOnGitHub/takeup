@@ -3,43 +3,46 @@
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
 \begin{tabular}{lcc}
    \tabularnewline \midrule \midrule
-                                                              & Treatment     & Treatment $\times$ Distance \\    
+                                                                         & Treatment     & Treatment $\times$ Distance \\    
    Dependent variable: Missing from monitored take-up sample       & (1)           & (2)\\  
    \midrule
-   Ink                                                        & -0.005        &   \\   
-                                                              & (0.005)       &   \\   
-   Calendar                                                   & 0.004         &   \\   
-                                                              & (0.005)       &   \\   
-   Bracelet                                                   & 0.007         &   \\   
-                                                              & (0.005)       &   \\   
-   Far                                                        &               & 0.007\\   
-                                                              &               & (0.007)\\   
-   Ink $\times$ Close                                         &               & -0.002\\   
-                                                              &               & (0.007)\\   
-   Ink $\times$ Far                                           &               & -0.008\\   
-                                                              &               & (0.006)\\   
-   Calendar $\times$ Close                                    &               & 0.004\\   
-                                                              &               & (0.007)\\   
-   Calendar $\times$ Far                                      &               & 0.003\\   
-                                                              &               & (0.005)\\   
-   Bracelet $\times$ Close                                    &               & 0.008\\   
-                                                              &               & (0.006)\\   
-   Bracelet $\times$ Far                                      &               & 0.005\\   
-                                                              &               & (0.008)\\   
+   Ink                                                                   & -0.005        &   \\   
+                                                                         & (0.005)       &   \\   
+   Calendar                                                              & 0.004         &   \\   
+                                                                         & (0.005)       &   \\   
+   Bracelet                                                              & 0.007         &   \\   
+                                                                         & (0.005)       &   \\   
+   Far                                                                   &               & 0.007\\   
+                                                                         &               & (0.007)\\   
+   Ink $\times$ Close                                                    &               & -0.002\\   
+                                                                         &               & (0.007)\\   
+   Ink $\times$ Far                                                      &               & -0.008\\   
+                                                                         &               & (0.006)\\   
+   Calendar $\times$ Close                                               &               & 0.004\\   
+                                                                         &               & (0.007)\\   
+   Calendar $\times$ Far                                                 &               & 0.003\\   
+                                                                         &               & (0.005)\\   
+   Bracelet $\times$ Close                                               &               & 0.008\\   
+                                                                         &               & (0.006)\\   
+   Bracelet $\times$ Far                                                 &               & 0.005\\   
+                                                                         &               & (0.008)\\   
    \addlinespace[0.4em]
-   Female                                                     & 0.015$^{***}$ & 0.015$^{***}$\\   
-                                                              & (0.004)       & (0.004)\\   
-   Age                                                        & 0.001$^{***}$ & 0.001$^{***}$\\   
-                                                              & (0.0002)      & (0.0002)\\   
-   Expected distance to PoT                                   & -0.004        & -0.004\\   
-                                                              & (0.005)       & (0.005)\\   
-   Control mean                                               & 0.091         & 0.091\\  
-   County FEs                                                 & Yes           & Yes\\  
-   RF controls                                                & Yes           & Yes\\  
-   $H_0$: all displayed treatment coefficients = 0, $p$-value & 0.081         & 0.195\\  
+   Female                                                                & 0.015$^{***}$ & 0.015$^{***}$\\   
+                                                                         & (0.004)       & (0.004)\\   
+   Age                                                                   & 0.001$^{***}$ & 0.001$^{***}$\\   
+                                                                         & (0.0002)      & (0.0002)\\   
+   Expected distance to PoT                                              & -0.004        & -0.004\\   
+                                                                         & (0.005)       & (0.005)\\   
+   Control mean                                                          & 0.091         & 0.091\\  
+   County FEs                                                            & Yes           & Yes\\  
+   RF controls                                                           & Yes           & Yes\\  
+   $H_0$: all displayed treatment coefficients = 0, $p$-value            & 0.081         & 0.195\\  
+   $H_0$: Bracelet = Calendar, $p$-value                                 & 0.511         & 0.754\\  
+   $H_0$: Bracelet $\times$ Close = Calendar $\times$ Close, $p$-value   &               & 0.480\\  
+   $H_0$: Bracelet $\times$ Far = Calendar $\times$ Far, $p$-value       &               & 0.804\\  
    \midrule
-   Observations                                               & 10,794        & 10,794\\  
-   R$^2$                                                      & 0.121         & 0.121\\  
+   Observations                                                          & 10,794        & 10,794\\  
+   R$^2$                                                                 & 0.121         & 0.121\\  
    \midrule \midrule
 \end{tabular}}
 
