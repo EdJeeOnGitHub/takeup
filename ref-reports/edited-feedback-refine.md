@@ -85,7 +85,7 @@ Spell out the conclusion.
 
 # Extra ToDos June 15th
 
-- [ ] TODO: "reframe the text strictly as correcting baseline spatial measurement error"
+- [x] TODO: "reframe the text strictly as correcting baseline spatial measurement error"
 Edit in main text, appendix, and PAP. 
 
 
@@ -126,7 +126,7 @@ A central question for the structural decomposition is how the direct travel-cos
 - [ ] 1. explain why/how we need the structural model even if we don't have a zero obs arm. I.e. if we have more clusters we would hav emore distance points and we  could nonparametrically get the overall 
 multiplier by \partial takeup / \partial distance - but with more clusters we're never really observing more observability points - we'd need continuous variation in visibility. Even w/ "pseudo continuous variation in visibility" suppose we have 8 arms - we could do semi-parametrics. But we'd never see anyone at 0 observability - even in control there's observability.
 
-- [ ] 2., create the table people use to show which data maps to which moments.
+- [x] 2., create the table people use to show which data maps to which moments.
 
 
 ## Overall: 2 **Mapping the observability measure to social image payoffs**
@@ -137,13 +137,14 @@ An apparent empirical tension is that the structural model treats this measure a
 
 
 **TODO**: 
-- [ ]  Structural Model w/ robustness checks w/: 
+- [x]  Structural Model w/ robustness checks w/: 
     - a) sample over missing data for the people we're missing beliefs for in structural model (ideally w/o building selection model. CHECK in RF if we find selection).
     - b) SOB 
     - c) Definite classification (panel C of our FOB RF table)
     - reverse order of importance c > b > a
     - Show social multiplier persists.
     - Add to robustness section.
+- [ ] Add discussion in text!
 
 
 
