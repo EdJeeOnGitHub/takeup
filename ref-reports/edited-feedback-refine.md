@@ -66,17 +66,17 @@ Checks:
 
 Suggested framing: "We had a harder time following up with control group, we had lower follow-up rates, and therefore had to use more backups." Discuss potential follow-up bias using Lee bounds, clarify which paper conclusions are sensitive to it, and present calendar as an active control.
 
-Remaining edits:
-- [ ] Endline observability module:
-  - Add the Calendar comparison and p-value.
-  - Do not describe the result as "pooled" if no pooled specification is reported.
-  - Replace "an exception" with a precise statement such as "there is one statistically significant difference."
-  - Emphasize that the main comparison is the Bracelet--Calendar double difference, which is not statistically significant.
-  - Describe the issue as recruitment into the endline sample, rather than failure to complete a module after recruitment.
-- [ ] Monitored take-up sample:
-  - Present the same structure as for the endline sample: first the joint test and then the arm-specific comparisons.
-  - Add the Calendar comparison to both.
-- [ ] Spell out the conclusion: state clearly what pattern would be concerning and what the results imply for the take-up and observability conclusions.
+- [ ] endline observability module: Add calendar p-value -> for endline observability
+	- "pooled" isn't used currently.
+	- Not an exception, "there's one significant difference" or something
+	- Our comparisons rely on bra-cal double difference, there's no significant difference.
+	- Not completion -> it's missing from being there in the beginning. Reword (it's recruitment into the sample).
+
+- [ ] monitored takeup sample, same structure as endline (joint and then individual)
+	- calendar comparison for both
+
+Spell out the conclusion.
+	-> what to worry about and what this means.
 
 ### TODO 3: Mermaid diagram simplification.
 - The diagram is too complicated.
