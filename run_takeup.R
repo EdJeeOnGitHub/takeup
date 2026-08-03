@@ -2,8 +2,8 @@
 print(commandArgs(trailingOnly = TRUE))
 script_options <- docopt::docopt(
   stringr::str_glue("Usage:
-  run_takeup.R takeup prior [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
-  run_takeup.R takeup fit [--no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --sbc --num-sbc-sims=<num-sbc-sims> --gen-optim --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
+  run_takeup.R takeup prior [--no-save --data-only --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
+  run_takeup.R takeup fit [--no-save --data-only --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --multilevel --age --county-fe --sbc --num-sbc-sims=<num-sbc-sims> --gen-optim --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
   run_takeup.R takeup cv [--folds=<number of folds> --parallel-folds=<parallel-folds> --no-save --sequential --chains=<chains> --threads=<threads> --iter=<iter> --thin=<thin> --force-iter --models=<models> --outputname=<output file name> --update-output --cmdstanr --include-paths=<paths> --output-path=<path> --num-mix-groups=<num> --age --save-rds --beliefs-outcome=<outcome> --beliefs-missing=<mode>]
   
   run_takeup.R beliefs prior [--chains=<chains> --iter=<iter> --outputname=<output file name> --include-paths=<paths> --output-path=<path> --multilevel --no-dist]
@@ -216,18 +216,18 @@ load_belief_data = function(outcome = "fob", missing = "drop") {
       assigned_treatment = assigned.treatment,
       assigned_dist_group = dist.pot.group,
       belief_denominator = case_when(
-        outcome %in% c("fob", "sob") ~ obs_know_person,
-        outcome == "correct-observability" ~ correct_obs_denominator
+        outcome %in% c("fob", "sob") ~ as.integer(obs_know_person),
+        outcome == "correct-observability" ~ as.integer(correct_obs_denominator)
       ),
       belief_numerator_1ord = case_when(
-        outcome == "fob" ~ knows_other_dewormed,
-        outcome == "sob" ~ knows_other_dewormed,
-        outcome == "correct-observability" ~ correct_obs_numerator
+        outcome == "fob" ~ as.integer(knows_other_dewormed),
+        outcome == "sob" ~ as.integer(knows_other_dewormed),
+        outcome == "correct-observability" ~ as.integer(correct_obs_numerator)
       ),
       belief_numerator_2ord = case_when(
-        outcome == "fob" ~ thinks_other_knows,
-        outcome == "sob" ~ thinks_other_knows,
-        outcome == "correct-observability" ~ correct_obs_numerator
+        outcome == "fob" ~ as.integer(thinks_other_knows),
+        outcome == "sob" ~ as.integer(thinks_other_knows),
+        outcome == "correct-observability" ~ as.integer(correct_obs_numerator)
       ),
       belief_observed = !is.na(belief_denominator) & belief_denominator > 0 &
         !is.na(belief_numerator_1ord) & !is.na(belief_numerator_2ord),
@@ -798,10 +798,24 @@ models <- lst(
 
 # WTP Stan Data -----------------------------------------------------------
 
+# Retain the active Stan cluster ID for each WTP observation so the minimal
+# structural runner can reweight the entire joint likelihood by cluster. The
+# individual-fixed-point model expands one community into many pseudo-clusters;
+# no one-to-one community mapping exists there, so leave its legacy data alone.
+wtp_cluster_map <- analysis_data %>%
+  distinct(cluster.id, cluster_id)
+if (anyDuplicated(wtp_cluster_map$cluster.id)) {
+  wtp_cluster_map <- NULL
+} else {
+  wtp_cluster_map <- wtp_cluster_map %>%
+    transmute(cluster.id, new_cluster_id = cluster_id)
+}
+
 wtp_stan_data <- analysis.data %>% 
   mutate(stratum = county) %>% 
   prepare_bayes_wtp_data(
     wtp.data,
+    cluster_map = wtp_cluster_map,
     
     preference_value_diff = seq(-100, 100, 10), 
     num_preference_value_diff = length(preference_value_diff), 
@@ -1037,6 +1051,13 @@ if (script_options$takeup) {
     models[models_to_run]
   } else {
     models
+  }
+
+  if (isTRUE(script_options$data_only)) {
+    dir.create(script_options$output_path, recursive = TRUE, showWarnings = FALSE)
+    save(models, stan_data, file = output_file_name)
+    cat("Saved data-only structural workspace: ", output_file_name, "\n", sep = "")
+    quit(save = "no", status = 0L)
   }
   
   if (script_options$fit || script_options$prior) {
