@@ -1,0 +1,26 @@
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}{lccc}
+\toprule
+Observability & Assigned PoTs & Mean take-up & Mean distance (km) \\
+\midrule
+\multicolumn{4}{l}{\textit{Panel A: Experimental allocation}} \\
+Control & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.327\\(0.291, 0.373)} & \makecell[c]{1.18\\(1.18, 1.18)} \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Panel B: Policymaker allocation, 3.5km}} \\
+Control & \makecell[c]{109\\(94, 126)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.26\\(0.92, 1.59)} \\
+Bracelet & \makecell[c]{81\\(76, 107)} & \makecell[c]{0.328\\(0.327, 0.368)} & \makecell[c]{1.91\\(1.30, 2.44)} \\
+Control social image returns at 0.5km & \makecell[c]{97\\(76, 120)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.52\\(1.03, 2.23)} \\
+Bracelet social image returns at 0.5km & \makecell[c]{88\\(76, 118)} & \makecell[c]{0.328\\(0.327, 0.345)} & \makecell[c]{1.73\\(1.07, 2.42)} \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.082\\(0.017, 0.213)} & \makecell[c]{0.64\\(0.64, 0.64)} \\
+\bottomrule
+\end{tabular}}
+\begin{minipage}{0.98\linewidth}
+\footnotesize \textit{Notes:} Entries are medians across
+210 county-stratified cluster-bootstrap mode refits;
+parentheses are 2.5th and 97.5th percentiles. The welfare target is fixed
+at the baseline experimental-allocation target. The no-social-image target
+is infeasible in every replicate, so that row reports the best/closest-site
+benchmark. The mode approximation passed 93.4 percent of its prespecified
+short-MCMC audit cells.
+\end{minipage}
