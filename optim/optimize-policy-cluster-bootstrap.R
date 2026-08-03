@@ -15,15 +15,31 @@ target_csv <- policy_option_value(args, "--target-csv")
 scenario_id <- as.integer(policy_option_value(args, "--scenario-id"))
 num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "210"))
 time_limit <- as.numeric(policy_option_value(args, "--time-limit", "10000"))
+target_tolerance <- as.numeric(policy_option_value(args, "--target-tolerance", "1e-5"))
 if (is.null(input_path) || is.null(target_csv) || !scenario_id %in% policy_scenarios$scenario_id) {
   stop("--input-path, --target-csv, and a valid --scenario-id are required.", call. = FALSE)
 }
 
 scenario <- policy_scenarios[policy_scenarios$scenario_id == scenario_id, ]
 edges <- readRDS(file.path(input_path, "policy-feasible-edges.rds"))
-curves <- readRDS(file.path(input_path, "policy-demand-curves.rds"))
-curves <- curves[curves$scenario_id == scenario_id, ]
-draws <- sort(unique(curves$draw))
+edge_demand_path <- file.path(input_path, "policy-edge-demand-matrix.rds")
+if (file.exists(edge_demand_path)) {
+  edge_demand <- readRDS(edge_demand_path)
+  draw_map <- read.csv(
+    file.path(input_path, "policy-edge-demand-draw-map.csv"),
+    stringsAsFactors = FALSE
+  )
+  if (nrow(edge_demand) != nrow(draw_map)) {
+    stop("Compact edge-demand matrix and draw map disagree.", call. = FALSE)
+  }
+  curves <- NULL
+  draws <- draw_map$draw
+} else {
+  edge_demand <- NULL
+  curves <- readRDS(file.path(input_path, "policy-demand-curves.rds"))
+  curves <- curves[curves$scenario_id == scenario_id, ]
+  draws <- sort(unique(curves$draw))
+}
 draws <- draws[seq_len(min(num_replicates, length(draws)))]
 
 target_data <- read.csv(target_csv, stringsAsFactors = FALSE)
@@ -100,21 +116,56 @@ for (draw in draws) {
     statuses <- rbind(statuses, saved$status)
     next
   }
-  prediction <- curves[curves$draw == draw, ]
-  demand <- prediction$demand[match(edges$distance, prediction$distance)]
-  if (any(!is.finite(demand))) stop("Missing edge demand for draw ", draw, call. = FALSE)
+  if (!is.null(edge_demand)) {
+    draw_row <- match(draw, draw_map$draw)
+    scenario_columns <- (scenario_id - 1L) * nrow(edges) + seq_len(nrow(edges))
+    demand <- edge_demand[draw_row, scenario_columns]
+    replicate_value <- draw_map$replicate[draw_row]
+  } else {
+    prediction <- curves[curves$draw == draw, ]
+    edge_specific <- "village_i" %in% names(prediction) &&
+      all(!is.na(prediction$village_i))
+    if (edge_specific) {
+      if (nrow(prediction) != nrow(edges) ||
+          !identical(as.integer(prediction$village_i), as.integer(edges$village_i)) ||
+          !isTRUE(all.equal(prediction$distance, edges$distance, tolerance = 0))) {
+        stop("Edge-specific predictions do not align with feasible edges.", call. = FALSE)
+      }
+      demand <- prediction$demand
+    } else {
+      demand <- prediction$demand[match(edges$distance, prediction$distance)]
+    }
+    replicate_value <- prediction$replicate[1L]
+  }
+  if (any(!is.finite(demand))) {
+    status <- data.frame(
+      draw = draw, replicate = replicate_value, scenario_id = scenario_id,
+      scenario = scenario$scenario, scenario_label = scenario$label,
+      status = "equilibrium_undefined", solver_status = NA_integer_,
+      elapsed_seconds = 0, n_pot = NA_real_, mean_demand = NA_real_,
+      mean_distance = NA_real_, achieved_welfare = NA_real_,
+      target_welfare = target, stringsAsFactors = FALSE
+    )
+    saveRDS(
+      list(status = status, allocation = edges[FALSE, ]), output_file,
+      compress = FALSE
+    )
+    statuses <- rbind(statuses, status)
+    if (draw %% 25L == 0L || draw == max(draws)) {
+      write.csv(statuses, status_path, row.names = FALSE)
+      message(scenario$scenario, ": processed draw ", draw, "/", max(draws))
+    }
+    next
+  }
   started <- Sys.time()
   best_edge <- unlist(lapply(split(seq_len(num_edges), village_index), function(index) {
     index[which.max(demand[index])]
   }), use.names = FALSE)
   maximum_achievable <- sum(demand[best_edge])
-  if (maximum_achievable + 1e-7 < target) {
-    if (!scenario$suppress_reputation) {
-      stop("Policy target is infeasible for scenario ", scenario$scenario,
-           ", draw ", draw, call. = FALSE)
-    }
-    # This is the paper's explicit no-social-image benchmark: the target cannot
-    # be attained even with every village using its best/closest feasible site.
+  if (maximum_achievable + target_tolerance < target) {
+    # Retain the best feasible allocation and record target infeasibility. This
+    # is expected for the no-social-image benchmark and can also occur in tail
+    # posterior draws of flexible alternative structural models.
     selected <- best_edge
     status_code <- NA_integer_
     run_status <- "target_infeasible"
@@ -139,12 +190,15 @@ for (draw in draws) {
     stop("Invalid sparse allocation for draw ", draw, call. = FALSE)
   }
   achieved <- sum(allocation$demand)
-  if (run_status == "complete" && achieved + 1e-7 < target) {
-    stop("Allocation missed fixed target.", call. = FALSE)
+  if (run_status == "complete" && achieved + target_tolerance < target) {
+    stop(
+      "Allocation missed fixed target by ", target - achieved, ".",
+      call. = FALSE
+    )
   }
   status <- data.frame(
     draw = draw,
-    replicate = prediction$replicate[1L],
+    replicate = replicate_value,
     scenario_id = scenario_id,
     scenario = scenario$scenario,
     scenario_label = scenario$label,
@@ -160,8 +214,10 @@ for (draw in draws) {
   )
   saveRDS(list(status = status, allocation = allocation), output_file, compress = FALSE)
   statuses <- rbind(statuses, status)
-  write.csv(statuses, status_path, row.names = FALSE)
-  message(scenario$scenario, ": ", run_status, " draw ", draw, "/", max(draws))
+  if (draw %% 25L == 0L || draw == max(draws)) {
+    write.csv(statuses, status_path, row.names = FALSE)
+    message(scenario$scenario, ": processed draw ", draw, "/", max(draws))
+  }
 }
 
 statuses <- statuses[order(statuses$draw), ]
@@ -169,4 +225,4 @@ if (nrow(statuses) != length(draws) || anyDuplicated(statuses$draw)) {
   stop("Incomplete scenario status manifest.", call. = FALSE)
 }
 write.csv(statuses, status_path, row.names = FALSE)
-message("Completed ", scenario$scenario, " for ", nrow(statuses), " bootstrap modes.")
+message("Completed ", scenario$scenario, " for ", nrow(statuses), " draws.")

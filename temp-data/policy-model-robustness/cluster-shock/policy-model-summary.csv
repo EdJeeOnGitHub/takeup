@@ -1,0 +1,7 @@
+"model_id","model_label","scenario_id","scenario","scenario_label","n_pot_estimate","n_pot_low","n_pot_high","takeup_estimate","takeup_low","takeup_high","distance_estimate","distance_low","distance_high","draws","target_infeasible_share","equilibrium_undefined_share"
+"cluster-shock","Cluster random shock",0,"experimental","Experimental allocation",144,144,144,0.328538534679986,0.294830316322174,0.362886141389883,1.1762046829448,1.1762046829448,1.1762046829448,4000,0,0
+"cluster-shock","Cluster random shock",1,"control","Control",107,94,123,0.327819875735458,0.327249070736627,0.32912198069418,1.32643802131786,1.01626752564413,1.59120108093344,4000,0.00075,0
+"cluster-shock","Cluster random shock",2,"bracelet","Bracelet",94,76,115,0.327757172520607,0.327248535584698,0.329161659412012,1.5996105389626,1.16730389572008,2.18809832332912,4000,0.00025,0
+"cluster-shock","Cluster random shock",3,"static-control","Control social image returns at 0.5km",101,86,120,0.327771165266732,0.327246764255239,0.329033227441942,1.43392839416574,1.06567084227316,1.80470930470893,4000,5e-04,0
+"cluster-shock","Cluster random shock",4,"static-bracelet","Bracelet social image returns at 0.5km",98,80,117,0.327801189577358,0.327249651373131,0.329082157036992,1.50379877976938,1.1285853278881,1.9518499411453,4000,0.00025,0.00025
+"cluster-shock","Cluster random shock",5,"suppress-reputation","No social image returns",144,109,144,0.222537180000363,0.0764891580933554,0.328067924590475,0.643364579263291,0.643364579263291,1.27012629924575,4000,0.8715,0

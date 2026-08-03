@@ -1,0 +1,18 @@
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}{lcccc}
+\toprule
+Structural model & Control PoTs & Bracelet PoTs & PoTs saved & PoTs saved, static \\
+\midrule
+Baseline model (cluster bootstrap) & 109 & 81 & \makecell[c]{25\\(10, 42)} & \makecell[c]{7\\(-5, 23)} \\
+Correct classification & 107 & 89 & \makecell[c]{18\\(6, 29)} & \makecell[c]{1\\(-12, 14)} \\
+Perceived observability (second order) & 98 & 76 & \makecell[c]{21\\(13, 30)} & \makecell[c]{5\\(0, 12)} \\
+Any-signal/no-signal social image weight & 108 & 79 & \makecell[c]{28\\(18, 36)} & \makecell[c]{11\\(-2, 22)} \\
+Treatment-specific social image weight & 108 & 83 & \makecell[c]{25\\(-27, 37)} & \makecell[c]{8\\(-42, 26)} \\
+Student-t(5) intrinsic-motivation types & 107 & 79 & \makecell[c]{27\\(17, 35)} & \makecell[c]{7\\(1, 16)} \\
+Cluster random shock & 107 & 94 & \makecell[c]{12\\(1, 28)} & \makecell[c]{3\\(0, 11)} \\
+\bottomrule
+\end{tabular}}
+\begin{minipage}{0.98\linewidth}
+\footnotesize \textit{Notes:} PoTs saved is the draw-level paired difference between the Control and Bracelet optimal allocations at the common welfare target. Parentheses contain 2.5th and 97.5th percentiles. The final column holds social image returns fixed at their 0.5 km level. The baseline uses cluster-bootstrap mode refits; other rows use all retained posterior draws. The companion full table reports undefined-equilibrium and target-infeasibility shares; target-infeasible draws enter paired contrasts at their best feasible allocation.
+\end{minipage}

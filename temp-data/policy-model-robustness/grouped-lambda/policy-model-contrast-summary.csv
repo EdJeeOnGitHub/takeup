@@ -1,0 +1,3 @@
+"model_id","model_label","contrast","left_scenario","right_scenario","left_n_pot","right_n_pot","n_pot_saved","n_pot_saved_low","n_pot_saved_high","defined_draws","draws","equilibrium_undefined_share","target_infeasible_share"
+"grouped-lambda","Any-signal/no-signal social image weight","Endogenous social image returns","control","bracelet",108,79,28,18,36,1600,1600,0,0
+"grouped-lambda","Any-signal/no-signal social image weight","Social image returns fixed at 0.5km","static-control","static-bracelet",97,87,11,-2,22,1600,1600,0,0

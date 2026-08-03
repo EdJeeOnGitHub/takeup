@@ -1,0 +1,15 @@
+"model_id","model_label","contrast","left_scenario","right_scenario","left_n_pot","right_n_pot","n_pot_saved","n_pot_saved_low","n_pot_saved_high","defined_draws","draws","equilibrium_undefined_share","target_infeasible_share"
+"baseline-cluster-bootstrap","Baseline model (cluster bootstrap)","Endogenous social image returns","control","bracelet",109,81,25,10.225,41.775,210,210,0,0
+"baseline-cluster-bootstrap","Baseline model (cluster bootstrap)","Social image returns fixed at 0.5km","static-control","static-bracelet",97,88,7,-5,23,210,210,0,0
+"correct-observability","Correct classification","Endogenous social image returns","control","bracelet",107,89,18,6,29,800,800,0,0
+"correct-observability","Correct classification","Social image returns fixed at 0.5km","static-control","static-bracelet",93,92,1,-12.025,14.025,800,800,0,0
+"second-order-observability","Perceived observability (second order)","Endogenous social image returns","control","bracelet",98,76,21,12.975,30,800,800,0,0
+"second-order-observability","Perceived observability (second order)","Social image returns fixed at 0.5km","static-control","static-bracelet",84,77,5,0,12,800,800,0,0
+"grouped-lambda","Any-signal/no-signal social image weight","Endogenous social image returns","control","bracelet",108,79,28,18,36,1600,1600,0,0
+"grouped-lambda","Any-signal/no-signal social image weight","Social image returns fixed at 0.5km","static-control","static-bracelet",97,87,11,-2,22,1600,1600,0,0
+"arm-lambda","Treatment-specific social image weight","Endogenous social image returns","control","bracelet",108,83,25,-27,37,1600,1600,0,0.013125
+"arm-lambda","Treatment-specific social image weight","Social image returns fixed at 0.5km","static-control","static-bracelet",97,90,8,-42,26,1600,1600,0,0.02
+"student-t5","Student-t(5) intrinsic-motivation types","Endogenous social image returns","control","bracelet",107,79,27,17,35,1600,1600,0,0
+"student-t5","Student-t(5) intrinsic-motivation types","Social image returns fixed at 0.5km","static-control","static-bracelet",98,90,7,1,16,1600,1600,0,0
+"cluster-shock","Cluster random shock","Endogenous social image returns","control","bracelet",107,94,12,1,28,4000,4000,0,0.00075
+"cluster-shock","Cluster random shock","Social image returns fixed at 0.5km","static-control","static-bracelet",101,98,3,0,11,3999,4000,0.00025,5e-04

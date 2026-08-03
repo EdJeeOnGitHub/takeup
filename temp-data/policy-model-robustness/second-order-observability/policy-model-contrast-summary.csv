@@ -1,0 +1,3 @@
+"model_id","model_label","contrast","left_scenario","right_scenario","left_n_pot","right_n_pot","n_pot_saved","n_pot_saved_low","n_pot_saved_high","defined_draws","draws","equilibrium_undefined_share","target_infeasible_share"
+"second-order-observability","Perceived observability (second order)","Endogenous social image returns","control","bracelet",98,76,21,12.975,30,800,800,0,0
+"second-order-observability","Perceived observability (second order)","Social image returns fixed at 0.5km","static-control","static-bracelet",84,77,5,0,12,800,800,0,0

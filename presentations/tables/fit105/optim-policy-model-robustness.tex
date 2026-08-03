@@ -1,0 +1,73 @@
+\small
+\begin{longtable}{p{0.34\linewidth}cccc}
+\caption{Optimal policy robustness across structural models}\label{tab:policy-model-robustness}\\
+\toprule
+Policy information & \makecell{Assigned\\PoTs} & \makecell{Mean\\take-up} & \makecell{Mean distance\\(km)} & \makecell{Undefined /\\infeasible (\%)} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{c}{\tablename\ \thetable{} -- continued} \\
+\toprule
+Policy information & \makecell{Assigned\\PoTs} & \makecell{Mean\\take-up} & \makecell{Mean distance\\(km)} & \makecell{Undefined /\\infeasible (\%)} \\
+\midrule
+\endhead
+\multicolumn{5}{l}{\textit{Baseline model (cluster bootstrap)}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.327\\(0.291, 0.373)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{109\\(94, 126)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.26\\(0.92, 1.59)} & 0.00 / 0.00 \\
+Bracelet & \makecell[c]{81\\(76, 107)} & \makecell[c]{0.328\\(0.327, 0.368)} & \makecell[c]{1.91\\(1.30, 2.44)} & 0.00 / 0.00 \\
+Control social image returns at 0.5km & \makecell[c]{97\\(76, 120)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.52\\(1.03, 2.23)} & 0.00 / 0.00 \\
+Bracelet social image returns at 0.5km & \makecell[c]{88\\(76, 118)} & \makecell[c]{0.328\\(0.327, 0.345)} & \makecell[c]{1.73\\(1.07, 2.42)} & 0.00 / 0.00 \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.082\\(0.017, 0.213)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 100.00 \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Correct classification}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.332\\(0.314, 0.350)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{107\\(100, 114)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.29\\(1.14, 1.44)} & 0.00 / 0.00 \\
+Bracelet & \makecell[c]{89\\(76, 104)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.70\\(1.35, 2.15)} & 0.00 / 0.00 \\
+Control social image returns at 0.5km & \makecell[c]{93\\(77, 105)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.60\\(1.32, 2.05)} & 0.00 / 0.00 \\
+Bracelet social image returns at 0.5km & \makecell[c]{92\\(76, 109)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.63\\(1.24, 2.12)} & 0.00 / 0.00 \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.119\\(0.041, 0.222)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 100.00 \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Perceived observability (second order)}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.361\\(0.334, 0.399)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{98\\(89, 107)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.48\\(1.29, 1.71)} & 0.00 / 0.00 \\
+Bracelet & \makecell[c]{76\\(76, 86)} & \makecell[c]{0.330\\(0.327, 0.394)} & \makecell[c]{2.36\\(1.78, 2.44)} & 0.00 / 0.00 \\
+Control social image returns at 0.5km & \makecell[c]{84\\(76, 98)} & \makecell[c]{0.328\\(0.327, 0.330)} & \makecell[c]{1.84\\(1.50, 2.37)} & 0.00 / 0.00 \\
+Bracelet social image returns at 0.5km & \makecell[c]{77\\(76, 92)} & \makecell[c]{0.328\\(0.327, 0.357)} & \makecell[c]{2.06\\(1.63, 2.44)} & 0.00 / 0.00 \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.080\\(0.021, 0.192)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 100.00 \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Any-signal/no-signal social image weight}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.331\\(0.312, 0.350)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{108\\(102, 116)} & \makecell[c]{0.328\\(0.327, 0.330)} & \makecell[c]{1.27\\(1.12, 1.41)} & 0.00 / 0.00 \\
+Bracelet & \makecell[c]{79\\(76, 93)} & \makecell[c]{0.328\\(0.327, 0.332)} & \makecell[c]{1.98\\(1.61, 2.43)} & 0.00 / 0.00 \\
+Control social image returns at 0.5km & \makecell[c]{97\\(86, 109)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.50\\(1.24, 1.79)} & 0.00 / 0.00 \\
+Bracelet social image returns at 0.5km & \makecell[c]{87\\(76, 101)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.76\\(1.43, 2.16)} & 0.00 / 0.00 \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.119\\(0.028, 0.268)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 99.81 \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Treatment-specific social image weight}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.332\\(0.313, 0.351)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{108\\(101, 115)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.27\\(1.12, 1.42)} & 0.00 / 0.00 \\
+Bracelet & \makecell[c]{83\\(76, 137)} & \makecell[c]{0.328\\(0.327, 0.385)} & \makecell[c]{1.86\\(0.74, 2.44)} & 0.00 / 1.31 \\
+Control social image returns at 0.5km & \makecell[c]{97\\(85, 108)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.50\\(1.26, 1.80)} & 0.00 / 0.00 \\
+Bracelet social image returns at 0.5km & \makecell[c]{90\\(76, 141)} & \makecell[c]{0.328\\(0.327, 0.358)} & \makecell[c]{1.68\\(0.68, 2.43)} & 0.00 / 2.00 \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.123\\(0.031, 0.260)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 100.00 \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Student-t(5) intrinsic-motivation types}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.331\\(0.311, 0.350)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{107\\(101, 115)} & \makecell[c]{0.328\\(0.327, 0.330)} & \makecell[c]{1.29\\(1.13, 1.43)} & 0.00 / 0.00 \\
+Bracelet & \makecell[c]{79\\(76, 92)} & \makecell[c]{0.328\\(0.327, 0.331)} & \makecell[c]{1.98\\(1.63, 2.41)} & 0.00 / 0.00 \\
+Control social image returns at 0.5km & \makecell[c]{98\\(87, 108)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.49\\(1.28, 1.75)} & 0.00 / 0.00 \\
+Bracelet social image returns at 0.5km & \makecell[c]{90\\(78, 102)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.68\\(1.40, 2.03)} & 0.00 / 0.00 \\
+No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.085\\(0.031, 0.169)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 100.00 \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Cluster random shock}} \\
+Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.329\\(0.295, 0.363)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
+Control & \makecell[c]{107\\(94, 123)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.33\\(1.02, 1.59)} & 0.00 / 0.07 \\
+Bracelet & \makecell[c]{94\\(76, 115)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.60\\(1.17, 2.19)} & 0.00 / 0.03 \\
+Control social image returns at 0.5km & \makecell[c]{101\\(86, 120)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.43\\(1.07, 1.80)} & 0.00 / 0.05 \\
+Bracelet social image returns at 0.5km & \makecell[c]{98\\(80, 117)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.50\\(1.13, 1.95)} & 0.03 / 0.03 \\
+No social image returns & \makecell[c]{144\\(109, 144)} & \makecell[c]{0.223\\(0.076, 0.328)} & \makecell[c]{0.64\\(0.64, 1.27)} & 0.00 / 87.15 \\
+\addlinespace
+\bottomrule
+\end{longtable}
+\begin{minipage}{\linewidth}
+\footnotesize \textit{Notes:} Each panel applies the same five policy counterfactuals, 3.5 km feasible-site cap, and baseline experimental-allocation welfare target. Parentheses contain 2.5th and 97.5th percentiles. The baseline panel uses county-stratified cluster-bootstrap mode refits; alternative-model panels use all retained HMC posterior draws. The final column reports, respectively, the percent of draws with an undefined counterfactual equilibrium and the percent with an unattainable welfare target. Target-infeasible draws report the allocation that maximizes attainable take-up; undefined-equilibrium draws are retained in the diagnostic denominator but excluded from that scenario's quantiles.
+\end{minipage}

@@ -1,0 +1,7 @@
+"model_id","model_label","scenario_id","scenario","scenario_label","n_pot_estimate","n_pot_low","n_pot_high","takeup_estimate","takeup_low","takeup_high","distance_estimate","distance_low","distance_high","draws","target_infeasible_share","equilibrium_undefined_share"
+"correct-observability","Correct classification",0,"experimental","Experimental allocation",144,144,144,0.331929973948799,0.314176130328044,0.350265054751782,1.1762046829448,1.1762046829448,1.1762046829448,800,0,0
+"correct-observability","Correct classification",1,"control","Control",107,100,114,0.327921076853591,0.3272523569661,0.329464559300318,1.29419061140515,1.14039326101517,1.43799399141487,800,0,0
+"correct-observability","Correct classification",2,"bracelet","Bracelet",89,76,104,0.32773970686515,0.32725076216222,0.328556579642146,1.70213090287338,1.34757164913743,2.1470118885809,800,0,0
+"correct-observability","Correct classification",3,"static-control","Control social image returns at 0.5km",93,77,105.025,0.327768003734445,0.327260385169424,0.328683804043877,1.60155763389057,1.32313520441146,2.04851298002101,800,0,0
+"correct-observability","Correct classification",4,"static-bracelet","Bracelet social image returns at 0.5km",92,76,109,0.327793322698969,0.32725557732489,0.328808664365515,1.62664872750077,1.23807571948886,2.12126880423564,800,0,0
+"correct-observability","Correct classification",5,"suppress-reputation","No social image returns",144,144,144,0.118876628135642,0.0407626092995758,0.221538763156843,0.643364579263291,0.643364579263291,0.643364579263291,800,1,0

@@ -1,0 +1,3 @@
+"model_id","model_label","contrast","left_scenario","right_scenario","left_n_pot","right_n_pot","n_pot_saved","n_pot_saved_low","n_pot_saved_high","defined_draws","draws","equilibrium_undefined_share","target_infeasible_share"
+"correct-observability","Correct classification","Endogenous social image returns","control","bracelet",107,89,18,6,29,800,800,0,0
+"correct-observability","Correct classification","Social image returns fixed at 0.5km","static-control","static-bracelet",93,92,1,-12.025,14.025,800,800,0,0

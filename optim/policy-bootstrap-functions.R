@@ -85,6 +85,52 @@ canonical_policy_parameters <- function(mode, replicate, mode_csv) {
   )
 }
 
+# Convert one retained HMC draw from any of the compact main-core models to the
+# policy parameterization.  Optional model-specific quantities are represented
+# explicitly so the prediction/optimization code does not need to know Stan
+# parameter names.
+canonical_policy_draw <- function(
+    draw, draw_id, chain, model_id, model_label, model_family = "gaussian",
+    lambda_structure = "common", lambda_log_ratio_sd_prior = 0.25,
+    source_csv = NA_character_) {
+  value <- canonical_policy_parameters(draw, draw_id, source_csv)
+  value$chain <- as.integer(chain)
+  value$model_id <- model_id
+  value$model_label <- model_label
+  value$model_family <- model_family
+  value$lambda_control <- value$base_mu_rep
+  value$lambda_ink <- value$base_mu_rep
+  value$lambda_calendar <- value$base_mu_rep
+  value$lambda_bracelet <- value$base_mu_rep
+  if (lambda_structure == "grouped") {
+    ratio <- lambda_log_ratio_sd_prior *
+      mode_scalar(draw, "core_lambda_group_log_ratio_raw")
+    value[c("lambda_control", "lambda_calendar")] <-
+      value$base_mu_rep * exp(-0.5 * ratio)
+    value[c("lambda_ink", "lambda_bracelet")] <-
+      value$base_mu_rep * exp(0.5 * ratio)
+  } else if (lambda_structure == "arm") {
+    helmert_basis <- matrix(
+      c(
+        1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
+        -1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
+        0, -2 / sqrt(6), 1 / sqrt(12),
+        0, 0, -3 / sqrt(12)
+      ),
+      nrow = 4, byrow = TRUE
+    )
+    raw <- mode_vector(draw, "core_lambda_arm_log_ratio_raw", 3L)
+    lambda <- value$base_mu_rep * exp(
+      lambda_log_ratio_sd_prior / sqrt(2) * as.vector(helmert_basis %*% raw)
+    )
+    value[c("lambda_control", "lambda_ink", "lambda_calendar", "lambda_bracelet")] <-
+      as.list(lambda)
+  } else if (lambda_structure != "common") {
+    stop("Unknown lambda structure: ", lambda_structure, call. = FALSE)
+  }
+  value
+}
+
 policy_delta <- function(cutoff, u_sd) {
   total_sd <- sqrt(1 + u_sd^2)
   probability <- pnorm(cutoff, sd = total_sd)
@@ -132,34 +178,45 @@ solve_policy_fixedpoint <- function(
   }
   solution <- 0.5 * (lower + upper)
   if (any(fallback)) {
-    if (!requireNamespace("nleqslv", quietly = TRUE)) {
-      stop(
-        "Legacy nleqslv fallback is required for ", sum(fallback),
-        " non-bracketed fixed points.", call. = FALSE
-      )
-    }
     fallback_index <- which(fallback)
-    fallback_fit <- lapply(fallback_index, function(index) {
-      nleqslv::nleqslv(
-        x = -benefit[index],
-        fn = function(cutoff) policy_fixedpoint_residual(
-          cutoff, benefit[index], mu_rep[index], u_sd
+    if (requireNamespace("nleqslv", quietly = TRUE)) {
+      fallback_fit <- lapply(fallback_index, function(index) {
+        nleqslv::nleqslv(
+          x = -benefit[index],
+          fn = function(cutoff) policy_fixedpoint_residual(
+            cutoff, benefit[index], mu_rep[index], u_sd
+          )
         )
+      })
+      # nleqslv termination codes are advisory here: validate the equation
+      # directly below instead of discarding accurate small-step solutions.
+      solution[fallback_index] <- vapply(
+        fallback_fit, function(fit) fit$x, numeric(1)
       )
-    })
-    fallback_code <- vapply(fallback_fit, `[[`, numeric(1), "termcd")
-    if (any(fallback_code > 2)) {
-      stop("Legacy fallback failed for ", sum(fallback_code > 2),
-           " policy fixed points.", call. = FALSE)
+    } else {
+      # Dependency-free diagnostic fallback. This also distinguishes a
+      # near-tangent root from a counterfactual with no equilibrium.
+      solution[fallback_index] <- vapply(fallback_index, function(index) {
+        optimize(
+          function(cutoff) policy_fixedpoint_residual(
+            cutoff, benefit[index], mu_rep[index], u_sd
+          )^2,
+          interval = c(-20, 20), tol = tolerance
+        )$minimum
+      }, numeric(1))
     }
-    solution[fallback_index] <- vapply(fallback_fit, function(fit) fit$x, numeric(1))
   }
   residual <- abs(policy_fixedpoint_residual(solution, benefit, mu_rep, u_sd))
   residual_tolerance <- if (any(fallback)) max(tolerance, 1e-7) else tolerance
-  if (any(!is.finite(solution)) || max(residual) > residual_tolerance) {
-    stop("Policy fixed-point residual exceeds tolerance: ", max(residual), call. = FALSE)
-  }
+  if (any(!is.finite(solution))) stop("Non-finite policy fixed point.", call. = FALSE)
+  undefined <- residual > residual_tolerance
+  # A flexible posterior draw can cross the saddle-node boundary under a new
+  # policy even when the fitted, observed allocation has a valid equilibrium.
+  # Preserve the draw and mark that counterfactual undefined rather than
+  # substituting a numerical pseudo-root.
+  solution[undefined] <- NA_real_
   attr(solution, "fallback_count") <- sum(fallback)
+  attr(solution, "undefined_count") <- sum(undefined)
   solution
 }
 
@@ -172,25 +229,116 @@ policy_mu_rep <- function(distance_sd, parameter, visibility) {
     latent <- parameter$mu_control + intercept +
       (parameter$mu_dist_control + slope) * distance_sd
   }
-  parameter$base_mu_rep * plogis(latent)
+  lambda_name <- paste0("lambda_", visibility)
+  lambda <- if (lambda_name %in% names(parameter)) {
+    parameter[[lambda_name]]
+  } else {
+    parameter$base_mu_rep
+  }
+  lambda * plogis(latent)
 }
 
-predict_policy_draw <- function(parameter, distances, scenarios = policy_scenarios) {
+policy_student_t_mixture <- function(df = 5, components = 12L) {
+  shape <- df / 2
+  alpha <- shape - 1
+  index <- seq_len(components)
+  jacobi <- diag(2 * index - 1 + alpha)
+  off_diagonal <- sqrt(index[-components] * (index[-components] + alpha))
+  jacobi[cbind(index[-components], index[-1L])] <- off_diagonal
+  jacobi[cbind(index[-1L], index[-components])] <- off_diagonal
+  decomposition <- eigen(jacobi, symmetric = TRUE)
+  ordering <- order(decomposition$values)
+  list(
+    scale_sq = (df - 2) / df,
+    precision = decomposition$values[ordering] / shape,
+    weight = decomposition$vectors[1L, ordering]^2
+  )
+}
+
+policy_student_t_moments <- function(cutoff, u_sd, mixture) {
+  type_variance <- mixture$scale_sq / mixture$precision
+  index_variance <- type_variance + u_sd^2
+  standardized <- outer(cutoff, sqrt(index_variance), "/")
+  density_kernel <- dnorm(standardized)
+  below <- as.vector(pnorm(standardized) %*% mixture$weight)
+  below <- pmin(1 - 1e-12, pmax(1e-12, below))
+  numerator <- as.vector(
+    density_kernel %*% (mixture$weight * type_variance / sqrt(index_variance))
+  )
+  index_density <- as.vector(
+    density_kernel %*% (mixture$weight / sqrt(index_variance))
+  )
+  numerator_derivative <- as.vector(
+    density_kernel %*% (mixture$weight * type_variance /
+      (sqrt(index_variance) * index_variance))
+  ) * -cutoff
+  denominator <- below * (1 - below)
+  delta <- numerator / denominator
+  delta_derivative <- numerator_derivative / denominator -
+    numerator * index_density * (1 - 2 * below) / denominator^2
+  list(probability_below = below, delta = delta, delta_derivative = delta_derivative)
+}
+
+solve_policy_student_t_fixedpoint <- function(benefit, mu_rep, u_sd, mixture) {
+  cutoff <- pmin(8, pmax(-8, -benefit))
+  for (step in seq_len(8L)) {
+    moments <- policy_student_t_moments(cutoff, u_sd, mixture)
+    residual <- cutoff + benefit + mu_rep * moments$delta
+    derivative <- 1 + mu_rep * moments$delta_derivative
+    safe_derivative <- ifelse(
+      abs(derivative) < 0.1, ifelse(derivative < 0, -0.1, 0.1), derivative
+    )
+    cutoff <- pmin(8, pmax(-8, cutoff - pmin(1, pmax(-1, residual / safe_derivative))))
+  }
+  cutoff
+}
+
+predict_policy_draw <- function(
+    parameter, distances, scenarios = policy_scenarios, village_ids = NULL) {
   distance_sd <- distances / parameter$sd_of_dist
   benefit <- parameter$beta_control - parameter$dist_beta * distance_sd
+  if (!is.null(parameter$cluster_shock)) {
+    if (is.null(village_ids) || any(!village_ids %in% seq_along(parameter$cluster_shock))) {
+      stop("Cluster-shock prediction requires valid village indices.", call. = FALSE)
+    }
+    benefit <- benefit + parameter$cluster_shock[village_ids]
+  }
   dynamic_cache <- list()
   for (visibility in unique(scenarios$visibility[!scenarios$suppress_reputation])) {
     mu <- policy_mu_rep(distance_sd, parameter, visibility)
-    cutoff <- solve_policy_fixedpoint(benefit, mu, parameter$u_sd)
+    cutoff <- if (identical(parameter$model_family, "student_t5")) {
+      solve_policy_student_t_fixedpoint(
+        benefit, mu, parameter$u_sd, policy_student_t_mixture()
+      )
+    } else {
+      solve_policy_fixedpoint(benefit, mu, parameter$u_sd)
+    }
     dynamic_cache[[visibility]] <- list(mu = mu, cutoff = cutoff)
   }
   static_signal <- lapply(unique(scenarios$visibility[scenarios$static_signal]), function(visibility) {
     distance_500_sd <- 500 / parameter$sd_of_dist
     benefit_500 <- parameter$beta_control - parameter$dist_beta * distance_500_sd
+    if (!is.null(parameter$cluster_shock)) {
+      benefit_500 <- benefit_500 + parameter$cluster_shock[village_ids]
+    }
     mu_500 <- policy_mu_rep(distance_500_sd, parameter, visibility)
-    cutoff_500 <- solve_policy_fixedpoint(benefit_500, mu_500, parameter$u_sd)
-    signal <- mu_500 * policy_delta(cutoff_500, parameter$u_sd)
+    if (!is.null(parameter$cluster_shock)) {
+      mu_500 <- rep(mu_500, length(benefit_500))
+    }
+    if (identical(parameter$model_family, "student_t5")) {
+      mixture <- policy_student_t_mixture()
+      cutoff_500 <- solve_policy_student_t_fixedpoint(
+        benefit_500, mu_500, parameter$u_sd, mixture
+      )
+      signal <- mu_500 * policy_student_t_moments(
+        cutoff_500, parameter$u_sd, mixture
+      )$delta
+    } else {
+      cutoff_500 <- solve_policy_fixedpoint(benefit_500, mu_500, parameter$u_sd)
+      signal <- mu_500 * policy_delta(cutoff_500, parameter$u_sd)
+    }
     attr(signal, "fallback_count") <- attr(cutoff_500, "fallback_count")
+    attr(signal, "undefined_count") <- attr(cutoff_500, "undefined_count")
     signal
   })
   names(static_signal) <- unique(scenarios$visibility[scenarios$static_signal])
@@ -200,12 +348,15 @@ predict_policy_draw <- function(parameter, distances, scenarios = policy_scenari
     if (scenario$suppress_reputation) {
       cutoff <- -benefit
       fallback_count <- 0L
+      undefined_count <- 0L
     } else if (scenario$static_signal) {
       cutoff <- -(benefit + static_signal[[scenario$visibility]])
       fallback_count <- attr(static_signal[[scenario$visibility]], "fallback_count") %||% 0L
+      undefined_count <- attr(static_signal[[scenario$visibility]], "undefined_count") %||% 0L
     } else {
       cutoff <- dynamic_cache[[scenario$visibility]]$cutoff
       fallback_count <- attr(cutoff, "fallback_count") %||% 0L
+      undefined_count <- attr(cutoff, "undefined_count") %||% 0L
     }
     data.frame(
       draw = parameter$draw,
@@ -214,10 +365,18 @@ predict_policy_draw <- function(parameter, distances, scenarios = policy_scenari
       scenario = scenario$scenario,
       scenario_label = scenario$label,
       visibility = scenario$visibility,
+      village_i = if (is.null(village_ids)) NA_integer_ else village_ids,
       distance = distances,
       distance_km = distances / 1000,
-      demand = 1 - pnorm(cutoff / parameter$total_error_sd),
+      demand = if (identical(parameter$model_family, "student_t5")) {
+        1 - policy_student_t_moments(
+          cutoff, parameter$u_sd, policy_student_t_mixture()
+        )$probability_below
+      } else {
+        1 - pnorm(cutoff / parameter$total_error_sd)
+      },
       fixedpoint_fallbacks = fallback_count,
+      fixedpoint_undefined = undefined_count,
       stringsAsFactors = FALSE
     )
   })

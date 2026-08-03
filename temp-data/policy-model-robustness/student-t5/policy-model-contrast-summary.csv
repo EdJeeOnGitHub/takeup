@@ -1,0 +1,3 @@
+"model_id","model_label","contrast","left_scenario","right_scenario","left_n_pot","right_n_pot","n_pot_saved","n_pot_saved_low","n_pot_saved_high","defined_draws","draws","equilibrium_undefined_share","target_infeasible_share"
+"student-t5","Student-t(5) intrinsic-motivation types","Endogenous social image returns","control","bracelet",107,79,27,17,35,1600,1600,0,0
+"student-t5","Student-t(5) intrinsic-motivation types","Social image returns fixed at 0.5km","static-control","static-bracelet",98,90,7,1,16,1600,1600,0,0
