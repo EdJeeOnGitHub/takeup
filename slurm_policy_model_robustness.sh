@@ -86,6 +86,7 @@ esac
 
 cd "${REPO_ROOT}"
 module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
+export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2/x86_64-pc-linux-gnu}
 export GUROBI_HOME="${HOME}/gurobi952/linux64"
 export PATH="${GUROBI_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${GUROBI_HOME}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
