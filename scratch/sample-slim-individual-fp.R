@@ -136,7 +136,12 @@ init_value <- if (is.null(init_files_option)) {
   # Mode JSONs can contain exact lower-bound values.  Nudge those values into
   # the parameter space before passing them to HMC.
   sanitized_init_files <- file.path(
-    output_path, sprintf("sanitized-init-%02d.json", seq_along(init_files))
+    output_path,
+    sprintf(
+      "%s-sanitized-init-%02d.json",
+      output_basename,
+      seq_along(init_files)
+    )
   )
   dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
   for (index in seq_along(init_files)) {
