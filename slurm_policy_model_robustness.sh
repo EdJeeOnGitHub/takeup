@@ -17,7 +17,8 @@ NUM_CORES=${NUM_CORES:-12}
 ROOT=/project/akaring/takeup-data/data/stan_analysis_data
 OUTPUT_PATH=${OUTPUT_PATH:-optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/policy-model-robustness/${MODEL_ID}}
 COMPACT_CSV=${OUTPUT_PATH}/compact-policy-draws.csv
-TARGET_CSV=${TARGET_CSV:-optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
+TARGET_CSV=${TARGET_CSV:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
+DISTANCE_DATA=${DISTANCE_DATA:-/project/akaring/takeup-data/optim/data/full-many-pots-experiment.rds}
 REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 
 case "${MODEL_ID}" in
@@ -104,7 +105,8 @@ case "${STAGE}" in
   predict)
     Rscript --no-save --no-restore optim/predict-policy-model-robustness.R \
       "--parameter-rds=${OUTPUT_PATH}/policy-model-parameters.rds" \
-      "--output-path=${OUTPUT_PATH}" --distance-cap=3500 \
+      "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
+      --distance-cap=3500 \
       "--num-cores=${NUM_CORES}"
     ;;
   optimize)
