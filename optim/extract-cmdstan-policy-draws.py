@@ -34,6 +34,8 @@ def main():
     parser.add_argument("--include-lambda", choices=["none", "grouped", "arm"], default="none")
     parser.add_argument("--include-cluster-shock", type=int, default=0,
                         help="Number of cluster shock elements to retain")
+    parser.add_argument("--include-asymmetric", action="store_true",
+                        help="Retain the 48 asymmetric-observability parameters")
     parser.add_argument("fits", nargs="+")
     args = parser.parse_args()
 
@@ -45,6 +47,21 @@ def main():
     if args.include_cluster_shock:
         wanted += ["core_cluster_shock_sd.1"]
         wanted += [f"core_cluster_shock_raw.{i}" for i in range(1, args.include_cluster_shock + 1)]
+    if args.include_asymmetric:
+        wanted += [f"core_recognition_intercept.{i}" for i in range(1, 3)]
+        wanted += [f"core_recognition_dist_slope.{i}" for i in range(1, 3)]
+        wanted += [f"core_recognition_arm_intercept_raw.{i}.{j}"
+                   for j in range(1, 4) for i in range(1, 3)]
+        wanted += [f"core_recognition_arm_dist_raw.{i}.{j}"
+                   for j in range(1, 4) for i in range(1, 3)]
+        wanted += [f"core_report_intercept.{i}.{j}"
+                   for j in range(1, 3) for i in range(1, 3)]
+        wanted += [f"core_report_dist_slope.{i}.{j}"
+                   for j in range(1, 3) for i in range(1, 3)]
+        wanted += [f"core_report_arm_intercept_raw.{i}.{j}"
+                   for j in range(1, 7) for i in range(1, 3)]
+        wanted += [f"core_report_arm_dist_raw.{i}.{j}"
+                   for j in range(1, 7) for i in range(1, 3)]
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

@@ -35,7 +35,11 @@ if (any(is.na(specifications$fit_dir)) || any(is.na(specifications$gq_dir)) ||
   stop("All three fit and compact-GQ directories are required.", call. = FALSE)
 }
 
-csvs <- function(path) sort(list.files(path, "\\.csv$", full.names = TRUE))
+csvs <- function(path) {
+  files <- sort(list.files(path, "\\.csv$", full.names = TRUE))
+  files <- files[!grepl("peer-link-audit|profile|status", basename(files))]
+  files[file.info(files)$size > 10000]
+}
 summarize_value <- function(value) c(
   median = median(value, na.rm = TRUE),
   lower = unname(quantile(value, 0.025, na.rm = TRUE)),

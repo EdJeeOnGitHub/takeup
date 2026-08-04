@@ -18,6 +18,7 @@ ROOT=/project/akaring/takeup-data/data/stan_analysis_data
 OUTPUT_PATH=${OUTPUT_PATH:-optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/policy-model-robustness/${MODEL_ID}}
 COMPACT_CSV=${OUTPUT_PATH}/compact-policy-draws.csv
 TARGET_CSV=${TARGET_CSV:-optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
+REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 
 case "${MODEL_ID}" in
   correct-observability)
@@ -62,13 +63,27 @@ case "${MODEL_ID}" in
     FITS=("${ROOT}"/main-core-cluster-shock-production/dist_fit106_MAIN_CORE_SHOCK_SD0.1_chain{1,2,3,4}-1.csv)
     EXTRACT_OPTIONS=(--include-cluster-shock 144)
     ;;
+  asymmetric-conditional)
+    MODEL_LABEL="Asymmetric reports, conditional on recognition"
+    MODEL_FAMILY=asymmetric_conditional
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/main-core-asym-conditional-production/dist_fit106_MAIN_CORE_chain{1,2,3,4}-1.csv)
+    EXTRACT_OPTIONS=(--include-asymmetric)
+    ;;
+  asymmetric-unconditional)
+    MODEL_LABEL="Asymmetric reports, unrecognized as null signal"
+    MODEL_FAMILY=asymmetric_unconditional
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/main-core-asym-unconditional-production/dist_fit106_MAIN_CORE_chain{1,2,3,4}-1.csv)
+    EXTRACT_OPTIONS=(--include-asymmetric)
+    ;;
   *)
     echo "Unknown MODEL_ID=${MODEL_ID}" >&2
     exit 2
     ;;
 esac
 
-cd ~/projects/takeup
+cd "${REPO_ROOT}"
 module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
 export GUROBI_HOME="${HOME}/gurobi952/linux64"
 export PATH="${GUROBI_HOME}/bin:${PATH}"
