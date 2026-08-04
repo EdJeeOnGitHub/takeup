@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=4G
 #SBATCH --time=1-12:00:00
-#SBATCH --output=temp/log/main-core-%j.log
-#SBATCH --error=temp/log/main-core-%j.log
+#SBATCH --output=temp/log/main-core-%A_%a.log
+#SBATCH --error=temp/log/main-core-%A_%a.log
 
 set -euo pipefail
 
