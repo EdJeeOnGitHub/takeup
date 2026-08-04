@@ -55,6 +55,20 @@ mode_vector <- function(mode, name, length_out) {
   value
 }
 
+mode_matrix <- function(mode, name, nrow, ncol) {
+  bracket <- as.vector(outer(
+    seq_len(nrow), seq_len(ncol),
+    function(i, j) paste0(name, "[", i, ",", j, "]")
+  ))
+  dotted <- as.vector(outer(
+    seq_len(nrow), seq_len(ncol),
+    function(i, j) paste(name, i, j, sep = ".")
+  ))
+  columns <- if (all(bracket %in% names(mode))) bracket else dotted
+  if (!all(columns %in% names(mode))) stop("Missing mode matrix: ", name, call. = FALSE)
+  matrix(as.numeric(mode[1L, columns, drop = TRUE]), nrow = nrow, ncol = ncol)
+}
+
 canonical_policy_parameters <- function(mode, replicate, mode_csv) {
   hyper_beta <- mode_vector(mode, "hyper_beta_1ord", 4L)
   hyper_dist_beta <- mode_vector(mode, "hyper_dist_beta_1ord", 4L)
@@ -128,6 +142,22 @@ canonical_policy_draw <- function(
   } else if (lambda_structure != "common") {
     stop("Unknown lambda structure: ", lambda_structure, call. = FALSE)
   }
+  if (model_family %in% c("asymmetric_conditional", "asymmetric_unconditional")) {
+    measurement <- c(
+      mode_vector(draw, "core_recognition_intercept", 2L),
+      mode_vector(draw, "core_recognition_dist_slope", 2L),
+      as.vector(mode_matrix(draw, "core_recognition_arm_intercept_raw", 2L, 3L)),
+      as.vector(mode_matrix(draw, "core_recognition_arm_dist_raw", 2L, 3L)),
+      as.vector(mode_matrix(draw, "core_report_intercept", 2L, 2L)),
+      as.vector(mode_matrix(draw, "core_report_dist_slope", 2L, 2L)),
+      as.vector(mode_matrix(draw, "core_report_arm_intercept_raw", 2L, 6L)),
+      as.vector(mode_matrix(draw, "core_report_arm_dist_raw", 2L, 6L))
+    )
+    names(measurement) <- paste0("observation_parameter_", seq_along(measurement))
+    for (parameter_name in names(measurement)) {
+      value[[parameter_name]] <- measurement[[parameter_name]]
+    }
+  }
   value
 }
 
@@ -141,6 +171,114 @@ policy_delta <- function(cutoff, u_sd) {
 
 policy_fixedpoint_residual <- function(cutoff, benefit, mu_rep, u_sd) {
   cutoff + benefit + mu_rep * policy_delta(cutoff, u_sd)
+}
+
+policy_noisy_channel <- function(distance_sd, parameter, visibility) {
+  value <- unlist(parameter[paste0("observation_parameter_", 1:48)], use.names = FALSE)
+  if (length(value) != 48L || any(!is.finite(value))) {
+    stop("Missing asymmetric-observability policy parameters.", call. = FALSE)
+  }
+  cursor <- 0L
+  take <- function(n) {
+    index <- cursor + seq_len(n)
+    cursor <<- cursor + n
+    value[index]
+  }
+  recognition_intercept <- take(2L)
+  recognition_dist_slope <- take(2L)
+  recognition_arm_intercept <- matrix(take(6L), 2L, 3L)
+  recognition_arm_dist <- matrix(take(6L), 2L, 3L)
+  report_intercept <- matrix(take(4L), 2L, 2L)
+  report_dist_slope <- matrix(take(4L), 2L, 2L)
+  report_arm_intercept <- matrix(take(12L), 2L, 6L)
+  report_arm_dist <- matrix(take(12L), 2L, 6L)
+  helmert_basis <- matrix(
+    c(1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
+      -1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
+      0, -2 / sqrt(6), 1 / sqrt(12),
+      0, 0, -3 / sqrt(12)),
+    nrow = 4, byrow = TRUE
+  )
+  treatment <- match(visibility, c("control", "ink", "calendar", "bracelet"))
+  if (is.na(treatment)) stop("Unknown policy visibility: ", visibility, call. = FALSE)
+  q <- vector("list", 2L)
+  recognition <- vector("list", 2L)
+  for (truth in 1:2) {
+    recognition_eta <- recognition_intercept[truth] +
+      sum(recognition_arm_intercept[truth, ] * helmert_basis[treatment, ]) +
+      (recognition_dist_slope[truth] +
+       sum(recognition_arm_dist[truth, ] * helmert_basis[treatment, ])) *
+      distance_sd
+    recognition[[truth]] <- plogis(recognition_eta)
+    report_eta <- vapply(1:2, function(category) {
+      columns <- (category - 1L) * 3L + 1:3
+      report_intercept[truth, category] +
+        sum(report_arm_intercept[truth, columns] * helmert_basis[treatment, ]) +
+        (report_dist_slope[truth, category] +
+         sum(report_arm_dist[truth, columns] * helmert_basis[treatment, ])) *
+        distance_sd
+    }, numeric(length(distance_sd)))
+    if (length(distance_sd) == 1L) {
+      report_eta <- matrix(report_eta, nrow = 1L, ncol = 2L)
+    }
+    full_eta <- cbind(report_eta, 0)
+    exp_eta <- exp(full_eta - apply(full_eta, 1L, max))
+    conditional <- exp_eta / rowSums(exp_eta)
+    q[[truth]] <- if (identical(parameter$model_family, "asymmetric_conditional")) {
+      conditional
+    } else {
+      cbind(recognition[[truth]] * conditional, 1 - recognition[[truth]])
+    }
+  }
+  list(nontaker = q[[1L]], taker = q[[2L]], recognition = recognition)
+}
+
+policy_noisy_information <- function(cutoff, total_error_sd, channel) {
+  if (nrow(channel$taker) == 1L && length(cutoff) > 1L) {
+    channel$taker <- channel$taker[rep.int(1L, length(cutoff)), , drop = FALSE]
+    channel$nontaker <- channel$nontaker[
+      rep.int(1L, length(cutoff)), , drop = FALSE
+    ]
+  }
+  if (nrow(channel$taker) != length(cutoff)) {
+    stop("Noisy policy channel and cutoff lengths differ.", call. = FALSE)
+  }
+  probability <- pnorm(-cutoff / total_error_sd)
+  difference <- channel$taker - channel$nontaker
+  signal_probability <- probability * channel$taker +
+    (1 - probability) * channel$nontaker
+  probability * (1 - probability) * rowSums(difference^2 / signal_probability)
+}
+
+policy_noisy_residual <- function(cutoff, benefit, lambda, u_sd, channel) {
+  cutoff + benefit + lambda *
+    policy_noisy_information(cutoff, sqrt(1 + u_sd^2), channel) *
+    policy_delta(cutoff, u_sd)
+}
+
+solve_policy_noisy_fixedpoint <- function(
+    benefit, lambda, u_sd, channel, tolerance = 1e-9, iterations = 70L) {
+  lower <- rep(-8, length(benefit))
+  upper <- rep(8, length(benefit))
+  lower_value <- policy_noisy_residual(lower, benefit, lambda, u_sd, channel)
+  upper_value <- policy_noisy_residual(upper, benefit, lambda, u_sd, channel)
+  bracketed <- lower_value * upper_value <= 0
+  for (step in seq_len(iterations)) {
+    midpoint <- 0.5 * (lower + upper)
+    midpoint_value <- policy_noisy_residual(midpoint, benefit, lambda, u_sd, channel)
+    use_lower <- bracketed & lower_value * midpoint_value <= 0
+    upper[use_lower] <- midpoint[use_lower]
+    use_upper <- bracketed & !use_lower
+    lower[use_upper] <- midpoint[use_upper]
+    lower_value[use_upper] <- midpoint_value[use_upper]
+  }
+  solution <- 0.5 * (lower + upper)
+  residual <- abs(policy_noisy_residual(solution, benefit, lambda, u_sd, channel))
+  undefined <- !bracketed | !is.finite(residual) | residual > tolerance
+  solution[undefined] <- NA_real_
+  attr(solution, "fallback_count") <- sum(!bracketed)
+  attr(solution, "undefined_count") <- sum(undefined)
+  solution
 }
 
 # Exact vectorized scalar solve. The stable-equilibrium restriction gives one
@@ -305,8 +443,19 @@ predict_policy_draw <- function(
   }
   dynamic_cache <- list()
   for (visibility in unique(scenarios$visibility[!scenarios$suppress_reputation])) {
-    mu <- policy_mu_rep(distance_sd, parameter, visibility)
-    cutoff <- if (identical(parameter$model_family, "student_t5")) {
+    asymmetric <- parameter$model_family %in%
+      c("asymmetric_conditional", "asymmetric_unconditional")
+    mu <- if (asymmetric) {
+      rep(parameter$base_mu_rep, length(distance_sd))
+    } else {
+      policy_mu_rep(distance_sd, parameter, visibility)
+    }
+    cutoff <- if (asymmetric) {
+      solve_policy_noisy_fixedpoint(
+        benefit, parameter$base_mu_rep, parameter$u_sd,
+        policy_noisy_channel(distance_sd, parameter, visibility)
+      )
+    } else if (identical(parameter$model_family, "student_t5")) {
       solve_policy_student_t_fixedpoint(
         benefit, mu, parameter$u_sd, policy_student_t_mixture()
       )
@@ -321,11 +470,24 @@ predict_policy_draw <- function(
     if (!is.null(parameter$cluster_shock)) {
       benefit_500 <- benefit_500 + parameter$cluster_shock[village_ids]
     }
-    mu_500 <- policy_mu_rep(distance_500_sd, parameter, visibility)
+    asymmetric <- parameter$model_family %in%
+      c("asymmetric_conditional", "asymmetric_unconditional")
+    mu_500 <- if (asymmetric) parameter$base_mu_rep else
+      policy_mu_rep(distance_500_sd, parameter, visibility)
     if (!is.null(parameter$cluster_shock)) {
       mu_500 <- rep(mu_500, length(benefit_500))
     }
-    if (identical(parameter$model_family, "student_t5")) {
+    if (asymmetric) {
+      channel_500 <- policy_noisy_channel(
+        distance_500_sd, parameter, visibility
+      )
+      cutoff_500 <- solve_policy_noisy_fixedpoint(
+        benefit_500, parameter$base_mu_rep, parameter$u_sd, channel_500
+      )
+      signal <- parameter$base_mu_rep * policy_noisy_information(
+        cutoff_500, parameter$total_error_sd, channel_500
+      ) * policy_delta(cutoff_500, parameter$u_sd)
+    } else if (identical(parameter$model_family, "student_t5")) {
       mixture <- policy_student_t_mixture()
       cutoff_500 <- solve_policy_student_t_fixedpoint(
         benefit_500, mu_500, parameter$u_sd, mixture
