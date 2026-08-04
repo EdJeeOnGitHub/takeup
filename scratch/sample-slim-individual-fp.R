@@ -25,6 +25,7 @@ output_path <- option_value(
   "--output-path",
   "/project/akaring/takeup-data/data/stan_analysis_data"
 )
+data_json <- option_value("--data-json")
 stan_path <- option_value("--stan-path", "stan_models")
 stan_file_name <- option_value(
   "--stan-file",
@@ -60,6 +61,28 @@ use_core_cluster_shock <- as.integer(
 core_cluster_shock_sd_prior <- as.numeric(
   option_value("--core-cluster-shock-sd-prior", "0.1")
 )
+core_lambda_structure <- as.integer(
+  option_value("--core-lambda-structure", "0")
+)
+core_lambda_log_ratio_sd_prior <- as.numeric(
+  option_value("--core-lambda-log-ratio-sd-prior", "0.25")
+)
+core_profile_group_lambda <- as.integer(
+  option_value("--core-profile-group-lambda", "0")
+)
+core_profile_group_log_ratio <- as.numeric(
+  option_value("--core-profile-group-log-ratio", "0")
+)
+core_type_distribution <- as.integer(
+  option_value("--core-type-distribution", "0")
+)
+core_student_t_df <- as.numeric(option_value("--core-student-t-df", "5"))
+core_student_t_components <- as.integer(
+  option_value("--core-student-t-components", "12")
+)
+core_observation_model <- as.integer(
+  option_value("--core-observation-model", "0")
+)
 
 stopifnot(
   chains >= 1L,
@@ -79,6 +102,25 @@ if (!use_core_cluster_shock %in% 0:1) {
 if (!is.finite(core_cluster_shock_sd_prior) ||
     core_cluster_shock_sd_prior <= 0) {
   stop("--core-cluster-shock-sd-prior must be positive.", call. = FALSE)
+}
+if (!core_lambda_structure %in% 0:2) {
+  stop("--core-lambda-structure must be 0, 1, or 2.", call. = FALSE)
+}
+if (!is.finite(core_lambda_log_ratio_sd_prior) ||
+    core_lambda_log_ratio_sd_prior <= 0) {
+  stop("--core-lambda-log-ratio-sd-prior must be positive.", call. = FALSE)
+}
+if (!core_profile_group_lambda %in% 0:1 ||
+    (core_profile_group_lambda == 1L && core_lambda_structure != 1L)) {
+  stop("Grouped-lambda profiling requires structure 1.", call. = FALSE)
+}
+if (!core_type_distribution %in% 0:1 || !is.finite(core_student_t_df) ||
+    core_student_t_df <= 2 || core_student_t_components < 2L) {
+  stop("Student-t controls require distribution 0/1, df > 2, and components >= 2.",
+       call. = FALSE)
+}
+if (!core_observation_model %in% 0:2) {
+  stop("--core-observation-model must be 0, 1, or 2.", call. = FALSE)
 }
 
 init_value <- if (is.null(init_files_option)) {
@@ -103,7 +145,10 @@ init_value <- if (is.null(init_files_option)) {
     # jsonlite simplifies a one-element JSON array to a scalar. Restore the
     # singleton arrays used by the core Stan parameter schema.
     for (parameter in intersect(
-      names(init), c("raw_u_sd", "dist_beta_v", "core_cluster_shock_sd")
+      names(init), c(
+        "raw_u_sd", "dist_beta_v", "core_cluster_shock_sd",
+        "core_lambda_group_log_ratio_raw"
+      )
     )) {
       if (is.null(dim(init[[parameter]])) && length(init[[parameter]]) == 1L) {
         init[[parameter]] <- array(init[[parameter]], dim = 1L)
@@ -169,6 +214,20 @@ sample_data <- stan_data_preprocess(fit_env$stan_data) |>
 
 # Match the original fit-105 invocation.
 sample_data$num_dist_group_mix <- 1L
+sample_data$use_belief_row_cluster_mu_rep <-
+  sample_data$use_belief_row_cluster_mu_rep %||% 0L
+if (length(sample_data$num_belief_rows_by_cluster) != sample_data$num_clusters) {
+  sample_data$num_belief_rows_by_cluster <- tabulate(
+    sample_data$obs_cluster_id[sample_data$beliefs_obs_index],
+    nbins = sample_data$num_clusters
+  )
+}
+if (length(sample_data$belief_observed) != sample_data$num_beliefs_obs) {
+  sample_data$belief_observed <- rep.int(1L, sample_data$num_beliefs_obs)
+}
+if (sample_data$num_optim_distances == 1L) {
+  sample_data$optim_distances <- array(sample_data$optim_distances, dim = 1L)
+}
 
 # Minimal main-model extensions. Older saved workspaces do not retain the WTP
 # cluster mapping; that is harmless for an unweighted fit but must be rejected
@@ -176,6 +235,37 @@ sample_data$num_dist_group_mix <- 1L
 sample_data$core_cluster_weight <- rep(1, sample_data$num_clusters)
 sample_data$use_core_cluster_shock <- use_core_cluster_shock
 sample_data$core_cluster_shock_sd_prior <- core_cluster_shock_sd_prior
+sample_data$core_lambda_structure <- core_lambda_structure
+sample_data$core_lambda_log_ratio_sd_prior <-
+  core_lambda_log_ratio_sd_prior
+sample_data$core_profile_group_lambda <- core_profile_group_lambda
+sample_data$core_profile_group_log_ratio <- core_profile_group_log_ratio
+sample_data$core_gq_override_lambda <- 0L
+sample_data$core_gq_lambda_override <- rep(0, sample_data$num_treatments)
+type_mixture <- main_core_student_t_mixture(
+  core_student_t_df, core_student_t_components
+)
+sample_data$core_type_distribution <- core_type_distribution
+sample_data$core_student_t_df <- type_mixture$df
+sample_data$core_type_scale_sq <- type_mixture$scale_sq
+sample_data$core_type_mixture_components <- type_mixture$components
+sample_data$core_type_mixture_precision <- type_mixture$precision
+sample_data$core_type_mixture_weight <- type_mixture$weight
+sample_data$core_observation_model <- core_observation_model
+peer_data <- if (core_observation_model == 0L) {
+  main_core_empty_peer_response_data()
+} else {
+  main_core_prepare_peer_response_data(
+    sample_data,
+    project_root = ".",
+    write_audit = file.path(
+      output_path,
+      paste0(output_basename, "-peer-link-audit.csv")
+    )
+  )
+}
+peer_data$core_peer_link_audit <- NULL
+sample_data <- modifyList(sample_data, peer_data)
 if (is.null(sample_data$wtp_cluster_id)) {
   if (!is.null(cluster_weight_file)) {
     stop(
@@ -217,6 +307,31 @@ sample_data <- discard(
   sample_data,
   \(x) is.function(x) || is.character(x) || is.null(x)
 )
+if (!is.null(data_json)) {
+  if (core_observation_model > 0L) {
+    stop("Asymmetric observability requires rebuilding data, not --data-json.",
+         call. = FALSE)
+  }
+  if (!file.exists(data_json)) stop("Data JSON not found: ", data_json, call. = FALSE)
+  patched_data_json <- tempfile(fileext = ".json")
+  on.exit(unlink(patched_data_json), add = TRUE)
+  sample_data <- main_core_patch_stan_json_scalars(
+    data_json,
+    patched_data_json,
+    c(
+      core_lambda_structure = core_lambda_structure,
+      core_lambda_log_ratio_sd_prior = core_lambda_log_ratio_sd_prior,
+      core_profile_group_lambda = core_profile_group_lambda,
+      core_profile_group_log_ratio = core_profile_group_log_ratio,
+      core_gq_override_lambda = 0L,
+      core_type_distribution = core_type_distribution,
+      core_student_t_df = core_student_t_df,
+      core_type_scale_sq = type_mixture$scale_sq,
+      core_type_mixture_components = core_student_t_components,
+      core_observation_model = core_observation_model
+    )
+  )
+}
 
 parse_binary_override <- function(value, option_name) {
   if (is.null(value)) return(NULL)

@@ -11,13 +11,17 @@
 
 set -euo pipefail
 
-CHAIN_ID=${CHAIN_ID:?Set CHAIN_ID to 1, 2, 3, or 4}
+CHAIN_ID=${CHAIN_ID:-${SLURM_ARRAY_TASK_ID:-}}
+if [[ -z "${CHAIN_ID}" ]]; then
+  echo "Set CHAIN_ID or submit this script with --array=1-4." >&2
+  exit 2
+fi
 if [[ ! "${CHAIN_ID}" =~ ^[1-4]$ ]]; then
   echo "CHAIN_ID must be 1, 2, 3, or 4; got ${CHAIN_ID}." >&2
   exit 2
 fi
 
-MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP}
+MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP}
 INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-production}
 STAN_PATH=${STAN_PATH:-stan_models_fit105}
@@ -36,6 +40,9 @@ INIT_FILE=${INIT_FILE:-}
 CLUSTER_WEIGHT_FILE=${CLUSTER_WEIGHT_FILE:-}
 USE_CORE_CLUSTER_SHOCK=${USE_CORE_CLUSTER_SHOCK:-0}
 CORE_CLUSTER_SHOCK_SD_PRIOR=${CORE_CLUSTER_SHOCK_SD_PRIOR:-0.1}
+CORE_LAMBDA_STRUCTURE=${CORE_LAMBDA_STRUCTURE:-0}
+CORE_LAMBDA_LOG_RATIO_SD_PRIOR=${CORE_LAMBDA_LOG_RATIO_SD_PRIOR:-0.25}
+CORE_OBSERVATION_MODEL=${CORE_OBSERVATION_MODEL:-0}
 
 mkdir -p temp/log "${OUTPUT_PATH}"
 module load -f R/4.2.0
@@ -63,6 +70,9 @@ args=(
   "--refresh=${REFRESH}"
   "--use-core-cluster-shock=${USE_CORE_CLUSTER_SHOCK}"
   "--core-cluster-shock-sd-prior=${CORE_CLUSTER_SHOCK_SD_PRIOR}"
+  "--core-lambda-structure=${CORE_LAMBDA_STRUCTURE}"
+  "--core-lambda-log-ratio-sd-prior=${CORE_LAMBDA_LOG_RATIO_SD_PRIOR}"
+  "--core-observation-model=${CORE_OBSERVATION_MODEL}"
 )
 if [[ -n "${INIT_FILE}" ]]; then
   if [[ ! -f "${INIT_FILE}" ]]; then

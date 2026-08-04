@@ -1,11 +1,72 @@
 # Shared data preparation for the minimal main structural model and its compact
 # generated quantities. Callers must load dplyr, purrr, and rlang first.
 
+source("scratch/main-core-asymmetric-observability-data.R")
+
 main_core_option_value <- function(args, name, default = NULL) {
   prefix <- paste0(name, "=")
   hit <- args[startsWith(args, prefix)]
   if (length(hit) > 1L) stop("Duplicate option: ", name, call. = FALSE)
   if (length(hit) == 0L) default else substring(hit, nchar(prefix) + 1L)
+}
+
+# Change scalar controls in an existing Stan JSON file without parsing and
+# reserializing the full document. jsonlite simplifies length-one arrays to
+# scalars, which changes Stan data dimensions; a textual scalar patch preserves
+# every original array and matrix shape.
+main_core_patch_stan_json_scalars <- function(input_path, output_path, values) {
+  if (!file.exists(input_path)) {
+    stop("Stan JSON not found: ", input_path, call. = FALSE)
+  }
+  if (is.null(names(values)) || any(!nzchar(names(values)))) {
+    stop("JSON scalar replacements must be named.", call. = FALSE)
+  }
+  json_text <- paste(readLines(input_path, warn = FALSE), collapse = "\n")
+  json_number <- paste0(
+    "[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)",
+    "(?:[eE][+-]?[0-9]+)?"
+  )
+  for (field in names(values)) {
+    if (length(values[[field]]) != 1L || !is.finite(values[[field]])) {
+      stop("Replacement for ", field, " must be one finite scalar.", call. = FALSE)
+    }
+    pattern <- paste0(
+      "(\\\"", field, "\\\"[[:space:]]*:[[:space:]]*)(", json_number, ")"
+    )
+    hits <- gregexpr(pattern, json_text, perl = TRUE)[[1L]]
+    if (identical(hits, -1L) || length(hits) != 1L) {
+      stop("Expected exactly one scalar JSON field named ", field, ".", call. = FALSE)
+    }
+    encoded <- as.character(jsonlite::toJSON(
+      values[[field]], auto_unbox = TRUE, digits = NA
+    ))
+    json_text <- sub(pattern, paste0("\\1", encoded), json_text, perl = TRUE)
+  }
+  dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
+  writeLines(json_text, output_path, useBytes = TRUE)
+  output_path
+}
+
+main_core_student_t_mixture <- function(df = 5, components = 12L) {
+  if (!is.finite(df) || df <= 2) stop("Student-t df must exceed 2.", call. = FALSE)
+  components <- as.integer(components)
+  if (components < 2L) stop("At least two mixture components are required.", call. = FALSE)
+  shape <- df / 2
+  alpha <- shape - 1
+  index <- seq_len(components)
+  jacobi <- diag(2 * index - 1 + alpha)
+  off_diagonal <- sqrt(index[-components] * (index[-components] + alpha))
+  jacobi[cbind(index[-components], index[-1L])] <- off_diagonal
+  jacobi[cbind(index[-1L], index[-components])] <- off_diagonal
+  decomposition <- eigen(jacobi, symmetric = TRUE)
+  ordering <- order(decomposition$values)
+  list(
+    df = df,
+    components = components,
+    scale_sq = (df - 2) / df,
+    precision = decomposition$values[ordering] / shape,
+    weight = decomposition$vectors[1L, ordering]^2
+  )
 }
 
 read_main_core_weights <- function(path, num_clusters) {
@@ -31,7 +92,19 @@ prepare_main_core_data <- function(
     model_name = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP",
     weight_file = NULL,
     use_cluster_shock = 0L,
-    cluster_shock_sd_prior = 0.1) {
+    cluster_shock_sd_prior = 0.1,
+    lambda_structure = 0L,
+    lambda_log_ratio_sd_prior = 0.25,
+    profile_group_lambda = 0L,
+    profile_group_log_ratio = 0,
+    gq_override_lambda = 0L,
+    gq_lambda_override = NULL,
+    type_distribution = 0L,
+    student_t_df = 5,
+    student_t_components = 12L,
+    observation_model = 0L,
+    project_root = ".",
+    peer_audit_path = NULL) {
   if (!file.exists(workspace_path)) {
     stop("Workspace not found: ", workspace_path, call. = FALSE)
   }
@@ -54,12 +127,63 @@ prepare_main_core_data <- function(
     list_modify(!!!model_info) |>
     map_if(is.factor, as.integer)
   sample_data$num_dist_group_mix <- 1L
+  sample_data$use_belief_row_cluster_mu_rep <-
+    sample_data$use_belief_row_cluster_mu_rep %||% 0L
+  if (length(sample_data$num_belief_rows_by_cluster) != sample_data$num_clusters) {
+    sample_data$num_belief_rows_by_cluster <- tabulate(
+      sample_data$obs_cluster_id[sample_data$beliefs_obs_index],
+      nbins = sample_data$num_clusters
+    )
+  }
+  if (length(sample_data$belief_observed) != sample_data$num_beliefs_obs) {
+    sample_data$belief_observed <- rep.int(1L, sample_data$num_beliefs_obs)
+  }
+  # Preserve a one-element Stan vector when older CmdStanR/jsonlite versions
+  # would otherwise auto-unbox it to a scalar JSON number.
+  if (sample_data$num_optim_distances == 1L) {
+    sample_data$optim_distances <- array(sample_data$optim_distances, dim = 1L)
+  }
   sample_data$core_cluster_weight <- read_main_core_weights(
     weight_file,
     sample_data$num_clusters
   )
   sample_data$use_core_cluster_shock <- as.integer(use_cluster_shock)
   sample_data$core_cluster_shock_sd_prior <- cluster_shock_sd_prior
+  sample_data$core_lambda_structure <- as.integer(lambda_structure)
+  sample_data$core_lambda_log_ratio_sd_prior <- lambda_log_ratio_sd_prior
+  sample_data$core_profile_group_lambda <- as.integer(profile_group_lambda)
+  sample_data$core_profile_group_log_ratio <- profile_group_log_ratio
+  sample_data$core_gq_override_lambda <- as.integer(gq_override_lambda)
+  sample_data$core_gq_lambda_override <- if (is.null(gq_lambda_override)) {
+    rep(0, sample_data$num_treatments)
+  } else {
+    gq_lambda_override
+  }
+  type_mixture <- main_core_student_t_mixture(
+    student_t_df, student_t_components
+  )
+  sample_data$core_type_distribution <- as.integer(type_distribution)
+  sample_data$core_student_t_df <- type_mixture$df
+  sample_data$core_type_scale_sq <- type_mixture$scale_sq
+  sample_data$core_type_mixture_components <- type_mixture$components
+  sample_data$core_type_mixture_precision <- type_mixture$precision
+  sample_data$core_type_mixture_weight <- type_mixture$weight
+  observation_model <- as.integer(observation_model)
+  if (!observation_model %in% 0:2) {
+    stop("observation_model must be 0, 1, or 2.", call. = FALSE)
+  }
+  sample_data$core_observation_model <- observation_model
+  peer_data <- if (observation_model == 0L) {
+    main_core_empty_peer_response_data()
+  } else {
+    main_core_prepare_peer_response_data(
+      sample_data,
+      project_root = project_root,
+      write_audit = peer_audit_path
+    )
+  }
+  peer_data$core_peer_link_audit <- NULL
+  sample_data <- modifyList(sample_data, peer_data)
 
   if (is.null(sample_data$wtp_cluster_id)) {
     if (!is.null(weight_file)) {

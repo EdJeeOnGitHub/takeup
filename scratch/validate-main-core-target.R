@@ -6,6 +6,7 @@
 # cluster-binomial kernel, which should be the identical Stan sampling target.
 
 args <- commandArgs(trailingOnly = TRUE)
+source("scratch/main-core-data.R")
 option_value <- function(name, default = NULL) {
   prefix <- paste0(name, "=")
   hit <- args[startsWith(args, prefix)]
@@ -67,9 +68,39 @@ sample_data <- stan_data_preprocess(fit_env$stan_data) |>
   list_modify(!!!model_info) |>
   map_if(is.factor, as.integer)
 sample_data$num_dist_group_mix <- 1L
+sample_data$use_belief_row_cluster_mu_rep <-
+  sample_data$use_belief_row_cluster_mu_rep %||% 0L
+if (length(sample_data$num_belief_rows_by_cluster) != sample_data$num_clusters) {
+  sample_data$num_belief_rows_by_cluster <- tabulate(
+    sample_data$obs_cluster_id[sample_data$beliefs_obs_index],
+    nbins = sample_data$num_clusters
+  )
+}
+if (length(sample_data$belief_observed) != sample_data$num_beliefs_obs) {
+  sample_data$belief_observed <- rep.int(1L, sample_data$num_beliefs_obs)
+}
+if (sample_data$num_optim_distances == 1L) {
+  sample_data$optim_distances <- array(sample_data$optim_distances, dim = 1L)
+}
 sample_data$core_cluster_weight <- rep(1, sample_data$num_clusters)
 sample_data$use_core_cluster_shock <- 0L
 sample_data$core_cluster_shock_sd_prior <- 0.1
+sample_data$core_lambda_structure <- 0L
+sample_data$core_lambda_log_ratio_sd_prior <- 0.25
+sample_data$core_profile_group_lambda <- 0L
+sample_data$core_profile_group_log_ratio <- 0
+sample_data$core_gq_override_lambda <- 0L
+sample_data$core_gq_lambda_override <- rep(0, sample_data$num_treatments)
+type_mixture <- main_core_student_t_mixture(5, 12)
+sample_data$core_type_distribution <- 0L
+sample_data$core_student_t_df <- type_mixture$df
+sample_data$core_type_scale_sq <- type_mixture$scale_sq
+sample_data$core_type_mixture_components <- type_mixture$components
+sample_data$core_type_mixture_precision <- type_mixture$precision
+sample_data$core_type_mixture_weight <- type_mixture$weight
+sample_data$core_observation_model <- 0L
+sample_data <- modifyList(sample_data, main_core_empty_peer_response_data())
+sample_data$core_peer_link_audit <- NULL
 # Legacy workspaces did not retain this mapping. With unit weights its values
 # cannot affect the target, so a valid placeholder preserves exact equivalence.
 sample_data$wtp_cluster_id <- sample_data$wtp_cluster_id %||%
