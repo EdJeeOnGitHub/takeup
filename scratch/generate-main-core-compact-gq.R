@@ -61,6 +61,12 @@ recognition_structure <- as.integer(
 report_structure <- as.integer(
   option_value("--core-report-structure", "0")
 )
+report_arm_dist_hierarchical <- as.integer(
+  option_value("--core-report-arm-dist-hierarchical", "0")
+)
+report_arm_dist_prior_scale <- as.numeric(
+  option_value("--core-report-arm-dist-prior-scale", "0.25")
+)
 peer_audit_path <- option_value("--peer-audit-path")
 cluster_weight_file <- option_value("--cluster-weight-file")
 threads <- as.integer(option_value("--threads", "2"))
@@ -116,6 +122,8 @@ data <- if (!is.null(data_json)) {
     observation_model = observation_model,
     recognition_structure = recognition_structure,
     report_structure = report_structure,
+    report_arm_dist_hierarchical = report_arm_dist_hierarchical,
+    report_arm_dist_prior_scale = report_arm_dist_prior_scale,
     peer_audit_path = peer_audit_path
   )
 }

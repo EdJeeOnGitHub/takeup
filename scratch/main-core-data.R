@@ -105,6 +105,8 @@ prepare_main_core_data <- function(
     observation_model = 0L,
     recognition_structure = 0L,
     report_structure = 0L,
+    report_arm_dist_hierarchical = 0L,
+    report_arm_dist_prior_scale = 0.25,
     project_root = ".",
     peer_audit_path = NULL) {
   if (!file.exists(workspace_path)) {
@@ -191,6 +193,21 @@ prepare_main_core_data <- function(
   }
   sample_data$core_recognition_structure <- recognition_structure
   sample_data$core_report_structure <- report_structure
+  report_arm_dist_hierarchical <- as.integer(report_arm_dist_hierarchical)
+  if (!report_arm_dist_hierarchical %in% 0:1 ||
+      !is.finite(report_arm_dist_prior_scale) ||
+      report_arm_dist_prior_scale <= 0) {
+    stop("Invalid report arm-distance hierarchy controls.", call. = FALSE)
+  }
+  if (report_arm_dist_hierarchical == 1L &&
+      (observation_model == 0L || report_structure != 0L)) {
+    stop("Hierarchical slopes require the full multinomial channel.",
+         call. = FALSE)
+  }
+  sample_data$core_report_arm_dist_hierarchical <-
+    report_arm_dist_hierarchical
+  sample_data$core_report_arm_dist_prior_scale <-
+    report_arm_dist_prior_scale
   peer_data <- if (observation_model == 0L) {
     main_core_empty_peer_response_data()
   } else {

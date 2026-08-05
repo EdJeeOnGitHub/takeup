@@ -12,16 +12,18 @@
 set -euo pipefail
 
 CHAIN_ID=${CHAIN_ID:-${SLURM_ARRAY_TASK_ID:-}}
-SPECIFICATION=${SPECIFICATION:?Set SPECIFICATION to f1, f2, f3, or u3}
+SPECIFICATION=${SPECIFICATION:?Set an observability specification}
 FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-observability-ladder}
 INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-asym-input}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 
 case "${SPECIFICATION}" in
-  f1) observation=1; recognition=0; report=1 ;;
-  f2) observation=1; recognition=2; report=1 ;;
-  f3) observation=1; recognition=2; report=2 ;;
-  u3) observation=2; recognition=1; report=2 ;;
+  f1) observation=1; recognition=0; report=1; hierarchical=0; prior_scale=0.25 ;;
+  f2) observation=1; recognition=2; report=1; hierarchical=0; prior_scale=0.25 ;;
+  f3) observation=1; recognition=2; report=2; hierarchical=0; prior_scale=0.25 ;;
+  u3) observation=2; recognition=1; report=2; hierarchical=0; prior_scale=0.25 ;;
+  hierarchical) observation=1; recognition=0; report=0; hierarchical=1; prior_scale=0.25 ;;
+  tight) observation=1; recognition=0; report=0; hierarchical=0; prior_scale=0.10 ;;
   *) echo "Unknown SPECIFICATION=${SPECIFICATION}" >&2; exit 2 ;;
 esac
 
@@ -45,5 +47,7 @@ Rscript --no-save --no-restore --no-init-file \
   "--core-observation-model=${observation}" \
   "--core-recognition-structure=${recognition}" \
   "--core-report-structure=${report}" \
+  "--core-report-arm-dist-hierarchical=${hierarchical}" \
+  "--core-report-arm-dist-prior-scale=${prior_scale}" \
   --threads=4 --parallel-chains=1 \
   "--cmdstan-path=${CMDSTAN_PATH}"

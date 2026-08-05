@@ -89,6 +89,12 @@ core_recognition_structure <- as.integer(
 core_report_structure <- as.integer(
   option_value("--core-report-structure", "0")
 )
+core_report_arm_dist_hierarchical <- as.integer(
+  option_value("--core-report-arm-dist-hierarchical", "0")
+)
+core_report_arm_dist_prior_scale <- as.numeric(
+  option_value("--core-report-arm-dist-prior-scale", "0.25")
+)
 
 stopifnot(
   chains >= 1L,
@@ -138,6 +144,16 @@ if (core_observation_model == 0L &&
 }
 if (core_observation_model == 2L && core_recognition_structure == 2L) {
   stop("The unconditional model cannot condition recognition out.",
+       call. = FALSE)
+}
+if (!core_report_arm_dist_hierarchical %in% 0:1 ||
+    !is.finite(core_report_arm_dist_prior_scale) ||
+    core_report_arm_dist_prior_scale <= 0) {
+  stop("Invalid report arm-distance hierarchy controls.", call. = FALSE)
+}
+if (core_report_arm_dist_hierarchical == 1L &&
+    (core_observation_model == 0L || core_report_structure != 0L)) {
+  stop("Hierarchical slopes require the full multinomial channel.",
        call. = FALSE)
 }
 
@@ -277,6 +293,10 @@ sample_data$core_type_mixture_weight <- type_mixture$weight
 sample_data$core_observation_model <- core_observation_model
 sample_data$core_recognition_structure <- core_recognition_structure
 sample_data$core_report_structure <- core_report_structure
+sample_data$core_report_arm_dist_hierarchical <-
+  core_report_arm_dist_hierarchical
+sample_data$core_report_arm_dist_prior_scale <-
+  core_report_arm_dist_prior_scale
 peer_data <- if (core_observation_model == 0L) {
   main_core_empty_peer_response_data()
 } else {
@@ -355,7 +375,9 @@ if (!is.null(data_json)) {
       core_type_mixture_components = core_student_t_components,
       core_observation_model = core_observation_model,
       core_recognition_structure = core_recognition_structure,
-      core_report_structure = core_report_structure
+      core_report_structure = core_report_structure,
+      core_report_arm_dist_hierarchical = core_report_arm_dist_hierarchical,
+      core_report_arm_dist_prior_scale = core_report_arm_dist_prior_scale
     )
   )
 }

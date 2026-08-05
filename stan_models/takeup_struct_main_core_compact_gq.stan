@@ -46,6 +46,8 @@ functions {
       matrix report_dist_slope,
       matrix report_arm_intercept,
       matrix report_arm_dist,
+      data int report_arm_dist_hierarchical,
+      matrix report_arm_dist_sd,
       vector definite_intercept,
       vector definite_dist_slope,
       matrix definite_arm_intercept,
@@ -83,6 +85,9 @@ functions {
           arm_slope = dot_product(
             report_arm_dist[truth, first:last], contrast_basis[treatment]
           );
+          if (report_arm_dist_hierarchical) {
+            arm_slope *= report_arm_dist_sd[truth, category];
+          }
         }
         slope[category] = report_dist_slope[truth, category] + arm_slope;
         logit[category] = report_intercept[truth, category] +
@@ -370,6 +375,8 @@ data {
   int<lower=0, upper=2> core_observation_model;
   int<lower=0, upper=2> core_recognition_structure;
   int<lower=0, upper=2> core_report_structure;
+  int<lower=0, upper=1> core_report_arm_dist_hierarchical;
+  real<lower=0> core_report_arm_dist_prior_scale;
   int<lower=0> core_num_peer_response_rows;
   array[core_num_peer_response_rows] int<lower=1, upper=num_clusters>
     core_peer_response_cluster_id;
@@ -418,6 +425,10 @@ transformed data {
   if (core_observation_model == 2 && core_recognition_structure == 2) {
     reject("The unconditional channel cannot condition recognition out.");
   }
+  if (core_report_arm_dist_hierarchical &&
+      (core_observation_model == 0 || core_report_structure != 0)) {
+    reject("Hierarchical report-distance slopes require the full multinomial channel.");
+  }
   for (included_index in 1:num_included_monitored_obs) {
     int obs_index = included_monitored_obs[included_index];
     int cluster_index = obs_cluster_id[obs_index];
@@ -452,6 +463,8 @@ parameters {
     core_report_arm_intercept_raw;
   matrix[core_observation_model > 0 && core_report_structure == 0 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_dist_raw;
+  matrix<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical ? 2 : 0, 2]
+    core_report_arm_dist_sd;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
     core_definite_intercept;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
@@ -600,6 +613,7 @@ generated quantities {
             core_report_structure, core_is_public_signal[treatment_index],
             core_report_intercept, core_report_dist_slope,
             core_report_arm_intercept_raw, core_report_arm_dist_raw,
+            core_report_arm_dist_hierarchical, core_report_arm_dist_sd,
             core_definite_intercept, core_definite_dist_slope,
             core_definite_arm_intercept_raw,
             core_definite_public_signal_dist_slope, core_accuracy_intercept,
@@ -816,6 +830,7 @@ generated quantities {
                 core_report_structure, core_is_public_signal[treatment_index],
                 core_report_intercept, core_report_dist_slope,
                 core_report_arm_intercept_raw, core_report_arm_dist_raw,
+                core_report_arm_dist_hierarchical, core_report_arm_dist_sd,
                 core_definite_intercept, core_definite_dist_slope,
                 core_definite_arm_intercept_raw,
                 core_definite_public_signal_dist_slope,
@@ -964,7 +979,8 @@ generated quantities {
               roc_distance, truth, treatment_index, core_report_structure,
               core_is_public_signal[treatment_index], core_report_intercept,
               core_report_dist_slope, core_report_arm_intercept_raw,
-              core_report_arm_dist_raw, core_definite_intercept,
+              core_report_arm_dist_raw, core_report_arm_dist_hierarchical,
+              core_report_arm_dist_sd, core_definite_intercept,
               core_definite_dist_slope, core_definite_arm_intercept_raw,
               core_definite_public_signal_dist_slope,
               core_accuracy_intercept, core_accuracy_arm_intercept_raw,

@@ -43,6 +43,9 @@ data {
   int<lower=0, upper=2> core_recognition_structure;
   // Reports: 0 = full multinomial; 1 = no arm-distance slopes; 2 = two-stage.
   int<lower=0, upper=2> core_report_structure;
+  // Full-multinomial arm-distance slopes: 0 = independent; 1 = hierarchical.
+  int<lower=0, upper=1> core_report_arm_dist_hierarchical;
+  real<lower=0> core_report_arm_dist_prior_scale;
   int<lower=0> core_num_peer_response_rows;
   array[core_num_peer_response_rows] int<lower=1, upper=num_clusters>
     core_peer_response_cluster_id;
@@ -134,6 +137,10 @@ transformed data {
   if (core_observation_model == 2 && core_recognition_structure == 2) {
     reject("The unconditional channel cannot condition recognition out.");
   }
+  if (core_report_arm_dist_hierarchical &&
+      (core_observation_model == 0 || core_report_structure != 0)) {
+    reject("Hierarchical report-distance slopes require the full multinomial channel.");
+  }
   if (core_num_peer_response_rows > 0) {
     for (row in 1:core_num_peer_response_rows) {
       if (core_peer_recognized[row] > core_peer_total[row] ||
@@ -187,6 +194,8 @@ parameters {
     core_report_arm_intercept_raw;
   matrix[core_observation_model > 0 && core_report_structure == 0 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_dist_raw;
+  matrix<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical ? 2 : 0, 2]
+    core_report_arm_dist_sd;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
     core_definite_intercept;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
@@ -273,7 +282,16 @@ model {
     to_vector(core_report_intercept) ~ normal(0, 1.5);
     to_vector(core_report_dist_slope) ~ normal(0, 0.5);
     to_vector(core_report_arm_intercept_raw) ~ normal(0, 0.5);
-    to_vector(core_report_arm_dist_raw) ~ normal(0, 0.25);
+    if (core_report_arm_dist_hierarchical) {
+      to_vector(core_report_arm_dist_raw) ~ std_normal();
+      to_vector(core_report_arm_dist_sd) ~ normal(
+        0, core_report_arm_dist_prior_scale
+      );
+    } else {
+      to_vector(core_report_arm_dist_raw) ~ normal(
+        0, core_report_arm_dist_prior_scale
+      );
+    }
     core_definite_intercept ~ normal(0, 1.5);
     core_definite_dist_slope ~ normal(0, 0.5);
     to_vector(core_definite_arm_intercept_raw) ~ normal(0, 0.5);
@@ -328,6 +346,9 @@ model {
                 core_report_arm_dist_raw[truth, first:last],
                 core_signal_lambda_contrast_basis[treatment]
               );
+              if (core_report_arm_dist_hierarchical) {
+                report_arm_slope *= core_report_arm_dist_sd[truth, category];
+              }
             }
             report_logit[category] = core_report_intercept[truth, category] +
               dot_product(
