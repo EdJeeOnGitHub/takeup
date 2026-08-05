@@ -39,6 +39,10 @@ data {
   // 0 = baseline perfect-observation schedule; 1 = asymmetric reports
   // conditional on recognition; 2 = unrecognized is a fourth null signal.
   int<lower=0, upper=2> core_observation_model;
+  // Recognition: 0 = full; 1 = truth-specific intercepts; 2 = condition out.
+  int<lower=0, upper=2> core_recognition_structure;
+  // Reports: 0 = full multinomial; 1 = no arm-distance slopes; 2 = two-stage.
+  int<lower=0, upper=2> core_report_structure;
   int<lower=0> core_num_peer_response_rows;
   array[core_num_peer_response_rows] int<lower=1, upper=num_clusters>
     core_peer_response_cluster_id;
@@ -123,6 +127,13 @@ transformed data {
   if (core_observation_model > 0 && core_num_peer_response_rows == 0) {
     reject("Asymmetric observability requires linked peer-response rows.");
   }
+  if (core_observation_model == 0 &&
+      (core_recognition_structure != 0 || core_report_structure != 0)) {
+    reject("Observation restrictions require an asymmetric observation model.");
+  }
+  if (core_observation_model == 2 && core_recognition_structure == 2) {
+    reject("The unconditional channel cannot condition recognition out.");
+  }
   if (core_num_peer_response_rows > 0) {
     for (row in 1:core_num_peer_response_rows) {
       if (core_peer_recognized[row] > core_peer_total[row] ||
@@ -160,22 +171,34 @@ parameters {
     core_lambda_group_log_ratio_raw;
   vector[core_lambda_structure == 2 ? num_treatments - 1 : 0]
     core_lambda_arm_log_ratio_raw;
-  vector[core_observation_model > 0 ? 2 : 0]
+  vector[core_observation_model > 0 && core_recognition_structure < 2 ? 2 : 0]
     core_recognition_intercept;
-  vector[core_observation_model > 0 ? 2 : 0]
+  vector[core_observation_model > 0 && core_recognition_structure == 0 ? 2 : 0]
     core_recognition_dist_slope;
-  matrix[core_observation_model > 0 ? 2 : 0, num_treatments - 1]
+  matrix[core_observation_model > 0 && core_recognition_structure == 0 ? 2 : 0, num_treatments - 1]
     core_recognition_arm_intercept_raw;
-  matrix[core_observation_model > 0 ? 2 : 0, num_treatments - 1]
+  matrix[core_observation_model > 0 && core_recognition_structure == 0 ? 2 : 0, num_treatments - 1]
     core_recognition_arm_dist_raw;
-  matrix[core_observation_model > 0 ? 2 : 0, 2]
+  matrix[core_observation_model > 0 && core_report_structure < 2 ? 2 : 0, 2]
     core_report_intercept;
-  matrix[core_observation_model > 0 ? 2 : 0, 2]
+  matrix[core_observation_model > 0 && core_report_structure < 2 ? 2 : 0, 2]
     core_report_dist_slope;
-  matrix[core_observation_model > 0 ? 2 : 0, 2 * (num_treatments - 1)]
+  matrix[core_observation_model > 0 && core_report_structure < 2 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_intercept_raw;
-  matrix[core_observation_model > 0 ? 2 : 0, 2 * (num_treatments - 1)]
+  matrix[core_observation_model > 0 && core_report_structure == 0 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_dist_raw;
+  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+    core_definite_intercept;
+  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+    core_definite_dist_slope;
+  matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
+    core_definite_arm_intercept_raw;
+  vector[core_observation_model > 0 && core_report_structure == 2 ? 1 : 0]
+    core_definite_public_signal_dist_slope;
+  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+    core_accuracy_intercept;
+  matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
+    core_accuracy_arm_intercept_raw;
 }
 
 model {
@@ -251,44 +274,72 @@ model {
     to_vector(core_report_dist_slope) ~ normal(0, 0.5);
     to_vector(core_report_arm_intercept_raw) ~ normal(0, 0.5);
     to_vector(core_report_arm_dist_raw) ~ normal(0, 0.25);
+    core_definite_intercept ~ normal(0, 1.5);
+    core_definite_dist_slope ~ normal(0, 0.5);
+    to_vector(core_definite_arm_intercept_raw) ~ normal(0, 0.5);
+    core_definite_public_signal_dist_slope ~ normal(0, 0.25);
+    core_accuracy_intercept ~ normal(0, 1.5);
+    to_vector(core_accuracy_arm_intercept_raw) ~ normal(0, 0.5);
 
     for (cluster in 1:num_clusters) {
       int treatment = cluster_incentive_treatment_id[cluster];
       for (truth in 1:2) {
-        real recognition_arm_intercept = dot_product(
-          core_recognition_arm_intercept_raw[truth],
-          core_signal_lambda_contrast_basis[treatment]
-        );
-        real recognition_arm_slope = dot_product(
-          core_recognition_arm_dist_raw[truth],
-          core_signal_lambda_contrast_basis[treatment]
-        );
-        vector[2] report_logit;
         vector[3] conditional_report;
-        real recognition_prob = inv_logit(
-          core_recognition_intercept[truth] + recognition_arm_intercept +
-          (core_recognition_dist_slope[truth] + recognition_arm_slope) *
-          cluster_standard_dist[cluster]
-        );
-        for (category in 1:2) {
-          int first = (category - 1) * (num_treatments - 1) + 1;
-          int last = category * (num_treatments - 1);
-          real report_arm_intercept = dot_product(
-            core_report_arm_intercept_raw[truth, first:last],
-            core_signal_lambda_contrast_basis[treatment]
-          );
-          real report_arm_slope = dot_product(
-            core_report_arm_dist_raw[truth, first:last],
-            core_signal_lambda_contrast_basis[treatment]
-          );
-          report_logit[category] = core_report_intercept[truth, category] +
-            report_arm_intercept +
-            (core_report_dist_slope[truth, category] + report_arm_slope) *
-            cluster_standard_dist[cluster];
+        real recognition_prob = 1;
+        if (core_recognition_structure < 2) {
+          real recognition_eta = core_recognition_intercept[truth];
+          if (core_recognition_structure == 0) {
+            recognition_eta += dot_product(
+              core_recognition_arm_intercept_raw[truth],
+              core_signal_lambda_contrast_basis[treatment]
+            ) + (
+              core_recognition_dist_slope[truth] + dot_product(
+                core_recognition_arm_dist_raw[truth],
+                core_signal_lambda_contrast_basis[treatment]
+              )
+            ) * cluster_standard_dist[cluster];
+          }
+          recognition_prob = inv_logit(recognition_eta);
         }
-        conditional_report = core_softmax_with_reference(
-          report_logit[1], report_logit[2]
-        );
+        if (core_report_structure == 2) {
+          real definite_eta = core_definite_intercept[truth] + dot_product(
+            core_definite_arm_intercept_raw[truth],
+            core_signal_lambda_contrast_basis[treatment]
+          ) + (
+            core_definite_dist_slope[truth] +
+            core_definite_public_signal_dist_slope[1] *
+              core_is_public_signal[treatment]
+          ) * cluster_standard_dist[cluster];
+          real accuracy_eta = core_accuracy_intercept[truth] + dot_product(
+            core_accuracy_arm_intercept_raw[truth],
+            core_signal_lambda_contrast_basis[treatment]
+          );
+          conditional_report = core_two_stage_report_row(
+            inv_logit(definite_eta), inv_logit(accuracy_eta), truth
+          );
+        } else {
+          vector[2] report_logit;
+          for (category in 1:2) {
+            int first = (category - 1) * (num_treatments - 1) + 1;
+            int last = category * (num_treatments - 1);
+            real report_arm_slope = 0;
+            if (core_report_structure == 0) {
+              report_arm_slope = dot_product(
+                core_report_arm_dist_raw[truth, first:last],
+                core_signal_lambda_contrast_basis[treatment]
+              );
+            }
+            report_logit[category] = core_report_intercept[truth, category] +
+              dot_product(
+                core_report_arm_intercept_raw[truth, first:last],
+                core_signal_lambda_contrast_basis[treatment]
+              ) + (core_report_dist_slope[truth, category] +
+                report_arm_slope) * cluster_standard_dist[cluster];
+          }
+          conditional_report = core_softmax_with_reference(
+            report_logit[1], report_logit[2]
+          );
+        }
         core_cluster_recognition[cluster, truth] = recognition_prob;
         if (truth == 1) {
           core_cluster_report_nontaker[cluster] = conditional_report';
@@ -360,11 +411,13 @@ model {
       vector[3] report_probability = truth == 1 ?
         core_cluster_report_nontaker[cluster]' :
         core_cluster_report_taker[cluster]';
-      target += core_cluster_weight[cluster] * binomial_lupmf(
-        core_peer_recognized[row] |
-        core_peer_total[row],
-        core_cluster_recognition[cluster, truth]
-      );
+      if (core_recognition_structure < 2) {
+        target += core_cluster_weight[cluster] * binomial_lupmf(
+          core_peer_recognized[row] |
+          core_peer_total[row],
+          core_cluster_recognition[cluster, truth]
+        );
+      }
       target += core_cluster_weight[cluster] * multinomial_lupmf(
         core_peer_report_count[row] | report_probability
       );

@@ -83,6 +83,12 @@ core_student_t_components <- as.integer(
 core_observation_model <- as.integer(
   option_value("--core-observation-model", "0")
 )
+core_recognition_structure <- as.integer(
+  option_value("--core-recognition-structure", "0")
+)
+core_report_structure <- as.integer(
+  option_value("--core-report-structure", "0")
+)
 
 stopifnot(
   chains >= 1L,
@@ -121,6 +127,18 @@ if (!core_type_distribution %in% 0:1 || !is.finite(core_student_t_df) ||
 }
 if (!core_observation_model %in% 0:2) {
   stop("--core-observation-model must be 0, 1, or 2.", call. = FALSE)
+}
+if (!core_recognition_structure %in% 0:2 ||
+    !core_report_structure %in% 0:2) {
+  stop("Observation structures must be 0, 1, or 2.", call. = FALSE)
+}
+if (core_observation_model == 0L &&
+    (core_recognition_structure != 0L || core_report_structure != 0L)) {
+  stop("Observation restrictions require an asymmetric model.", call. = FALSE)
+}
+if (core_observation_model == 2L && core_recognition_structure == 2L) {
+  stop("The unconditional model cannot condition recognition out.",
+       call. = FALSE)
 }
 
 init_value <- if (is.null(init_files_option)) {
@@ -257,6 +275,8 @@ sample_data$core_type_mixture_components <- type_mixture$components
 sample_data$core_type_mixture_precision <- type_mixture$precision
 sample_data$core_type_mixture_weight <- type_mixture$weight
 sample_data$core_observation_model <- core_observation_model
+sample_data$core_recognition_structure <- core_recognition_structure
+sample_data$core_report_structure <- core_report_structure
 peer_data <- if (core_observation_model == 0L) {
   main_core_empty_peer_response_data()
 } else {
@@ -333,7 +353,9 @@ if (!is.null(data_json)) {
       core_student_t_df = core_student_t_df,
       core_type_scale_sq = type_mixture$scale_sq,
       core_type_mixture_components = core_student_t_components,
-      core_observation_model = core_observation_model
+      core_observation_model = core_observation_model,
+      core_recognition_structure = core_recognition_structure,
+      core_report_structure = core_report_structure
     )
   )
 }

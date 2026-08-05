@@ -103,6 +103,8 @@ prepare_main_core_data <- function(
     student_t_df = 5,
     student_t_components = 12L,
     observation_model = 0L,
+    recognition_structure = 0L,
+    report_structure = 0L,
     project_root = ".",
     peer_audit_path = NULL) {
   if (!file.exists(workspace_path)) {
@@ -173,6 +175,22 @@ prepare_main_core_data <- function(
     stop("observation_model must be 0, 1, or 2.", call. = FALSE)
   }
   sample_data$core_observation_model <- observation_model
+  recognition_structure <- as.integer(recognition_structure)
+  report_structure <- as.integer(report_structure)
+  if (!recognition_structure %in% 0:2 || !report_structure %in% 0:2) {
+    stop("recognition_structure and report_structure must be 0, 1, or 2.",
+         call. = FALSE)
+  }
+  if (observation_model == 0L &&
+      (recognition_structure != 0L || report_structure != 0L)) {
+    stop("Observation restrictions require an asymmetric model.", call. = FALSE)
+  }
+  if (observation_model == 2L && recognition_structure == 2L) {
+    stop("The unconditional model cannot condition recognition out.",
+         call. = FALSE)
+  }
+  sample_data$core_recognition_structure <- recognition_structure
+  sample_data$core_report_structure <- report_structure
   peer_data <- if (observation_model == 0L) {
     main_core_empty_peer_response_data()
   } else {

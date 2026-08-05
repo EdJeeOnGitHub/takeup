@@ -164,3 +164,47 @@ vector core_noisy_signal_row(
   }
   return result;
 }
+
+vector core_two_stage_report_row(
+    real definite_prob,
+    real accuracy_prob,
+    data int truth) {
+  vector[3] result;
+  if (truth == 2) {
+    result = [
+      definite_prob * accuracy_prob,
+      definite_prob * (1 - accuracy_prob),
+      1 - definite_prob
+    ]';
+  } else {
+    result = [
+      definite_prob * (1 - accuracy_prob),
+      definite_prob * accuracy_prob,
+      1 - definite_prob
+    ]';
+  }
+  return result;
+}
+
+vector core_two_stage_report_row_derivative(
+    real definite_prob,
+    real definite_slope,
+    real accuracy_prob,
+    data int truth) {
+  real definite_deriv = definite_prob * (1 - definite_prob) * definite_slope;
+  vector[3] result;
+  if (truth == 2) {
+    result = [
+      definite_deriv * accuracy_prob,
+      definite_deriv * (1 - accuracy_prob),
+      -definite_deriv
+    ]';
+  } else {
+    result = [
+      definite_deriv * (1 - accuracy_prob),
+      definite_deriv * accuracy_prob,
+      -definite_deriv
+    ]';
+  }
+  return result;
+}
