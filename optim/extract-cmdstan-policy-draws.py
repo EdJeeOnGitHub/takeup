@@ -36,6 +36,12 @@ def main():
                         help="Number of cluster shock elements to retain")
     parser.add_argument("--include-asymmetric", action="store_true",
                         help="Retain the 48 asymmetric-observability parameters")
+    parser.add_argument(
+        "--asymmetric-structure",
+        choices=["none", "full", "f1", "f2", "f3", "u3"],
+        default="none",
+        help="Retain the parameters present in an observability-ladder fit",
+    )
     parser.add_argument("fits", nargs="+")
     args = parser.parse_args()
 
@@ -47,21 +53,38 @@ def main():
     if args.include_cluster_shock:
         wanted += ["core_cluster_shock_sd.1"]
         wanted += [f"core_cluster_shock_raw.{i}" for i in range(1, args.include_cluster_shock + 1)]
-    if args.include_asymmetric:
+    if args.include_asymmetric and args.asymmetric_structure != "none":
+        parser.error("Use either --include-asymmetric or --asymmetric-structure")
+    asymmetric_structure = (
+        "full" if args.include_asymmetric else args.asymmetric_structure
+    )
+    if asymmetric_structure in ("full", "f1", "u3"):
         wanted += [f"core_recognition_intercept.{i}" for i in range(1, 3)]
+    if asymmetric_structure in ("full", "f1"):
         wanted += [f"core_recognition_dist_slope.{i}" for i in range(1, 3)]
         wanted += [f"core_recognition_arm_intercept_raw.{i}.{j}"
                    for j in range(1, 4) for i in range(1, 3)]
         wanted += [f"core_recognition_arm_dist_raw.{i}.{j}"
                    for j in range(1, 4) for i in range(1, 3)]
+    if asymmetric_structure in ("full", "f1", "f2"):
         wanted += [f"core_report_intercept.{i}.{j}"
                    for j in range(1, 3) for i in range(1, 3)]
         wanted += [f"core_report_dist_slope.{i}.{j}"
                    for j in range(1, 3) for i in range(1, 3)]
         wanted += [f"core_report_arm_intercept_raw.{i}.{j}"
                    for j in range(1, 7) for i in range(1, 3)]
+    if asymmetric_structure == "full":
         wanted += [f"core_report_arm_dist_raw.{i}.{j}"
                    for j in range(1, 7) for i in range(1, 3)]
+    if asymmetric_structure in ("f3", "u3"):
+        wanted += [f"core_definite_intercept.{i}" for i in range(1, 3)]
+        wanted += [f"core_definite_dist_slope.{i}" for i in range(1, 3)]
+        wanted += [f"core_definite_arm_intercept_raw.{i}.{j}"
+                   for j in range(1, 4) for i in range(1, 3)]
+        wanted += ["core_definite_public_signal_dist_slope.1"]
+        wanted += [f"core_accuracy_intercept.{i}" for i in range(1, 3)]
+        wanted += [f"core_accuracy_arm_intercept_raw.{i}.{j}"
+                   for j in range(1, 4) for i in range(1, 3)]
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

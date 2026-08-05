@@ -22,6 +22,10 @@ policy_scenarios <- data.frame(
   suppress_reputation = c(FALSE, FALSE, FALSE, FALSE, TRUE),
   stringsAsFactors = FALSE
 )
+policy_asymmetric_families <- c(
+  "asymmetric_conditional", "asymmetric_unconditional",
+  "asymmetric_f1", "asymmetric_f2", "asymmetric_f3", "asymmetric_u3"
+)
 
 read_cmdstan_mode_row <- function(path) {
   if (!file.exists(path)) stop("Mode CSV not found: ", path, call. = FALSE)
@@ -142,17 +146,49 @@ canonical_policy_draw <- function(
   } else if (lambda_structure != "common") {
     stop("Unknown lambda structure: ", lambda_structure, call. = FALSE)
   }
-  if (model_family %in% c("asymmetric_conditional", "asymmetric_unconditional")) {
-    measurement <- c(
-      mode_vector(draw, "core_recognition_intercept", 2L),
-      mode_vector(draw, "core_recognition_dist_slope", 2L),
-      as.vector(mode_matrix(draw, "core_recognition_arm_intercept_raw", 2L, 3L)),
-      as.vector(mode_matrix(draw, "core_recognition_arm_dist_raw", 2L, 3L)),
-      as.vector(mode_matrix(draw, "core_report_intercept", 2L, 2L)),
-      as.vector(mode_matrix(draw, "core_report_dist_slope", 2L, 2L)),
-      as.vector(mode_matrix(draw, "core_report_arm_intercept_raw", 2L, 6L)),
-      as.vector(mode_matrix(draw, "core_report_arm_dist_raw", 2L, 6L))
-    )
+  if (model_family %in% policy_asymmetric_families) {
+    if (model_family %in% c("asymmetric_f3", "asymmetric_u3")) {
+      measurement <- c(
+        if (model_family == "asymmetric_u3") {
+          mode_vector(draw, "core_recognition_intercept", 2L)
+        } else numeric(),
+        mode_vector(draw, "core_definite_intercept", 2L),
+        mode_vector(draw, "core_definite_dist_slope", 2L),
+        as.vector(mode_matrix(
+          draw, "core_definite_arm_intercept_raw", 2L, 3L
+        )),
+        mode_vector(draw, "core_definite_public_signal_dist_slope", 1L),
+        mode_vector(draw, "core_accuracy_intercept", 2L),
+        as.vector(mode_matrix(
+          draw, "core_accuracy_arm_intercept_raw", 2L, 3L
+        ))
+      )
+    } else {
+      full_recognition <- model_family != "asymmetric_f2"
+      full_report <- model_family %in% c(
+        "asymmetric_conditional", "asymmetric_unconditional"
+      )
+      measurement <- c(
+        if (full_recognition) {
+          mode_vector(draw, "core_recognition_intercept", 2L)
+        } else numeric(2L),
+        if (full_recognition) {
+          mode_vector(draw, "core_recognition_dist_slope", 2L)
+        } else numeric(2L),
+        if (full_recognition) as.vector(mode_matrix(
+          draw, "core_recognition_arm_intercept_raw", 2L, 3L
+        )) else numeric(6L),
+        if (full_recognition) as.vector(mode_matrix(
+          draw, "core_recognition_arm_dist_raw", 2L, 3L
+        )) else numeric(6L),
+        as.vector(mode_matrix(draw, "core_report_intercept", 2L, 2L)),
+        as.vector(mode_matrix(draw, "core_report_dist_slope", 2L, 2L)),
+        as.vector(mode_matrix(draw, "core_report_arm_intercept_raw", 2L, 6L)),
+        if (full_report) as.vector(mode_matrix(
+          draw, "core_report_arm_dist_raw", 2L, 6L
+        )) else numeric(12L)
+      )
+    }
     names(measurement) <- paste0("observation_parameter_", seq_along(measurement))
     for (parameter_name in names(measurement)) {
       value[[parameter_name]] <- measurement[[parameter_name]]
@@ -174,6 +210,65 @@ policy_fixedpoint_residual <- function(cutoff, benefit, mu_rep, u_sd) {
 }
 
 policy_noisy_channel <- function(distance_sd, parameter, visibility) {
+  helmert_basis <- matrix(
+    c(1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
+      -1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
+      0, -2 / sqrt(6), 1 / sqrt(12),
+      0, 0, -3 / sqrt(12)),
+    nrow = 4, byrow = TRUE
+  )
+  treatment <- match(visibility, c("control", "ink", "calendar", "bracelet"))
+  if (is.na(treatment)) stop("Unknown policy visibility: ", visibility, call. = FALSE)
+  if (parameter$model_family %in% c("asymmetric_f3", "asymmetric_u3")) {
+    parameter_count <- if (parameter$model_family == "asymmetric_u3") 21L else 19L
+    value <- unlist(parameter[paste0(
+      "observation_parameter_", seq_len(parameter_count)
+    )], use.names = FALSE)
+    if (length(value) != parameter_count || any(!is.finite(value))) {
+      stop("Missing two-stage observability policy parameters.", call. = FALSE)
+    }
+    cursor <- 0L
+    take <- function(n) {
+      index <- cursor + seq_len(n)
+      cursor <<- cursor + n
+      value[index]
+    }
+    recognition_intercept <- if (parameter$model_family == "asymmetric_u3") {
+      take(2L)
+    } else c(Inf, Inf)
+    definite_intercept <- take(2L)
+    definite_dist_slope <- take(2L)
+    definite_arm_intercept <- matrix(take(6L), 2L, 3L)
+    definite_public_dist_slope <- take(1L)
+    accuracy_intercept <- take(2L)
+    accuracy_arm_intercept <- matrix(take(6L), 2L, 3L)
+    public_signal <- as.integer(visibility %in% c("ink", "bracelet"))
+    q <- recognition <- vector("list", 2L)
+    for (truth in 1:2) {
+      recognition[[truth]] <- plogis(recognition_intercept[truth])
+      definite <- plogis(
+        definite_intercept[truth] +
+          sum(definite_arm_intercept[truth, ] * helmert_basis[treatment, ]) +
+          (definite_dist_slope[truth] +
+           definite_public_dist_slope * public_signal) * distance_sd
+      )
+      accuracy <- plogis(
+        accuracy_intercept[truth] +
+          sum(accuracy_arm_intercept[truth, ] * helmert_basis[treatment, ])
+      )
+      conditional <- if (truth == 2L) {
+        cbind(definite * accuracy, definite * (1 - accuracy), 1 - definite)
+      } else {
+        cbind(definite * (1 - accuracy), definite * accuracy, 1 - definite)
+      }
+      q[[truth]] <- if (parameter$model_family == "asymmetric_f3") {
+        conditional
+      } else {
+        cbind(recognition[[truth]] * conditional, 1 - recognition[[truth]])
+      }
+    }
+    return(list(nontaker = q[[1L]], taker = q[[2L]], recognition = recognition))
+  }
   value <- unlist(parameter[paste0("observation_parameter_", 1:48)], use.names = FALSE)
   if (length(value) != 48L || any(!is.finite(value))) {
     stop("Missing asymmetric-observability policy parameters.", call. = FALSE)
@@ -192,15 +287,6 @@ policy_noisy_channel <- function(distance_sd, parameter, visibility) {
   report_dist_slope <- matrix(take(4L), 2L, 2L)
   report_arm_intercept <- matrix(take(12L), 2L, 6L)
   report_arm_dist <- matrix(take(12L), 2L, 6L)
-  helmert_basis <- matrix(
-    c(1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
-      -1 / sqrt(2), 1 / sqrt(6), 1 / sqrt(12),
-      0, -2 / sqrt(6), 1 / sqrt(12),
-      0, 0, -3 / sqrt(12)),
-    nrow = 4, byrow = TRUE
-  )
-  treatment <- match(visibility, c("control", "ink", "calendar", "bracelet"))
-  if (is.na(treatment)) stop("Unknown policy visibility: ", visibility, call. = FALSE)
   q <- vector("list", 2L)
   recognition <- vector("list", 2L)
   for (truth in 1:2) {
@@ -224,7 +310,9 @@ policy_noisy_channel <- function(distance_sd, parameter, visibility) {
     full_eta <- cbind(report_eta, 0)
     exp_eta <- exp(full_eta - apply(full_eta, 1L, max))
     conditional <- exp_eta / rowSums(exp_eta)
-    q[[truth]] <- if (identical(parameter$model_family, "asymmetric_conditional")) {
+    q[[truth]] <- if (parameter$model_family %in% c(
+      "asymmetric_conditional", "asymmetric_f1", "asymmetric_f2"
+    )) {
       conditional
     } else {
       cbind(recognition[[truth]] * conditional, 1 - recognition[[truth]])
@@ -443,8 +531,7 @@ predict_policy_draw <- function(
   }
   dynamic_cache <- list()
   for (visibility in unique(scenarios$visibility[!scenarios$suppress_reputation])) {
-    asymmetric <- parameter$model_family %in%
-      c("asymmetric_conditional", "asymmetric_unconditional")
+    asymmetric <- parameter$model_family %in% policy_asymmetric_families
     mu <- if (asymmetric) {
       rep(parameter$base_mu_rep, length(distance_sd))
     } else {
@@ -470,8 +557,7 @@ predict_policy_draw <- function(
     if (!is.null(parameter$cluster_shock)) {
       benefit_500 <- benefit_500 + parameter$cluster_shock[village_ids]
     }
-    asymmetric <- parameter$model_family %in%
-      c("asymmetric_conditional", "asymmetric_unconditional")
+    asymmetric <- parameter$model_family %in% policy_asymmetric_families
     mu_500 <- if (asymmetric) parameter$base_mu_rep else
       policy_mu_rep(distance_500_sd, parameter, visibility)
     if (!is.null(parameter$cluster_shock)) {

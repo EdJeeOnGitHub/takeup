@@ -38,6 +38,64 @@ softmax <- function(value) {
   shifted <- value - max(value)
   exp(shifted) / sum(exp(shifted))
 }
+
+# Structure 0 is the exact pre-ladder response likelihood: the same full
+# recognition and multinomial logits, with no altered scaling or priors.
+set.seed(20260805)
+contrast <- matrix(rnorm(12), 4, 3)
+recognition_intercept <- rnorm(2)
+recognition_dist <- rnorm(2)
+recognition_arm <- matrix(rnorm(6), 2, 3)
+recognition_arm_dist <- matrix(rnorm(6), 2, 3)
+report_intercept <- matrix(rnorm(4), 2, 2)
+report_dist <- matrix(rnorm(4), 2, 2)
+report_arm <- matrix(rnorm(12), 2, 6)
+report_arm_dist <- matrix(rnorm(12), 2, 6)
+distance_test <- -0.37
+treatment_test <- 3L
+truth_test <- 2L
+old_recognition_eta <- recognition_intercept[truth_test] +
+  sum(recognition_arm[truth_test, ] * contrast[treatment_test, ]) +
+  (recognition_dist[truth_test] +
+   sum(recognition_arm_dist[truth_test, ] * contrast[treatment_test, ])) *
+  distance_test
+old_report_eta <- vapply(1:2, function(category) {
+  columns <- (category - 1L) * 3L + 1:3
+  report_intercept[truth_test, category] +
+    sum(report_arm[truth_test, columns] * contrast[treatment_test, ]) +
+    (report_dist[truth_test, category] +
+     sum(report_arm_dist[truth_test, columns] * contrast[treatment_test, ])) *
+    distance_test
+}, numeric(1))
+new_recognition_eta <- recognition_intercept[truth_test]
+if (0L == 0L) {
+  new_recognition_eta <- new_recognition_eta +
+    sum(recognition_arm[truth_test, ] * contrast[treatment_test, ]) +
+    (recognition_dist[truth_test] +
+     sum(recognition_arm_dist[truth_test, ] * contrast[treatment_test, ])) *
+    distance_test
+}
+new_report_eta <- vapply(1:2, function(category) {
+  columns <- (category - 1L) * 3L + 1:3
+  arm_slope <- if (0L == 0L) {
+    sum(report_arm_dist[truth_test, columns] * contrast[treatment_test, ])
+  } else 0
+  report_intercept[truth_test, category] +
+    sum(report_arm[truth_test, columns] * contrast[treatment_test, ]) +
+    (report_dist[truth_test, category] + arm_slope) * distance_test
+}, numeric(1))
+recognized <- 17L
+total <- 23L
+report_count <- c(8L, 6L, 3L)
+old_target <- dbinom(recognized, total, plogis(old_recognition_eta), log = TRUE) +
+  dmultinom(report_count, prob = softmax(c(old_report_eta, 0)), log = TRUE)
+new_target <- dbinom(recognized, total, plogis(new_recognition_eta), log = TRUE) +
+  dmultinom(report_count, prob = softmax(c(new_report_eta, 0)), log = TRUE)
+stopifnot(
+  identical(old_recognition_eta, new_recognition_eta),
+  identical(old_report_eta, new_report_eta),
+  identical(old_target, new_target)
+)
 channel <- function(distance) {
   make_truth <- function(intercept, slope, recognition_intercept,
                          recognition_slope) {

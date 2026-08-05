@@ -78,6 +78,14 @@ case "${MODEL_ID}" in
     FITS=("${ROOT}"/main-core-asym-unconditional-production/dist_fit106_MAIN_CORE_chain{1,2,3,4}-1.csv)
     EXTRACT_OPTIONS=(--include-asymmetric)
     ;;
+  asymmetric-f1|asymmetric-f2|asymmetric-f3|asymmetric-u3)
+    LADDER_ID=${MODEL_ID#asymmetric-}
+    MODEL_LABEL="Observability ladder ${LADDER_ID^^}"
+    MODEL_FAMILY="asymmetric_${LADDER_ID}"
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/main-core-observability-ladder/"${LADDER_ID}"/dist_fit106_MAIN_CORE_chain{1,2,3,4}-1.csv)
+    EXTRACT_OPTIONS=(--asymmetric-structure "${LADDER_ID}")
+    ;;
   *)
     echo "Unknown MODEL_ID=${MODEL_ID}" >&2
     exit 2
