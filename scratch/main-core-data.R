@@ -163,10 +163,15 @@ prepare_main_core_data <- function(
   } else {
     gq_lambda_override
   }
+  type_distribution <- as.integer(type_distribution)
+  if (!type_distribution %in% 0:2) {
+    stop("type_distribution must be 0 (Gaussian), 1 (Student-t), or 2 (finite mixture).",
+         call. = FALSE)
+  }
   type_mixture <- main_core_student_t_mixture(
     student_t_df, student_t_components
   )
-  sample_data$core_type_distribution <- as.integer(type_distribution)
+  sample_data$core_type_distribution <- type_distribution
   sample_data$core_student_t_df <- type_mixture$df
   sample_data$core_type_scale_sq <- type_mixture$scale_sq
   sample_data$core_type_mixture_components <- type_mixture$components
@@ -267,6 +272,12 @@ main_core_nudge_init_boundaries <- function(init, epsilon = 1e-4) {
   }
   for (parameter in intersect(names(init), positive_parameters)) {
     init[[parameter]] <- nudge_value(init[[parameter]])
+  }
+  for (parameter in intersect(
+    names(init),
+    c("core_finite_mixture_weight", "core_finite_mixture_between_share")
+  )) {
+    init[[parameter]] <- pmin(1 - epsilon, pmax(epsilon, init[[parameter]]))
   }
   # These effects are lower-bounded only when the private-incentive
   # restrictions are active. Preserve negative unrestricted values, but move

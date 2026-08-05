@@ -141,6 +141,8 @@ gq_fit <- model$generate_quantities(
     output_basename
   } else if (type_distribution == 1L) {
     paste0("main-core-student-t-df", format(student_t_df, trim = TRUE), "-compact")
+  } else if (type_distribution == 2L) {
+    "main-core-finite-mixture-compact"
   } else if (observation_model > 0L) {
     paste0(
       "main-core-observation-", observation_model, "-rec-",

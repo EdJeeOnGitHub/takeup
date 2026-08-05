@@ -126,9 +126,9 @@ if (!core_profile_group_lambda %in% 0:1 ||
     (core_profile_group_lambda == 1L && core_lambda_structure != 1L)) {
   stop("Grouped-lambda profiling requires structure 1.", call. = FALSE)
 }
-if (!core_type_distribution %in% 0:1 || !is.finite(core_student_t_df) ||
+if (!core_type_distribution %in% 0:2 || !is.finite(core_student_t_df) ||
     core_student_t_df <= 2 || core_student_t_components < 2L) {
-  stop("Student-t controls require distribution 0/1, df > 2, and components >= 2.",
+  stop("Type controls require distribution 0/1/2, df > 2, and components >= 2.",
        call. = FALSE)
 }
 if (!core_observation_model %in% 0:2) {

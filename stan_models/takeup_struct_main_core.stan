@@ -7,6 +7,7 @@ functions {
   // Heavy-tailed type robustness with bounded Newton solves; inactive in the
   // exact Gaussian branch.
   #include core_student_t_functions.stan
+  #include core_finite_mixture_functions.stan
   #include core_asymmetric_observability_functions.stan
 }
 
@@ -28,7 +29,8 @@ data {
   real core_profile_group_log_ratio;
   int<lower=0, upper=1> core_gq_override_lambda;
   vector<lower=0>[num_treatments] core_gq_lambda_override;
-  int<lower=0, upper=1> core_type_distribution;
+  // 0 = Gaussian; 1 = Student-t; 2 = estimated two-normal mixture.
+  int<lower=0, upper=2> core_type_distribution;
   real<lower=2> core_student_t_df;
   real<lower=0> core_type_scale_sq;
   int<lower=2> core_type_mixture_components;
@@ -208,6 +210,10 @@ parameters {
     core_accuracy_intercept;
   matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
     core_accuracy_arm_intercept_raw;
+  vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
+    core_finite_mixture_weight;
+  vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
+    core_finite_mixture_between_share;
 }
 
 model {
@@ -236,6 +242,25 @@ model {
   matrix[num_clusters, 4] core_cluster_signal_nontaker = rep_matrix(0, num_clusters, 4);
   real u_sd = raw_u_sd[1];
   real total_error_sd = sqrt(1 + square(u_sd));
+  vector[2] finite_component_mean = rep_vector(0, 2);
+  vector[2] finite_component_variance = rep_vector(1, 2);
+  vector[2] finite_component_weight = rep_vector(0.5, 2);
+
+  if (core_type_distribution == 2) {
+    real mixture_weight = core_finite_mixture_weight[1];
+    real between_share = core_finite_mixture_between_share[1];
+    real separation = sqrt(
+      between_share / (mixture_weight * (1 - mixture_weight))
+    );
+    finite_component_weight = [mixture_weight, 1 - mixture_weight]';
+    finite_component_mean = [
+      -(1 - mixture_weight) * separation,
+      mixture_weight * separation
+    ]';
+    finite_component_variance = rep_vector(1 - between_share, 2);
+    core_finite_mixture_weight ~ beta(2, 2);
+    core_finite_mixture_between_share ~ beta(2, 4);
+  }
 
   for (dist_group_index in 1:num_discrete_dist) {
     group_dist_mean[dist_group_index] =
@@ -545,6 +570,30 @@ model {
             cluster_cutoff[cluster_index], u_sd, use_u_in_delta,
             core_type_scale_sq, core_type_mixture_precision,
             core_type_mixture_weight
+          )[1];
+      }
+    } else if (core_type_distribution == 2) {
+      if (multithreaded) {
+        cluster_cutoff = core_finite_mixture_map_find_fixedpoint(
+          cluster_benefit_cost, cluster_mu_rep, u_sd, use_u_in_delta,
+          finite_component_mean, finite_component_variance,
+          finite_component_weight
+        );
+      } else {
+        for (cluster_index in 1:num_clusters) {
+          cluster_cutoff[cluster_index] = core_finite_mixture_find_fixedpoint(
+            cluster_benefit_cost[cluster_index], cluster_mu_rep[cluster_index],
+            u_sd, use_u_in_delta, finite_component_mean,
+            finite_component_variance, finite_component_weight
+          );
+        }
+      }
+      for (cluster_index in 1:num_clusters) {
+        cluster_takeup_probability[cluster_index] = 1 -
+          core_finite_mixture_moments(
+            cluster_cutoff[cluster_index], u_sd, use_u_in_delta,
+            finite_component_mean, finite_component_variance,
+            finite_component_weight
           )[1];
       }
     } else {

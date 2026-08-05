@@ -6,6 +6,7 @@ functions {
   // Heavy-tailed type robustness with bounded Newton solves; inactive in the
   // exact Gaussian branch.
   #include core_student_t_functions.stan
+  #include core_finite_mixture_functions.stan
   #include core_asymmetric_observability_functions.stan
 
   // Probability and distance derivative for the selected recognition ladder.
@@ -231,6 +232,52 @@ functions {
     return midpoint;
   }
 
+  real core_gq_find_fixedpoint_finite_mixture_safe(
+      real benefit_cost, real mu_rep, real u_sd,
+      data int use_u_in_delta, vector component_mean,
+      vector component_variance, vector component_weight) {
+    real lower_bound = -8;
+    real upper_bound = 8;
+    real midpoint = -benefit_cost;
+    real lower_residual = lower_bound + benefit_cost + mu_rep *
+      core_finite_mixture_moments(
+        lower_bound, u_sd, use_u_in_delta, component_mean,
+        component_variance, component_weight
+      )[3];
+    real upper_residual = upper_bound + benefit_cost + mu_rep *
+      core_finite_mixture_moments(
+        upper_bound, u_sd, use_u_in_delta, component_mean,
+        component_variance, component_weight
+      )[3];
+    if (lower_residual * upper_residual <= 0) {
+      for (step in 1:60) {
+        real midpoint_residual;
+        midpoint = 0.5 * (lower_bound + upper_bound);
+        midpoint_residual = midpoint + benefit_cost + mu_rep *
+          core_finite_mixture_moments(
+            midpoint, u_sd, use_u_in_delta, component_mean,
+            component_variance, component_weight
+          )[3];
+        if (lower_residual * midpoint_residual <= 0) {
+          upper_bound = midpoint;
+        } else {
+          lower_bound = midpoint;
+          lower_residual = midpoint_residual;
+        }
+      }
+    } else {
+      for (step in 1:120) {
+        real residual = midpoint + benefit_cost + mu_rep *
+          core_finite_mixture_moments(
+            midpoint, u_sd, use_u_in_delta, component_mean,
+            component_variance, component_weight
+          )[3];
+        midpoint = fmin(8, fmax(-8, midpoint - 0.4 * residual));
+      }
+    }
+    return midpoint;
+  }
+
   vector core_gq_calculate_roc(
       real benefit_cost,
       real benefit_cost_control,
@@ -318,6 +365,41 @@ functions {
     ]';
   }
 
+  vector core_gq_calculate_roc_finite_mixture(
+      real benefit_cost, real benefit_cost_control, real u_sd,
+      real dist_beta, real mu_rep, real mu_rep_control,
+      real mu_rep_deriv, data int use_u_in_delta,
+      vector component_mean, vector component_variance,
+      vector component_weight) {
+    real w = core_gq_find_fixedpoint_finite_mixture_safe(
+      benefit_cost, mu_rep, u_sd, use_u_in_delta, component_mean,
+      component_variance, component_weight
+    );
+    real w_control = core_gq_find_fixedpoint_finite_mixture_safe(
+      benefit_cost_control, mu_rep_control, u_sd, use_u_in_delta,
+      component_mean, component_variance, component_weight
+    );
+    vector[4] moments = core_finite_mixture_moments(
+      w, u_sd, use_u_in_delta, component_mean,
+      component_variance, component_weight
+    );
+    vector[4] control_moments = core_finite_mixture_moments(
+      w_control, u_sd, use_u_in_delta, component_mean,
+      component_variance, component_weight
+    );
+    real roc = -control_moments[2] *
+      (dist_beta - mu_rep_deriv * control_moments[3]) /
+      (1 + mu_rep * control_moments[4]);
+    real roc_no_visibility = -control_moments[2] * dist_beta;
+    real sm_value = calculate_sm(
+      w, 1, dist_beta, mu_rep, mu_rep_deriv, moments[3], moments[4]
+    );
+    return [
+      w, w_control, control_moments[3], control_moments[4], roc,
+      roc_no_visibility, sm_value, moments[3], moments[4]
+    ]';
+  }
+
   real core_gq_calculate_noisy_sm(
       real benefit_cost,
       real lambda,
@@ -364,7 +446,7 @@ data {
   real core_profile_group_log_ratio;
   int<lower=0, upper=1> core_gq_override_lambda;
   vector<lower=0>[num_treatments] core_gq_lambda_override;
-  int<lower=0, upper=1> core_type_distribution;
+  int<lower=0, upper=2> core_type_distribution;
   real<lower=2> core_student_t_df;
   real<lower=0> core_type_scale_sq;
   int<lower=2> core_type_mixture_components;
@@ -477,6 +559,10 @@ parameters {
     core_accuracy_intercept;
   matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
     core_accuracy_arm_intercept_raw;
+  vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
+    core_finite_mixture_weight;
+  vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
+    core_finite_mixture_between_share;
 }
 
 model {
@@ -538,12 +624,29 @@ generated quantities {
     real total_weight = 0;
     real u_sd = raw_u_sd[1];
     real total_error_sd = sqrt(1 + square(u_sd));
+    vector[2] finite_component_mean = rep_vector(0, 2);
+    vector[2] finite_component_variance = rep_vector(1, 2);
+    vector[2] finite_component_weight = rep_vector(0.5, 2);
     matrix[num_clusters, num_discrete_dist] all_cluster_dist;
     matrix[num_clusters, 2] observed_recognition = rep_matrix(0, num_clusters, 2);
     matrix[num_clusters, 3] observed_report_nontaker = rep_matrix(0, num_clusters, 3);
     matrix[num_clusters, 3] observed_report_taker = rep_matrix(0, num_clusters, 3);
     matrix[num_clusters, 4] observed_q_nontaker = rep_matrix(0, num_clusters, 4);
     matrix[num_clusters, 4] observed_q_taker = rep_matrix(0, num_clusters, 4);
+
+    if (core_type_distribution == 2) {
+      real mixture_weight = core_finite_mixture_weight[1];
+      real between_share = core_finite_mixture_between_share[1];
+      real separation = sqrt(
+        between_share / (mixture_weight * (1 - mixture_weight))
+      );
+      finite_component_weight = [mixture_weight, 1 - mixture_weight]';
+      finite_component_mean = [
+        -(1 - mixture_weight) * separation,
+        mixture_weight * separation
+      ]';
+      finite_component_variance = rep_vector(1 - between_share, 2);
+    }
 
     if (core_lambda_structure == 1) {
       core_compact_signal_vs_no_signal_log_lambda =
@@ -668,6 +771,16 @@ generated quantities {
           takeup_probability = 1 - core_student_t_moments(
             cutoff, u_sd, use_u_in_delta, core_type_scale_sq,
             core_type_mixture_precision, core_type_mixture_weight
+          )[1];
+        } else if (core_type_distribution == 2) {
+          cutoff = core_gq_find_fixedpoint_finite_mixture_safe(
+            actual_benefit[cluster_index], actual_mu[cluster_index], u_sd,
+            use_u_in_delta, finite_component_mean,
+            finite_component_variance, finite_component_weight
+          );
+          takeup_probability = 1 - core_finite_mixture_moments(
+            cutoff, u_sd, use_u_in_delta, finite_component_mean,
+            finite_component_variance, finite_component_weight
           )[1];
         } else {
           cutoff = core_gq_find_fixedpoint_safe(
@@ -866,6 +979,13 @@ generated quantities {
               use_u_in_delta, core_type_scale_sq,
               core_type_mixture_precision, core_type_mixture_weight
             );
+          } else if (core_type_distribution == 2) {
+            cutoff[cluster_index] =
+              core_gq_find_fixedpoint_finite_mixture_safe(
+                benefit_cost[cluster_index], mu_rep[cluster_index], u_sd,
+                use_u_in_delta, finite_component_mean,
+                finite_component_variance, finite_component_weight
+              );
           } else {
             cutoff[cluster_index] = core_gq_find_fixedpoint_safe(
               benefit_cost[cluster_index],
@@ -886,6 +1006,15 @@ generated quantities {
               core_type_scale_sq, core_type_mixture_precision,
               core_type_mixture_weight
             )[1];
+          }
+        } else if (core_type_distribution == 2) {
+          for (cluster_index in 1:num_clusters) {
+            probability[cluster_index] = 1 -
+              core_finite_mixture_moments(
+                cutoff[cluster_index], u_sd, use_u_in_delta,
+                finite_component_mean, finite_component_variance,
+                finite_component_weight
+              )[1];
           }
         } else {
           probability = Phi_approx(-cutoff / total_error_sd);
@@ -1074,6 +1203,18 @@ generated quantities {
               core_type_mixture_precision,
               core_type_mixture_weight
             )';
+            cutoff_sum += roc_results[cluster_index, 1];
+            image_return_sum +=
+              curr_mu[cluster_index] * roc_results[cluster_index, 8];
+          } else if (core_type_distribution == 2) {
+            roc_results[cluster_index] =
+              core_gq_calculate_roc_finite_mixture(
+                curr_benefit[cluster_index], control_benefit[cluster_index],
+                u_sd, dist_beta_v[1], curr_mu[cluster_index],
+                control_mu[cluster_index], curr_mu_deriv[cluster_index],
+                use_u_in_delta, finite_component_mean,
+                finite_component_variance, finite_component_weight
+              )';
             cutoff_sum += roc_results[cluster_index, 1];
             image_return_sum +=
               curr_mu[cluster_index] * roc_results[cluster_index, 8];
