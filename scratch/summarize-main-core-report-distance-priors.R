@@ -2,6 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 source("scratch/main-core-data.R")
+source("scratch/main-core-multiplier-contrasts.R")
 option_value <- function(name, default = NULL) {
   main_core_option_value(args, name, default)
 }
@@ -33,22 +34,30 @@ summary_data <- prepare_main_core_data(
 finite_distance_change <- summary_data$roc_distances[26L] -
   summary_data$roc_distances[6L]
 
+grouped_fit <- file.path(root, "design-pooled")
 specifications <- data.frame(
-  id = c("f0", "hierarchical", "tight"),
+  id = c("f0", "hierarchical", "tight", "design-pooled"),
   label = c(
     "Unrestricted multinomial, N(0, 0.25)",
     "Hierarchical multinomial, half-N(0, 0.25) scales",
-    "Tighter multinomial, N(0, 0.10)"
+    "Tighter multinomial, N(0, 0.10)",
+    "Design-pooled multinomial"
   ),
-  hierarchical = c(0L, 1L, 0L),
-  prior_scale = c(0.25, 0.25, 0.10),
-  fit_dir = c(f0_fit, file.path(root, c("hierarchical", "tight"))),
+  hierarchical = c(0L, 1L, 0L, 2L),
+  prior_scale = c(0.25, 0.25, 0.10, 0.25),
+  fit_dir = c(
+    f0_fit, file.path(root, c("hierarchical", "tight")), grouped_fit
+  ),
   gq_dir = c(
     file.path(f0_fit, "compact-gq"),
-    file.path(root, c("hierarchical", "tight"), "gq")
+    file.path(root, c("hierarchical", "tight"), "gq"),
+    file.path(grouped_fit, "gq")
   ),
   stringsAsFactors = FALSE
 )
+specifications <- specifications[
+  dir.exists(specifications$fit_dir) & dir.exists(specifications$gq_dir),
+]
 
 csvs <- function(path, fit = FALSE) {
   value <- sort(list.files(path, "[.]csv$", full.names = TRUE))
@@ -71,6 +80,7 @@ treatments <- c("Control", "Ink", "Calendar", "Bracelet")
 distances <- c("500m", "1500m", "2500m")
 levels <- c("Combined", "Close", "Far")
 multiplier_rows <- ate_rows <- diagnostic_rows <- scale_rows <- list()
+contrast_rows <- list()
 
 for (specification_index in seq_len(nrow(specifications))) {
   specification <- specifications[specification_index, ]
@@ -91,7 +101,7 @@ for (specification_index in seq_len(nrow(specifications))) {
     divergences = sum(sampler$divergent__, na.rm = TRUE),
     max_treedepth = sum(sampler$treedepth__ >= 12, na.rm = TRUE)
   )
-  if (specification$hierarchical) {
+  if (specification$hierarchical == 1L) {
     for (truth in 1:2) for (category in 1:2) {
       parameter <- sprintf("core_report_arm_dist_sd[%d,%d]", truth, category)
       scale_rows[[length(scale_rows) + 1L]] <- data.frame(
@@ -102,11 +112,19 @@ for (specification_index in seq_len(nrow(specifications))) {
     }
   }
   gq <- as_draws_df(read_cmdstan_csv(gq_files)$generated_quantities)
+  point_multiplier <- matrix(
+    NA_real_, nrow = nrow(gq), ncol = length(treatments) * length(distances)
+  )
+  dim(point_multiplier) <- c(nrow(gq), length(distances), length(treatments))
+  finite_multiplier <- matrix(
+    NA_real_, nrow = nrow(gq), ncol = length(treatments)
+  )
   for (treatment_index in seq_along(treatments)) {
     for (distance_index in seq_along(distances)) {
       value <- -gq[[sprintf(
         "core_compact_sm_rescaled[%d,%d]", distance_index, treatment_index
       )]]
+      point_multiplier[, distance_index, treatment_index] <- value
       multiplier_rows[[length(multiplier_rows) + 1L]] <- data.frame(
         id = specification$id, specification = specification$label,
         treatment = treatments[treatment_index], estimand = "Point",
@@ -122,12 +140,47 @@ for (specification_index in seq_len(nrow(specifications))) {
         gq[[sprintf("core_compact_cutoff[1,%d]", treatment_index)]]
       numerator / (fit_draws[["dist_beta_v[1]"]] * finite_distance_change)
     }
+    finite_multiplier[, treatment_index] <- finite
     multiplier_rows[[length(multiplier_rows) + 1L]] <- data.frame(
       id = specification$id, specification = specification$label,
       treatment = treatments[treatment_index], estimand = "Finite",
       distance = "500--2500m", t(summarize_value(finite)), check.names = FALSE
     )
   }
+  primary_by_distance <- matrix(NA_real_, nrow(gq), length(distances))
+  for (distance_index in seq_along(distances)) {
+    contrasts <- main_core_multiplier_contrasts(
+      point_multiplier[, distance_index, ]
+    )
+    primary_by_distance[, distance_index] <-
+      contrasts[, "No Signal - Any Signal"]
+    for (contrast_name in colnames(contrasts)) {
+      contrast_rows[[length(contrast_rows) + 1L]] <- data.frame(
+        id = specification$id, specification = specification$label,
+        contrast = contrast_name, estimand = "Point",
+        distance = distances[distance_index],
+        t(main_core_summarize_contrast(contrasts[, contrast_name])),
+        check.names = FALSE
+      )
+    }
+  }
+  finite_contrasts <- main_core_multiplier_contrasts(finite_multiplier)
+  for (contrast_name in colnames(finite_contrasts)) {
+    contrast_rows[[length(contrast_rows) + 1L]] <- data.frame(
+      id = specification$id, specification = specification$label,
+      contrast = contrast_name, estimand = "Finite",
+      distance = "500--2500m",
+      t(main_core_summarize_contrast(finite_contrasts[, contrast_name])),
+      check.names = FALSE
+    )
+  }
+  minimum_primary <- apply(primary_by_distance, 1L, min, na.rm = FALSE)
+  contrast_rows[[length(contrast_rows) + 1L]] <- data.frame(
+    id = specification$id, specification = specification$label,
+    contrast = "No Signal - Any Signal", estimand = "Grid minimum",
+    distance = "Minimum", t(main_core_summarize_contrast(minimum_primary)),
+    check.names = FALSE
+  )
   for (treatment_index in 2:4) {
     level_draws <- vapply(seq_along(levels), function(level_index) {
       gq[[sprintf(
@@ -145,20 +198,31 @@ for (specification_index in seq_len(nrow(specifications))) {
         treatment = treatments[treatment_index], effect = effect,
         t(summarize_value(effects[, effect])), check.names = FALSE
       )
+      }
     }
+  } else if (specification$hierarchical == 2L) {
+    scale_rows[[length(scale_rows) + 1L]] <- data.frame(
+      id = specification$id, truth = "All", report = "Within-group SD",
+      t(summarize_value(fit_draws[["core_report_within_dist_sd[1]"]])),
+      check.names = FALSE
+    )
   }
-}
 
 multiplier <- do.call(rbind, multiplier_rows)
 ate <- do.call(rbind, ate_rows)
 diagnostics <- do.call(rbind, diagnostic_rows)
 scales <- if (length(scale_rows)) do.call(rbind, scale_rows) else data.frame()
+contrasts <- do.call(rbind, contrast_rows)
 dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 write.csv(specifications, file.path(output_path, "prior-specification-manifest.csv"), row.names = FALSE)
 write.csv(diagnostics, file.path(output_path, "prior-fit-diagnostics.csv"), row.names = FALSE)
 write.csv(multiplier, file.path(output_path, "prior-multipliers.csv"), row.names = FALSE)
 write.csv(ate, file.path(output_path, "prior-ates.csv"), row.names = FALSE)
 write.csv(scales, file.path(output_path, "hierarchical-scales.csv"), row.names = FALSE)
+write.csv(
+  contrasts, file.path(output_path, "prior-multiplier-contrasts.csv"),
+  row.names = FALSE
+)
 
 fmt <- function(x) sprintf("%.2f", x)
 ci <- function(lower, upper) paste0("(", fmt(lower), ", ", fmt(upper), ")")
@@ -188,5 +252,32 @@ for (specification_index in seq_len(nrow(specifications))) {
 writeLines(
   c(lines, "\\bottomrule", "\\end{tabular}"),
   file.path(output_path, "main-core-report-distance-prior-multipliers.tex")
+)
+
+contrast_columns <- c("500m", "1500m", "2500m", "500--2500m", "Minimum")
+primary <- contrasts[
+  contrasts$contrast == "No Signal - Any Signal",
+]
+contrast_lines <- c(
+  "\\begin{tabular}{lccccc}", "\\toprule",
+  "Specification & 500m & 1500m & 2500m & Finite & Grid minimum \\\\ ",
+  "\\midrule"
+)
+for (specification_index in seq_len(nrow(specifications))) {
+  cells <- primary[primary$id == specifications$id[specification_index], ]
+  cells <- cells[match(contrast_columns, cells$distance), ]
+  contrast_lines <- c(
+    contrast_lines,
+    paste0(
+      specifications$label[specification_index], " & ",
+      paste(fmt(cells$median), collapse = " & "), " \\\\"
+    ),
+    paste0(" & ", paste(ci(cells$lower, cells$upper), collapse = " & "),
+           " \\\\ ")
+  )
+}
+writeLines(
+  c(contrast_lines, "\\bottomrule", "\\end{tabular}"),
+  file.path(output_path, "main-core-report-distance-contrasts.tex")
 )
 print(diagnostics)
