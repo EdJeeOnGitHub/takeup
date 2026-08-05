@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#SBATCH --partition=broadwl
+#SBATCH --job-name=obs-gq
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=4G
+#SBATCH --time=02:00:00
+#SBATCH --output=temp/log/obs-gq-%A_%a.log
+#SBATCH --error=temp/log/obs-gq-%A_%a.log
+
+set -euo pipefail
+
+CHAIN_ID=${CHAIN_ID:-${SLURM_ARRAY_TASK_ID:-}}
+SPECIFICATION=${SPECIFICATION:?Set SPECIFICATION to f1, f2, f3, or u3}
+FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-observability-ladder}
+INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-asym-input}
+CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
+
+case "${SPECIFICATION}" in
+  f1) observation=1; recognition=0; report=1 ;;
+  f2) observation=1; recognition=2; report=1 ;;
+  f3) observation=1; recognition=2; report=2 ;;
+  u3) observation=2; recognition=1; report=2 ;;
+  *) echo "Unknown SPECIFICATION=${SPECIFICATION}" >&2; exit 2 ;;
+esac
+
+fit_csv=${FIT_ROOT}/${SPECIFICATION}/dist_fit106_MAIN_CORE_chain${CHAIN_ID}-1.csv
+output_path=${FIT_ROOT}/${SPECIFICATION}/gq
+mkdir -p temp/log "${output_path}"
+module load gcc/10.2.0
+module load -f R/4.2.0
+export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2/x86_64-pc-linux-gnu}
+export CMDSTAN=${CMDSTAN_PATH}
+export CMDSTANR_NO_VER_CHECK=TRUE
+
+Rscript --no-save --no-restore --no-init-file \
+  scratch/generate-main-core-compact-gq.R \
+  "--workspace=${INPUT_PATH}/dist_fit105.RData" \
+  --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS \
+  --stan-path=stan_models \
+  "--fit-csvs=${fit_csv}" \
+  "--output-path=${output_path}" \
+  "--output-basename=${SPECIFICATION}-compact-chain${CHAIN_ID}" \
+  "--core-observation-model=${observation}" \
+  "--core-recognition-structure=${recognition}" \
+  "--core-report-structure=${report}" \
+  --threads=4 --parallel-chains=1 \
+  "--cmdstan-path=${CMDSTAN_PATH}"

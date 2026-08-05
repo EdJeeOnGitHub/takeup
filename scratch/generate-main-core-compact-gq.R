@@ -28,6 +28,7 @@ fit_csvs <- strsplit(
   option_value("--fit-csvs", ""), ",", fixed = TRUE
 )[[1L]]
 output_path <- option_value("--output-path", "temp/main-core-compact-gq")
+output_basename <- option_value("--output-basename")
 use_cluster_shock <- as.integer(
   option_value("--use-core-cluster-shock", "0")
 )
@@ -128,7 +129,9 @@ gq_fit <- model$generate_quantities(
   fitted_params = fit_csvs,
   data = data,
   output_dir = output_path,
-  output_basename = if (type_distribution == 1L) {
+  output_basename = if (!is.null(output_basename)) {
+    output_basename
+  } else if (type_distribution == 1L) {
     paste0("main-core-student-t-df", format(student_t_df, trim = TRUE), "-compact")
   } else if (observation_model > 0L) {
     paste0(
