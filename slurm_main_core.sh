@@ -24,7 +24,7 @@ fi
 MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP}
 INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-production}
-STAN_PATH=${STAN_PATH:-stan_models_fit105}
+STAN_PATH=${STAN_PATH:-stan_models}
 STAN_FILE=${STAN_FILE:-takeup_struct_main_core.stan}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 OUTPUT_BASENAME=${OUTPUT_BASENAME:-dist_fit106_MAIN_CORE_chain${CHAIN_ID}}

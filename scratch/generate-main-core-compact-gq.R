@@ -54,6 +54,12 @@ student_t_components <- as.integer(
 observation_model <- as.integer(
   option_value("--core-observation-model", "0")
 )
+recognition_structure <- as.integer(
+  option_value("--core-recognition-structure", "0")
+)
+report_structure <- as.integer(
+  option_value("--core-report-structure", "0")
+)
 peer_audit_path <- option_value("--peer-audit-path")
 cluster_weight_file <- option_value("--cluster-weight-file")
 threads <- as.integer(option_value("--threads", "2"))
@@ -107,6 +113,8 @@ data <- if (!is.null(data_json)) {
     student_t_df = student_t_df,
     student_t_components = student_t_components,
     observation_model = observation_model,
+    recognition_structure = recognition_structure,
+    report_structure = report_structure,
     peer_audit_path = peer_audit_path
   )
 }
@@ -123,7 +131,10 @@ gq_fit <- model$generate_quantities(
   output_basename = if (type_distribution == 1L) {
     paste0("main-core-student-t-df", format(student_t_df, trim = TRUE), "-compact")
   } else if (observation_model > 0L) {
-    paste0("main-core-observation-", observation_model, "-compact")
+    paste0(
+      "main-core-observation-", observation_model, "-rec-",
+      recognition_structure, "-report-", report_structure, "-compact"
+    )
   } else if (lambda_structure > 0) {
     paste0(
       "main-core-lambda-", lambda_structure, "-",
