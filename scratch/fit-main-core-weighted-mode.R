@@ -18,6 +18,7 @@ suppressPackageStartupMessages({
 workspace_path <- option_value(
   "--workspace", "data/stan_analysis_data/dist_fit105.RData"
 )
+data_json <- option_value("--data-json")
 model_name <- option_value(
   "--model", "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 )
@@ -27,6 +28,7 @@ gq_file <- option_value(
   "--gq-file", "takeup_struct_main_core_compact_gq.stan"
 )
 output_path <- option_value("--output-path", "temp/main-core-weighted-modes")
+label_override <- option_value("--label")
 weight_file <- option_value("--weight-file")
 manifest_path <- option_value("--manifest")
 task_id <- as.integer(option_value("--task-id", "0"))
@@ -36,6 +38,21 @@ iterations <- as.integer(option_value("--iterations", "2000"))
 seed <- as.integer(option_value("--seed", "20260802"))
 cmdstan_path_option <- option_value(
   "--cmdstan-path", Sys.getenv("CMDSTAN", unset = "")
+)
+lambda_structure <- as.integer(option_value("--core-lambda-structure", "0"))
+lambda_prior <- as.numeric(
+  option_value("--core-lambda-log-ratio-sd-prior", "0.25")
+)
+profile_group_lambda <- as.integer(
+  option_value("--core-profile-group-lambda", "0")
+)
+profile_group_log_ratio <- as.numeric(
+  option_value("--core-profile-group-log-ratio", "0")
+)
+type_distribution <- as.integer(option_value("--core-type-distribution", "0"))
+student_t_df <- as.numeric(option_value("--core-student-t-df", "5"))
+student_t_components <- as.integer(
+  option_value("--core-student-t-components", "12")
 )
 
 method <- "unweighted"
@@ -52,7 +69,9 @@ if (!is.null(manifest_path)) {
   seed <- seed + task_id
 }
 if (!is.null(weight_file) && method == "unweighted") method <- "weighted"
-label <- if (replicate_id > 0L) {
+label <- if (!is.null(label_override)) {
+  label_override
+} else if (replicate_id > 0L) {
   sprintf("%s-%04d", method, replicate_id)
 } else {
   method
@@ -68,12 +87,39 @@ dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 run_path <- file.path(output_path, label)
 dir.create(run_path, recursive = TRUE, showWarnings = FALSE)
 
-data <- prepare_main_core_data(
-  workspace_path = workspace_path,
-  model_name = model_name,
-  weight_file = weight_file,
-  use_cluster_shock = 0L
-)
+data <- if (!is.null(data_json)) {
+  if (!file.exists(data_json)) {
+    stop("Data JSON not found: ", data_json, call. = FALSE)
+  }
+  fitted_data_json <- file.path(run_path, "fit-data.json")
+  main_core_patch_stan_json_scalars(
+    data_json,
+    fitted_data_json,
+    c(
+      core_lambda_structure = lambda_structure,
+      core_lambda_log_ratio_sd_prior = lambda_prior,
+      core_profile_group_lambda = profile_group_lambda,
+      core_profile_group_log_ratio = profile_group_log_ratio,
+      core_type_distribution = type_distribution,
+      core_student_t_df = student_t_df,
+      core_student_t_components = student_t_components
+    )
+  )
+} else {
+  prepare_main_core_data(
+    workspace_path = workspace_path,
+    model_name = model_name,
+    weight_file = weight_file,
+    use_cluster_shock = 0L,
+    lambda_structure = lambda_structure,
+    lambda_log_ratio_sd_prior = lambda_prior,
+    profile_group_lambda = profile_group_lambda,
+    profile_group_log_ratio = profile_group_log_ratio,
+    type_distribution = type_distribution,
+    student_t_df = student_t_df,
+    student_t_components = student_t_components
+  )
+}
 model <- cmdstan_model(
   file.path(stan_path, stan_file),
   include_paths = stan_path,
@@ -167,6 +213,14 @@ if (status == "complete") {
 
 status_data <- data.frame(
   method = method,
+  label = label,
+  lambda_structure = lambda_structure,
+  lambda_log_ratio_sd_prior = lambda_prior,
+  profile_group_lambda = profile_group_lambda,
+  profile_group_log_ratio = profile_group_log_ratio,
+  type_distribution = type_distribution,
+  student_t_df = student_t_df,
+  student_t_components = student_t_components,
   replicate = replicate_id,
   seed = seed,
   status = status,
