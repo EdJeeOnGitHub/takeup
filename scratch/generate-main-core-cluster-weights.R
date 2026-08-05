@@ -82,5 +82,11 @@ for (method in methods) {
   }
 }
 manifest <- do.call(rbind, manifest)
+manifest$weight_hash <- unname(tools::md5sum(manifest$weight_file))
+duplicate_hash <- duplicated(manifest[c("method", "weight_hash")]) |
+  duplicated(manifest[c("method", "weight_hash")], fromLast = TRUE)
+if (any(duplicate_hash)) {
+  stop("Generated duplicate cluster-bootstrap weight vectors.", call. = FALSE)
+}
 write.csv(manifest, file.path(output_path, manifest_name), row.names = FALSE)
 message("Wrote ", nrow(manifest), " stratified cluster-weight files to ", output_path)
