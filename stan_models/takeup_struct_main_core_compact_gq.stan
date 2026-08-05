@@ -49,6 +49,9 @@ functions {
       matrix report_arm_dist,
       data int report_arm_dist_hierarchical,
       matrix report_arm_dist_sd,
+      matrix report_group_dist,
+      matrix report_within_dist_raw,
+      vector report_within_dist_sd,
       vector definite_intercept,
       vector definite_dist_slope,
       matrix definite_arm_intercept,
@@ -83,10 +86,20 @@ functions {
         int last = category * cols(contrast_basis);
         real arm_slope = 0;
         if (report_structure == 0) {
-          arm_slope = dot_product(
-            report_arm_dist[truth, first:last], contrast_basis[treatment]
-          );
-          if (report_arm_dist_hierarchical) {
+          if (report_arm_dist_hierarchical == 2) {
+            int channel = (truth - 1) * 2 + category;
+            arm_slope = report_group_dist[truth, category] *
+              (is_public_signal - 0.5) + report_within_dist_sd[1] *
+              dot_product(
+                report_within_dist_raw[channel],
+                core_report_within_group_basis(treatment)
+              );
+          } else {
+            arm_slope = dot_product(
+              report_arm_dist[truth, first:last], contrast_basis[treatment]
+            );
+          }
+          if (report_arm_dist_hierarchical == 1) {
             arm_slope *= report_arm_dist_sd[truth, category];
           }
         }
@@ -457,7 +470,7 @@ data {
   int<lower=0, upper=2> core_observation_model;
   int<lower=0, upper=2> core_recognition_structure;
   int<lower=0, upper=2> core_report_structure;
-  int<lower=0, upper=1> core_report_arm_dist_hierarchical;
+  int<lower=0, upper=2> core_report_arm_dist_hierarchical;
   real<lower=0> core_report_arm_dist_prior_scale;
   int<lower=0> core_num_peer_response_rows;
   array[core_num_peer_response_rows] int<lower=1, upper=num_clusters>
@@ -507,7 +520,7 @@ transformed data {
   if (core_observation_model == 2 && core_recognition_structure == 2) {
     reject("The unconditional channel cannot condition recognition out.");
   }
-  if (core_report_arm_dist_hierarchical &&
+  if (core_report_arm_dist_hierarchical > 0 &&
       (core_observation_model == 0 || core_report_structure != 0)) {
     reject("Hierarchical report-distance slopes require the full multinomial channel.");
   }
@@ -543,10 +556,16 @@ parameters {
     core_report_dist_slope;
   matrix[core_observation_model > 0 && core_report_structure < 2 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_intercept_raw;
-  matrix[core_observation_model > 0 && core_report_structure == 0 ? 2 : 0, 2 * (num_treatments - 1)]
+  matrix[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical < 2 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_dist_raw;
-  matrix<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical ? 2 : 0, 2]
+  matrix<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 1 ? 2 : 0, 2]
     core_report_arm_dist_sd;
+  matrix[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 2 : 0, 2]
+    core_report_group_dist;
+  matrix[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 4 : 0, 2]
+    core_report_within_dist_raw;
+  vector<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 1 : 0]
+    core_report_within_dist_sd;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
     core_definite_intercept;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
@@ -717,6 +736,8 @@ generated quantities {
             core_report_intercept, core_report_dist_slope,
             core_report_arm_intercept_raw, core_report_arm_dist_raw,
             core_report_arm_dist_hierarchical, core_report_arm_dist_sd,
+            core_report_group_dist, core_report_within_dist_raw,
+            core_report_within_dist_sd,
             core_definite_intercept, core_definite_dist_slope,
             core_definite_arm_intercept_raw,
             core_definite_public_signal_dist_slope, core_accuracy_intercept,
@@ -944,6 +965,8 @@ generated quantities {
                 core_report_intercept, core_report_dist_slope,
                 core_report_arm_intercept_raw, core_report_arm_dist_raw,
                 core_report_arm_dist_hierarchical, core_report_arm_dist_sd,
+                core_report_group_dist, core_report_within_dist_raw,
+                core_report_within_dist_sd,
                 core_definite_intercept, core_definite_dist_slope,
                 core_definite_arm_intercept_raw,
                 core_definite_public_signal_dist_slope,
@@ -1109,7 +1132,9 @@ generated quantities {
               core_is_public_signal[treatment_index], core_report_intercept,
               core_report_dist_slope, core_report_arm_intercept_raw,
               core_report_arm_dist_raw, core_report_arm_dist_hierarchical,
-              core_report_arm_dist_sd, core_definite_intercept,
+              core_report_arm_dist_sd, core_report_group_dist,
+              core_report_within_dist_raw, core_report_within_dist_sd,
+              core_definite_intercept,
               core_definite_dist_slope, core_definite_arm_intercept_raw,
               core_definite_public_signal_dist_slope,
               core_accuracy_intercept, core_accuracy_arm_intercept_raw,

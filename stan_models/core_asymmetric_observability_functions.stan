@@ -151,6 +151,18 @@ vector core_softmax_with_reference(real yes_logit, real no_logit) {
   return softmax([yes_logit, no_logit, 0]');
 }
 
+// Orthonormal within-group contrasts for the canonical treatment order
+// Control, Ink, Calendar, Bracelet. Column 1 compares Control with Calendar;
+// column 2 compares Ink with Bracelet. Both are orthogonal to the centered
+// Any-Signal indicator (Ink/Bracelet versus Control/Calendar).
+vector core_report_within_group_basis(data int treatment) {
+  real inverse_sqrt_two = inv_sqrt(2.0);
+  if (treatment == 1) return [-inverse_sqrt_two, 0]';
+  if (treatment == 2) return [0, -inverse_sqrt_two]';
+  if (treatment == 3) return [inverse_sqrt_two, 0]';
+  return [0, inverse_sqrt_two]';
+}
+
 vector core_noisy_signal_row(
     real recognition_prob,
     vector conditional_report,

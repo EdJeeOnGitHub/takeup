@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 
 source("scratch/main-core-data.R")
+source("scratch/main-core-multiplier-contrasts.R")
 source("optim/policy-bootstrap-functions.R")
 
 phi_approx <- function(x) plogis(0.07056 * x^3 + 1.5976 * x)
@@ -16,6 +17,40 @@ stopifnot(
   abs(information_factor(0.4, 1.3, c(1, 0), c(0, 1)) - 1) < 1e-12,
   abs(information_factor(0.4, 1.3, c(0.3, 0.7), c(0.3, 0.7))) < 1e-12
 )
+
+# The design-pooled basis separates the Any-Signal/No-Signal contrast from
+# the two within-group contrasts and still spans every centered four-arm slope.
+group_basis <- c(-0.5, 0.5, -0.5, 0.5)
+within_basis <- rbind(
+  c(-1 / sqrt(2), 0), c(0, -1 / sqrt(2)),
+  c(1 / sqrt(2), 0), c(0, 1 / sqrt(2))
+)
+design_basis <- cbind(group_basis, within_basis)
+stopifnot(
+  max(abs(colSums(design_basis))) < 1e-12,
+  max(abs(crossprod(group_basis, within_basis))) < 1e-12,
+  qr(design_basis)$rank == 3L
+)
+unrestricted_slope <- c(-0.4, 0.2, 0.1, 0.1)
+coefficient <- qr.solve(design_basis, unrestricted_slope)
+stopifnot(max(abs(design_basis %*% coefficient - unrestricted_slope)) < 1e-12)
+pooled_slope <- 0.6 * group_basis
+stopifnot(
+  pooled_slope[1] == pooled_slope[3],
+  pooled_slope[2] == pooled_slope[4],
+  mean(pooled_slope[c(2, 4)]) - mean(pooled_slope[c(1, 3)]) == 0.6
+)
+
+# Paired contrasts must be computed within draws rather than by subtracting
+# marginal interval endpoints.
+synthetic_multiplier <- cbind(
+  Control = c(1.5, 1.7), Ink = c(0.9, 1.1),
+  Calendar = c(1.2, 1.4), Bracelet = c(0.8, 1.0)
+)
+synthetic_contrast <- main_core_multiplier_contrasts(synthetic_multiplier)
+stopifnot(all.equal(
+  unname(synthetic_contrast[, "No Signal - Any Signal"]), c(0.5, 0.5)
+))
 reveal_probability <- 0.63
 null_signal_taker <- c(reveal_probability, 0, 1 - reveal_probability)
 null_signal_nontaker <- c(0, reveal_probability, 1 - reveal_probability)

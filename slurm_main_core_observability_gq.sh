@@ -24,6 +24,7 @@ case "${SPECIFICATION}" in
   u3) observation=2; recognition=1; report=2; hierarchical=0; prior_scale=0.25 ;;
   hierarchical) observation=1; recognition=0; report=0; hierarchical=1; prior_scale=0.25 ;;
   tight) observation=1; recognition=0; report=0; hierarchical=0; prior_scale=0.10 ;;
+  design-pooled) observation=1; recognition=0; report=0; hierarchical=2; prior_scale=0.25 ;;
   *) echo "Unknown SPECIFICATION=${SPECIFICATION}" >&2; exit 2 ;;
 esac
 

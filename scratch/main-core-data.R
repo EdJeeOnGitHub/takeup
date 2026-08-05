@@ -199,12 +199,12 @@ prepare_main_core_data <- function(
   sample_data$core_recognition_structure <- recognition_structure
   sample_data$core_report_structure <- report_structure
   report_arm_dist_hierarchical <- as.integer(report_arm_dist_hierarchical)
-  if (!report_arm_dist_hierarchical %in% 0:1 ||
+  if (!report_arm_dist_hierarchical %in% 0:2 ||
       !is.finite(report_arm_dist_prior_scale) ||
       report_arm_dist_prior_scale <= 0) {
     stop("Invalid report arm-distance hierarchy controls.", call. = FALSE)
   }
-  if (report_arm_dist_hierarchical == 1L &&
+  if (report_arm_dist_hierarchical > 0L &&
       (observation_model == 0L || report_structure != 0L)) {
     stop("Hierarchical slopes require the full multinomial channel.",
          call. = FALSE)
@@ -264,7 +264,7 @@ main_core_nudge_init_boundaries <- function(init, epsilon = 1e-4) {
     "base_mu_rep", "raw_u_sd", "raw_cluster_sd_tilde",
     "dist_beta_cluster_sd", "dist_beta_county_sd",
     "dist_quadratic_beta_v", "wtp_value_utility",
-    "core_cluster_shock_sd"
+    "core_cluster_shock_sd", "core_report_within_dist_sd"
   )
   nudge_value <- function(value) {
     if (is.list(value)) return(lapply(value, nudge_value))

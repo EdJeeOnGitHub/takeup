@@ -146,12 +146,12 @@ if (core_observation_model == 2L && core_recognition_structure == 2L) {
   stop("The unconditional model cannot condition recognition out.",
        call. = FALSE)
 }
-if (!core_report_arm_dist_hierarchical %in% 0:1 ||
+if (!core_report_arm_dist_hierarchical %in% 0:2 ||
     !is.finite(core_report_arm_dist_prior_scale) ||
     core_report_arm_dist_prior_scale <= 0) {
   stop("Invalid report arm-distance hierarchy controls.", call. = FALSE)
 }
-if (core_report_arm_dist_hierarchical == 1L &&
+if (core_report_arm_dist_hierarchical > 0L &&
     (core_observation_model == 0L || core_report_structure != 0L)) {
   stop("Hierarchical slopes require the full multinomial channel.",
        call. = FALSE)

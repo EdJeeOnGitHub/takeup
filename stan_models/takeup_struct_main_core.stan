@@ -46,7 +46,9 @@ data {
   // Reports: 0 = full multinomial; 1 = no arm-distance slopes; 2 = two-stage.
   int<lower=0, upper=2> core_report_structure;
   // Full-multinomial arm-distance slopes: 0 = independent; 1 = hierarchical.
-  int<lower=0, upper=1> core_report_arm_dist_hierarchical;
+  // 0 = independent arm slopes; 1 = exchangeable arm slopes;
+  // 2 = Any-Signal/No-Signal slope plus shrunk within-group deviations.
+  int<lower=0, upper=2> core_report_arm_dist_hierarchical;
   real<lower=0> core_report_arm_dist_prior_scale;
   int<lower=0> core_num_peer_response_rows;
   array[core_num_peer_response_rows] int<lower=1, upper=num_clusters>
@@ -139,7 +141,7 @@ transformed data {
   if (core_observation_model == 2 && core_recognition_structure == 2) {
     reject("The unconditional channel cannot condition recognition out.");
   }
-  if (core_report_arm_dist_hierarchical &&
+  if (core_report_arm_dist_hierarchical > 0 &&
       (core_observation_model == 0 || core_report_structure != 0)) {
     reject("Hierarchical report-distance slopes require the full multinomial channel.");
   }
@@ -194,10 +196,16 @@ parameters {
     core_report_dist_slope;
   matrix[core_observation_model > 0 && core_report_structure < 2 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_intercept_raw;
-  matrix[core_observation_model > 0 && core_report_structure == 0 ? 2 : 0, 2 * (num_treatments - 1)]
+  matrix[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical < 2 ? 2 : 0, 2 * (num_treatments - 1)]
     core_report_arm_dist_raw;
-  matrix<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical ? 2 : 0, 2]
+  matrix<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 1 ? 2 : 0, 2]
     core_report_arm_dist_sd;
+  matrix[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 2 : 0, 2]
+    core_report_group_dist;
+  matrix[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 4 : 0, 2]
+    core_report_within_dist_raw;
+  vector<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 1 : 0]
+    core_report_within_dist_sd;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
     core_definite_intercept;
   vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
@@ -307,9 +315,17 @@ model {
     to_vector(core_report_intercept) ~ normal(0, 1.5);
     to_vector(core_report_dist_slope) ~ normal(0, 0.5);
     to_vector(core_report_arm_intercept_raw) ~ normal(0, 0.5);
-    if (core_report_arm_dist_hierarchical) {
+    if (core_report_arm_dist_hierarchical == 1) {
       to_vector(core_report_arm_dist_raw) ~ std_normal();
       to_vector(core_report_arm_dist_sd) ~ normal(
+        0, core_report_arm_dist_prior_scale
+      );
+    } else if (core_report_arm_dist_hierarchical == 2) {
+      to_vector(core_report_group_dist) ~ normal(
+        0, core_report_arm_dist_prior_scale
+      );
+      to_vector(core_report_within_dist_raw) ~ std_normal();
+      core_report_within_dist_sd ~ normal(
         0, core_report_arm_dist_prior_scale
       );
     } else {
@@ -367,11 +383,22 @@ model {
             int last = category * (num_treatments - 1);
             real report_arm_slope = 0;
             if (core_report_structure == 0) {
-              report_arm_slope = dot_product(
-                core_report_arm_dist_raw[truth, first:last],
-                core_signal_lambda_contrast_basis[treatment]
-              );
-              if (core_report_arm_dist_hierarchical) {
+              if (core_report_arm_dist_hierarchical == 2) {
+                int channel = (truth - 1) * 2 + category;
+                report_arm_slope =
+                  core_report_group_dist[truth, category] *
+                    (core_is_public_signal[treatment] - 0.5) +
+                  core_report_within_dist_sd[1] * dot_product(
+                    core_report_within_dist_raw[channel],
+                    core_report_within_group_basis(treatment)
+                  );
+              } else {
+                report_arm_slope = dot_product(
+                  core_report_arm_dist_raw[truth, first:last],
+                  core_signal_lambda_contrast_basis[treatment]
+                );
+              }
+              if (core_report_arm_dist_hierarchical == 1) {
                 report_arm_slope *= core_report_arm_dist_sd[truth, category];
               }
             }
