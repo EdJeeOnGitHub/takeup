@@ -194,4 +194,43 @@ writeLines(
   c(lines, "\\bottomrule", "\\end{tabular}"),
   file.path(output_path, "main-core-observability-ladder-multipliers.tex")
 )
+
+# A compact forest plot makes the local-versus-finite comparison visible
+# without requiring the paper's plotting stack.
+pdf(
+  file.path(output_path, "main-core-observability-ladder-multipliers.pdf"),
+  width = 8, height = 8
+)
+par(mfrow = c(2, 2), mar = c(4, 5, 3, 1), las = 1)
+for (treatment in treatments) {
+  block <- multiplier[
+    multiplier$treatment == treatment &
+      multiplier$distance %in% c("1500m", "500--2500m"),
+  ]
+  point <- block[block$distance == "1500m", ][
+    match(specifications$id, block$id[block$distance == "1500m"]),
+  ]
+  finite <- block[block$distance == "500--2500m", ][
+    match(specifications$id, block$id[block$distance == "500--2500m"]),
+  ]
+  y <- rev(seq_len(nrow(specifications)))
+  x_range <- range(c(point$lower, point$upper, finite$lower, finite$upper, 1))
+  plot(
+    NA, xlim = x_range, ylim = c(0.5, nrow(specifications) + 0.5),
+    yaxt = "n", ylab = "", xlab = "Social multiplier", main = treatment
+  )
+  axis(2, at = y, labels = toupper(specifications$id))
+  abline(v = 1, col = "grey65", lty = 2)
+  segments(point$lower, y + 0.10, point$upper, y + 0.10, lwd = 1.5)
+  points(point$median, y + 0.10, pch = 16)
+  segments(finite$lower, y - 0.10, finite$upper, y - 0.10, lwd = 1.5)
+  points(finite$median, y - 0.10, pch = 1)
+  if (treatment == treatments[1]) {
+    legend(
+      "topright", c("Point at 1500m", "Finite 500--2500m"),
+      pch = c(16, 1), bty = "n", cex = 0.8
+    )
+  }
+}
+dev.off()
 print(diagnostics)
