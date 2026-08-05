@@ -110,6 +110,12 @@ for (specification_index in seq_len(nrow(specifications))) {
         t(summarize_value(fit_draws[[parameter]])), check.names = FALSE
       )
     }
+  } else if (specification$hierarchical == 2L) {
+    scale_rows[[length(scale_rows) + 1L]] <- data.frame(
+      id = specification$id, truth = "All", report = "Within-group SD",
+      t(summarize_value(fit_draws[["core_report_within_dist_sd[1]"]])),
+      check.names = FALSE
+    )
   }
   gq <- as_draws_df(read_cmdstan_csv(gq_files)$generated_quantities)
   point_multiplier <- matrix(
@@ -198,15 +204,9 @@ for (specification_index in seq_len(nrow(specifications))) {
         treatment = treatments[treatment_index], effect = effect,
         t(summarize_value(effects[, effect])), check.names = FALSE
       )
-      }
     }
-  } else if (specification$hierarchical == 2L) {
-    scale_rows[[length(scale_rows) + 1L]] <- data.frame(
-      id = specification$id, truth = "All", report = "Within-group SD",
-      t(summarize_value(fit_draws[["core_report_within_dist_sd[1]"]])),
-      check.names = FALSE
-    )
   }
+}
 
 multiplier <- do.call(rbind, multiplier_rows)
 ate <- do.call(rbind, ate_rows)
