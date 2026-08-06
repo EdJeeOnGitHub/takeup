@@ -63,10 +63,16 @@ specifications <- data.frame(
     file.path(root, c("hierarchical", "tight"), "gq"),
     grouped_gq
   ),
+  ate_gq_dir = c(
+    file.path(f0_fit, "compact-gq"),
+    file.path(root, c("hierarchical", "tight"), "gq"),
+    file.path(grouped_fit, "gq")
+  ),
   stringsAsFactors = FALSE
 )
 specifications <- specifications[
-  dir.exists(specifications$fit_dir) & dir.exists(specifications$gq_dir),
+  dir.exists(specifications$fit_dir) & dir.exists(specifications$gq_dir) &
+    dir.exists(specifications$ate_gq_dir),
 ]
 
 csvs <- function(path, fit = FALSE) {
@@ -96,7 +102,9 @@ for (specification_index in seq_len(nrow(specifications))) {
   specification <- specifications[specification_index, ]
   fit_files <- csvs(specification$fit_dir, fit = TRUE)
   gq_files <- csvs(specification$gq_dir)
-  if (length(fit_files) != 4L || length(gq_files) != 4L) {
+  ate_gq_files <- csvs(specification$ate_gq_dir)
+  if (length(fit_files) != 4L || length(gq_files) != 4L ||
+      length(ate_gq_files) != 4L) {
     stop("Expected four fit and GQ files for ", specification$id, call. = FALSE)
   }
   fit <- read_cmdstan_csv(fit_files)
@@ -128,6 +136,11 @@ for (specification_index in seq_len(nrow(specifications))) {
     )
   }
   gq <- as_draws_df(read_cmdstan_csv(gq_files)$generated_quantities)
+  ate_gq <- if (identical(gq_files, ate_gq_files)) {
+    gq
+  } else {
+    as_draws_df(read_cmdstan_csv(ate_gq_files)$generated_quantities)
+  }
   point_multiplier <- matrix(
     NA_real_, nrow = nrow(gq), ncol = length(treatments) * length(distances)
   )
@@ -199,10 +212,12 @@ for (specification_index in seq_len(nrow(specifications))) {
   )
   for (treatment_index in 2:4) {
     level_draws <- vapply(seq_along(levels), function(level_index) {
-      gq[[sprintf(
+      ate_gq[[sprintf(
         "core_compact_takeup_level[%d,%d]", level_index, treatment_index
-      )]] - gq[[sprintf("core_compact_takeup_level[%d,1]", level_index)]]
-    }, numeric(nrow(gq)))
+      )]] - ate_gq[[sprintf(
+        "core_compact_takeup_level[%d,1]", level_index
+      )]]
+    }, numeric(nrow(ate_gq)))
     colnames(level_draws) <- levels
     effects <- cbind(
       level_draws,
