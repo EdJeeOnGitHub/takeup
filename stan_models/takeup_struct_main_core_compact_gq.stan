@@ -413,6 +413,90 @@ functions {
     ]';
   }
 
+  real core_gq_noisy_residual(
+      real cutoff,
+      real benefit_cost,
+      real lambda,
+      real total_error_sd,
+      real u_sd,
+      vector q_taker,
+      vector q_nontaker,
+      data int num_signals,
+      data int use_u_in_delta) {
+    real delta = expected_delta(
+      cutoff, total_error_sd, u_sd, {0.0}, {use_u_in_delta}
+    );
+    real information_factor = core_noisy_information_factor(
+      cutoff, total_error_sd, q_taker, q_nontaker, num_signals
+    );
+    return cutoff + benefit_cost + lambda * information_factor * delta;
+  }
+
+  real core_gq_find_fixedpoint_noisy_safe(
+      real benefit_cost,
+      real lambda,
+      real total_error_sd,
+      real u_sd,
+      vector q_taker,
+      vector q_nontaker,
+      data int num_signals,
+      data int use_u_in_delta) {
+    real center = -benefit_cost;
+    real span = 4;
+    real lower_bound = center - span;
+    real upper_bound = center + span;
+    real lower_residual = core_gq_noisy_residual(
+      lower_bound, benefit_cost, lambda, total_error_sd, u_sd,
+      q_taker, q_nontaker, num_signals, use_u_in_delta
+    );
+    real upper_residual = core_gq_noisy_residual(
+      upper_bound, benefit_cost, lambda, total_error_sd, u_sd,
+      q_taker, q_nontaker, num_signals, use_u_in_delta
+    );
+    real midpoint = center;
+    for (expand_step in 1:8) {
+      if (lower_residual * upper_residual > 0) {
+        span *= 2;
+        lower_bound = center - span;
+        upper_bound = center + span;
+        lower_residual = core_gq_noisy_residual(
+          lower_bound, benefit_cost, lambda, total_error_sd, u_sd,
+          q_taker, q_nontaker, num_signals, use_u_in_delta
+        );
+        upper_residual = core_gq_noisy_residual(
+          upper_bound, benefit_cost, lambda, total_error_sd, u_sd,
+          q_taker, q_nontaker, num_signals, use_u_in_delta
+        );
+      }
+    }
+    if (lower_residual * upper_residual <= 0) {
+      for (step in 1:80) {
+        real midpoint_residual;
+        midpoint = 0.5 * (lower_bound + upper_bound);
+        midpoint_residual = core_gq_noisy_residual(
+          midpoint, benefit_cost, lambda, total_error_sd, u_sd,
+          q_taker, q_nontaker, num_signals, use_u_in_delta
+        );
+        if (lower_residual * midpoint_residual <= 0) {
+          upper_bound = midpoint;
+          upper_residual = midpoint_residual;
+        } else {
+          lower_bound = midpoint;
+          lower_residual = midpoint_residual;
+        }
+      }
+    } else {
+      for (step in 1:160) {
+        real residual = core_gq_noisy_residual(
+          midpoint, benefit_cost, lambda, total_error_sd, u_sd,
+          q_taker, q_nontaker, num_signals, use_u_in_delta
+        );
+        midpoint = fmin(upper_bound, fmax(lower_bound, midpoint - 0.25 * residual));
+      }
+    }
+    return midpoint;
+  }
+
   real core_gq_calculate_noisy_sm(
       real benefit_cost,
       real lambda,
@@ -429,10 +513,9 @@ functions {
       data real alg_sol_f_tol,
       data int alg_sol_max_steps) {
     array[1] int x_i = {use_u_in_delta};
-    real cutoff = core_noisy_find_fixedpoint(
+    real cutoff = core_gq_find_fixedpoint_noisy_safe(
       benefit_cost, lambda, total_error_sd, u_sd, q_taker, q_nontaker,
-      num_signals, use_u_in_delta, alg_sol_rel_tol, alg_sol_f_tol,
-      alg_sol_max_steps
+      num_signals, use_u_in_delta
     );
     vector[2] delta = expected_delta_deriv(
       cutoff, total_error_sd, u_sd, {0.0}, x_i
@@ -774,13 +857,12 @@ generated quantities {
         real cutoff;
         real takeup_probability;
         if (core_observation_model > 0) {
-          cutoff = core_noisy_find_fixedpoint(
+          cutoff = core_gq_find_fixedpoint_noisy_safe(
             actual_benefit[cluster_index], base_mu_rep, total_error_sd, u_sd,
             observed_q_taker[cluster_index]',
             observed_q_nontaker[cluster_index]',
             core_observation_model == 1 ? 3 : 4,
-            use_u_in_delta, alg_sol_rel_tol, alg_sol_f_tol,
-            alg_sol_max_steps
+            use_u_in_delta
           );
           takeup_probability = Phi_approx(-cutoff / total_error_sd);
         } else if (core_type_distribution == 1) {
@@ -989,12 +1071,11 @@ generated quantities {
         }
         for (cluster_index in 1:num_clusters) {
           if (core_observation_model > 0) {
-            cutoff[cluster_index] = core_noisy_find_fixedpoint(
+            cutoff[cluster_index] = core_gq_find_fixedpoint_noisy_safe(
               benefit_cost[cluster_index], base_mu_rep, total_error_sd, u_sd,
               noisy_q_taker[cluster_index]', noisy_q_nontaker[cluster_index]',
               core_observation_model == 1 ? 3 : 4,
-              use_u_in_delta, alg_sol_rel_tol, alg_sol_f_tol,
-              alg_sol_max_steps
+              use_u_in_delta
             );
           } else if (core_type_distribution == 1) {
             cutoff[cluster_index] = core_gq_find_fixedpoint_student_t_safe(
@@ -1189,12 +1270,11 @@ generated quantities {
         for (cluster_index in 1:num_clusters) {
           if (core_observation_model > 0) {
             array[1] int delta_x_i = {use_u_in_delta};
-            real cutoff = core_noisy_find_fixedpoint(
+            real cutoff = core_gq_find_fixedpoint_noisy_safe(
               curr_benefit[cluster_index], base_mu_rep,
               total_error_sd, u_sd, noisy_q_taker, noisy_q_nontaker,
               core_observation_model == 1 ? 3 : 4,
-              use_u_in_delta, alg_sol_rel_tol, alg_sol_f_tol,
-              alg_sol_max_steps
+              use_u_in_delta
             );
             vector[2] delta = expected_delta_deriv(
               cutoff, total_error_sd, u_sd, {0.0}, delta_x_i
