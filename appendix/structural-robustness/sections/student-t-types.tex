@@ -1,0 +1,64 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{Robustness to Heavy-Tailed Intrinsic Motivation}
+\label{app:student-t-types}
+
+The baseline specification assumes that intrinsic motivation $v_i$ is
+standard normal. We re-estimate the model assuming instead that $v_i$ follows
+a centered Student-$t$ distribution with five degrees of freedom, scaled to
+have unit variance. The idiosyncratic decision shock $u_i$ remains Gaussian.
+Consequently, this exercise changes the tail thickness of intrinsic
+motivation while preserving its location and variance and leaving the rest of
+the structural model unchanged.
+
+The convolution of a Student-$t$ type with Gaussian decision noise has no
+convenient closed-form distribution. We evaluate it using the exact
+normal-variance-mixture representation of the Student-$t$ and a deterministic
+12-node generalized Gauss--Laguerre quadrature rule. The nodes and weights are
+fixed numerical integration constants, not estimated latent classes. Across
+the range used by the model, the approximation error is below $3\times10^{-4}$
+for the Student-$t(5)$ distribution function and below $2\times10^{-4}$ for
+its density. As an implementation check, selecting the Gaussian branch
+recovers the frozen baseline likelihood and gradient exactly at the audit
+points.
+
+The Student-$t$ fit used four chains with 400 warmup and 400 retained draws per
+chain. The maximum split $\widehat R$ was 1.008, minimum bulk and tail effective
+sample sizes were 475 and 549, respectively, and there were no divergences or
+maximum-treedepth transitions.
+
+Table~\ref{tab:student-t-multipliers} compares the resulting social
+multipliers. Heavy-tailed types modestly attenuate the estimated multipliers,
+with reductions of approximately 1--10 percent that are generally larger at
+longer distances. The qualitative pattern is unchanged. The multiplier
+remains above one for Control and Calendar and below one for Ink and Bracelet;
+for Calendar, the Student-$t$ credible intervals include one at 1.5 and 2.5
+km. Thus the conclusion that social image amplifies the distance response in
+the less visible arms and mitigates it in the signal arms does not depend on a
+Gaussian latent-type distribution.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Social multipliers under Gaussian and heavy-tailed intrinsic motivation}
+  \label{tab:student-t-multipliers}
+  \begin{threeparttable}
+    \input{\StructuralRobustnessPath/tables/main-core-student-t-multipliers.tex}
+    \begin{tablenotes}\footnotesize
+      \item \textit{Notes:} Entries are posterior medians of the social
+      multiplier evaluated at the indicated distance. Parentheses contain 95
+      percent posterior credible intervals. The Student-$t$ specification has
+      five degrees of freedom and is scaled to unit variance; its convolution
+      with Gaussian decision noise is evaluated using deterministic 12-node
+      quadrature.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\end{document}

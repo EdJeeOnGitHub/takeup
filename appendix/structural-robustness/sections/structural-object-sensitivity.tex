@@ -1,0 +1,66 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,array,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+\providecommand{\E}{\mathbb{E}}
+\providecommand{\Cov}{\operatorname{Cov}}
+
+\subsection{Which Data Discipline the Structural Objects?}
+\label{app:structural-object-sensitivity}
+
+Our structural conclusions concern equilibrium objects rather than any one
+primitive parameter in isolation. In particular, the model maps the joint
+posterior into four economically meaningful objects: the social multiplier,
+the social-image return, the private value of the incentives, and the
+visibility of deworming. Table~\ref{tab:object-sensitivity} reports a Bayesian
+likelihood-sensitivity diagnostic showing which parts of the data discipline
+each object.
+
+Let $Q(\theta)$ denote a structural object and let $\ell_b(\theta)$ be the log
+likelihood for data block $b$. If that block is assigned weight $\omega_b$,
+the local response of its posterior mean is
+\[
+  \left.
+  \frac{\partial \E_{\omega}[Q(\theta)\mid Y]}
+       {\partial \omega_b}
+  \right|_{\omega_b=1}
+  =
+  \Cov\!\left(Q(\theta),\ell_b(\theta)\mid Y\right).
+\]
+We divide this covariance by the posterior standard deviation of $Q$, so an
+entry measures the movement in the posterior mean, in posterior-standard-
+deviation units, induced by a local increase in the weight placed on a data
+block. Table~\ref{tab:object-sensitivity} evaluates the structural schedules
+at 1.5 km and reports each treatment arm separately. The first row within each
+group gives the root mean square of the four arm-specific sensitivities.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Absolute posterior-mean sensitivity of structural objects to the data}
+  \label{tab:object-sensitivity}
+  \input{\StructuralRobustnessPath/tables/structural-object-sensitivity-1500m.tex}
+  \begin{minipage}{0.90\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Entries are absolute standardized posterior-mean
+    sensitivities. Larger entries indicate that the posterior mean is more
+    responsive to the likelihood block. For arm-specific objects, the
+    italicized group row reports the RMS across arms. Bold denotes the largest
+    sensitivity in each row. All schedules are evaluated at 1.5 km.
+  \end{minipage}
+\end{table}
+
+The pattern mirrors the study design. Experimental take-up across arms and
+distances anchors the magnitude of the social-image return. The multiplier is
+jointly disciplined by take-up and observability beliefs: take-up is
+especially important for Control, whereas observability beliefs are especially
+important for Bracelet. Belief data directly discipline predicted visibility,
+and the randomized WTP experiment isolates private incentive values from
+signaling value. Thus distinct experimental and survey modules discipline the
+combinations of primitives that enter the decomposition and policy
+counterfactuals.
+
+\end{document}

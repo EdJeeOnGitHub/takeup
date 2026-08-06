@@ -1,0 +1,125 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,graphicx,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{Sensitivity to Signal-Specific Social-Image Weights}
+\label{app:signal-specific-lambda}
+
+The baseline model restricts the social-image weight $\lambda$ to be common
+across experimental arms. We assess this restriction using nested
+specifications with a common weight, two weights pooling Ink and Bracelet as
+Any Signal and Control and Calendar as No Signal, and four arm-specific
+weights. The flexible specifications parameterize log-weight contrasts around
+a common geometric mean. This keeps the common level of social-image concerns
+separate from treatment-arm heterogeneity in those concerns.
+
+Tables~\ref{tab:lambda-nested-ates} and
+\ref{tab:lambda-nested-multipliers} show that allowing signal-specific weights
+has little effect on the model-implied treatment effects or the qualitative
+multiplier pattern. In all three specifications, the multiplier is above one
+for Control and Calendar and below one for Ink and Bracelet. The flexible
+models modestly move all multipliers toward one.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Structural treatment effects under alternative social-image weights}
+  \label{tab:lambda-nested-ates}
+  \input{\StructuralRobustnessPath/tables/main-core-lambda-nested-ates.tex}
+  \begin{minipage}{0.93\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} The common specification imposes one $\lambda$ across all
+    arms. The signal-group specification estimates separate weights for Any
+    Signal (Ink and Bracelet) and No Signal (Control and Calendar). The
+    arm-specific specification estimates four weights. Parentheses contain
+    95 percent posterior credible intervals.
+  \end{minipage}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Social multipliers under alternative social-image weights}
+  \label{tab:lambda-nested-multipliers}
+  \input{\StructuralRobustnessPath/tables/main-core-lambda-nested-multipliers.tex}
+  \begin{minipage}{0.93\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Entries are posterior medians of the social multiplier at
+    the indicated distance. Parentheses contain 95 percent posterior credible
+    intervals. Model definitions are given in the notes to
+    Table~\ref{tab:lambda-nested-ates}.
+  \end{minipage}
+\end{table}
+
+Because extra weights can be weakly identified, we vary the prior standard
+deviation of pairwise log-weight ratios. Table~\ref{tab:lambda-prior} reports
+the resulting contrast and multiplier estimates at 1.5 km. The posterior
+contrasts remain near zero, and the multiplier conclusions are stable across
+the prior grid. The contraction statistic is reported to distinguish a stable
+posterior caused by data from one inherited mechanically from the prior.
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Prior sensitivity of signal-specific social-image weights}
+  \label{tab:lambda-prior}
+  \resizebox{\linewidth}{!}{%
+    \input{\StructuralRobustnessPath/tables/main-core-lambda-prior-sensitivity.tex}}
+  \begin{minipage}{0.96\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Prior SD is the standard deviation assigned to pairwise
+    log-$\lambda$ ratios. The contrast compares Any Signal with No Signal.
+    Multiplier columns are evaluated at 1.5 km. Contraction reports the
+    posterior standard deviation relative to its induced prior standard
+    deviation; smaller values indicate greater learning.
+  \end{minipage}
+\end{table}
+
+Figure~\ref{fig:lambda-prior-profile} complements the posterior comparison
+with the regularized profile support for the Any Signal--No Signal contrast.
+The profile retains the baseline priors on nuisance parameters and therefore
+is not interpreted as a likelihood-ratio confidence interval.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.48\linewidth]{\StructuralRobustnessPath/figures/main-core-lambda-prior-sensitivity.pdf}
+  \hfill
+  \includegraphics[width=.48\linewidth]{\StructuralRobustnessPath/figures/main-core-lambda-profile.pdf}
+  \caption{Prior sensitivity and regularized profile support for signal-specific image weights}
+  \label{fig:lambda-prior-profile}
+\end{figure}
+
+Finally, a simulation exercise fits the common, grouped, and arm-specific
+models to data generated under common, grouped, arm-heterogeneous, and
+no-image designs. Table~\ref{tab:lambda-recovery} reports recovery of the image
+weight and multiplier. The grouped and arm-specific models recover genuine
+heterogeneity substantially better than the common-weight restriction, while
+the more flexible specifications do not generate large multiplier errors when
+the true weight is common.
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Simulation recovery of signal-specific social-image weights}
+  \label{tab:lambda-recovery}
+  \input{\StructuralRobustnessPath/tables/main-core-lambda-recovery-table.tex}
+  \begin{minipage}{0.93\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Each row summarizes 50 simulated datasets. Bias and RMSE
+    for $\lambda$ concern the relevant signal-specific contrast; the final
+    column reports RMSE of the implied social multiplier.
+  \end{minipage}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.60\linewidth]{\StructuralRobustnessPath/figures/main-core-lambda-recovery-contrast.pdf}
+  \caption{Simulation recovery of the signal-specific social-image contrast}
+  \label{fig:lambda-recovery}
+\end{figure}
+
+\end{document}

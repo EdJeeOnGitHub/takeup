@@ -1,0 +1,119 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{Asymmetric Classification and Regularization of the Reporting Process}
+\label{app:asymmetric-reporting-priors}
+
+The baseline structural model maps definite classifications of recognized
+peers directly into observability. As a robustness exercise, we instead
+estimate the complete reporting process using peer reports linked to
+administrative take-up. Conditional on recognizing a peer, the probabilities
+of reporting Yes, No, or Don't Know depend on the peer's true take-up status,
+treatment assignment, distance, and treatment-by-distance interactions. The
+resulting truth-specific response matrix, including false-positive and
+false-negative classifications, enters the equilibrium fixed point.
+
+The treatment-specific report-by-distance interactions are estimated from a
+relatively small number of treatment-distance cells. We report three ways of
+handling this weakly informed portion of the reporting channel. The
+unrestricted specification assigns the twelve treatment-specific distance
+contrasts independent $N(0,0.25)$ priors. The tighter-prior specification
+changes these to $N(0,0.10)$. A design-pooled specification instead writes
+each slope as a No-Signal or Any-Signal group slope plus a centered
+within-group deviation: Control and Calendar deviations sum to zero, as do Ink
+and Bracelet deviations. A common half-normal scale shrinks those within-group
+deviations while allowing the two experimentally meaningful signal groups to
+have different reporting gradients. All other priors and likelihood
+components are unchanged.
+
+Table~\ref{tab:tight-asymmetric-report-multipliers} reports both local point
+multipliers and a finite-change multiplier over the 500--2500m interval. The
+tighter prior yields multipliers close to one for Control, Calendar, and Ink.
+For Bracelet, the local multiplier declines with distance and has a posterior
+median of $-0.12$ at 2500m, but its 95 percent credible interval includes zero
+widely. The corresponding finite-change multiplier is $0.34$, with a 95
+percent credible interval of $(-0.04,0.82)$. Thus the specification indicates
+substantial attenuation of the direct access-cost effect for Bracelet, while
+providing limited evidence that the response reverses over the full distance
+interval.
+
+The structural average treatment effects remain stable under this
+regularization. The combined effects are $-2.5$ percentage points for Ink,
+$+4.3$ percentage points for Calendar, and $+7.2$ percentage points for
+Bracelet. The sensitivity is therefore concentrated in the decomposition of
+the distance response rather than in recovery of the average treatment
+effects.
+
+Because the four multiplier estimates are computed from the same posterior
+draw, separate arm-by-arm intervals discard useful covariance. Our primary
+robustness summary therefore compares the average multiplier for Control and
+Calendar (No Signal) with the average for Ink and Bracelet (Any Signal) within
+each draw. Table~\ref{tab:asymmetric-report-contrasts} shows that this paired
+contrast is similar across the unrestricted, hierarchical, tighter-prior, and
+design-pooled reporting models. Under design pooling, the contrast is 0.47
+with a 95 percent interval of $(0.18,0.74)$ at 1500m and 0.45
+$(0.17,0.71)$ for the finite 500--2500m change. The corresponding within-group
+shrinkage scale has posterior median 0.12 and 95 percent interval
+$(0.03,0.27)$ under its half-normal scale-0.25 prior. Sampling diagnostics are
+clean (maximum $\widehat R=1.003$, minimum bulk ESS 843, no divergences, and no
+maximum-treedepth transitions). A Newton-first one-dimensional GQ solver
+reproduces the original algebra-solver multiplier values exactly on every draw
+where the latter converges and returns finite multiplier values for all 3,200
+posterior draws.
+
+The evidence is not uniform over the full distance function. At 500m the
+design-pooled contrast is 0.03, with a 95 percent interval from $-0.23$ to
+$0.27$. The minimum over the three reported distances is also 0.03, with an
+interval from $-0.23$ to $0.26$. We therefore interpret the exercise
+as supporting a positive pooled signal-versus-no-signal contrast at the
+paper's 1500m reference distance and over the observed 500--2500m finite
+change, not as establishing that every arm-specific multiplier differs from
+one at every distance.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Social multipliers with asymmetric classification and tighter priors}
+  \label{tab:tight-asymmetric-report-multipliers}
+  \begin{threeparttable}
+    \input{\StructuralRobustnessPath/tables/main-core-tight-asymmetric-report-multipliers.tex}
+    \begin{tablenotes}\footnotesize
+      \item \textit{Notes:} Entries are posterior medians; parentheses contain
+      95 percent posterior credible intervals. The first three columns report
+      local point multipliers at the indicated distances. The final column
+      reports the finite change in the equilibrium cutoff between 500m and
+      2500m, normalized by the corresponding direct access-cost change. A
+      multiplier of one indicates no amplification, a value between zero and
+      one indicates attenuation, and a negative value indicates a reversal of
+      the local comparative static. The twelve treatment-specific
+      report-by-distance contrasts have independent $N(0,0.10)$ priors. All
+      other priors and likelihood components are unchanged.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Paired multiplier contrast across asymmetric-reporting specifications}
+  \label{tab:asymmetric-report-contrasts}
+  {\setlength{\tabcolsep}{4pt}%
+  \input{\StructuralRobustnessPath/tables/main-core-report-distance-contrasts.tex}}
+  \begin{minipage}{0.94\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Entries are posterior medians; parentheses contain 95
+    percent credible intervals. Each entry is the within-draw difference
+    between the average multiplier for Control and Calendar (No Signal) and
+    the average for Ink and Bracelet (Any Signal). ``Finite'' uses the change
+    from 500m to 2500m. ``Grid minimum'' takes the minimum paired contrast over
+    the three displayed distances within each posterior draw before computing
+    summaries. No intervals are truncated and no confidence level is changed.
+  \end{minipage}
+\end{table}
+
+\end{document}

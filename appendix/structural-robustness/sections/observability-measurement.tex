@@ -1,0 +1,56 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{Alternative Measures of Observability}
+\label{app:alternative-observability}
+
+The baseline model measures observability using the share of recognized peers
+for whom respondents give a definite Yes or No answer about deworming. We
+re-estimate the complete structural model using two alternative inputs. The
+first uses the share of recognized peers whose status is classified correctly
+when linked to administrative take-up records. The second uses perceived
+second-order observability: respondents' beliefs about whether other community
+members know who dewormed. We also make the treatment of missing first-order
+belief responses explicit by retaining those respondents and marginalizing
+their unobserved belief outcomes.
+
+Table~\ref{tab:alternative-observability-multipliers} shows that the multiplier
+pattern is stable. Under correct classification, the multiplier remains above
+one for Control and Calendar and is generally below one for Ink; the Bracelet
+point estimates are close to one and fall with distance. Under perceived
+second-order observability, the estimates closely track the baseline, with
+amplification for Control and Calendar and mitigation for Bracelet and Ink at
+longer distances.
+
+In the present observability model, explicit marginalization of missing belief
+outcomes is algebraically equivalent to the baseline target. Missing rows make
+no likelihood contribution, and predicted observability depends only on
+treatment arm and community distance. Hence all respondents in a given
+community have the same predicted probability, so averaging predictions over
+observed and missing respondents produces the same community observability
+schedule. Panel D records this equality rather than presenting a poorly mixed
+duplicate fit as independent evidence.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Social multipliers under alternative measures of observability}
+  \label{tab:alternative-observability-multipliers}
+  \begin{threeparttable}
+    \input{\StructuralRobustnessPath/tables/main-core-observability-multipliers.tex}
+    \begin{tablenotes}\footnotesize
+      \item \textit{Notes:} Entries are posterior medians of the social
+      multiplier at the indicated distance. Parentheses contain 95 percent
+      posterior credible intervals. Panels A--C use four-chain posterior fits.
+      Panel D is identical to Panel A by construction under the current
+      observability model, as described in the text.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\end{document}
