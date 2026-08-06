@@ -186,7 +186,8 @@ init_value <- if (is.null(init_files_option)) {
     for (parameter in intersect(
       names(init), c(
         "raw_u_sd", "dist_beta_v", "core_cluster_shock_sd",
-        "core_lambda_group_log_ratio_raw"
+        "core_lambda_group_log_ratio_raw", "core_report_within_dist_sd",
+        "core_finite_mixture_weight", "core_finite_mixture_between_share"
       )
     )) {
       if (is.null(dim(init[[parameter]])) && length(init[[parameter]]) == 1L) {
