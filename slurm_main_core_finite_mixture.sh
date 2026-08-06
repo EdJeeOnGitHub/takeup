@@ -65,7 +65,8 @@ case "${STAGE}" in
       "--fit-csvs=${fit_csvs}" \
       "--output-path=${OUTPUT_PATH}/gq/finite-mixture" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
-      --core-type-distribution=2 --threads=2 --parallel-chains=4
+      --core-type-distribution=2 --force-recompile=1 \
+      --threads=2 --parallel-chains=4
     ;;
   summarize)
     Rscript --no-save --no-restore --no-init-file \

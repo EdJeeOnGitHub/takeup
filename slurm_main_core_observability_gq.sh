@@ -50,5 +50,6 @@ Rscript --no-save --no-restore --no-init-file \
   "--core-report-structure=${report}" \
   "--core-report-arm-dist-hierarchical=${hierarchical}" \
   "--core-report-arm-dist-prior-scale=${prior_scale}" \
+  "--force-recompile=${FORCE_RECOMPILE:-0}" \
   --threads=4 --parallel-chains=1 \
   "--cmdstan-path=${CMDSTAN_PATH}"

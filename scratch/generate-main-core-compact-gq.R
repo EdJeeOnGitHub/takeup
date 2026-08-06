@@ -74,6 +74,7 @@ parallel_chains <- as.integer(option_value("--parallel-chains", "4"))
 cmdstan_path_option <- option_value(
   "--cmdstan-path", Sys.getenv("CMDSTAN", unset = "")
 )
+force_recompile <- as.integer(option_value("--force-recompile", "0")) == 1L
 
 if (length(fit_csvs) < 1L || any(!nzchar(fit_csvs)) ||
     any(!file.exists(fit_csvs))) {
@@ -131,7 +132,8 @@ dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 model <- cmdstan_model(
   file.path(stan_path, stan_file),
   include_paths = stan_path,
-  cpp_options = list(stan_threads = TRUE)
+  cpp_options = list(stan_threads = TRUE),
+  force_recompile = force_recompile
 )
 gq_fit <- model$generate_quantities(
   fitted_params = fit_csvs,
@@ -162,4 +164,12 @@ gq_fit <- model$generate_quantities(
   parallel_chains = min(parallel_chains, length(fit_csvs)),
   threads_per_chain = threads
 )
-message(paste(gq_fit$output_files(), collapse = "\n"))
+gq_files <- gq_fit$output_files()
+if (length(gq_files) != length(fit_csvs) ||
+    !all(file.exists(gq_files)) || any(file.info(gq_files)$size == 0L)) {
+  stop(
+    "Generated quantities did not produce one nonempty output per fit CSV.",
+    call. = FALSE
+  )
+}
+message(paste(gq_files, collapse = "\n"))
