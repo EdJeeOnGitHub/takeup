@@ -37,7 +37,9 @@ finite_distance_change <- summary_data$roc_distances[26L] -
 grouped_fit <- file.path(root, "design-pooled")
 grouped_gq <- file.path(
   grouped_fit,
-  if (dir.exists(file.path(grouped_fit, "gq-bracketed"))) {
+  if (dir.exists(file.path(grouped_fit, "gq-newton"))) {
+    "gq-newton"
+  } else if (dir.exists(file.path(grouped_fit, "gq-bracketed"))) {
     "gq-bracketed"
   } else {
     "gq"

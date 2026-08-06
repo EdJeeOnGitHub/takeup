@@ -442,6 +442,38 @@ functions {
       data int num_signals,
       data int use_u_in_delta) {
     real center = -benefit_cost;
+    real midpoint = center;
+    vector[4] zero_q_dist = rep_vector(0, 4);
+    array[1] int delta_x_i = {use_u_in_delta};
+    // Match algebra_solver's initial root basin first. A bounded Newton step
+    // is more robust than the generic solver for these one-dimensional GQ
+    // evaluations while preserving its root choice when multiple roots exist.
+    for (newton_step in 1:100) {
+      real residual = core_gq_noisy_residual(
+        midpoint, benefit_cost, lambda, total_error_sd, u_sd,
+        q_taker, q_nontaker, num_signals, use_u_in_delta
+      );
+      vector[2] delta = expected_delta_deriv(
+        midpoint, total_error_sd, u_sd, {0.0}, delta_x_i
+      );
+      vector[3] information = core_noisy_information_derivatives(
+        midpoint, total_error_sd, q_taker, q_nontaker,
+        zero_q_dist, zero_q_dist, num_signals
+      );
+      real residual_derivative = 1 + lambda * (
+        information[2] * delta[1] + information[1] * delta[2]
+      );
+      if (abs(residual) < 1e-10) return midpoint;
+      if (abs(residual_derivative) > 1e-8) {
+        real update = residual / residual_derivative;
+        midpoint -= fmin(2, fmax(-2, update));
+      } else {
+        midpoint -= 0.25 * residual;
+      }
+    }
+    // Fall back to a globally bracketed root only when the local iteration
+    // cannot converge from algebra_solver's initialization.
+    center = midpoint;
     real span = 4;
     real lower_bound = center - span;
     real upper_bound = center + span;
@@ -453,7 +485,6 @@ functions {
       upper_bound, benefit_cost, lambda, total_error_sd, u_sd,
       q_taker, q_nontaker, num_signals, use_u_in_delta
     );
-    real midpoint = center;
     for (expand_step in 1:8) {
       if (lower_residual * upper_residual > 0) {
         span *= 2;
