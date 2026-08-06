@@ -10,7 +10,7 @@
 #SBATCH --error=temp/log/core-boot999-%A-%a.log
 
 set -euo pipefail
-STAGE=${STAGE:?Set STAGE to weights, baseline, bootstrap, or summarize}
+STAGE=${STAGE:?Set STAGE to weights, baseline, bootstrap, launch, or summarize}
 ANALYSIS_ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data}
 WORKSPACE=${WORKSPACE:-${ANALYSIS_ROOT}/main-core-bootstrap-input/dist_fit105.RData}
 WEIGHTS_PATH=${WEIGHTS_PATH:-${ANALYSIS_ROOT}/main-core-cluster-bootstrap-999-weights}
@@ -49,6 +49,34 @@ case "${STAGE}" in
       "--task-id=${SLURM_ARRAY_TASK_ID}" "--init-json=${BASELINE_INIT}" \
       "--output-path=${OUTPUT_PATH}" "--stan-path=${STAN_PATH}" \
       "--cmdstan-path=${CMDSTAN_PATH}" --threads=8
+    ;;
+  launch)
+    : "${NEXT_START:?launch stage requires NEXT_START}"
+    batch_size=${BATCH_SIZE:-333}
+    max_concurrent=${MAX_CONCURRENT:-32}
+    total_replicates=999
+    if (( NEXT_START > total_replicates )); then
+      summary_job=$(sbatch --parsable --export=ALL,STAGE=summarize "$0")
+      printf 'summary %s\n' "${summary_job}"
+      exit 0
+    fi
+    batch_end=$((NEXT_START + batch_size - 1))
+    if (( batch_end > total_replicates )); then batch_end=${total_replicates}; fi
+    bootstrap_job=$(sbatch --parsable \
+      --array="${NEXT_START}-${batch_end}%${max_concurrent}" \
+      --export=ALL,STAGE=bootstrap "$0")
+    if (( batch_end < total_replicates )); then
+      next_job=$(sbatch --parsable --dependency="afterok:${bootstrap_job}" \
+        --export=ALL,STAGE=launch,NEXT_START=$((batch_end + 1)),BATCH_SIZE="${batch_size}",MAX_CONCURRENT="${max_concurrent}" \
+        "$0")
+      printf 'bootstrap_%s_%s %s\nlauncher %s\n' \
+        "${NEXT_START}" "${batch_end}" "${bootstrap_job}" "${next_job}"
+    else
+      summary_job=$(sbatch --parsable --dependency="afterok:${bootstrap_job}" \
+        --export=ALL,STAGE=summarize "$0")
+      printf 'bootstrap_%s_%s %s\nsummary %s\n' \
+        "${NEXT_START}" "${batch_end}" "${bootstrap_job}" "${summary_job}"
+    fi
     ;;
   summarize)
     Rscript --no-save --no-restore --no-init-file \
