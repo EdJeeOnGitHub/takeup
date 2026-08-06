@@ -113,7 +113,7 @@ lines <- c(
   "\\midrule"
 )
 for (specification in c("Gaussian", "Two-component mixture")) {
-  block <- results |> filter(.data$specification == specification)
+  block <- results |> filter(.data$specification == .env$specification)
   panel <- if (specification == "Gaussian") {
     "Panel A: Gaussian intrinsic motivation"
   } else {
