@@ -29,7 +29,7 @@ case "${SPECIFICATION}" in
 esac
 
 fit_csv=${FIT_ROOT}/${SPECIFICATION}/dist_fit106_MAIN_CORE_chain${CHAIN_ID}-1.csv
-output_path=${FIT_ROOT}/${SPECIFICATION}/gq
+output_path=${FIT_ROOT}/${SPECIFICATION}/${GQ_SUBDIR:-gq}
 mkdir -p temp/log "${output_path}"
 module load gcc/10.2.0
 module load -f R/4.2.0

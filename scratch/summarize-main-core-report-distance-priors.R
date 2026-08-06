@@ -35,6 +35,14 @@ finite_distance_change <- summary_data$roc_distances[26L] -
   summary_data$roc_distances[6L]
 
 grouped_fit <- file.path(root, "design-pooled")
+grouped_gq <- file.path(
+  grouped_fit,
+  if (dir.exists(file.path(grouped_fit, "gq-bracketed"))) {
+    "gq-bracketed"
+  } else {
+    "gq"
+  }
+)
 specifications <- data.frame(
   id = c("f0", "hierarchical", "tight", "design-pooled"),
   label = c(
@@ -51,7 +59,7 @@ specifications <- data.frame(
   gq_dir = c(
     file.path(f0_fit, "compact-gq"),
     file.path(root, c("hierarchical", "tight"), "gq"),
-    file.path(grouped_fit, "gq")
+    grouped_gq
   ),
   stringsAsFactors = FALSE
 )
