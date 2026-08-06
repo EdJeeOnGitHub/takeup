@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=8G
-#SBATCH --time=04:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=temp/log/core-finite-mix-%A-%a.log
 #SBATCH --error=temp/log/core-finite-mix-%A-%a.log
 
@@ -65,7 +65,8 @@ case "${STAGE}" in
       "--fit-csvs=${fit_csvs}" \
       "--output-path=${OUTPUT_PATH}/gq/finite-mixture" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
-      --core-type-distribution=2 --force-recompile=1 \
+      --core-type-distribution=2 \
+      "--force-recompile=${FORCE_RECOMPILE:-1}" \
       --threads=2 --parallel-chains=4
     ;;
   summarize)
