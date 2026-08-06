@@ -311,10 +311,11 @@ write_mode_init_json <- function(fit, model, path) {
     array(as.numeric(selected), dim = value_dim)
   })
   names(init) <- names(draws)
-  # posterior::rvar represents a length-one vector like a scalar, so the
-  # singleton dimension can disappear above.  Restore the declared Stan rank
-  # before writing JSON; otherwise CmdStan rejects vector[1] initial values as
-  # scalar values (notably the finite-mixture parameters).
+  init <- main_core_nudge_init_boundaries(init)
+  # posterior::rvar represents a length-one vector like a scalar, and scalar
+  # pmin/pmax boundary nudges can also drop its dimension. Restore the declared
+  # Stan rank last; otherwise CmdStan rejects vector[1] initial values as
+  # scalars (notably the finite-mixture parameters).
   for (parameter in names(init)) {
     parameter_rank <- model$variables()$parameters[[parameter]]$dimensions
     if (parameter_rank > 0L && length(init[[parameter]]) == 1L &&
@@ -325,7 +326,6 @@ write_mode_init_json <- function(fit, model, path) {
       )
     }
   }
-  init <- main_core_nudge_init_boundaries(init)
   cmdstanr::write_stan_json(init, path)
   invisible(path)
 }
