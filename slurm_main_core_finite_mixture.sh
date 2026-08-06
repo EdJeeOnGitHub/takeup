@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=8G
-#SBATCH --time=1-12:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output=temp/log/core-finite-mix-%A-%a.log
 #SBATCH --error=temp/log/core-finite-mix-%A-%a.log
 
