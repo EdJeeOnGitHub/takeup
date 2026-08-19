@@ -1,22 +1,32 @@
+# Manuscript ToDos
+
+
+- [ ] Improve structure of structural model section.
+- [ ] Section 6.1 comes out of nowhere - says there's a table and then we only speak about 4 parameters. It's fine if we don't want to talk about params but need to be clear.
+- [ ] No intro in section 6 currently - need to add.
+
+
+
+
+
+- [ ] Add a footnote/sentence on how we translate dollar value in WTP into 
+walking distance in the structural writeup.
+
+
+
+
 
 # Extra ToDos June 16th
 
 
-- [ ] Robustness todo: Show social multiplier exists across all robustness checks.
+
+
+
+
+
+- [x] Robustness todo: Show social multiplier exists across all robustness checks.
 - [x] Identification grid.
 
-
-Immediate ed todo: 
-1. share w/ Anne this doc.
-2. run selection fits into missing.
-    -> knowledge table missingness by treatment assignment. Take 1,141 who are table A knowledge not SMS and find the number who should have been in there. Make balance more targeted. Make comparison as clean as possible. Display using Table 1 format of the pdf I created.
-    -> TODO: reconcile observability-missingness count in prose/sample-flow. Current cleaned analysis data gives 252 missing knowledge-table observations in the SMS-control endline sample, not 255. The 255 appears to be stale sample-flow/prose text; replace or explain before finalizing.
-    -> maybe people are not different across treatment arms however. observables different by treatment arm. Table B1 and B2 show that individuals seem to be 
-    similar across arms + we control for covariates.
-    -> Is table 5 actually useful for judging selection into sample driven by treatment.
-    -> Add table A missing checks where we randomly sample half assigned to table A so we mimic actual procedure. 
-    -> check anne comment about missing rates w/ SMS control.
-3. run structural model robustness w/ beliefs change.
 
 
 ### TODO 1: Reframe paragraphs so they start with the main takeaway, not "Table X reports...".
@@ -202,8 +212,8 @@ Use calendar as argument against:
 >Before you move to your second step of bounding the treatment effect, you have a very powerful conceptual defense already in the paper: the Calendar arm. The baseline data shows that the Calendar arm has largely the same Far-Close imbalance in past deworming as the Bracelet and Ink arms. Yet, in the main results, the Calendar arm yields completely flat take-up across distance (it acts as a clean placebo). If the reviewer were correct that this specific baseline imbalance mechanically drives the take-up gap, the Calendar arm should have shown the same attenuated distance gradient as the public-signal arms. It did not.
 
 
-- [ ] Move Section 4.2.2 text about severe baseline imbalance to appendix (it's already there)
-- [ ] Add link in balance main text discussion to appendix C, currently it's not discussed.
+- [x] Move Section 4.2.2 text about severe baseline imbalance to appendix (it's already there)
+- [x] Add link in balance main text discussion to appendix C, currently it's not discussed.
 
 
 
@@ -339,7 +349,7 @@ Tweaked writeup, added plots comparing prior and posterior:
 Appendix~\ref{priors} shows that the data are informative about this parameter by comparing the prior and posterior distributions for \(\sigma_u\).
 
 
-- [ ] Add link directly to figure. Rewrite prior appendix to remove many lines, add a small p.g. on what K1 figure is in the appendix.
+- [x] Add link directly to figure. Rewrite prior appendix to remove many lines, add a small p.g. on what K1 figure is in the appendix.
 
 ---
 
