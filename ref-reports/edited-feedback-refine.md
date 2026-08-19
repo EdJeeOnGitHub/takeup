@@ -1,12 +1,29 @@
+
+# AI Feedback ToDo
+
+
+- [ ] Update all results w/ reduced form and structural model.
+    -> and balance w/ ITT
+
+
+- [ ] don't include table on assymetric obseverability structural model as 
+negative multiplier seems weird - maybe say we did it.
+
+
+- [ ] Better framing in the paper about SM - it's not absolute magnitudes per se. It's the existence of amplification and mitigation.
+
+
+- [ ] What to put in the paper re: struct cluster.
+    -> Think about how best to present results.
+    -> key goal is not magnitude but amplification and mitigation.
+
+
 # Manuscript ToDos
 
 
 - [ ] Improve structure of structural model section.
 - [ ] Section 6.1 comes out of nowhere - says there's a table and then we only speak about 4 parameters. It's fine if we don't want to talk about params but need to be clear.
 - [ ] No intro in section 6 currently - need to add.
-
-
-
 
 
 - [ ] Add a footnote/sentence on how we translate dollar value in WTP into 
@@ -17,10 +34,6 @@ walking distance in the structural writeup.
 
 
 # Extra ToDos June 16th
-
-
-
-
 
 
 
