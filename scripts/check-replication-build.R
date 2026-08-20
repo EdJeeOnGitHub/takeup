@@ -30,19 +30,19 @@ dir.create(file.path("build", specification, "audit"), recursive = TRUE,
 checks <- data.frame(
   check = c("clusters", "switched_clusters", "paper_dependencies",
             "unresolved_dependencies", "latest_structural_files",
-            "make_covered_dependencies", "structural_render_gaps",
-            "external_policy_dependencies"),
+            "default_covered_dependencies", "default_uncovered_dependencies",
+            "structural_full_render_gaps", "external_policy_dependencies"),
   value = c(nrow(analysis_crosswalk), sum(analysis_crosswalk$switched), nrow(registry),
             sum(registry$status == "missing"), sum(file.exists(required_scripts)),
-            sum(coverage$pipeline_coverage == "covered_make_target"),
-            sum(coverage$pipeline_coverage == "gap_after_compact_gq"),
-            sum(coverage$pipeline_coverage ==
-                  "external_policy_workflow_not_make"))
+            sum(grepl("^covered_", coverage$pipeline_coverage)),
+            sum(!grepl("^covered_", coverage$pipeline_coverage)),
+            sum(coverage$full_regeneration_coverage == "render_target_gap"),
+            sum(coverage$full_regeneration_coverage ==
+                  "external_generator_available"))
 )
 path <- file.path("build", specification, "audit", "replication-checks.csv")
 write.csv(checks, path, row.names = FALSE)
 print(checks, row.names = FALSE)
-if (sum(registry$status == "missing") > 0L) {
-  warning("Some manuscript dependencies are unavailable in the repository snapshot; see ",
-          registry_path)
+if (sum(!grepl("^covered_", coverage$pipeline_coverage)) > 0L) {
+  stop("The default paper contract has uncovered dependencies; see ", coverage_path)
 }

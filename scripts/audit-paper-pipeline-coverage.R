@@ -1,8 +1,9 @@
 #!/usr/bin/env Rscript
 
-# Classify every active manuscript dependency by the workflow that owns it and
-# whether the current Make/targets graph actually regenerates it. Existing
-# files are not treated as reproduced merely because stage-paper.R can copy them.
+# Classify every active manuscript dependency under two distinct contracts:
+# the fast default build (generated, versioned-static, or checksum-frozen) and
+# full regeneration. A frozen artifact is covered by the default build, but is
+# never mislabeled as regenerated.
 
 status <- system2(
   "Rscript",
@@ -114,13 +115,57 @@ note[coverage == "missing_source"] <-
   "The artifact is neither generated nor available in this repository snapshot."
 
 registry$workflow_owner <- owner
-registry$pipeline_coverage <- coverage
+contract_path <- "replication/paper-artifact-contract.csv"
+if (file.exists(contract_path)) {
+  contract <- read.csv(contract_path, stringsAsFactors = FALSE,
+                       na.strings = character())
+  contract <- contract[match(registry$artifact, contract$artifact), ]
+  if (any(is.na(contract$artifact))) {
+    stop("The committed artifact contract does not cover every active dependency.")
+  }
+  frozen_exists <- file.exists(contract$deposit_path)
+  frozen_checksum_ok <- frozen_exists
+  for (i in which(contract$default_contract == "frozen" & frozen_exists)) {
+    output <- system2("sha256sum", contract$deposit_path[[i]], stdout = TRUE,
+                      stderr = TRUE)
+    actual <- sub("[[:space:]].*$", "", output[[1L]])
+    frozen_checksum_ok[[i]] <- identical(actual, contract$sha256[[i]])
+  }
+  default_coverage <- ifelse(
+    contract$default_contract == "generated" & generated_by_build,
+    "covered_generated",
+    ifelse(contract$default_contract == "generated", "missing_generated_output",
+      ifelse(contract$default_contract == "static" & registry$status == "resolved",
+        "covered_versioned_source",
+        ifelse(contract$default_contract == "frozen" & frozen_checksum_ok,
+          "covered_frozen_checksum", "missing_contracted_artifact")))
+  )
+  full_coverage <- ifelse(
+    contract$default_contract == "generated" & generated_by_build,
+    "regenerated",
+    ifelse(contract$default_contract == "static", "generation_not_required",
+      ifelse(owner == "optimal_policy", "external_generator_available",
+        ifelse(owner == "design_simulation", "legacy_generator_available",
+          ifelse(owner == "structural_postprocess", "render_target_gap",
+            ifelse(owner %in% c("reduced_form", "balance"),
+              "legacy_generator_not_isolated", "manual_source_no_generator")))))
+  )
+  registry$default_contract <- contract$default_contract
+  registry$deposit_path <- contract$deposit_path
+  registry$full_make_target <- contract$full_make_target
+  registry$pipeline_coverage <- default_coverage
+  registry$full_regeneration_coverage <- full_coverage
+  registry$coverage_note <- contract$provenance_note
+} else {
+  registry$pipeline_coverage <- coverage
+  registry$full_regeneration_coverage <- coverage
+  registry$coverage_note <- note
+}
 registry$generated_path <- vapply(
   generated_paths,
   function(paths) if (length(paths)) paths[[1L]] else NA_character_,
   character(1)
 )
-registry$coverage_note <- note
 
 output <- "build/manifest/paper-pipeline-coverage.csv"
 write.csv(registry, output, row.names = FALSE)
@@ -138,3 +183,5 @@ write.csv(
 
 cat("Wrote", nrow(registry), "active dependencies to", output, "\n")
 print(summary, row.names = FALSE)
+cat("\nFull-regeneration status (kept separate from default coverage):\n")
+print(as.data.frame(table(registry$full_regeneration_coverage)), row.names = FALSE)

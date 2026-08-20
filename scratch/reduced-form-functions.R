@@ -2,6 +2,41 @@
 #### Functions for RF bootstrap ------------------------------------------------
 # Estimate and Predict to generate ATEs
 
+# Run independent bootstrap draws across the CPU allocation. Each draw sets its
+# own seed inside the estimation function, so fork scheduling does not affect
+# the results. Forking also lets the workers share the large analysis frames by
+# copy-on-write on Linux rather than serializing them for every draw.
+bootstrap_map_dfr <- function(draws, fun, cores = NULL) {
+  fun <- purrr::as_mapper(fun)
+  if (is.null(cores)) {
+    cores <- suppressWarnings(as.integer(Sys.getenv("TAKEUP_THREADS", "1")))
+  }
+  if (is.na(cores) || cores < 1L) cores <- 1L
+  cores <- min(cores, length(draws))
+  if (.Platform$OS.type == "windows") cores <- 1L
+
+  if (cores == 1L) {
+    return(purrr::map_dfr(draws, fun, .progress = TRUE))
+  }
+  message("Bootstrap: ", length(draws), " draws across ", cores, " fork workers")
+  quiet_fun <- function(draw) {
+    old_options <- options(fixest.notes = FALSE, dplyr.summarise.inform = FALSE)
+    on.exit(options(old_options), add = TRUE)
+    fun(draw)
+  }
+  results <- parallel::mclapply(
+    draws, quiet_fun,
+    mc.cores = cores,
+    mc.preschedule = TRUE,
+    mc.set.seed = FALSE
+  )
+  failed <- vapply(results, inherits, logical(1), what = "try-error")
+  if (any(failed)) {
+    stop("Parallel bootstrap worker failed: ", as.character(results[[which(failed)[1L]]]))
+  }
+  dplyr::bind_rows(results)
+}
+
 # For a given set of IDs, create bs data - n.b. this allows cluster to appear 
 # multiple times
 create_bs_data = function(split_data, ids) {
@@ -538,14 +573,13 @@ create_regression_output = function(
     bs_f = bayes_bs_f_at_x
     actual_f = actual_bayesian_bs_fit_at_x
   }
-  bs_draws = map_dfr(
+  bs_draws = bootstrap_map_dfr(
     1:B_draws,
     ~bs_f(
       seed = .x,
       f = f,
       data = data
-    ),
-    .progress = TRUE
+    )
     )
 
   if (flip_calendar_sign) {

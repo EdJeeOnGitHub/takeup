@@ -1,0 +1,39 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.05, >=Latex]
+  \coordinate (pot) at (0,0);
+  \coordinate (anchor) at (3.1,0.65);
+  \coordinate (community) at (3.55,1.05);
+  \coordinate (neighbor) at (5.45,0.15);
+  \fill[blue!5] (pot) circle (4.25cm);
+  \fill[white] (neighbor) circle (2.15cm);
+  \draw[blue!65, thick] (pot) circle (4.25cm);
+  \draw[blue!65, densely dotted, thick] (pot) circle (2.125cm);
+  \draw[red!65, dashed, thick] (neighbor) circle (2.15cm);
+  \fill[black] (pot) circle (2.2pt);
+  \fill[orange!85!black] (anchor) circle (2.5pt);
+  \fill[green!50!black] (community) circle (2.7pt);
+  \fill[red!70!black] (neighbor) circle (2.2pt);
+  \draw[-{Latex[length=2mm]}, gray!70] (pot) -- node[above, sloped,
+    font=\scriptsize] {assigned distance band} (community);
+  \node[below left=1pt of pot, font=\small] {Assigned PoT};
+  \node[below=2pt of anchor, font=\small] {Anchor};
+  \node[above right=1pt of community, font=\small, align=left]
+    {Targeted\\community};
+  \node[below=2pt of neighbor, font=\small] {Neighboring PoT};
+  \node[font=\scriptsize, text=blue!70!black] at (-0.1,2.45)
+    {1.25 km Close/Far cutoff};
+  \node[font=\scriptsize, text=blue!70!black] at (-1.7,3.75)
+    {2.5 km eligibility catchment};
+  \node[font=\scriptsize, text=red!70!black, align=center] at (4.95,-1.65)
+    {Excluded by neighboring\\PoT buffer};
+\end{tikzpicture}
+\caption{Cluster Catchment, Distance Assignment, and Community Selection}
+\label{fig:cluster-overlap-schematic}
+\floatfoot{\textit{Notes:} The inner dotted circle separates the assigned Close
+(0--1.25 km) and Far (1.25--2.5 km) bands. Communities are listed near an
+anchor in the assigned band and selected from the portion of the 2.5 km
+catchment that remains after neighboring-PoT buffer restrictions. The diagram
+is schematic and not to scale.}
+\end{figure}
+

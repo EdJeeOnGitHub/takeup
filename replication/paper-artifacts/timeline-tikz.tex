@@ -1,0 +1,23 @@
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm, >=Latex,
+  event/.style={draw, rounded corners=2pt, align=center, inner sep=5pt,
+                minimum width=3.25cm, minimum height=1.05cm},
+  arrow/.style={-{Latex[length=2.2mm]}, thick}
+]
+  \node[event, fill=gray!8] (census) at (0,0)
+    {Household census\\and baseline survey};
+  \node[event, fill=blue!7] (outreach) at (4.1,0)
+    {Community outreach\\and SMS enrollment};
+  \node[event, fill=green!8] (campaign) at (8.2,0)
+    {Deworming campaign\\administrative take-up};
+  \node[event, fill=orange!10] (endline) at (12.3,0)
+    {Endline survey\\2--14 days later};
+  \draw[arrow] (census) -- (outreach);
+  \draw[arrow] (outreach) -- (campaign);
+  \draw[arrow] (campaign) -- (endline);
+  \node[font=\footnotesize, text=gray!70!black, below=3pt of campaign]
+    {Two 12-day waves: Oct.--Nov. 2016};
+\end{tikzpicture}
+\caption{Experiment Timeline and Data Collection}
+

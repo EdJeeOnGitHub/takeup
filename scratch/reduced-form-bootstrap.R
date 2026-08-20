@@ -1567,14 +1567,13 @@ discrete_sob_output = wrapper_function(
 if (run_all || script_options$takeup) run_section("Takeup Levels", {
 
 # For plotting
-dist_cts_spec_bs_draws = map_dfr(
+dist_cts_spec_bs_draws = bootstrap_map_dfr(
   seq_len(getOption("takeup.bootstrap_draws", 500L)),
   ~bayes_bs_f(
     seed = .x,
     f = dist_cts_regression,
     data = cov_analysis_data
-  ),
-  .progress = TRUE
+  )
   )
 
 dist_cts_spec_levels = actual_bayesian_bs_fit(
@@ -1604,14 +1603,13 @@ tidy_dist_cts_spec_levels %>%
 
 
 #### Takeup LEVELS Discrete Distance + LASSO Covs + Expected Distance
-discrete_distance_covs_bs_draws = map_dfr(
+discrete_distance_covs_bs_draws = bootstrap_map_dfr(
   seq_len(getOption("takeup.bootstrap_draws", 500L)),
   ~bayes_bs_f(
     seed = .x,
     f = discrete_distance_regression,
     data = cov_analysis_data
-  ),
-  .progress = TRUE
+  )
   )
 
 discrete_distance_covs_levels = actual_bayesian_bs_fit(
@@ -1647,15 +1645,14 @@ tidy_discrete_distance_cov_levels %>%
 
 if (run_all || script_options$beliefs) run_section("Beliefs Levels", {
 
-fob_bs_draws = map_dfr(
+fob_bs_draws = bootstrap_map_dfr(
   seq_len(getOption("takeup.bootstrap_draws", 500L)),
   ~bayes_bs_f(
     seed = .x,
     f = discrete_f_know,
     data = endline_know_A_df %>%
       mutate(prop_knows = prop_know_fob)
-  ),
-  .progress = TRUE
+  )
   )
 
 fob_levels_point = actual_bayesian_bs_fit(
@@ -2725,15 +2722,14 @@ f_sms = function(data, weights) {
 }
 
 
-sms_bs_draws = map_dfr(
+sms_bs_draws = bootstrap_map_dfr(
     seq_len(getOption("takeup.bootstrap_draws", 500L)),
     ~bayes_bs_f(
         seed = .x, 
         f = f_sms, 
         data = sms_analysis_data,
         sms_treatment
-    ),
-    .progress = TRUE
+    )
 )
 
 

@@ -26,15 +26,31 @@ stan_sources <- collect_stan_dependencies(c(
   "stan_models/takeup_struct_main_core_compact_gq.stan"
 ))
 
+artifact_contract <- read.csv(
+  "replication/paper-artifact-contract.csv",
+  stringsAsFactors = FALSE,
+  na.strings = character()
+)
+contract_files <- c(
+  artifact_contract$deposit_path[
+    artifact_contract$default_contract == "frozen"
+  ],
+  artifact_contract$source_path[
+    artifact_contract$default_contract == "static"
+  ]
+)
+
 include <- c(
   "README.md", "Makefile", "_targets.R", "renv.lock", "takeup.Rproj",
   "R/distance-spec.R", "R/pipeline.R", "replication/README.md",
-  "replication/data-manifest.csv", "scripts/validate-distance-spec.R",
+  "replication/data-manifest.csv", "replication/paper-artifact-contract.csv",
+  "scripts/validate-distance-spec.R",
   "scripts/prepare-structural-distance-data.R",
   "scripts/run-structural-fit.sh", "scripts/build-paper-artifact-registry.R",
   "scripts/audit-paper-pipeline-coverage.R",
   "scripts/build-stan-artifact-inventory.R",
   "scripts/check-replication-build.R", "scripts/stage-paper.R",
+  "scripts/manage-paper-artifacts.R",
   "scripts/stage-replication-package.R",
   "scripts/test-distance-spec.R",
   "scratch/reduced-form-bootstrap.R", "scratch/reduced-form-setup.R",
@@ -42,7 +58,7 @@ include <- c(
   "scratch/sample-slim-individual-fp.R",
   "scratch/generate-main-core-compact-gq.R",
   "ref-reports/ECM ReStud.tex",
-  stan_sources
+  stan_sources, contract_files
 )
 include <- unique(include)
 missing <- include[!file.exists(include)]
