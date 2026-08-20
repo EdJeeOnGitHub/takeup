@@ -2,9 +2,10 @@ library(targets)
 
 source("R/distance/spec.R")
 source("R/workflow/pipeline.R")
+source("R/reduced-form/context.R")
 
 tar_option_set(
-  packages = c("dplyr", "withr"),
+  packages = c("tidyverse", "withr"),
   error = "abridge",
   memory = "transient",
   garbage_collection = TRUE
@@ -37,8 +38,8 @@ list(
     reduced_form_source_files,
     c(
       "R/distance/spec.R", "scripts/reduced-form/bootstrap.R",
-      "scripts/reduced-form/setup.R", "R/reduced-form/functions.R",
-      "R/common/analysis.R", "scripts/shared/clean-analysis-setup.R", "R/structural/legacy-utils.R",
+      "R/reduced-form/context.R", "R/data/survey-cleaning.R",
+      "R/reduced-form/functions.R", "R/common/analysis.R", "R/structural/legacy-utils.R",
       "rct-design-fieldwork/takeup_rct_assign_clusters.R",
       "multilvlr/multilvlr_util.R"
     ),
@@ -47,9 +48,9 @@ list(
   tar_target(
     balance_source_files,
     c(
-      "R/distance/spec.R", "scripts/reduced-form/setup.R",
+      "R/distance/spec.R", "R/reduced-form/context.R",
       "R/reduced-form/functions.R", "R/common/analysis.R",
-      "scripts/shared/clean-analysis-setup.R",
+      "R/data/survey-cleaning.R",
       "rct-design-fieldwork/takeup_rct_assign_clusters.R",
       "scripts/balance/run.R", "R/balance/functions.R"
     ),
@@ -62,6 +63,11 @@ list(
   ),
   tar_target(distance_specification, specifications, iteration = "vector"),
   tar_target(balance_section, balance_sections, iteration = "vector"),
+  tar_target(
+    analysis_context_input_files,
+    takeup_analysis_context_inputs(),
+    format = "file"
+  ),
   tar_target(
     distance_crosswalk,
     {
@@ -89,13 +95,26 @@ list(
     format = "file"
   ),
   tar_target(
+    analysis_context,
+    {
+      analysis_context_input_files
+      takeup_write_analysis_context(
+        takeup_build_analysis_context(distance_specification),
+        file.path(takeup_build_root(), distance_specification, "context")
+      )
+    },
+    pattern = map(distance_specification),
+    format = "file"
+  ),
+  tar_target(
     reduced_form,
     takeup_run_reduced_form(
       distance_specification,
       file.path(takeup_build_root(), distance_specification),
+      analysis_context,
       dependencies = reduced_form_source_files
     ),
-    pattern = map(distance_specification),
+    pattern = map(distance_specification, analysis_context),
     format = "file"
   ),
   tar_target(
@@ -104,9 +123,10 @@ list(
       distance_specification,
       file.path(takeup_build_root(), distance_specification),
       balance_section,
+      analysis_context,
       dependencies = balance_source_files
     ),
-    pattern = cross(distance_specification, balance_section),
+    pattern = cross(map(distance_specification, analysis_context), balance_section),
     format = "file"
   ),
   tar_target(

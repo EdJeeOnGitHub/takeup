@@ -61,4 +61,18 @@ if (length(scratch_refs)) {
   fail("Production files refer to repository scratch/:\n", paste(scratch_refs, collapse = "\n"))
 }
 
+setup_refs <- unlist(lapply(production_files, function(path) {
+  lines <- readLines(path, warn = FALSE)
+  hits <- grep(
+    "reduced-form-setup[.]R|scripts/reduced-form/setup[.]R|scripts/shared/clean-analysis-setup[.]R",
+    lines
+  )
+  if (!length(hits)) return(character())
+  paste0(path, ":", hits, ":", trimws(lines[hits]))
+}), use.names = FALSE)
+if (length(setup_refs)) {
+  fail("Production files refer to retired setup scripts:\n",
+       paste(setup_refs, collapse = "\n"))
+}
+
 cat("Repository layout checks passed.\n")

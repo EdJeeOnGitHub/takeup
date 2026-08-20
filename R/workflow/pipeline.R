@@ -41,6 +41,14 @@ takeup_prepare_run_dir <- function(specification) {
   root <- takeup_project_root()
   run_dir <- file.path(takeup_build_root(), "work", specification)
   dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
+  legacy_links <- c(
+    "analysis_util.R", "balance-functions.R", "balance.R",
+    "clean-analysis-util.R", "dist_structural_util.R", "scratch"
+  )
+  for (entry in legacy_links) {
+    destination <- file.path(run_dir, entry)
+    if (nzchar(Sys.readlink(destination))) unlink(destination)
+  }
   source_entries <- c(
     "R", "scripts", "rct-design-fieldwork", "multilvlr",
     "simulate-treatment-assignment", "stan_models", "data",
@@ -49,7 +57,12 @@ takeup_prepare_run_dir <- function(specification) {
   for (entry in source_entries) {
     source <- file.path(root, entry)
     destination <- file.path(run_dir, entry)
-    if (!file.exists(source) || file.exists(destination)) next
+    if (!file.exists(source)) next
+    if (nzchar(Sys.readlink(destination)) &&
+        !identical(normalizePath(destination), normalizePath(source))) {
+      unlink(destination)
+    }
+    if (file.exists(destination)) next
     dir.create(dirname(destination), recursive = TRUE, showWarnings = FALSE)
     if (!file.symlink(source, destination)) {
       stop("Could not link build input: ", source, call. = FALSE)
@@ -82,7 +95,7 @@ takeup_prepare_run_dir <- function(specification) {
   run_dir
 }
 
-takeup_run_reduced_form <- function(specification, output_dir,
+takeup_run_reduced_form <- function(specification, output_dir, context_files,
                                     dependencies = NULL) {
   table_dir <- file.path(output_dir, "presentations", "rf-tables", "main-specs")
   dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
@@ -92,6 +105,10 @@ takeup_run_reduced_form <- function(specification, output_dir,
     paste0("TAKEUP_BUILD_OUTPUT=", normalizePath(output_dir, mustWork = FALSE))
   )
   run_dir <- takeup_prepare_run_dir(specification)
+  context_path <- normalizePath(
+    context_files[grepl("analysis-context[.]rds$", context_files)],
+    mustWork = TRUE
+  )
   status <- withr::with_dir(run_dir, system2(
       "Rscript",
       c("--no-save", "--no-restore", "scripts/reduced-form/bootstrap.R",
@@ -99,6 +116,7 @@ takeup_run_reduced_form <- function(specification, output_dir,
         paste0("--bootstrap-draws=", Sys.getenv(
           "TAKEUP_BOOTSTRAP_DRAWS", "500"
         )),
+        paste0("--context-path=", context_path),
         paste0("--table-output-path=", table_dir)),
       env = env,
       stdout = log_path,
@@ -137,6 +155,7 @@ takeup_run_balance <- function(specification, output_dir,
 }
 
 takeup_run_balance_section <- function(specification, output_dir, section,
+                                       context_files,
                                        dependencies = NULL) {
   valid_sections <- c(
     "main", "orig", "fit-ri", "attrition", "monitored-attrition", "sms"
@@ -148,11 +167,16 @@ takeup_run_balance_section <- function(specification, output_dir, section,
   dir.create(balance_dir, recursive = TRUE, showWarnings = FALSE)
   log_path <- file.path(output_dir, paste0("balance-", section, ".log"))
   run_dir <- takeup_prepare_run_dir(specification)
+  context_path <- normalizePath(
+    context_files[grepl("analysis-context[.]rds$", context_files)],
+    mustWork = TRUE
+  )
   status <- withr::with_dir(run_dir, system2(
     "Rscript",
     c("--no-save", "--no-restore", "scripts/balance/run.R", paste0("--", section),
       paste0("--output-path=", balance_dir),
       paste0("--ri-draws=", Sys.getenv("TAKEUP_RI_DRAWS", "500")),
+      paste0("--context-path=", context_path),
       paste0("--distance-definition=", specification)),
     env = paste0("TAKEUP_DISTANCE_SPEC=", specification),
     stdout = log_path, stderr = log_path

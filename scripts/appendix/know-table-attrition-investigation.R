@@ -1,12 +1,11 @@
 ## Knowledge Table Attrition Investigation
 ## Tests the three mechanisms in docs/notes/knowledge-table-attrition.md
-## Run after sourcing reduced-form-setup.R (as in balance.R)
+## Uses the same explicit analysis context as the reduced-form workflow.
 
 library(tidyverse)
 library(fixest)
 library(magrittr)
 
-# reduced-form-setup.R needs params even when run non-interactively
 params <- list(
   table_output_path = "presentations/rf-tables/main-specs",
   show_probs        = FALSE,
@@ -18,7 +17,9 @@ params <- list(
   stat              = "std.error"
 )
 
-source(file.path("scratch", "reduced-form-setup.R"))
+source(file.path("R", "reduced-form", "context.R"))
+analysis_context <- takeup_get_analysis_context()
+takeup_context_into_environment(analysis_context, environment())
 
 # endline_data already has in_know_table from clean-endline-data.R
 # survey.type = "individual" / "paired" (from endline_and_reconsent.csv pre-load)

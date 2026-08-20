@@ -10,3 +10,7 @@ refactored into explicit functions.
 - `reduced-form/`, `balance/`, `structural/`, `policy/`: main analyses.
 - `appendix/`: supported robustness and referee-response analyses.
 - `design/`: data preparation and design workflows.
+
+`reduced-form/prepare-context.R` is the explicit writer for the shared cleaned
+analysis context. The Make/targets pipeline normally calls the same API and
+passes the resulting RDS to reduced-form and balance entrypoints.

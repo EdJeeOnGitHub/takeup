@@ -13,7 +13,9 @@ Options:
   args = if (interactive()) "" else commandArgs(trailingOnly = TRUE)
 )
 
-source(file.path("scratch", "reduced-form-setup.R"))
+source(file.path("R", "reduced-form", "context.R"))
+analysis_context <- takeup_get_analysis_context()
+takeup_context_into_environment(analysis_context, environment())
 
 table_output_path <- script_options$table_output_path
 dir.create(table_output_path, recursive = TRUE, showWarnings = FALSE)

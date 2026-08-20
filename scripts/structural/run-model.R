@@ -99,6 +99,7 @@ thin_by <- as.integer(script_options$thin)
 source("R/common/analysis.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
 source("R/structural/legacy-utils.R")
+source("R/reduced-form/context.R")
 
 # Data --------------------------------------------------------------------
 
@@ -173,8 +174,8 @@ if (str_detect(script_options$models, "NO_OUTLIERS")) {
 }
 
 # Belief data loading
-load_belief_data = function(outcome = "fob", missing = "drop") {
-  source(file.path("scratch", "reduced-form-setup.R"), local = TRUE)
+load_belief_data = function(context, outcome = "fob", missing = "drop") {
+  takeup_context_into_environment(context, environment())
   summ_know_A_df = summ_endline_know_table %>%
     filter(fct_match(know.table.type, "table.A"))
   summ_know_B_df = summ_endline_know_table %>%
@@ -302,11 +303,14 @@ prepare_belief_stan_inputs = function(belief_df, variant_label) {
   )
 }
 
+belief_analysis_context <- takeup_get_analysis_context()
 belief_variant_data <- lst(
-  fob_drop = load_belief_data("fob", "drop"),
-  sob_drop = load_belief_data("sob", "drop"),
-  correct_observability_drop = load_belief_data("correct-observability", "drop"),
-  fob_latent = load_belief_data("fob", "latent")
+  fob_drop = load_belief_data(belief_analysis_context, "fob", "drop"),
+  sob_drop = load_belief_data(belief_analysis_context, "sob", "drop"),
+  correct_observability_drop = load_belief_data(
+    belief_analysis_context, "correct-observability", "drop"
+  ),
+  fob_latent = load_belief_data(belief_analysis_context, "fob", "latent")
 )
 
 belief_variant_inputs <- imap(

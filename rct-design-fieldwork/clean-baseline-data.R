@@ -3,7 +3,7 @@ library(tidyverse)
 library(sf)
 library(here)
 
-source("scripts/shared/clean-analysis-setup.R")
+source("R/data/survey-cleaning.R")
 source("rct-design-fieldwork/takeup_rct_assign_clusters.R")
 dir.create("data/clean-data", showWarnings = FALSE)
 
@@ -51,7 +51,11 @@ reclean_baseline_data = tu_data_reader(raw.data.path("Baseline Survey.csv")) %>%
          present == 1 | !is.na(age),
          !is.na(consent) & consent == 1) %>%
   select(-county)  %>%
-  left_join(filter(., !invalid.coord) %>% identify_closest_cluster, "KEY") %>%
+  left_join(
+    filter(., !invalid.coord) %>%
+      identify_closest_cluster(known.village.locations),
+    "KEY"
+  ) %>%
   left_join(cluster.wave.county.data, "cluster.id")
 
 reclean_baseline_data = reclean_baseline_data %>%

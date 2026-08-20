@@ -45,6 +45,12 @@ Independent balance sections and reduced-form bootstrap draws use up to
 defaults remain 500 draws; use `BOOTSTRAP_DRAWS=50 RI_DRAWS=50` only for a
 quick development smoke test.
 
+Reduced form, balance, maintained appendix scripts, and structural belief-data
+preparation use one explicit cleaned context per distance definition. Build it
+directly with `make analysis-context DISTANCE_SPEC=assigned`; ordinary targets
+build it automatically and reuse it across balance sections. The context and
+its recentered covariate CSV live under `build/<spec>/context/`.
+
 Eligible linear reduced-form specifications prebuild their observed and four
 treatment-counterfactual design matrices, then refit each Bayesian-bootstrap
 draw with weighted cross-products. Before using this path, every specification

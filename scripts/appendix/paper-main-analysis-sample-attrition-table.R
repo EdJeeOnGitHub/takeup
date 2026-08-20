@@ -9,7 +9,9 @@ source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source("R/common/analysis.R")
 source("R/structural/legacy-utils.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
-source(file.path("scratch", "reduced-form-setup.R"))
+source(file.path("R", "reduced-form", "context.R"))
+analysis_context <- takeup_get_analysis_context()
+takeup_context_into_environment(analysis_context, environment())
 
 dir.create(params$table_output_path, showWarnings = FALSE, recursive = TRUE)
 

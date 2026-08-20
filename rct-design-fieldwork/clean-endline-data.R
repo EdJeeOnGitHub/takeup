@@ -8,9 +8,14 @@ library(sf)
 library(here)
 
 
-source("scripts/shared/clean-analysis-setup.R")
+source("R/data/survey-cleaning.R")
 source("rct-design-fieldwork/takeup_rct_assign_clusters.R")
 dir.create("data/clean-data", showWarnings = FALSE)
+
+wgs.84 <- takeup_wgs84
+kenya.proj4 <- takeup_kenya_proj4
+datetime.format <- takeup_datetime_format
+raw.data.path <- purrr::partial(here::here, "data", "raw-data")
 
 cluster_wave_county_data = read_rds(here("data", "takeup_cluster_wave_county_5.0.rds"))
 cluster_strat_data = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
@@ -144,7 +149,7 @@ all_endline_data = raw_endline_df %>%
     # Data fabricated by enumerators 111
   filter(cluster.id != 1163 | SubmissionDate >= "2016-11-14", enumerator != 111) %>%
   filter(date(SubmissionDate) != "2016-11-7" | test == 1) %>% 
-  left_join(identify_closest_cluster(.), "KEY")  %>%
+  left_join(identify_closest_cluster(., known.village.locations), "KEY")  %>%
   left_join(select(census_data, KEY.individ, lon, lat), "KEY.individ", suffix = c(".survey", ".census")) %>% 
   rename(lon = lon.survey, lat = lat.survey)  %>%
   mutate(

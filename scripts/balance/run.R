@@ -14,6 +14,7 @@ Options:
   --main
   --distance-definition=<spec>  Close/Far definition: assigned or realized [default: assigned]
   --ri-draws=<n>  Randomization-inference draws [default: 500]
+  --context-path=<path>  Prebuilt analysis-context RDS
 
 "),
   args = if (interactive()) "
@@ -60,7 +61,10 @@ library(fixest)
 library(magrittr)
 library(furrr)
 
-source(file.path("scripts", "reduced-form", "setup.R"))
+source(file.path("R", "reduced-form", "context.R"))
+source(file.path("R", "reduced-form", "functions.R"))
+analysis_context <- takeup_get_analysis_context(script_options$context_path)
+takeup_context_into_environment(analysis_context, environment())
 source("R/balance/functions.R")
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
@@ -323,26 +327,7 @@ stigma_df = social_perception_baseline %>%
   unnest(c(stigma_immuniz, stigma_dewor))
 
 #### Endline
-baseline_worm_data = baseline_data %>%
-  inner_join(
-    cluster_treat_df, 
-    by = "cluster.id"
-  ) %>%
-  clean_worm_covariates()
-
-endline_worm_data = endline_data %>%
-  inner_join(
-    cluster_treat_df, 
-    by = "cluster.id"
-  ) %>%
-  clean_worm_covariates()
-
-endline_implementation_data = endline_data %>%
-  inner_join(
-    cluster_treat_df, 
-    by = "cluster.id"
-  ) %>%
-  clean_implementation_vars()
+# These cleaned frames are built once in the explicit analysis context.
 
 endline_vars = c(
   "fully_aware_externalities",

@@ -1,19 +1,7 @@
 
-wgs.84 = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-kenya.proj4 = "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
-
-datetime.format = "%b %d, %Y %I:%M:%S %p"
-takeup.datetime.type = col_datetime(datetime.format)
-takeup.date.type = col_date(datetime.format)
-raw.data.path = . %>% here("data", "raw-data", .)
-
-rct.counties = c("Busia", "Siaya", "Kakamega")
-busia.subcounties = c("butula", "nambale", "teso south", "teso north") 
-siaya.subcounties = c("gem", "ugenya", "ugunja")
-
-ke.lvl2.adm.data = read_rds(here("data", "adm", "KEN_adm2.rds"))
-
-counties.adm.data = ke.lvl2.adm.data[ke.lvl2.adm.data$NAME_1 %in% rct.counties, ] #, "Vihiga"), ]
+takeup_wgs84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+takeup_kenya_proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
+takeup_datetime_format <- "%b %d, %Y %I:%M:%S %p"
 
 
 yes_no_factor = function(.col, .yes.no = 1:2) {
@@ -116,7 +104,10 @@ prepare_baseline_data = function(.data, .cluster.strat.data) {
 
 
 tu_data_reader = function(file.name, submit.datetime.type = NULL, .other.types = NULL) {
-  col.types <- list(SubmissionDate = if (is.null(submit.datetime.type)) takeup.datetime.type else submit.datetime.type,
+  if (is.null(submit.datetime.type)) {
+    submit.datetime.type <- readr::col_datetime(takeup_datetime_format)
+  }
+  col.types <- list(SubmissionDate = submit.datetime.type,
                                        manual_long = col_number(),
                                        manual_lat = col_number()) %>%
     c(.other.types)
@@ -131,17 +122,21 @@ tu_data_reader = function(file.name, submit.datetime.type = NULL, .other.types =
            lat = ifelse(is.na(lat), manual_lat, lat)) %>%
     validate.coords()
 }
-identify_closest_cluster = function(.data, data.coords.formula = ~ lon + lat,  key.variable = "KEY") {
+identify_closest_cluster = function(.data, known.village.locations,
+                                    data.coords.formula = ~ lon + lat,
+                                    key.variable = "KEY",
+                                    source_crs = takeup_wgs84,
+                                    target_crs = takeup_kenya_proj4) {
   coord.vars <- all.vars(data.coords.formula)
 
   .data %>%
     filter(rowSums(is.na(model.frame(data.coords.formula, data = ., na.action = NULL))) == 0) %>%
     (function (.located.data) {
-      data.sf <- st_as_sf(.located.data, coords = coord.vars, crs = wgs.84) %>%
-        st_transform(kenya.proj4)
+      data.sf <- st_as_sf(.located.data, coords = coord.vars, crs = source_crs) %>%
+        st_transform(target_crs)
 
-      villages.sf <- st_as_sf(known.village.locations, coords = c("target.lon", "target.lat"), crs = wgs.84) %>%
-        st_transform(kenya.proj4)
+      villages.sf <- st_as_sf(known.village.locations, coords = c("target.lon", "target.lat"), crs = source_crs) %>%
+        st_transform(target_crs)
 
       dist.matrix <- st_distance(data.sf, villages.sf) %>%
         units::drop_units()

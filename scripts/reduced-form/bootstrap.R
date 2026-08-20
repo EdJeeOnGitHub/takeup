@@ -20,6 +20,7 @@ Options:
   --heterogeneity      Run heterogeneity + WTP section
   --distance-definition=<spec>  Close/Far definition: assigned or realized [default: assigned]
   --bootstrap-draws=<n>  Bayesian bootstrap draws [default: 500]
+  --context-path=<path>  Prebuilt analysis-context RDS
   --table-output-path=<path>  Table output path [default: presentations/rf-tables/main-specs]
   --stat=<stat>        Statistic to show [default: std.error]
 ",
@@ -91,7 +92,11 @@ source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("R/common/analysis.R"))
 source(file.path("R/structural/legacy-utils.R"))
 source(file.path("multilvlr", "multilvlr_util.R"))
-source(file.path("scripts", "reduced-form", "setup.R"))
+source(file.path("R", "reduced-form", "functions.R"))
+source(file.path("R", "reduced-form", "context.R"))
+analysis_context <- takeup_get_analysis_context(script_options$context_path)
+takeup_context_into_environment(analysis_context, environment())
+ci_width <- as.numeric(params$width)
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
 # where mu_d is the expected distance to the cluster

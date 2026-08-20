@@ -1,24 +1,26 @@
-
-if (interactive()) {
-library(tidyverse)
-library(broom)
-library(data.table)
-library(kableExtra)
-library(knitr)
-library(fixest)
-    params = lst(
-        table_output_path = "presentations/rf-tables/main-specs",
-        show_probs = FALSE,
-        width = 0.95,
-        cache = FALSE,
-        fit = FALSE,
-        stat = "std.error" # "ci", "p", "std.error"
-    )
-    source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-    source(file.path("R/common/analysis.R"))
-    source(file.path( "R/structural/legacy-utils.R"))
-    source(file.path("multilvlr", "multilvlr_util.R"))
+takeup_analysis_context_inputs <- function(project_root = ".") {
+  file.path(project_root, c(
+    "data/rct_targetable_schools_2.0.rds",
+    "data/takeup_processed_cluster_strat.rds",
+    "data/takeup_wtp.rds", "data/takeup_rct_schools.rds",
+    "data/rct_cluster_selection_2.0.rds", "data/takeup_village_pot_dist.RData",
+    "data/clean-data/clean-baseline-data.rds",
+    "data/clean-data/clean-endline-data.rds",
+    "data/clean-data/clean-endline-know-table-data.rds",
+    "data/clean-data/clean-endline-know-table-data-long.rds",
+    "data/clean-data/monitored-nosms-takeup-data.rds",
+    "data/clean-data/full-takeup-data.rds", "data/takeup_census.RData",
+    "data/raw-data/Sensitization Monitoring Form.csv",
+    "data/raw-data/Sensitization Monitoring Form-household.csv",
+    "data/cell_expected_dist_df.csv", "data/cluster_expected_dist.csv",
+    "temp-data/analysis-cluster-covariate-data.csv"
+  ))
 }
+
+takeup_build_analysis_context <- function(specification = "assigned",
+                                          project_root = ".") {
+  project_root <- normalizePath(project_root, mustWork = TRUE)
+  withr::local_dir(project_root)
 
 # Useful variables/hyperparameters
 treat_levels_c = c("control", "ink", "calendar", "bracelet")
@@ -28,23 +30,14 @@ model_level_order = c("reduced form", "structural")
 
 quant_probs <- c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99)
 
-if (exists("params")) {
-  output_basepath = file.path(
-    params$output_path,
-    str_glue("output_dist_fit{params$fit_version}")
-  )
-  ci_width = as.numeric(params$width)
-}
-
-
-
 ## Loading Scripts
-source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("R/common/analysis.R"))
-source(file.path("R", "reduced-form", "functions.R"))
-source(file.path("R", "distance", "spec.R"))
+source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"), local = environment())
+source(file.path("R/common/analysis.R"), local = environment())
+source(file.path("R", "reduced-form", "functions.R"), local = environment())
+source(file.path("R", "distance", "spec.R"), local = environment())
+source(file.path("R", "data", "survey-cleaning.R"), local = environment())
 
-distance_specification <- takeup_distance_spec()
+distance_specification <- takeup_distance_spec(specification)
 distance_crosswalk <- takeup_distance_crosswalk()
 
 
@@ -60,9 +53,6 @@ cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat
   takeup_apply_distance_spec(distance_crosswalk, distance_specification)
 load(file.path("data", "takeup_village_pot_dist.RData"))
 # load(file.path("data", "analysis.RData"))
-library(here)
-source("scripts/shared/clean-analysis-setup.R")
-
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
@@ -509,6 +499,14 @@ clean_implementation_vars = function(data)  {
     )
 }
 
+endline_worm_data = endline_data %>%
+  inner_join(cluster_treat_df, by = "cluster.id") %>%
+  clean_worm_covariates()
+
+endline_implementation_data = endline_data %>%
+  inner_join(cluster_treat_df, by = "cluster.id") %>%
+  clean_implementation_vars()
+
 
 worm_vars = c(
   "treated_lgl", 
@@ -701,9 +699,6 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
     mu_d = standard_clust_expected_dist
   )
 
-write_csv(cov_analysis_data, "temp-data/analysis-cluster-recentered-covariate-data.csv")
-
-
 all_data = full_analysis_data %>% 
   mutate(standard_cluster.dist.to.pot = standardize(cluster.dist.to.pot)) %>% 
   mutate(standard_dist.to.pot = standardize(dist.to.pot)) %>% 
@@ -751,3 +746,107 @@ endline_data = endline_data  %>%
 #   write_csv(
 #     "temp-data/analysis-data.csv"
 #   )
+
+  objects <- mget(ls(environment()), envir = environment(), inherits = FALSE)
+  internal <- c("objects", "internal", "project_root", "specification")
+  keep <- !names(objects) %in% internal &
+    !vapply(objects, function(x) is.function(x) || is.environment(x), logical(1))
+  context <- list(
+    config = list(
+      distance_specification = distance_specification,
+      project_root = project_root,
+      distance_sd = sd_of_dist,
+      treat_levels = treat_levels,
+      treat_levels_with_control = treat_levels_c,
+      dist_levels = dist_levels
+    ),
+    data = objects[keep]
+  )
+  class(context) <- c("takeup_analysis_context", "list")
+  takeup_validate_analysis_context(context)
+  context
+}
+
+takeup_validate_analysis_context <- function(context) {
+  required <- c(
+    "analysis_data", "full_analysis_data", "baseline_data", "endline_data",
+    "all_endline_data", "summ_endline_know_table", "endline_know_table_data",
+    "census_data", "baseline_worm", "pretreat_data", "cov_analysis_data",
+    "sms_analysis_data", "cluster.strat.data", "cluster_treat_df"
+  )
+  missing <- setdiff(required, names(context$data))
+  if (length(missing)) {
+    stop("Analysis context is missing: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!context$config$distance_specification %in% c("assigned", "realized")) {
+    stop("Invalid context distance specification.", call. = FALSE)
+  }
+  if (length(unique(context$data$analysis_data$cluster.id)) != 144L) {
+    stop("Analysis context must contain 144 communities.", call. = FALSE)
+  }
+  expected_rows <- c(
+    analysis_data = 9805L,
+    full_analysis_data = 38019L,
+    baseline_data = 1995L,
+    endline_data = 2659L,
+    all_endline_data = 3678L,
+    cov_analysis_data = 9805L
+  )
+  actual_rows <- vapply(
+    context$data[names(expected_rows)], nrow, integer(1)
+  )
+  if (!identical(actual_rows, expected_rows)) {
+    stop(
+      "Analysis context row-count contract changed: ",
+      paste(names(actual_rows), actual_rows, sep = "=", collapse = ", "),
+      call. = FALSE
+    )
+  }
+  invisible(context)
+}
+
+takeup_read_analysis_context <- function(path) {
+  if (!file.exists(path)) stop("Analysis context not found: ", path, call. = FALSE)
+  context <- readRDS(path)
+  takeup_validate_analysis_context(context)
+  context
+}
+
+takeup_get_analysis_context <- function(
+    path = Sys.getenv("TAKEUP_ANALYSIS_CONTEXT", ""),
+    specification = Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned"),
+    project_root = ".") {
+  if (!is.null(path) && !identical(path, FALSE) && length(path) == 1L && nzchar(path)) {
+    return(takeup_read_analysis_context(path))
+  }
+  takeup_build_analysis_context(specification, project_root)
+}
+
+takeup_write_analysis_context <- function(context, output_dir) {
+  takeup_validate_analysis_context(context)
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+  context_path <- file.path(output_dir, "analysis-context.rds")
+  covariate_path <- file.path(
+    output_dir, "analysis-cluster-recentered-covariate-data.csv"
+  )
+  saveRDS(context, context_path, version = 3)
+  readr::write_csv(context$data$cov_analysis_data, covariate_path)
+  tabular <- context$data[vapply(context$data, function(x) {
+    is.data.frame(x) || is.matrix(x)
+  }, logical(1))]
+  manifest <- data.frame(
+    object = names(tabular),
+    rows = vapply(tabular, nrow, integer(1)),
+    columns = vapply(tabular, ncol, integer(1)),
+    stringsAsFactors = FALSE
+  )
+  manifest_path <- file.path(output_dir, "context-manifest.csv")
+  utils::write.csv(manifest, manifest_path, row.names = FALSE)
+  c(context_path, covariate_path, manifest_path)
+}
+
+takeup_context_into_environment <- function(context, envir = parent.frame()) {
+  takeup_validate_analysis_context(context)
+  list2env(context$data, envir = envir)
+  invisible(context)
+}

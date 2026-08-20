@@ -20,7 +20,7 @@ export TAKEUP_RI_DRAWS := $(RI_DRAWS)
 export TAKEUP_BOOTSTRAP_DRAWS := $(BOOTSTRAP_DRAWS)
 export TAKEUP_THREADS
 
-.PHONY: help setup audit reduced-form balance balance-tables structural-data structural-fit \
+.PHONY: help setup audit analysis-context reduced-form balance balance-tables structural-data structural-fit \
 	structural-postprocess compare-distance paper paper-generated paper-full paper-assets \
 	structural-render structural-paper policy-paper design-paper design-paper-full auxiliary-paper check \
 	replication-package paper-audit stan-inventory optimal-policy optimal-policy-legacy \
@@ -40,6 +40,10 @@ audit:
 ## make reduced-form           Build reduced-form outputs for DISTANCE_SPEC.
 reduced-form:
 	Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of(c("distance_audit", "build_manifest", "reduced_form")), callr_function = NULL)'
+
+## make analysis-context       Build the shared cleaned context for DISTANCE_SPEC.
+analysis-context:
+	Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of("analysis_context"), callr_function = NULL)'
 
 ## make balance                Build cached balance sections (BALANCE_SECTIONS=main,orig,...).
 balance:
@@ -168,6 +172,7 @@ optimal-policy-legacy:
 ## make check                  Run build and manuscript dependency checks.
 check: audit paper-assets
 	Rscript --no-save --no-restore scripts/checks/check-repository-layout.R
+	Rscript --no-save --no-restore scripts/checks/test-source-purity.R
 	Rscript --no-save --no-restore scripts/checks/test-distance-spec.R
 	Rscript --no-save --no-restore scripts/checks/audit-paper-pipeline-coverage.R
 	Rscript --no-save --no-restore scripts/checks/build-stan-artifact-inventory.R
