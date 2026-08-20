@@ -400,6 +400,9 @@ original_distance_discrete_regression <- function(data, weights) {
     weights = ~wt
   )
 }
+original_distance_discrete_regression <- enable_fast_discrete_wls(
+  original_distance_discrete_regression, "dewormed", c(l_cov_vars, "mu_d")
+)
 
 original_distance_itt_output <- wrapper_function(
   data = original_distance_itt_data,
@@ -562,6 +565,10 @@ original_distance_discrete_observability_regression <- function(data, weights) {
     weights = weights
   )
 }
+original_distance_discrete_observability_regression <- enable_fast_discrete_wls(
+  original_distance_discrete_observability_regression,
+  "prop_knows", c(l_cov_vars, "mu_d")
+)
 
 original_distance_fob_output <- wrapper_function(
   data = endline_know_A_itt_data %>%
@@ -748,6 +755,10 @@ externality_knowledge_regression = function(data, weights) {
     weights = ~wt
   )
 }
+externality_knowledge_regression <- enable_fast_discrete_wls(
+  externality_knowledge_regression,
+  "externality_omnibus", c(l_cov_vars, "mu_d")
+)
 
 
 externality_knowledge_output = wrapper_function(
@@ -888,6 +899,7 @@ att_reg = function(data, weights) {
     weights = ~wt
   )
 }
+att_reg <- enable_fast_discrete_wls(att_reg, "dropped_cto")
 
 attrition_cto_output = wrapper_function(
   data = full_cto_dropped_df,
@@ -909,6 +921,12 @@ dist_cts_regression = function(data, weights) {
     weights = ~wt
   )
 }
+dist_cts_regression <- enable_fast_continuous_wls(
+  dist_cts_regression, "dewormed",
+  main_distance = "standard_cluster.dist.to.pot",
+  interaction_distance = "cluster.dist.to.pot",
+  controls = c("mu_d", l_cov_vars)
+)
 
 dist_cts_output = wrapper_function(
   data = cov_analysis_data,
@@ -942,6 +960,12 @@ dist_cts_no_covs_regression = function(data, weights) {
     weights = ~wt
   )
 }
+dist_cts_no_covs_regression <- enable_fast_continuous_wls(
+  dist_cts_no_covs_regression, "dewormed",
+  main_distance = "standard_cluster.dist.to.pot",
+  interaction_distance = "cluster.dist.to.pot",
+  controls = "mu_d"
+)
 
 dist_cts_no_covs_output = wrapper_function(
   data = cov_analysis_data,
@@ -961,6 +985,9 @@ discrete_distance_regression = function(data, weights) {
     weights = ~wt
   )
 }
+discrete_distance_regression <- enable_fast_discrete_wls(
+  discrete_distance_regression, "dewormed", c(l_cov_vars, "mu_d")
+)
 
 discrete_distance_covs_output = wrapper_function(
   data = cov_analysis_data,
@@ -978,6 +1005,9 @@ discrete_distance_no_covs_no_mu_d_regression = function(data, weights) {
     weights = ~wt
   )
 }
+discrete_distance_no_covs_no_mu_d_regression <- enable_fast_discrete_wls(
+  discrete_distance_no_covs_no_mu_d_regression, "dewormed"
+)
 
 discrete_distance_no_covs_no_mu_d_output = wrapper_function(
   data = cov_analysis_data,
@@ -1012,6 +1042,10 @@ hh_spec_regression = function(data, weights) {
     weights = ~wt
   )
 }
+hh_spec_regression <- enable_fast_continuous_wls(
+  hh_spec_regression, "dewormed", main_distance = "dist.to.pot",
+  controls = c("mu_d", l_cov_vars)
+)
 
 hh_spec_output = wrapper_function(
   data = cov_analysis_data,
@@ -1165,6 +1199,9 @@ discrete_pct_yesno = function(data, weights) {
     weights = weights
   )
 }
+discrete_pct_yesno <- enable_fast_discrete_wls(
+  discrete_pct_yesno, "pct_correct_classification_yesno", c(l_cov_vars, "mu_d")
+)
 
 discrete_pct_yesnodk = function(data, weights) {
   feols(
@@ -1173,6 +1210,9 @@ discrete_pct_yesnodk = function(data, weights) {
     weights = weights
   )
 }
+discrete_pct_yesnodk <- enable_fast_discrete_wls(
+  discrete_pct_yesnodk, "pct_correct_classification_yesnodk", c(l_cov_vars, "mu_d")
+)
 
 
 discrete_f_know = function(data, weights) {
@@ -1182,6 +1222,9 @@ discrete_f_know = function(data, weights) {
     weights = weights
   )
 }
+discrete_f_know <- enable_fast_discrete_wls(
+  discrete_f_know, "prop_knows", c(l_cov_vars, "mu_d")
+)
 
 discrete_f_know_no_covs_no_mu_d = function(data, weights) {
   feols(
@@ -1190,6 +1233,9 @@ discrete_f_know_no_covs_no_mu_d = function(data, weights) {
     weights = weights
   )
 }
+discrete_f_know_no_covs_no_mu_d <- enable_fast_discrete_wls(
+  discrete_f_know_no_covs_no_mu_d, "prop_knows"
+)
 
 cts_f_know = function(data, weights) {
   feols(
@@ -1198,6 +1244,12 @@ cts_f_know = function(data, weights) {
     weights = weights
   )
 }
+cts_f_know <- enable_fast_continuous_wls(
+  cts_f_know, "prop_knows",
+  main_distance = "standard_cluster.dist.to.pot",
+  interaction_distance = "standard_cluster.dist.to.pot",
+  controls = c(l_cov_vars, "mu_d")
+)
 
 hh_f_know = function(data, weights) {
   feols(
@@ -1206,6 +1258,10 @@ hh_f_know = function(data, weights) {
     weights = weights
   )
 }
+hh_f_know <- enable_fast_continuous_wls(
+  hh_f_know, "prop_knows", main_distance = "dist.to.pot",
+  controls = c(l_cov_vars, "mu_d")
+)
 
 
 #### FOB Discrete Distance + LASSO Covs + Cluster Expected Distance
@@ -1567,14 +1623,10 @@ discrete_sob_output = wrapper_function(
 if (run_all || script_options$takeup) run_section("Takeup Levels", {
 
 # For plotting
-dist_cts_spec_bs_draws = bootstrap_map_dfr(
-  seq_len(getOption("takeup.bootstrap_draws", 500L)),
-  ~bayes_bs_f(
-    seed = .x,
-    f = dist_cts_regression,
-    data = cov_analysis_data
-  )
-  )
+dist_cts_spec_bs_draws = bootstrap_regression_draws(
+  dist_cts_regression, cov_analysis_data,
+  getOption("takeup.bootstrap_draws", 500L)
+)
 
 dist_cts_spec_levels = actual_bayesian_bs_fit(
   seed = "realised fit",
@@ -1603,14 +1655,10 @@ tidy_dist_cts_spec_levels %>%
 
 
 #### Takeup LEVELS Discrete Distance + LASSO Covs + Expected Distance
-discrete_distance_covs_bs_draws = bootstrap_map_dfr(
-  seq_len(getOption("takeup.bootstrap_draws", 500L)),
-  ~bayes_bs_f(
-    seed = .x,
-    f = discrete_distance_regression,
-    data = cov_analysis_data
-  )
-  )
+discrete_distance_covs_bs_draws = bootstrap_regression_draws(
+  discrete_distance_regression, cov_analysis_data,
+  getOption("takeup.bootstrap_draws", 500L)
+)
 
 discrete_distance_covs_levels = actual_bayesian_bs_fit(
   seed = "realised fit",
@@ -1645,15 +1693,11 @@ tidy_discrete_distance_cov_levels %>%
 
 if (run_all || script_options$beliefs) run_section("Beliefs Levels", {
 
-fob_bs_draws = bootstrap_map_dfr(
-  seq_len(getOption("takeup.bootstrap_draws", 500L)),
-  ~bayes_bs_f(
-    seed = .x,
-    f = discrete_f_know,
-    data = endline_know_A_df %>%
-      mutate(prop_knows = prop_know_fob)
-  )
-  )
+fob_bs_draws = bootstrap_regression_draws(
+  discrete_f_know,
+  endline_know_A_df %>% mutate(prop_knows = prop_know_fob),
+  getOption("takeup.bootstrap_draws", 500L)
+)
 
 fob_levels_point = actual_bayesian_bs_fit(
   seed = "realised fit",
@@ -1741,6 +1785,9 @@ know_table_fit = function(data, weights) {
     weights = ~wt
   )
 }
+know_table_fit <- enable_fast_discrete_wls(
+  know_table_fit, "attrit_know_table"
+)
 
 know_table_A_fit = function(data, weights) {
   feols(
@@ -1750,6 +1797,9 @@ know_table_A_fit = function(data, weights) {
     weights = ~wt
   )
 }
+know_table_A_fit <- enable_fast_discrete_wls(
+  know_table_A_fit, "attrit_know_table", "is_backup"
+)
 
 mis_endline_df = mis_endline_df %>%
   mutate(is_backup = KEY.individ %in% census_data$KEY.individ[census_data$endline.backup == TRUE])
@@ -1793,6 +1843,9 @@ pred_dworm_fit = function(data, weights) {
     weights = ~wt
   )
 }
+pred_dworm_fit <- enable_fast_discrete_wls(
+  pred_dworm_fit, "dworm_frac", c(l_cov_vars, "mu_d")
+)
 
 
 pred_dworm_output = wrapper_function(
@@ -2315,6 +2368,9 @@ pref_gift_fit = function(data, weights) {
     weights = ~wt
   )
 } 
+pref_gift_fit <- enable_fast_discrete_wls(
+  pref_gift_fit, "want_bracelet", c(l_cov_vars, "mu_d")
+)
 
 
 pref_fit_flipped = wrapper_function(

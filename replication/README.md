@@ -45,6 +45,15 @@ Independent balance sections and reduced-form bootstrap draws use up to
 defaults remain 500 draws; use `BOOTSTRAP_DRAWS=50 RI_DRAWS=50` only for a
 quick development smoke test.
 
+Eligible linear reduced-form specifications prebuild their observed and four
+treatment-counterfactual design matrices, then refit each Bayesian-bootstrap
+draw with weighted cross-products. Before using this path, every specification
+checks its first draw against the original Fixest fit and stops if collapsed
+predictions differ by more than `1e-9`. IV, Lee-bound, and other unsupported
+specifications retain the Fixest implementation. Set `TAKEUP_FAST_WLS=0` to
+force the complete legacy Fixest path for comparison. The reproducible timing
+and numerical-equivalence benchmark is `scratch/bench-rf-direct-wls.R`.
+
 ## Paper-output coverage
 
 The default workflow is deliberately freeze-first. Each active dependency is

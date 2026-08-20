@@ -37,6 +37,166 @@ bootstrap_map_dfr <- function(draws, fun, cores = NULL) {
   dplyr::bind_rows(results)
 }
 
+# Mark a linear discrete-distance specification as eligible for the cached
+# weighted-cross-product bootstrap. The original function remains attached and
+# is always used for the realised fit and as a validation/fallback path.
+enable_fast_wls <- function(f, outcome, design_terms, required) {
+  attr(f, "takeup_fast_wls") <- list(
+    outcome = outcome,
+    design_terms = design_terms,
+    required = required
+  )
+  f
+}
+
+enable_fast_discrete_wls <- function(f, outcome, controls = character()) {
+  enable_fast_wls(
+    f, outcome,
+    design_terms = c(
+      "0 + assigned_treatment * assigned_dist_group", controls, "county"
+    ),
+    required = controls
+  )
+}
+
+enable_fast_continuous_wls <- function(f, outcome, main_distance,
+                                       interaction_distance = main_distance,
+                                       controls = character()) {
+  interactions <- sprintf(
+    "I((assigned_treatment == '%s') * %s)",
+    c("ink", "calendar", "bracelet"), interaction_distance
+  )
+  enable_fast_wls(
+    f, outcome,
+    design_terms = c(
+      "0 + assigned_treatment", main_distance, interactions, controls, "county"
+    ),
+    required = unique(c(main_distance, interaction_distance, controls))
+  )
+}
+
+prepare_fast_wls <- function(f, data, type = "APE") {
+  enabled <- !identical(Sys.getenv("TAKEUP_FAST_WLS", "1"), "0")
+  specification <- attr(f, "takeup_fast_wls", exact = TRUE)
+  if (!enabled || is.null(specification) || type != "APE") return(NULL)
+
+  required <- c(
+    specification$outcome, "assigned_treatment", "assigned_dist_group",
+    "county", "cluster.id", "cluster_id_rank", specification$required
+  )
+  if (!all(required %in% names(data))) return(NULL)
+
+  prepared <- data
+  prepared$assigned_treatment <- factor(
+    as.character(prepared$assigned_treatment),
+    levels = c("control", "ink", "calendar", "bracelet")
+  )
+  prepared$assigned_dist_group <- factor(
+    as.character(prepared$assigned_dist_group), levels = c("close", "far")
+  )
+  prepared$county <- factor(prepared$county)
+
+  rhs <- paste(specification$design_terms, collapse = " + ")
+  design_formula <- as.formula(paste("~", rhs), env = environment(f))
+  observed_matrix <- model.matrix(design_formula, prepared, na.action = na.pass)
+  outcome <- prepared[[specification$outcome]]
+  estimation_rows <- complete.cases(observed_matrix, outcome)
+  if (qr(observed_matrix[estimation_rows, , drop = FALSE])$rank !=
+      ncol(observed_matrix)) return(NULL)
+
+  arms <- levels(prepared$assigned_treatment)
+  prediction_data <- bind_rows(lapply(arms, function(arm) {
+    mutate(prepared, assigned_treatment = factor(
+      arm, levels = levels(prepared$assigned_treatment)
+    ))
+  }))
+  prediction_matrix <- model.matrix(
+    design_formula, prediction_data, na.action = na.pass
+  )
+
+  list(
+    f = f,
+    original_data = data,
+    data = prepared,
+    observed_matrix = observed_matrix,
+    outcome = outcome,
+    estimation_rows = estimation_rows,
+    prediction_data = prediction_data,
+    prediction_matrix = prediction_matrix
+  )
+}
+
+fast_wls_bs_f <- function(seed, context, ...) {
+  set.seed(seed)
+  n_clusters <- length(unique(context$data$cluster.id))
+  cluster_weights <- drop(generate_dirichlet(rep(1, n_clusters), 1))
+  weights <- cluster_weights[context$data$cluster_id_rank]
+  rows <- context$estimation_rows
+  X <- context$observed_matrix[rows, , drop = FALSE]
+  y <- context$outcome[rows]
+  w <- weights[rows]
+
+  coefficients <- tryCatch(
+    solve(crossprod(X, w * X), crossprod(X, w * y)),
+    error = function(e) NULL
+  )
+  if (is.null(coefficients)) {
+    return(bayes_bs_f(seed, context$f, context$original_data, ...))
+  }
+  predictions <- drop(context$prediction_matrix %*% coefficients)
+  prediction_data <- context$prediction_data
+  prediction_data$pred <- predictions
+  output <- prediction_data %>%
+    select(
+      assigned_dist_group, assigned_treatment,
+      standard_cluster.dist.to.pot, pred, any_of("sms_treatment")
+    ) %>%
+    create_bs_preds(...)
+  output$seed <- seed
+  output
+}
+
+validate_fast_wls <- function(context) {
+  if (is.null(context)) return(invisible(TRUE))
+  direct <- fast_wls_bs_f(1L, context)
+  reference <- bayes_bs_f(1L, context$f, context$original_data)
+  keys <- intersect(
+    c("assigned_treatment", "assigned_dist_group", "signal", "sms_treatment"),
+    names(direct)
+  )
+  comparison <- full_join(
+    direct %>% select(all_of(keys), direct = mean_pred),
+    reference %>% select(all_of(keys), reference = mean_pred),
+    by = keys
+  ) %>%
+    mutate(difference = direct - reference)
+  difference <- max(abs(comparison$difference), na.rm = TRUE)
+  if (!is.finite(difference) || difference > 1e-9) {
+    print(comparison)
+    stop("Fast WLS validation failed; maximum prediction difference = ",
+         format(difference, scientific = TRUE))
+  }
+  message("Fast WLS validated; maximum prediction difference = ",
+          format(difference, scientific = TRUE))
+  invisible(TRUE)
+}
+
+bootstrap_regression_draws <- function(f, data, B_draws, type = "APE", ...) {
+  context <- prepare_fast_wls(f, data, type)
+  if (!is.null(context)) {
+    validate_fast_wls(context)
+    return(bootstrap_map_dfr(
+      seq_len(B_draws),
+      ~fast_wls_bs_f(seed = .x, context = context, ...)
+    ))
+  }
+  bootstrap_function <- if (type == "APE") bayes_bs_f else bayes_bs_f_at_x
+  bootstrap_map_dfr(
+    seq_len(B_draws),
+    ~bootstrap_function(seed = .x, f = f, data = data, ...)
+  )
+}
+
 # For a given set of IDs, create bs data - n.b. this allows cluster to appear 
 # multiple times
 create_bs_data = function(split_data, ids) {
@@ -566,21 +726,12 @@ create_regression_output = function(
     f = make_lee_trim_f(f, lee_base_data, lee_direction, B_draws = B_draws)
   }
 
-  if (type == "APE") {
-    bs_f = bayes_bs_f
-    actual_f = actual_bayesian_bs_fit
+  actual_f <- if (type == "APE") {
+    actual_bayesian_bs_fit
   } else {
-    bs_f = bayes_bs_f_at_x
-    actual_f = actual_bayesian_bs_fit_at_x
+    actual_bayesian_bs_fit_at_x
   }
-  bs_draws = bootstrap_map_dfr(
-    1:B_draws,
-    ~bs_f(
-      seed = .x,
-      f = f,
-      data = data
-    )
-    )
+  bs_draws <- bootstrap_regression_draws(f, data, B_draws, type = type)
 
   if (flip_calendar_sign) {
     clean_te_draws_df = bs_draws %>%
