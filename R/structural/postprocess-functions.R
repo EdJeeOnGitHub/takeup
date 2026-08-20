@@ -3,6 +3,8 @@ library(cmdstanr)
 library(posterior)
 library(tidybayes)
 
+source("R/distance/spec.R")
+
 
 ## Load analysis data
 takeup_data_dir <- if (exists("script_options") && !is.null(script_options$data_path)) {
@@ -48,6 +50,21 @@ sd_of_dist = sd(analysis_data$cluster.dist.to.pot)
 ## Load Stan output
 prepare_postprocess_analysis_data <- function(model) {
   postprocess_analysis_data <- analysis_data
+
+  distance_definition <- if (
+    exists("script_options") &&
+      !is.null(script_options$distance_definition)
+  ) {
+    script_options$distance_definition
+  } else {
+    Sys.getenv("TAKEUP_DISTANCE_SPEC", "realized")
+  }
+  postprocess_analysis_data <- postprocess_analysis_data %>%
+    takeup_apply_distance_spec(
+      crosswalk = takeup_distance_crosswalk(),
+      specification = distance_definition
+    ) %>%
+    mutate(assigned_dist_group = analysis_dist_group)
 
   if (str_detect(model, "INDIV_DIST_INDIV_FP")) {
     postprocess_analysis_data <- postprocess_analysis_data %>%
