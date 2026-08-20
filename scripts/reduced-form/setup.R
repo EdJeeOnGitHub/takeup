@@ -15,8 +15,8 @@ library(fixest)
         stat = "std.error" # "ci", "p", "std.error"
     )
     source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-    source(file.path("analysis_util.R"))
-    source(file.path( "dist_structural_util.R"))
+    source(file.path("R/common/analysis.R"))
+    source(file.path( "R/structural/legacy-utils.R"))
     source(file.path("multilvlr", "multilvlr_util.R"))
 }
 
@@ -40,9 +40,9 @@ if (exists("params")) {
 
 ## Loading Scripts
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path("scratch", "reduced-form-functions.R"))
-source(file.path("R", "distance-spec.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path("R", "reduced-form", "functions.R"))
+source(file.path("R", "distance", "spec.R"))
 
 distance_specification <- takeup_distance_spec()
 distance_crosswalk <- takeup_distance_crosswalk()
@@ -61,7 +61,7 @@ cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat
 load(file.path("data", "takeup_village_pot_dist.RData"))
 # load(file.path("data", "analysis.RData"))
 library(here)
-source("clean-analysis-util.R")
+source("scripts/shared/clean-analysis-setup.R")
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
@@ -248,7 +248,7 @@ clean_worm_covariates = function(data) {
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
         # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
-        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # a coding error in `R/common/analysis.R:129` in SurveyCTO these two 
         # variables use different binary encoding for yes/no and the original 
         # code corrects this but doesn't correct "don't know" correctly
         is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,

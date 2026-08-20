@@ -14,7 +14,7 @@ sha256 <- function(path) {
 
 if (initialize) {
   status <- system2("Rscript", c("--no-save", "--no-restore",
-    "scripts/audit-paper-pipeline-coverage.R"))
+    "scripts/checks/audit-paper-pipeline-coverage.R"))
   if (!identical(status, 0L)) stop("Could not audit manuscript artifacts.")
   x <- read.csv("build/manifest/paper-pipeline-coverage.csv",
                 stringsAsFactors = FALSE)

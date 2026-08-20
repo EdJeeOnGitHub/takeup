@@ -4,11 +4,11 @@ args <- commandArgs(trailingOnly = TRUE)
 value <- sub("^--spec=", "", args[grepl("^--spec=", args)])
 if (!length(value)) value <- Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
 strict <- "--strict" %in% args
-source("R/distance-spec.R")
+source("R/distance/spec.R")
 specification <- takeup_distance_spec(value[[1L]])
 
 system2("Rscript", c("--no-save", "--no-restore",
-                     "scripts/build-paper-artifact-registry.R"))
+                     "scripts/workflow/build-paper-artifact-registry.R"))
 registry <- read.csv("build/manifest/paper-artifacts.csv",
                      stringsAsFactors = FALSE)
 contract <- read.csv("replication/paper-artifact-contract.csv",

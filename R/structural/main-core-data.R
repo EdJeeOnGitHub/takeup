@@ -1,8 +1,8 @@
 # Shared data preparation for the minimal main structural model and its compact
 # generated quantities. Callers must load dplyr, purrr, and rlang first.
 
-source("scratch/main-core-asymmetric-observability-data.R")
-source("R/distance-spec.R")
+source("R/structural/asymmetric-observability-data.R")
+source("R/distance/spec.R")
 
 main_core_apply_distance_definition <- function(sample_data,
                                                 distance_definition = "realized",

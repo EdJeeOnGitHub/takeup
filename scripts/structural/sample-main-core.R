@@ -4,7 +4,7 @@
 # Large deterministic arrays remain local to the Stan model.
 
 args <- commandArgs(trailingOnly = TRUE)
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 
 option_value <- function(name, default = NULL) {
   prefix <- paste0(name, "=")

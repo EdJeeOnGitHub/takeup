@@ -4,7 +4,7 @@ args <- commandArgs(trailingOnly = TRUE)
 value <- sub("^--spec=", "", args[grepl("^--spec=", args)])
 if (!length(value)) value <- Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
 
-source("R/distance-spec.R")
+source("R/distance/spec.R")
 specification <- takeup_distance_spec(value[[1L]])
 crosswalk <- takeup_distance_crosswalk()
 output_dir <- file.path("build", specification, "audit")

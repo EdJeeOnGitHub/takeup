@@ -52,7 +52,7 @@ checks its first draw against the original Fixest fit and stops if collapsed
 predictions differ by more than `1e-9`. IV, Lee-bound, and other unsupported
 specifications retain the Fixest implementation. Set `TAKEUP_FAST_WLS=0` to
 force the complete legacy Fixest path for comparison. The reproducible timing
-and numerical-equivalence benchmark is `scratch/bench-rf-direct-wls.R`.
+and numerical-equivalence benchmark is `tests/benchmarks/rf-direct-wls.R`.
 
 ## Paper-output coverage
 

@@ -88,10 +88,10 @@ params <- lst(
 )
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path("dist_structural_util.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path("R/structural/legacy-utils.R"))
 source(file.path("multilvlr", "multilvlr_util.R"))
-source(file.path("scratch", "reduced-form-setup.R"))
+source(file.path("scripts", "reduced-form", "setup.R"))
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
 # where mu_d is the expected distance to the cluster
@@ -699,7 +699,7 @@ externality_data = endline_data %>%
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
         # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
-        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # a coding error in `R/common/analysis.R:129` in SurveyCTO these two 
         # variables use different binary encoding for yes/no and the original 
         # code corrects this but doesn't correct "don't know" correctly
         is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,

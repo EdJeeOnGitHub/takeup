@@ -5,7 +5,7 @@ suppressPackageStartupMessages({
   library(fixest)
   library(readr)
 })
-source("R/distance-spec.R")
+source("R/distance/spec.R")
 
 crosswalk <- takeup_distance_crosswalk()
 analysis_crosswalk <- filter(crosswalk, in_main_analysis)

@@ -60,8 +60,8 @@ library(fixest)
 library(magrittr)
 library(furrr)
 
-source(file.path("scratch", "reduced-form-setup.R"))
-source("balance-functions.R")
+source(file.path("scripts", "reduced-form", "setup.R"))
+source("R/balance/functions.R")
 # From running:
 # pdslasso dewormed_num dpf ($cov_vars i.county_fac mu_d), cluster(clusteridx) pnotpen(i.county_fac)
 # where mu_d is the expected distance to the cluster

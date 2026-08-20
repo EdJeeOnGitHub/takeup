@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
   library(purrr)
   library(rlang)
 })
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 
 specification <- takeup_distance_spec(value[[1L]])
 model_name <- Sys.getenv(

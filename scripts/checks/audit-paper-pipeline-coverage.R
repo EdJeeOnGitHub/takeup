@@ -7,7 +7,7 @@
 
 status <- system2(
   "Rscript",
-  c("--no-save", "--no-restore", "scripts/build-paper-artifact-registry.R")
+  c("--no-save", "--no-restore", "scripts/workflow/build-paper-artifact-registry.R")
 )
 if (!identical(status, 0L)) stop("Could not build paper artifact registry.")
 

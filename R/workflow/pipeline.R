@@ -42,10 +42,9 @@ takeup_prepare_run_dir <- function(specification) {
   run_dir <- file.path(takeup_build_root(), "work", specification)
   dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
   source_entries <- c(
-    "R", "scratch", "rct-design-fieldwork", "multilvlr",
+    "R", "scripts", "rct-design-fieldwork", "multilvlr",
     "simulate-treatment-assignment", "stan_models", "data",
-    "analysis_util.R", "clean-analysis-util.R", "dist_structural_util.R",
-    "balance-functions.R", "balance.R", "takeup.Rproj", "renv.lock"
+    "takeup.Rproj", "renv.lock"
   )
   for (entry in source_entries) {
     source <- file.path(root, entry)
@@ -95,7 +94,7 @@ takeup_run_reduced_form <- function(specification, output_dir,
   run_dir <- takeup_prepare_run_dir(specification)
   status <- withr::with_dir(run_dir, system2(
       "Rscript",
-      c("--no-save", "--no-restore", "scratch/reduced-form-bootstrap.R",
+      c("--no-save", "--no-restore", "scripts/reduced-form/bootstrap.R",
         paste0("--distance-definition=", specification),
         paste0("--bootstrap-draws=", Sys.getenv(
           "TAKEUP_BOOTSTRAP_DRAWS", "500"
@@ -119,7 +118,7 @@ takeup_run_balance <- function(specification, output_dir,
   run_dir <- takeup_prepare_run_dir(specification)
   status <- withr::with_dir(run_dir, system2(
       "Rscript",
-      c("--no-save", "--no-restore", "balance.R", "--main", "--attrition",
+      c("--no-save", "--no-restore", "scripts/balance/run.R", "--main", "--attrition",
         "--monitored-attrition", "--sms", paste0("--output-path=", balance_dir),
         paste0("--distance-definition=", specification)),
       env = paste0("TAKEUP_DISTANCE_SPEC=", specification),
@@ -151,7 +150,7 @@ takeup_run_balance_section <- function(specification, output_dir, section,
   run_dir <- takeup_prepare_run_dir(specification)
   status <- withr::with_dir(run_dir, system2(
     "Rscript",
-    c("--no-save", "--no-restore", "balance.R", paste0("--", section),
+    c("--no-save", "--no-restore", "scripts/balance/run.R", paste0("--", section),
       paste0("--output-path=", balance_dir),
       paste0("--ri-draws=", Sys.getenv("TAKEUP_RI_DRAWS", "500")),
       paste0("--distance-definition=", specification)),
@@ -228,7 +227,7 @@ takeup_run_compact_gq <- function(specification, output_dir, draws) {
   dir.create(gq_dir, recursive = TRUE, showWarnings = FALSE)
   log_path <- file.path(output_dir, "structural-postprocess.log")
   args <- c(
-    "--no-save", "--no-restore", "scratch/generate-main-core-compact-gq.R",
+    "--no-save", "--no-restore", "scripts/structural/generate-compact-gq.R",
     paste0("--workspace=", Sys.getenv(
       "TAKEUP_STRUCTURAL_WORKSPACE",
       "data/stan_analysis_data/dist_fit104.RData"

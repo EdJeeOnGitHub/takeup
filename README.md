@@ -16,7 +16,7 @@ paper artifacts.
 
 The paper's primary design specification uses the randomized, assigned
 Close/Far group. The distance group reconstructed from realized distance is
-retained as a sensitivity definition. `R/distance-spec.R` creates both
+retained as a sensitivity definition. `R/distance/spec.R` creates both
 variables and an explicit active analysis variable.
 
 The canonical structural sampling workflow is:
@@ -24,7 +24,7 @@ The canonical structural sampling workflow is:
 * sampling-only model: `stan_models/takeup_struct_main_core.stan`;
 * compact generated quantities: `stan_models/takeup_struct_main_core_compact_gq.stan`;
 * default fit workspace: `data/stan_analysis_data/dist_fit104.RData`;
-* local runner: `scripts/run-structural-fit.sh`;
+* local runner: `scripts/workflow/run-structural-fit.sh`;
 * ordinary paper reproduction: compact postprocessing of four deposited chain
   CSVs, without automatically refitting the model.
 

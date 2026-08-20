@@ -15,7 +15,7 @@ output_dir="build/structural-fit/${specification}"
 mkdir -p "$output_dir"
 
 Rscript --no-save --no-restore --no-init-file \
-  scratch/sample-slim-individual-fp.R \
+  scripts/structural/sample-main-core.R \
   --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
   --input-path=data/stan_analysis_data \
   --workspace="${TAKEUP_STRUCTURAL_WORKSPACE:-data/stan_analysis_data/dist_fit104.RData}" \

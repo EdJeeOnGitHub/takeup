@@ -1,7 +1,7 @@
 library(targets)
 
-source("R/distance-spec.R")
-source("R/pipeline.R")
+source("R/distance/spec.R")
+source("R/workflow/pipeline.R")
 
 tar_option_set(
   packages = c("dplyr", "withr"),
@@ -36,9 +36,9 @@ list(
   tar_target(
     reduced_form_source_files,
     c(
-      "R/distance-spec.R", "scratch/reduced-form-bootstrap.R",
-      "scratch/reduced-form-setup.R", "scratch/reduced-form-functions.R",
-      "analysis_util.R", "clean-analysis-util.R", "dist_structural_util.R",
+      "R/distance/spec.R", "scripts/reduced-form/bootstrap.R",
+      "scripts/reduced-form/setup.R", "R/reduced-form/functions.R",
+      "R/common/analysis.R", "scripts/shared/clean-analysis-setup.R", "R/structural/legacy-utils.R",
       "rct-design-fieldwork/takeup_rct_assign_clusters.R",
       "multilvlr/multilvlr_util.R"
     ),
@@ -47,11 +47,11 @@ list(
   tar_target(
     balance_source_files,
     c(
-      "R/distance-spec.R", "scratch/reduced-form-setup.R",
-      "scratch/reduced-form-functions.R", "analysis_util.R",
-      "clean-analysis-util.R",
+      "R/distance/spec.R", "scripts/reduced-form/setup.R",
+      "R/reduced-form/functions.R", "R/common/analysis.R",
+      "scripts/shared/clean-analysis-setup.R",
       "rct-design-fieldwork/takeup_rct_assign_clusters.R",
-      "balance.R", "balance-functions.R"
+      "scripts/balance/run.R", "R/balance/functions.R"
     ),
     format = "file"
   ),

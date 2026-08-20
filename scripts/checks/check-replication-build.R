@@ -3,7 +3,7 @@
 args <- commandArgs(trailingOnly = TRUE)
 value <- sub("^--spec=", "", args[grepl("^--spec=", args)])
 if (!length(value)) value <- Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
-source("R/distance-spec.R")
+source("R/distance/spec.R")
 specification <- takeup_distance_spec(value[[1L]])
 crosswalk <- takeup_distance_crosswalk()
 analysis_crosswalk <- dplyr::filter(crosswalk, .data$in_main_analysis)
@@ -18,9 +18,9 @@ if (!file.exists(coverage_path)) stop("Run the paper pipeline audit first.")
 coverage <- read.csv(coverage_path, stringsAsFactors = FALSE)
 
 required_scripts <- c(
-  "scratch/sample-slim-individual-fp.R",
+  "scripts/structural/sample-main-core.R",
   "stan_models/takeup_struct_main_core.stan",
-  "scratch/generate-main-core-compact-gq.R",
+  "scripts/structural/generate-compact-gq.R",
   "stan_models/takeup_struct_main_core_compact_gq.stan"
 )
 if (!all(file.exists(required_scripts))) stop("Latest structural workflow is incomplete.")

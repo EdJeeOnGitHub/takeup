@@ -1,10 +1,10 @@
 #!/usr/bin/Rscript
-# structural_tables.R
+# scripts/structural/render-paper.R
 # Standalone script: generates structural model tables (overall ATEs,
 # signal/private decomposition, belief ATEs) from quick-postprocess RDS output.
 #
 # Usage:
-#   Rscript --no-save --no-restore structural_tables.R \
+#   Rscript --no-save --no-restore scripts/structural/render-paper.R \
 #     --fit-version=104 \
 #     --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 #
@@ -25,7 +25,7 @@
 script_options <- docopt::docopt(
   stringr::str_glue(
 "Usage:
-  structural_tables.R [options]
+  scripts/structural/render-paper.R [options]
 
 Options:
   --fit-version=<v>       Fit version number [default: 104]
@@ -84,8 +84,8 @@ dir.create(params$output_path, showWarnings = FALSE, recursive = TRUE)
 # Load analysis data
 # ---------------------------------------------------------------------------
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path("dist_structural_util.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path("R/structural/legacy-utils.R"))
 source(file.path("multilvlr", "multilvlr_util.R"))
 
 standardize   <- as_mapper(~ (.) / sd(.))
