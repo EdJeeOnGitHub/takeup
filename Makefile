@@ -81,7 +81,7 @@ structural-render:
 
 ## make compare-distance       Build both definitions and compare artifacts.
 compare-distance:
-	TAKEUP_BUILD_SPECS=both Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of("distance_comparison"), callr_function = NULL)'
+	TAKEUP_BUILD_SPECS=both Rscript --no-save --no-restore -e 'targets::tar_make_future(names = tidyselect::all_of("distance_comparison"), workers = as.integer(Sys.getenv("TAKEUP_THREADS", "1")), callr_function = NULL)'
 
 ## make paper-assets           Validate frozen approved outputs and static assets.
 paper-assets:

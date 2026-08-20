@@ -58,7 +58,9 @@ takeup_prepare_run_dir <- function(specification) {
     source <- file.path(root, entry)
     destination <- file.path(run_dir, entry)
     if (!file.exists(source)) next
-    if (nzchar(Sys.readlink(destination)) &&
+    link_target <- Sys.readlink(destination)
+    is_link <- !is.na(link_target) && nzchar(link_target)
+    if (is_link &&
         !identical(normalizePath(destination), normalizePath(source))) {
       unlink(destination)
     }
@@ -96,6 +98,7 @@ takeup_prepare_run_dir <- function(specification) {
 }
 
 takeup_run_reduced_form <- function(specification, output_dir, context_files,
+                                    bootstrap_draws,
                                     dependencies = NULL) {
   table_dir <- file.path(output_dir, "presentations", "rf-tables", "main-specs")
   dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
@@ -113,9 +116,7 @@ takeup_run_reduced_form <- function(specification, output_dir, context_files,
       "Rscript",
       c("--no-save", "--no-restore", "scripts/reduced-form/bootstrap.R",
         paste0("--distance-definition=", specification),
-        paste0("--bootstrap-draws=", Sys.getenv(
-          "TAKEUP_BOOTSTRAP_DRAWS", "500"
-        )),
+        paste0("--bootstrap-draws=", bootstrap_draws),
         paste0("--context-path=", context_path),
         paste0("--table-output-path=", table_dir)),
       env = env,
@@ -156,6 +157,7 @@ takeup_run_balance <- function(specification, output_dir,
 
 takeup_run_balance_section <- function(specification, output_dir, section,
                                        context_files,
+                                       ri_draws,
                                        dependencies = NULL) {
   valid_sections <- c(
     "main", "orig", "fit-ri", "attrition", "monitored-attrition", "sms"
@@ -175,7 +177,7 @@ takeup_run_balance_section <- function(specification, output_dir, section,
     "Rscript",
     c("--no-save", "--no-restore", "scripts/balance/run.R", paste0("--", section),
       paste0("--output-path=", balance_dir),
-      paste0("--ri-draws=", Sys.getenv("TAKEUP_RI_DRAWS", "500")),
+      paste0("--ri-draws=", ri_draws),
       paste0("--context-path=", context_path),
       paste0("--distance-definition=", specification)),
     env = paste0("TAKEUP_DISTANCE_SPEC=", specification),

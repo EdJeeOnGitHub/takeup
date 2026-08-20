@@ -18,6 +18,8 @@ specifications <- if (identical(requested_specs, "both")) {
   takeup_distance_spec(requested_specs)
 }
 requested_balance_sections <- Sys.getenv("TAKEUP_BALANCE_SECTIONS", "all")
+requested_bootstrap_draws <- as.integer(Sys.getenv("TAKEUP_BOOTSTRAP_DRAWS", "500"))
+requested_ri_draws <- as.integer(Sys.getenv("TAKEUP_RI_DRAWS", "500"))
 balance_sections <- if (identical(requested_balance_sections, "all")) {
   c("main", "orig", "fit-ri", "attrition", "monitored-attrition", "sms")
 } else {
@@ -63,6 +65,8 @@ list(
   ),
   tar_target(distance_specification, specifications, iteration = "vector"),
   tar_target(balance_section, balance_sections, iteration = "vector"),
+  tar_target(bootstrap_draws, requested_bootstrap_draws),
+  tar_target(ri_draws, requested_ri_draws),
   tar_target(
     analysis_context_input_files,
     takeup_analysis_context_inputs(),
@@ -112,6 +116,7 @@ list(
       distance_specification,
       file.path(takeup_build_root(), distance_specification),
       analysis_context,
+      bootstrap_draws,
       dependencies = reduced_form_source_files
     ),
     pattern = map(distance_specification, analysis_context),
@@ -124,6 +129,7 @@ list(
       file.path(takeup_build_root(), distance_specification),
       balance_section,
       analysis_context,
+      ri_draws,
       dependencies = balance_source_files
     ),
     pattern = cross(map(distance_specification, analysis_context), balance_section),
