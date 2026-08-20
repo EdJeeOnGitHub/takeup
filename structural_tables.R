@@ -14,6 +14,7 @@
 #   struct-overall-te-table.tex
 #   private-signal-te-table.tex
 #   fob-beliefs-table.tex
+#   wtp-summ-table.tex
 #   indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table.tex  [--write-robustness]
 #   indiv-dist-indiv-fp-robust-struct-overall-te-table.tex                [--write-robustness]
 #   struct-robustness-nooutliers-overall-te-table.tex                     [--write-robustness]
@@ -544,6 +545,64 @@ obs_rvar_tbl <- obs_rvar_df %>%
   create_ate_kbl()
 
 obs_rvar_tbl %>% custom_save_latex_table("fob-beliefs-table")
+
+# ---------------------------------------------------------------------------
+# Table 4: WTP valuation and calendar preferences
+# ---------------------------------------------------------------------------
+cat("Writing wtp-summ-table.tex ...\n")
+
+wtp_rvar <- read_rds(
+  file.path(
+    params$input_path,
+    str_glue(
+      "rvar_processed_dist_fit{params$fit_version}_wtp_params_{params$struct_models}_1-4.rds"
+    )
+  )
+) %>%
+  left_join(
+    tibble(pref_value_diff_idx = 1:21, val_diff = -seq(-100, 100, 10)),
+    by = "pref_value_diff_idx"
+  ) %>%
+  filter(
+    (variable == "prob_prefer_calendar" & val_diff %in% c(-50, 0, 50)) |
+      (variable == "hyper_wtp_mu" & val_diff == 0)
+  ) %>%
+  mutate(
+    estimate = map_dbl(value, ~ mean(draws_of(.x))),
+    conf_low = map_dbl(value, ~ quantile(draws_of(.x), (1 - params$width) / 2)),
+    conf_high = map_dbl(value, ~ quantile(draws_of(.x), 1 - (1 - params$width) / 2)),
+    estim_std = linebreak(
+      sprintf("%.3f\n(%.3f, %.3f)", estimate, conf_low, conf_high),
+      align = "c"
+    ),
+    name = case_when(
+      variable == "hyper_wtp_mu" ~ "Valuation difference (USD), mean",
+      TRUE ~ str_glue("Pr(Prefer calendar), offered {val_diff}KSh")
+    ),
+    row_order = case_when(
+      variable == "hyper_wtp_mu" ~ 1L,
+      val_diff == 50 ~ 2L,
+      val_diff == 0 ~ 3L,
+      TRUE ~ 4L
+    )
+  ) %>%
+  arrange(row_order) %>%
+  select(name, estim_std)
+
+wtp_rvar %>%
+  kbl(
+    col.names = c("Parameter", "Posterior estimates"),
+    booktabs = TRUE, escape = FALSE, format = "latex", align = "lc"
+  ) %>%
+  pack_rows(
+    index = c(
+      "Panel A: Model parameters" = 1,
+      "Panel B: Estimated preferences" = 3
+    ),
+    italic = TRUE, escape = FALSE,
+    hline_after = TRUE, hline_before = TRUE, bold = TRUE
+  ) %>%
+  custom_save_latex_table("wtp-summ-table")
 
 if (isTRUE(script_options$write_robustness)) {
   write_robustness_tables()

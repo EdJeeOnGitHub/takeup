@@ -69,18 +69,38 @@ coverage separately from full-regeneration coverage. The latter continues to
 identify the focused structural-render and isolated legacy-output work that
 remains for a public replication package.
 
-`make paper-full POLICY_SMOKETEST=0` refreshes the expensive compact structural
-GQ and production policy workflows before staging. It still does not promote
-new results over approved paper outputs automatically. `make design-paper-full`
-runs the historical design simulation and PAP map source; both require the
-restricted design inputs.
+`make structural-render` runs the focused fit-105 table/figure renderer into
+`build/structural-paper/fit105/` and writes `comparison.csv` against the frozen
+paper artifacts. It reads the small postprocessed RDS summaries in
+`temp-data/struct-postprocess`; it does not load the 12GB social-multiplier draw
+object. `make structural-postprocess` remains the separate compact-GQ step from
+the four saved Stan chains. New results are never promoted over approved paper
+outputs automatically.
 
-Production policy optimization is not silently run by `make paper`: it needs
-Gurobi, posterior inputs, and substantially more compute. Its current entry
-points are `make optimal-policy` for estimation/optimization/figures and
-`make policy-tables` for validating synced outputs and rendering tables.
-`make optimal-policy` is a five-draw smoke test by default; pass
-`POLICY_SMOKETEST=0` only in a production Gurobi environment.
+`make paper-full` refreshes compact structural GQ, focused structural renders,
+and the fast sparse policy workflow before staging. The policy default is a
+five-refit smoke test; use `POLICY_REPLICATES=999` for the complete exponential
+cluster-weighted exercise. `make design-paper-full` runs the historical design
+simulation and PAP map source; both require the restricted design inputs.
+
+Production policy optimization is not silently run by `make paper`. The
+current `make optimal-policy` entrypoint is the low-memory cluster-weighted
+workflow: it reads the compact `policy-bootstrap-parameters.csv`, predicts only
+the 1,252 feasible village--PoT edges, optimizes five scenarios, and writes
+everything below `build/policy/cluster-weighted/`. It needs either `glpsol`
+(Ubuntu package `glpk-utils`) or `gurobi_cl`. Five refits are used by default;
+set `POLICY_REPLICATES=999` for production. The older fit-105 dense posterior
+workflow is retained as `make optimal-policy-legacy` and still supports
+`POLICY_SMOKETEST=1`.
+
+The policy inputs have three layers. The external cluster-weighted mode fits
+are needed only to rebuild the compact parameter CSV with
+`optim/prepare-policy-cluster-bootstrap.R`. Thereafter the local workflow needs
+that CSV, `optim/data/full-many-pots-experiment.rds`, and the fixed experimental
+welfare-target CSV under `optim/data/.../agg-full-many-pots/`. The design
+workflow is not downstream of the structural model: it separately needs the
+restricted randomization and geospatial RDS inputs documented in
+`replication/data-manifest.csv`.
 
 ## Full structural refit
 

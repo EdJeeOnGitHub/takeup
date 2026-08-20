@@ -7,6 +7,12 @@ BALANCE_SECTIONS ?= all
 RI_DRAWS ?= 500
 BOOTSTRAP_DRAWS ?= 500
 POLICY_SMOKETEST ?= 1
+POLICY_REPLICATES ?= 5
+POLICY_SOLVER ?= auto
+POLICY_FAST_SOURCE ?= optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-exponential-cluster-weights
+POLICY_FAST_BUILD ?= build/policy/cluster-weighted
+STRUCTURAL_RENDER_FIT ?= 105
+STRUCTURAL_RENDER_INPUT ?= temp-data/struct-postprocess
 export TAKEUP_DISTANCE_SPEC := $(DISTANCE_SPEC)
 export TAKEUP_BUILD_SPECS := $(DISTANCE_SPEC)
 export TAKEUP_BALANCE_SECTIONS := $(BALANCE_SECTIONS)
@@ -16,8 +22,9 @@ export TAKEUP_THREADS
 
 .PHONY: help setup audit reduced-form balance balance-tables structural-data structural-fit \
 	structural-postprocess compare-distance paper paper-generated paper-full paper-assets \
-	structural-paper policy-paper design-paper design-paper-full auxiliary-paper check \
-	replication-package paper-audit stan-inventory optimal-policy policy-tables clean-cache
+	structural-render structural-paper policy-paper design-paper design-paper-full auxiliary-paper check \
+	replication-package paper-audit stan-inventory optimal-policy optimal-policy-legacy \
+	policy-fast-predict policy-fast-optimize policy-fast-summarize policy-tables clean-cache
 
 help:
 	@sed -n 's/^## //p' Makefile
@@ -54,6 +61,20 @@ structural-fit: structural-data
 structural-postprocess:
 	Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of("compact_gq"), callr_function = NULL)'
 
+## make structural-render      Render current fit-105 tables/figures from focused summaries for review.
+structural-render:
+	Rscript --no-save --no-restore structural_tables.R \
+		--fit-version=$(STRUCTURAL_RENDER_FIT) \
+		--input-path=$(STRUCTURAL_RENDER_INPUT) \
+		--output-path=build/structural-paper/fit$(STRUCTURAL_RENDER_FIT)/data \
+		--table-output=build/structural-paper/fit$(STRUCTURAL_RENDER_FIT)/tables \
+		--figure-output=build/structural-paper/fit$(STRUCTURAL_RENDER_FIT)/figures \
+		--write-robustness
+	Rscript --no-save --no-restore scripts/compare-generated-paper-artifacts.R \
+		--owner=structural_postprocess \
+		--generated-root=build/structural-paper/fit$(STRUCTURAL_RENDER_FIT) \
+		--output=build/structural-paper/fit$(STRUCTURAL_RENDER_FIT)/comparison.csv
+
 ## make compare-distance       Build both definitions and compare artifacts.
 compare-distance:
 	TAKEUP_BUILD_SPECS=both Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of("distance_comparison"), callr_function = NULL)'
@@ -89,8 +110,8 @@ paper-generated:
 paper: paper-generated paper-assets structural-paper policy-paper design-paper auxiliary-paper
 	Rscript --no-save --no-restore scripts/stage-paper.R --spec=$(DISTANCE_SPEC) --strict
 
-## make paper-full             Refresh expensive structural/policy intermediates, then stage for review.
-paper-full: paper-generated structural-postprocess optimal-policy policy-tables paper-assets
+## make paper-full             Refresh structural renders and fast policy intermediates, then stage for review.
+paper-full: paper-generated structural-postprocess structural-render optimal-policy paper-assets
 	Rscript --no-save --no-restore scripts/stage-paper.R --spec=$(DISTANCE_SPEC) --strict
 
 ## make paper-audit            Report which active paper artifacts are reproducible.
@@ -105,8 +126,43 @@ stan-inventory:
 policy-tables:
 	bash run_optim_tables.sh
 
-## make optimal-policy         Run policy workflow (smoke test by default; POLICY_SMOKETEST=0 for production).
-optimal-policy:
+## make policy-fast-predict    Predict sparse feasible-edge demand from compact cluster-weighted parameters.
+policy-fast-predict:
+	test -f "$(POLICY_FAST_SOURCE)/policy-bootstrap-parameters.csv"
+	test -f optim/data/full-many-pots-experiment.rds
+	mkdir -p "$(POLICY_FAST_BUILD)"
+	Rscript --no-save --no-restore optim/predict-policy-cluster-bootstrap.R \
+		--parameter-csv="$(POLICY_FAST_SOURCE)/policy-bootstrap-parameters.csv" \
+		--distance-data=optim/data/full-many-pots-experiment.rds \
+		--output-path="$(POLICY_FAST_BUILD)" --distance-cap=3500 \
+		--num-cores=$(TAKEUP_THREADS) --num-replicates=$(POLICY_REPLICATES)
+
+## make policy-fast-optimize   Optimize five policy scenarios from sparse predicted demand.
+policy-fast-optimize: policy-fast-predict
+	test -f optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv
+	@if ! command -v glpsol >/dev/null 2>&1 && ! command -v gurobi_cl >/dev/null 2>&1 && [ ! -x /opt/gurobi1000/linux64/bin/gurobi_cl ]; then \
+		echo "No MILP solver found. Install glpk-utils (glpsol) or provide gurobi_cl." >&2; \
+		exit 1; \
+	fi
+	set -e; for scenario in 1 2 3 4 5; do \
+		Rscript --no-save --no-restore optim/optimize-policy-cluster-bootstrap.R \
+			--input-path="$(POLICY_FAST_BUILD)" \
+			--target-csv=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv \
+			--scenario-id=$$scenario --num-replicates=$(POLICY_REPLICATES) --solver=$(POLICY_SOLVER); \
+	done
+
+## make policy-fast-summarize Render the fast policy table into build/ for review.
+policy-fast-summarize: policy-fast-optimize
+	Rscript --no-save --no-restore optim/summarize-policy-cluster-bootstrap.R \
+		--input-path="$(POLICY_FAST_BUILD)" \
+		--table-path="$(POLICY_FAST_BUILD)/optim-summ-exponential-cluster-weights.tex" \
+		--num-replicates=$(POLICY_REPLICATES) --method=exponential
+
+## make optimal-policy         Run the low-memory sparse policy workflow (5 refits by default).
+optimal-policy: policy-fast-summarize
+
+## make optimal-policy-legacy Run the older dense posterior workflow (smoke test by default).
+optimal-policy-legacy:
 	SMOKETEST=$(POLICY_SMOKETEST) bash slurm_run_optim.sh
 
 ## make check                  Run build and manuscript dependency checks.

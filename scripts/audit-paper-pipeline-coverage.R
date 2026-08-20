@@ -22,16 +22,19 @@ escape_regex <- function(value) {
 }
 
 generated_matches <- function(artifact) {
-  basename_pattern <- paste0("^", escape_regex(basename(artifact)), "$")
+  artifact_key <- sub("-1\\.pdf$", ".pdf", basename(artifact))
   roots <- c(
     file.path("build", specification),
-    file.path("build", "work", specification)
+    file.path("build", "work", specification),
+    file.path("build", "structural-paper"),
+    file.path("build", "policy"),
+    file.path("build", "design-paper")
   )
   hits <- unlist(lapply(roots[dir.exists(roots)], function(root) {
-    list.files(
-      root, recursive = TRUE, full.names = TRUE,
-      pattern = basename_pattern
-    )
+    candidates <- list.files(root, recursive = TRUE, full.names = TRUE)
+    candidates[
+      sub("-1\\.pdf$", ".pdf", basename(candidates)) == artifact_key
+    ]
   }), use.names = FALSE)
   unique(hits)
 }
@@ -141,7 +144,7 @@ if (file.exists(contract_path)) {
           "covered_frozen_checksum", "missing_contracted_artifact")))
   )
   full_coverage <- ifelse(
-    contract$default_contract == "generated" & generated_by_build,
+    generated_by_build,
     "regenerated",
     ifelse(contract$default_contract == "static", "generation_not_required",
       ifelse(owner == "optimal_policy", "external_generator_available",
