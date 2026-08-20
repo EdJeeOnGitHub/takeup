@@ -50,9 +50,9 @@ library(latex2exp)
 library(econometr)
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source("analysis_util.R")
+source("R/common/analysis.R")
 
-knitr::read_chunk("analysis_util.R", labels = "analysis-util")
+knitr::read_chunk("R/common/analysis.R", labels = "analysis-util")
 
 knit_hooks$set(document = function(x) {sub('\\usepackage[]{color}', '\\usepackage[table,dvipsnames]{xcolor}', x, fixed = TRUE)})
 

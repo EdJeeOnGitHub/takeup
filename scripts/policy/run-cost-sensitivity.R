@@ -3,8 +3,8 @@
 # Local, review-only policy exercise.  It writes only below
 # ref-reports/policy-cost-sensitivity and temp-data/policy-cost-sensitivity.
 
-source("optim/policy-bootstrap-functions.R")
-source("optim/policy-cost-sensitivity-functions.R")
+source("R/policy/bootstrap.R")
+source("R/policy/cost-sensitivity.R")
 
 output_path <- "ref-reports/policy-cost-sensitivity"
 temporary_path <- "temp-data/policy-cost-sensitivity"
@@ -13,7 +13,7 @@ distance_path <- "optim/data/full-many-pots-experiment.rds"
 
 if (!file.exists(compact_path)) {
   stop(
-    "Missing ", compact_path, ". Run optim/extract-cmdstan-policy-draws.py ",
+    "Missing ", compact_path, ". Run scripts/policy/extract-cmdstan-draws.py ",
     "on the four local fit105 chains first.", call. = FALSE
   )
 }

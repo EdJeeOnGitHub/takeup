@@ -105,7 +105,7 @@ rrun() {
 
 # ── Step 1: Village/PoT distance data ─────────────────────────────────────────
 if [[ ! -f "optim/data/${DATA_INPUT}" ]]; then
-    rrun "create-distance-data" optim/create-distance-data.R \
+    rrun "create-distance-data" scripts/policy/create-distance-data.R \
         --output-name="${DATA_INPUT}" \
         --num-extra-pots=100 \
         --county-subset="${COUNTY}" \

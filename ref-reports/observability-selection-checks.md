@@ -12,7 +12,7 @@ Existing code/table:
 - `balance.R`, Knowledge Table Attrition Analysis: `not_in_know_table ~ treatment`.
 - Code location: `balance.R:1068`, especially `balance.R:1091`.
 - Output: `presentations/tables/attrition-by-treatment.tex`.
-- Bootstrap/RF-style version: `scratch/reduced-form-bootstrap.R:1659`.
+- Bootstrap/RF-style version: `scripts/reduced-form/bootstrap.R:1659`.
 - Bootstrap outputs: `temp-data/tidy-rf-tes/know-table-attrition-tidy-tes.csv`, table name `know_table_attrition_spec_tbl`.
 
 ## 2. Missing vs. Non-Missing Observable Balance
@@ -55,9 +55,9 @@ What it is: rerun the main FOB/observability treatment-effect table after exclud
 How it helps: directly targets the reviewer concern that control households required more backups. If the observability effects are stable when backups are excluded, then the results are not driven by replacing unreachable control respondents with different backup respondents.
 
 Existing code/table:
-- Implemented in `scratch/reduced-form-bootstrap.R` in the beliefs regressions section. The code defines `is_backup` from `census_data$endline.backup`, sets `is_first_responder = !is_backup`, writes backup/first-responder sample counts, then reruns the main FOB/observability reduced-form table after `filter(is_first_responder)`.
-- Code locations: `scratch/reduced-form-bootstrap.R:1094` for the first-responder flag and sample counts; `scratch/reduced-form-bootstrap.R:1173` for the first-responder-only FOB regression.
-- Outputs generated on July 9, 2026 with `devcontainer exec --workspace-folder /home/ed/projects/takeup Rscript scratch/reduced-form-bootstrap.R --beliefs`: `temp-data/tidy-rf-tes/fob-first-responder-sample-counts.csv`, `temp-data/tidy-rf-tes/reducedform-discrete-fob-first-responder-tidy-tes.csv`, `presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl.tex`, and `presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl_weird_order.tex`.
+- Implemented in `scripts/reduced-form/bootstrap.R` in the beliefs regressions section. The code defines `is_backup` from `census_data$endline.backup`, sets `is_first_responder = !is_backup`, writes backup/first-responder sample counts, then reruns the main FOB/observability reduced-form table after `filter(is_first_responder)`.
+- Code locations: `scripts/reduced-form/bootstrap.R:1094` for the first-responder flag and sample counts; `scripts/reduced-form/bootstrap.R:1173` for the first-responder-only FOB regression.
+- Outputs generated on July 9, 2026 with `devcontainer exec --workspace-folder /home/ed/projects/takeup Rscript scripts/reduced-form/bootstrap.R --beliefs`: `temp-data/tidy-rf-tes/fob-first-responder-sample-counts.csv`, `temp-data/tidy-rf-tes/reducedform-discrete-fob-first-responder-tidy-tes.csv`, `presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl.tex`, and `presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl_weird_order.tex`.
 - Main first-responder-only estimates are qualitatively similar to the full FOB table: the signal effect is 0.105 for combined, 0.051 for close, 0.176 for far, and 0.125 for far-minus-close. The bracelet-calendar contrast is 0.104 for combined and 0.127 for far-minus-close.
 
 ## 6. Lee Bounds for FOB Observability
@@ -67,10 +67,10 @@ What it is: compute Lee-style upper and lower bounds for the FOB/observability e
 How it helps: provides a worst-case selection adjustment for missing observability outcomes. This is useful even if missingness is only modestly differential, because it bounds how much the FOB estimates could move under monotone selection.
 
 Existing code/table:
-- Code location: `scratch/reduced-form-bootstrap.R:1178`.
+- Code location: `scripts/reduced-form/bootstrap.R:1178`.
 - Outputs: `temp-data/tidy-rf-tes/fob-lee-upper-tidy-tes.csv`, `temp-data/tidy-rf-tes/fob-lee-lower-tidy-tes.csv`.
 - Table name: `fob_lee_bounds_tbl`.
-- Note: the code currently has `stop()` after saving the Lee-bounds table at `scratch/reduced-form-bootstrap.R:1302`, so running the full beliefs section will halt there.
+- Note: the code currently has `stop()` after saving the Lee-bounds table at `scripts/reduced-form/bootstrap.R:1302`, so running the full beliefs section will halt there.
 
 ## 7. Calendar Active-Control Checks
 
@@ -79,8 +79,8 @@ What it is: inspect whether calendar has similar missingness/backup patterns and
 How it helps: calendar is useful as an active-control argument. If calendar has comparable follow-up/missingness issues but does not generate the same observability pattern as bracelet, then differential follow-up alone is less likely to explain the substantive observability results.
 
 Existing code/table:
-- Treatment-specific attrition estimates are included in `balance.R:1091` and the bootstrapped missingness outputs in `scratch/reduced-form-bootstrap.R:1659`.
-- Main calendar/control observability estimates are in the beliefs/FOB reduced-form section of `scratch/reduced-form-bootstrap.R`.
+- Treatment-specific attrition estimates are included in `balance.R:1091` and the bootstrapped missingness outputs in `scripts/reduced-form/bootstrap.R:1659`.
+- Main calendar/control observability estimates are in the beliefs/FOB reduced-form section of `scripts/reduced-form/bootstrap.R`.
 - Needed addition: explicitly pull out and narrate calendar missingness and calendar-control FOB comparisons together.
 
 ## 8. Structural Robustness to Missing Beliefs

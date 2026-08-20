@@ -138,7 +138,7 @@ targets <- crossing(
 
 # Average each counterfactual design over the covariate distribution observed in
 # its randomized distance cell. This reproduces the APE construction used by
-# scratch/reduced-form-functions.R.
+# R/reduced-form/functions.R.
 P <- map_dfr(seq_len(nrow(targets)), function(i) {
   distance_i <- as.character(targets$assigned_dist_group[[i]])
   arm_i <- as.character(targets$assigned_treatment[[i]])

@@ -71,4 +71,4 @@ if [[ -n "${FIT_WTP_MODEL}" ]]; then
 fi
 
 Rscript --no-save --no-restore --no-init-file \
-  scratch/sample-slim-individual-fp.R "${args[@]}"
+  scripts/structural/sample-main-core.R "${args[@]}"

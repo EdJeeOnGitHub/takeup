@@ -30,13 +30,13 @@ workflow.
 - [x] Run the population/cost/pooling policy analysis on the 999 canonical
   exponential-weight modes (included as the final stage of the same submitted
   production chain; all 999 draws completed):
-  `Rscript optim/run-policy-population-cost.R
-  --parameter-csv=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-exponential-cluster-weights/policy-bootstrap-parameters.csv
+  `Rscript scripts/policy/run-population-cost.R
+  --parameter-csv=replication/inputs/policy/policy-bootstrap-parameters.csv
   --parameter-type=canonical --analysis-id=exponential-cluster-weights
   --cores=12`. Copy the allocation, break-even, pooling, and audit CSVs to
   `ref-reports/policy-cost-sensitivity/`, rerun
-  `optim/assemble-policy-population-cost.R`, and validate with
-  `optim/validate-policy-population-cost.R`. The assembler will add the
+  `scripts/policy/assemble-population-cost.R`, and validate with
+  `scripts/policy/validate-population-cost.R`. The assembler will add the
   cluster-weighted rows and uncertainty band automatically.
 - [x] Put the regenerated tables in
   `appendix/structural-robustness/tables/`, and the stated replication counts

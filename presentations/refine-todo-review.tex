@@ -83,7 +83,7 @@ Generated reduced-form table outputs are shown here for review but are intention
 \todoheading{2}{Balance Table Control Means}
 \commitline{Analysis \coderef{f9d733e}. No paper-text commit.}
 
-\textbf{What changed.} \coderef{balance-functions.R} now computes displayed Control means as raw means from the relevant estimation sample. \coderef{balance.R} passes the underlying data into the balance-table helper for the main, appendix, attrition, monitoring-attrition, and SMS-enrollment balance paths.
+\textbf{What changed.} \coderef{R/balance/functions.R} now computes displayed Control means as raw means from the relevant estimation sample. \coderef{balance.R} passes the underlying data into the balance-table helper for the main, appendix, attrition, monitoring-attrition, and SMS-enrollment balance paths.
 
 \beforeafter
 {Displayed ``Control mean'' was the omitted-county fixed-effect intercept from the balance regression. This could fall outside the range implied by the raw sample mean and treatment differences.}
@@ -268,7 +268,7 @@ Full-info individual-FP appendix & Max split \(\hat R=1.022\), min bulk ESS 142,
 \todoheading{18}{Closest PoT and Original-Distance ITT}
 \commitline{Analysis \coderef{fe26587} and \coderef{a22d7eb}. Paper \coderef{9195391}.}
 
-\textbf{What changed.} The paper distinguishes candidate PoT centers from finalized implemented PoT locations. The code adds \coderef{--itt} support to \coderef{scratch/reduced-form-bootstrap.R}, using original assigned Close/Far cells while keeping the existing reduced-form table writer.
+\textbf{What changed.} The paper distinguishes candidate PoT centers from finalized implemented PoT locations. The code adds \coderef{--itt} support to \coderef{scripts/reduced-form/bootstrap.R}, using original assigned Close/Far cells while keeping the existing reduced-form table writer.
 
 \textbf{Merge/data checks.} The generated diagnostics verify 9,805 take-up rows, 144 clusters, no missing original assignments, no treatment/distance mismatches against monitored and processed randomization data, and PoT distance differences only at floating-point tolerance. Observability checks similarly verify 1,141 rows and 144 clusters.
 

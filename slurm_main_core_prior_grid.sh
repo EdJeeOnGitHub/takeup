@@ -99,7 +99,7 @@ case "${STAGE}" in
     mkdir -p "${output_dir}"
     mapfile -t priors < <(prior_args "${spec}")
     Rscript --no-save --no-restore --no-init-file \
-      scratch/sample-slim-individual-fp.R \
+      scripts/structural/sample-main-core.R \
       "--model=${MODEL}" "--input-path=$(dirname "${WORKSPACE}")" \
       "--output-path=${output_dir}" "--stan-path=${STAN_PATH}" \
       --stan-file=takeup_struct_main_core.stan \
@@ -132,7 +132,7 @@ case "${STAGE}" in
     fi
     mapfile -t priors < <(prior_args "${spec}")
     Rscript --no-save --no-restore --no-init-file \
-      scratch/generate-main-core-compact-gq.R \
+      scripts/structural/generate-compact-gq.R \
       "--workspace=${WORKSPACE}" "--model=${MODEL}" \
       "--fit-csvs=${fit_csvs}" \
       "--output-path=${OUTPUT_PATH}/${gq_root}/${label}" \

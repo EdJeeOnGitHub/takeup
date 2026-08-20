@@ -3,7 +3,7 @@
 # Write a custom_save_latex_table-style fragment: no table float, caption,
 # label, or notes. Those belong to the LaTeX file that inputs the fragment.
 args <- commandArgs(trailingOnly = TRUE)
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 parameter_path <- policy_option_value(args, "--parameter-csv", paste0(
   "optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/",

@@ -1,9 +1,9 @@
 library(tidyverse)
 library(magrittr)
 
-source("analysis_util.R")
+source("R/common/analysis.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 
 struct_fit = read_rds("data/stan_analysis_data/dist_fit66_STRUCTURAL_LINEAR_U_SHOCKS.rds")
 

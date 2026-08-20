@@ -58,6 +58,11 @@ include <- c(
   "R/structural/main-core-data.R",
   "scripts/structural/sample-main-core.R",
   "scripts/structural/generate-compact-gq.R",
+  "R/policy/bootstrap.R", "R/policy/cost-sensitivity.R",
+  "scripts/policy/predict-cluster-bootstrap.R",
+  "scripts/policy/optimize-cluster-bootstrap.R",
+  "scripts/policy/summarize-cluster-bootstrap.R",
+  list.files("replication/inputs/policy", full.names = TRUE),
   "ref-reports/ECM ReStud.tex",
   stan_sources, contract_files
 )

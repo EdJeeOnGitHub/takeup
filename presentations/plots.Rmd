@@ -65,12 +65,12 @@ if (interactive()) {
 }
 
 source(here("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(here("analysis_util.R"))
-source(here("dist_structural_util.R"))
+source(here("R/common/analysis.R"))
+source(here("R/structural/legacy-utils.R"))
 source(here("multilvlr", "multilvlr_util.R"))
 
 knitr::read_chunk(
-  here("analysis_util.R"), 
+  here("R/common/analysis.R"), 
   labels = "analysis-util"
 )
 

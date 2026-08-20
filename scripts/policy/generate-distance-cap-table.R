@@ -3,8 +3,8 @@
 # Generate the review-only appendix diagnostic showing why a 2.5 km policy cap
 # is nearly a no-consolidation constraint under the experimental geography.
 
-source("optim/policy-bootstrap-functions.R")
-source("optim/policy-cost-sensitivity-functions.R")
+source("R/policy/bootstrap.R")
+source("R/policy/cost-sensitivity.R")
 
 compact_path <- "temp-data/policy-cost-sensitivity/fit105-compact.csv"
 distance_path <- "optim/data/full-many-pots-experiment.rds"

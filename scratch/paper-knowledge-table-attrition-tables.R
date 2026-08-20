@@ -10,8 +10,8 @@ params <- lst(
 )
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source("analysis_util.R")
-source("dist_structural_util.R")
+source("R/common/analysis.R")
+source("R/structural/legacy-utils.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
 source(file.path("scratch", "reduced-form-setup.R"))
 

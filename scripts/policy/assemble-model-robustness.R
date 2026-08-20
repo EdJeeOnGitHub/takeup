@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 args <- commandArgs(trailingOnly = TRUE)
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 input_root <- policy_option_value(
   args, "--input-root",

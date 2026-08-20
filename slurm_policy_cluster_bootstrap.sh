@@ -53,12 +53,12 @@ mkdir -p temp/log "${OUTPUT_PATH}"
 
 case "${STAGE}" in
   prepare)
-    Rscript --no-save --no-restore optim/prepare-policy-cluster-bootstrap.R \
+    Rscript --no-save --no-restore scripts/policy/prepare-cluster-bootstrap.R \
       "--weighted-path=${WEIGHTED_PATH}" "--output-path=${OUTPUT_PATH}" \
       "--num-replicates=${NUM_REPLICATES}" "--method=${WEIGHT_METHOD}"
     ;;
   predict)
-    Rscript --no-save --no-restore optim/predict-policy-cluster-bootstrap.R \
+    Rscript --no-save --no-restore scripts/policy/predict-cluster-bootstrap.R \
       "--parameter-csv=${OUTPUT_PATH}/policy-bootstrap-parameters.csv" \
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
       --distance-cap=3500 "--num-cores=${NUM_CORES}" \
@@ -66,18 +66,18 @@ case "${STAGE}" in
     ;;
   optimize)
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
-    Rscript --no-save --no-restore optim/optimize-policy-cluster-bootstrap.R \
+    Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
       "--input-path=${OUTPUT_PATH}" "--target-csv=${TARGET_CSV}" \
       "--scenario-id=${SLURM_ARRAY_TASK_ID}" \
       "--num-replicates=${NUM_REPLICATES}"
     ;;
   summarize)
-    Rscript --no-save --no-restore optim/summarize-policy-cluster-bootstrap.R \
+    Rscript --no-save --no-restore scripts/policy/summarize-cluster-bootstrap.R \
       "--input-path=${OUTPUT_PATH}" "--table-path=${TABLE_PATH}" \
       "--num-replicates=${NUM_REPLICATES}" "--method=${WEIGHT_METHOD}"
     ;;
   population)
-    Rscript --no-save --no-restore optim/run-policy-population-cost.R \
+    Rscript --no-save --no-restore scripts/policy/run-population-cost.R \
       "--parameter-csv=${OUTPUT_PATH}/policy-bootstrap-parameters.csv" \
       --parameter-type=canonical --analysis-id=exponential-cluster-weights \
       "--distance-data=${DISTANCE_DATA}" \

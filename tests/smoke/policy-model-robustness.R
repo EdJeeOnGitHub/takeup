@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 mixture <- policy_student_t_mixture(df = 5, components = 12)
 grid <- seq(-4, 4, by = 0.05)

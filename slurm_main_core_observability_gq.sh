@@ -38,7 +38,7 @@ export CMDSTAN=${CMDSTAN_PATH}
 export CMDSTANR_NO_VER_CHECK=TRUE
 
 Rscript --no-save --no-restore --no-init-file \
-  scratch/generate-main-core-compact-gq.R \
+  scripts/structural/generate-compact-gq.R \
   "--workspace=${INPUT_PATH}/dist_fit105.RData" \
   --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS \
   --stan-path=stan_models \

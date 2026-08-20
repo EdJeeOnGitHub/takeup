@@ -15,8 +15,8 @@ library(broom)
 
 
 source(here("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(here("analysis_util.R"))
-source(here("dist_structural_util.R"))
+source(here("R/common/analysis.R"))
+source(here("R/structural/legacy-utils.R"))
 
 theme_set(theme_minimal() + theme(legend.position = "bottom"))
 ```

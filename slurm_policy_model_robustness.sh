@@ -103,16 +103,16 @@ mkdir -p temp/log "${OUTPUT_PATH}"
 
 case "${STAGE}" in
   prepare)
-    python3 optim/extract-cmdstan-policy-draws.py \
+    python3 scripts/policy/extract-cmdstan-draws.py \
       --output "${COMPACT_CSV}" \
       ${EXTRACT_OPTIONS[@]+"${EXTRACT_OPTIONS[@]}"} "${FITS[@]}"
-    Rscript --no-save --no-restore optim/prepare-policy-model-robustness.R \
+    Rscript --no-save --no-restore scripts/policy/prepare-model-robustness.R \
       "--input-csv=${COMPACT_CSV}" "--output-path=${OUTPUT_PATH}" \
       "--model-id=${MODEL_ID}" "--model-label=${MODEL_LABEL}" \
       "--model-family=${MODEL_FAMILY}" "--lambda-structure=${LAMBDA_STRUCTURE}"
     ;;
   predict)
-    Rscript --no-save --no-restore optim/predict-policy-model-robustness.R \
+    Rscript --no-save --no-restore scripts/policy/predict-model-robustness.R \
       "--parameter-rds=${OUTPUT_PATH}/policy-model-parameters.rds" \
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
       --distance-cap=3500 \
@@ -120,12 +120,12 @@ case "${STAGE}" in
     ;;
   optimize)
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
-    Rscript --no-save --no-restore optim/optimize-policy-cluster-bootstrap.R \
+    Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
       "--input-path=${OUTPUT_PATH}" "--target-csv=${TARGET_CSV}" \
       "--scenario-id=${SLURM_ARRAY_TASK_ID}" --num-replicates=100000
     ;;
   summarize)
-    Rscript --no-save --no-restore optim/summarize-policy-model-results.R \
+    Rscript --no-save --no-restore scripts/policy/summarize-model-results.R \
       "--input-path=${OUTPUT_PATH}"
     ;;
   *)

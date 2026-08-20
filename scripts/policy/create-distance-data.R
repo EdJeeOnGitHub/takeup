@@ -28,8 +28,8 @@ set.seed(19484)
 library(tidyverse)
 library(sf)
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path( "dist_structural_util.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path( "R/structural/legacy-utils.R"))
 
 
 script_options$distance_cutoff = as.numeric(script_options$distance_cutoff)

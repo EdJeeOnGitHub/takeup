@@ -46,7 +46,7 @@ else
 fi
 
 
-Rscript ./optim/create-distance-data.R \
+Rscript ./scripts/policy/create-distance-data.R \
     --output-name=${DATA_INPUT_NAME} \
     --num-extra-pots=4 \
     --county=${COUNTY_VAR}

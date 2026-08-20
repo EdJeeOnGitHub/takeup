@@ -54,9 +54,9 @@ ggsave("temp-data/prop-beliefs-ml-estimates.png", width = 10, height = 10, dpi =
 
 ## Data Prep
 
-# source("analysis_util.R")
+# source("R/common/analysis.R")
 # source(file.path("multilvlr", "multilvlr_util.R"))
-# source("dist_structural_util.R")
+# source("R/structural/legacy-utils.R")
 
 # # Data --------------------------------------------------------------------
 

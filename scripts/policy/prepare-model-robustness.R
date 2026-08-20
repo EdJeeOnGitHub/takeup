@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 args <- commandArgs(trailingOnly = TRUE)
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 input_csv <- policy_option_value(args, "--input-csv")
 output_path <- policy_option_value(args, "--output-path")

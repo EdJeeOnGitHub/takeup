@@ -85,7 +85,7 @@ case "${STAGE}" in
     output_dir="${OUTPUT_PATH}/fits/${label}"
     mkdir -p "${output_dir}"
     Rscript --no-save --no-restore --no-init-file \
-      scratch/sample-slim-individual-fp.R \
+      scripts/structural/sample-main-core.R \
       "--model=${MODEL}" "--input-path=$(dirname "${WORKSPACE}")" \
       "--output-path=${output_dir}" "--stan-path=${STAN_PATH}" \
       --stan-file=takeup_struct_main_core.stan \
@@ -108,7 +108,7 @@ case "${STAGE}" in
     fit_csvs=$(find "${OUTPUT_PATH}/fits/${label}" -maxdepth 1 \
       -type f -name "${label}-chain*-*.csv" | sort | paste -sd, -)
     Rscript --no-save --no-restore --no-init-file \
-      scratch/generate-main-core-compact-gq.R \
+      scripts/structural/generate-compact-gq.R \
       "--workspace=${WORKSPACE}" "--model=${MODEL}" \
       "--fit-csvs=${fit_csvs}" \
       "--output-path=${OUTPUT_PATH}/gq/${label}" \

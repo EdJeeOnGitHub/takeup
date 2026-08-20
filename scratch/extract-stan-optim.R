@@ -14,7 +14,7 @@ if (load_exposed_functions) {
     source("scratch/expose-stan-functions.R")
 }
 
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 source(file.path("optim", "optim-functions.R"))
 
 load(file.path("data", "analysis.RData"))

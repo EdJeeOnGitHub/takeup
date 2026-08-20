@@ -1779,8 +1779,8 @@ if (interactive()) {
 }
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path("dist_structural_util.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path("R/structural/legacy-utils.R"))
 source(file.path("multilvlr", "multilvlr_util.R"))
 
 

@@ -9,8 +9,8 @@ data/stan_analysis_data/dist_fit104.RData,canonical workspace used to construct 
 replication/structural-draws/assigned,assigned-definition slim posterior draws,derived,make structural-fit,required
 replication/structural-draws/realized,realized-definition slim posterior draws,derived,make structural-fit,robustness
 data/stan_analysis_data/param_posterior_draws_dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv,posterior parameter input for policy demand,derived,optim/predict-takeup-for-optim.R,required for policy workflow
-optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-exponential-cluster-weights/policy-bootstrap-parameters.csv,compact cluster-weighted parameter input for low-memory policy demand,derived,optim/prepare-policy-cluster-bootstrap.R,required for current policy workflow
-optim/data/full-many-pots-experiment.rds,candidate PoT and distance input for policy optimization,derived,optim/create-distance-data.R,required for policy workflow
+replication/inputs/policy/policy-bootstrap-parameters.csv,compact cluster-weighted parameter input for low-memory policy demand,derived,scripts/policy/prepare-cluster-bootstrap.R,required for current policy workflow
+optim/data/full-many-pots-experiment.rds,candidate PoT and distance input for policy optimization,derived,scripts/policy/create-distance-data.R,required for policy workflow
 optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv,fixed experimental welfare target for policy optimization,derived,optim/create-experiment-target.R,required for policy workflow
 temp-data/struct-postprocess/rvar_processed_dist_fit105_*.rds,focused fit-105 structural summaries,derived,quick postprocess scripts,required for structural renderer until compact-GQ adapter is complete
 data/rct_cluster_selection_2.0.rds,design selection history,restricted,rct-design-fieldwork,required for design workflow

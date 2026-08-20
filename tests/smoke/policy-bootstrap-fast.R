@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 parameter <- data.frame(
   draw = 1L,

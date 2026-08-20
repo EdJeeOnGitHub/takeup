@@ -1,5 +1,5 @@
 library(tidyverse)
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 library(microbenchmark)
 library(truncnorm)
 library(testthat)
@@ -217,7 +217,7 @@ draw_bc_rvar_df %>%
 
 
 library(tidyverse)
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 library(microbenchmark)
 library(truncnorm)
 library(testthat)

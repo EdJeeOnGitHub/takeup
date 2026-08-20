@@ -49,8 +49,8 @@ library(furrr)
 
 source(file.path("optim", "optim-functions.R"))
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path("dist_structural_util.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path("R/structural/legacy-utils.R"))
 
 fit_version = script_options$fit_version
 

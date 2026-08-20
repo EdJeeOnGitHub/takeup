@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 
 helmert_basis <- matrix(
   c(

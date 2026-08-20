@@ -30,9 +30,9 @@ options(mc.cores = 4)
 canva_palette_vibrant <- "Primary colors with a vibrant twist"
 
 
-source("analysis_util.R")
+source("R/common/analysis.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 
 # Data --------------------------------------------------------------------
 

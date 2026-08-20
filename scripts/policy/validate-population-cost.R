@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 args <- commandArgs(trailingOnly = TRUE)
 input_path <- policy_option_value(
   args, "--input-path", "ref-reports/policy-cost-sensitivity"

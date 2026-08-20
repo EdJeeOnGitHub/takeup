@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 source("scratch/main-core-multiplier-contrasts.R")
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 phi_approx <- function(x) plogis(0.07056 * x^3 + 1.5976 * x)
 information_factor <- function(cutoff, total_sd, q1, q0) {

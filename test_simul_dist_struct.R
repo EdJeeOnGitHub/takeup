@@ -14,9 +14,9 @@ library(rstan)
 options(mc.cores = 12)
 rstan_options(auto_write = TRUE)
 
-source("analysis_util.R")
+source("R/common/analysis.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 
 num_clusters <- 140
 cluster_size <- 50

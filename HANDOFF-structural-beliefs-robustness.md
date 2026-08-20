@@ -20,7 +20,7 @@ The Overleaf paper file at `~/projects/overleaf/overleaf-takeup/ECM ReStud.tex` 
     - `STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_CORRECT_OBS`
     - `STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB`
     - `STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB_LATENT_MISSING`
-- `dist_structural_util.R`
+- `R/structural/legacy-utils.R`
   - Adds a model-specific `stan_data_preprocess` hook so each alias can swap the belief data passed to Stan.
 - `stan_models/beliefs_data_sec.stan`
   - Adds `belief_observed`.
@@ -63,7 +63,7 @@ ITER=800 sbatch slurm_beliefs_robustness.sh 106
 These checks passed locally:
 
 ```bash
-Rscript -e 'parse("run_takeup.R"); parse("dist_structural_util.R")'
+Rscript -e 'parse("run_takeup.R"); parse("R/structural/legacy-utils.R")'
 git diff --check
 bash -n slurm_beliefs_robustness.sh
 /home/ed/.cmdstan/cmdstan-2.36.0/bin/stanc --include-paths=stan_models stan_models/takeup_struct.stan --name=takeup_struct_smoke_model --o=/tmp/takeup_struct_smoke.hpp

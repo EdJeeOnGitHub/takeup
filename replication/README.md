@@ -95,7 +95,7 @@ workflow is retained as `make optimal-policy-legacy` and still supports
 
 The policy inputs have three layers. The external cluster-weighted mode fits
 are needed only to rebuild the compact parameter CSV with
-`optim/prepare-policy-cluster-bootstrap.R`. Thereafter the local workflow needs
+`scripts/policy/prepare-cluster-bootstrap.R`. Thereafter the local workflow needs
 that CSV, `optim/data/full-many-pots-experiment.rds`, and the fixed experimental
 welfare-target CSV under `optim/data/.../agg-full-many-pots/`. The design
 workflow is not downstream of the structural model: it separately needs the

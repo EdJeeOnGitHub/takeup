@@ -20,8 +20,8 @@ theme_set(theme_minimal() +
             theme(legend.position = "bottom"))
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source(file.path("analysis_util.R"))
-source(file.path( "dist_structural_util.R"))
+source(file.path("R/common/analysis.R"))
+source(file.path( "R/structural/legacy-utils.R"))
 source(file.path("multilvlr", "multilvlr_util.R"))
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"

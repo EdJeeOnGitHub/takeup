@@ -24,7 +24,7 @@ suppressPackageStartupMessages({
   library(tidyverse)
 })
 
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 
 interpolate_fit_version <- function(path, fit_version) {
   stringr::str_replace_all(path, fixed("{fit-version}"), fit_version)

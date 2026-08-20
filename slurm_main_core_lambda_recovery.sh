@@ -83,7 +83,7 @@ case "${STAGE}" in
     hmc_path="${OUTPUT_PATH}/hmc/${label}"
     mkdir -p "${hmc_path}"
     Rscript --no-save --no-restore --no-init-file \
-      scratch/sample-slim-individual-fp.R \
+      scripts/structural/sample-main-core.R \
       "--model=${MODEL}" "--input-path=$(dirname "${WORKSPACE}")" \
       "--data-json=${data_json}" "--output-path=${hmc_path}" \
       "--stan-path=${STAN_PATH}" --stan-file=takeup_struct_main_core.stan \
@@ -106,7 +106,7 @@ case "${STAGE}" in
     fit_csvs=$(find "${OUTPUT_PATH}/hmc/${label}" -maxdepth 1 -type f \
       -name "${label}-chain*-*.csv" | sort | paste -sd, -)
     Rscript --no-save --no-restore --no-init-file \
-      scratch/generate-main-core-compact-gq.R \
+      scripts/structural/generate-compact-gq.R \
       "--data-json=${data_json}" "--fit-csvs=${fit_csvs}" \
       "--output-path=${OUTPUT_PATH}/hmc-gq/${label}" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \

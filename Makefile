@@ -9,7 +9,7 @@ BOOTSTRAP_DRAWS ?= 500
 POLICY_SMOKETEST ?= 1
 POLICY_REPLICATES ?= 5
 POLICY_SOLVER ?= auto
-POLICY_FAST_SOURCE ?= optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-exponential-cluster-weights
+POLICY_FAST_SOURCE ?= replication/inputs/policy
 POLICY_FAST_BUILD ?= build/policy/cluster-weighted
 STRUCTURAL_RENDER_FIT ?= 105
 STRUCTURAL_RENDER_INPUT ?= temp-data/struct-postprocess
@@ -131,7 +131,7 @@ policy-fast-predict:
 	test -f "$(POLICY_FAST_SOURCE)/policy-bootstrap-parameters.csv"
 	test -f optim/data/full-many-pots-experiment.rds
 	mkdir -p "$(POLICY_FAST_BUILD)"
-	Rscript --no-save --no-restore optim/predict-policy-cluster-bootstrap.R \
+	Rscript --no-save --no-restore scripts/policy/predict-cluster-bootstrap.R \
 		--parameter-csv="$(POLICY_FAST_SOURCE)/policy-bootstrap-parameters.csv" \
 		--distance-data=optim/data/full-many-pots-experiment.rds \
 		--output-path="$(POLICY_FAST_BUILD)" --distance-cap=3500 \
@@ -145,7 +145,7 @@ policy-fast-optimize: policy-fast-predict
 		exit 1; \
 	fi
 	set -e; for scenario in 1 2 3 4 5; do \
-		Rscript --no-save --no-restore optim/optimize-policy-cluster-bootstrap.R \
+		Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
 			--input-path="$(POLICY_FAST_BUILD)" \
 			--target-csv=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv \
 			--scenario-id=$$scenario --num-replicates=$(POLICY_REPLICATES) --solver=$(POLICY_SOLVER); \
@@ -153,7 +153,7 @@ policy-fast-optimize: policy-fast-predict
 
 ## make policy-fast-summarize Render the fast policy table into build/ for review.
 policy-fast-summarize: policy-fast-optimize
-	Rscript --no-save --no-restore optim/summarize-policy-cluster-bootstrap.R \
+	Rscript --no-save --no-restore scripts/policy/summarize-cluster-bootstrap.R \
 		--input-path="$(POLICY_FAST_BUILD)" \
 		--table-path="$(POLICY_FAST_BUILD)/optim-summ-exponential-cluster-weights.tex" \
 		--num-replicates=$(POLICY_REPLICATES) --method=exponential

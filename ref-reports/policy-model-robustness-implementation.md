@@ -67,7 +67,7 @@ After the model summaries have been copied back locally, assemble the combined
 CSV and portable LaTeX table with:
 
 ```bash
-Rscript optim/assemble-policy-model-robustness.R
+Rscript scripts/policy/assemble-model-robustness.R
 ```
 
 The principal outputs are:
@@ -79,7 +79,7 @@ The principal outputs are:
   on Midway. Compact model summaries are copied to
   `temp-data/policy-model-robustness/` for table assembly and version control.
 
-Validation is in `scratch/test-policy-model-robustness.R`, alongside the
+Validation is in `tests/smoke/policy-model-robustness.R`, alongside the
 existing fast-policy equivalence and benchmark tests.
 
 ## Production results

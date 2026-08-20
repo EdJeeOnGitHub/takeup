@@ -5,8 +5,8 @@
 # (minimize sites) from the ex-post break-even calculation.
 
 args <- commandArgs(trailingOnly = TRUE)
-source("optim/policy-bootstrap-functions.R")
-source("optim/policy-cost-sensitivity-functions.R")
+source("R/policy/bootstrap.R")
+source("R/policy/cost-sensitivity.R")
 
 parameter_csv <- policy_option_value(
   args, "--parameter-csv",

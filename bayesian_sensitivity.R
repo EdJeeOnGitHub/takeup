@@ -174,7 +174,7 @@ for (chain_index in seq_along(fit_files)) {
       )
       cluster_average <-
         rowMeans(fit_draws[, cluster_variables, drop = FALSE])
-      # Match the paper convention in structural_tables.R:
+      # Match the paper convention in scripts/structural/render-paper.R:
       # reported multiplier = -cluster_social_multiplier / dist_beta_v.
       chain_derived[, row_index] <- if (row$measure == "social_multiplier") {
         -cluster_average / fit_draws[, "dist_beta_v[1]"]

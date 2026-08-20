@@ -5,7 +5,7 @@
 # its draw file is present.
 
 args <- commandArgs(trailingOnly = TRUE)
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 input_path <- policy_option_value(
   args, "--input-path", "ref-reports/policy-cost-sensitivity"

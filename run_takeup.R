@@ -96,9 +96,9 @@ if (script_options$sbc & !str_detect(output_name, "sbc")) {
 output_file_name <- file.path(script_options$output_path, str_c(output_name, ".RData"))
 thin_by <- as.integer(script_options$thin)
 
-source("analysis_util.R")
+source("R/common/analysis.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 
 # Data --------------------------------------------------------------------
 

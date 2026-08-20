@@ -120,7 +120,7 @@ gq_data$num_belief_rows_by_cluster <-
 gq_data$belief_observed <-
   gq_data$belief_observed %||% rep.int(1L, gq_data$num_beliefs_obs)
 
-# Match fit_model() in dist_structural_util.R, while dropping run controls that
+# Match fit_model() in R/structural/legacy-utils.R, while dropping run controls that
 # are not Stan data.
 gq_data$control <- NULL
 gq_data$analysis_data <- NULL

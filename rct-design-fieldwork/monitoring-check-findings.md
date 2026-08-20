@@ -33,7 +33,7 @@ The wave 1 survey uses numeric `person_key` values that require the dict to link
 
 ### 3. Name-matched individuals are in the analysis data
 
-The `prepare.analysis.data()` function in `analysis_util.R` handles the gap via fuzzy name matching. For anyone with unknown or negative deworming status, it runs `name.match.monitored()` which computes string distances between census names and PoT survey names within each cluster.
+The `prepare.analysis.data()` function in `R/common/analysis.R` handles the gap via fuzzy name matching. For anyone with unknown or negative deworming status, it runs `name.match.monitored()` which computes string distances between census names and PoT survey names within each cluster.
 
 In the final `analysis.data` (SMS control sample):
 

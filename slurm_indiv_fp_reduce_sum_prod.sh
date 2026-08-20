@@ -42,7 +42,7 @@ module load -f R/4.2.0
 export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2/x86_64-pc-linux-gnu}
 
 Rscript --no-save --no-restore --no-init-file \
-  scratch/sample-slim-individual-fp.R \
+  scripts/structural/sample-main-core.R \
   "--input-path=${INPUT_PATH}" \
   "--output-path=${OUTPUT_PATH}" \
   "--stan-path=${STAN_PATH}" \

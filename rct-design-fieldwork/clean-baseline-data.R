@@ -3,7 +3,7 @@ library(tidyverse)
 library(sf)
 library(here)
 
-source("clean-analysis-util.R")
+source("scripts/shared/clean-analysis-setup.R")
 source("rct-design-fieldwork/takeup_rct_assign_clusters.R")
 dir.create("data/clean-data", showWarnings = FALSE)
 

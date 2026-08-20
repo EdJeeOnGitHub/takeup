@@ -6,7 +6,7 @@
 # cluster-binomial kernel, which should be the identical Stan sampling target.
 
 args <- commandArgs(trailingOnly = TRUE)
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 option_value <- function(name, default = NULL) {
   prefix <- paste0(name, "=")
   hit <- args[startsWith(args, prefix)]

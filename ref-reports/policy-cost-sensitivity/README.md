@@ -43,10 +43,10 @@ cost grids or break-even thresholds rather than a single calibration.
 Run locally from the repository root with:
 
 ```bash
-python optim/extract-cmdstan-policy-draws.py \
+python scripts/policy/extract-cmdstan-draws.py \
   --output=temp-data/policy-cost-sensitivity/fit105-compact.csv \
   data/stan_analysis_data/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-{1,2,3,4}.csv
-Rscript optim/run-policy-cost-sensitivity.R
+Rscript scripts/policy/run-cost-sensitivity.R
 ```
 
 The local runner writes a standard LP and uses the installed open-source GLPK

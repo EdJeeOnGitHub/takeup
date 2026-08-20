@@ -45,9 +45,9 @@ library(bayesplot)
 library(econometr)
 
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
-source("analysis_util.R")
+source("R/common/analysis.R")
 
-knitr::read_chunk("analysis_util.R", labels = "analysis-util")
+knitr::read_chunk("R/common/analysis.R", labels = "analysis-util")
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"

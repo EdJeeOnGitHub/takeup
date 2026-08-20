@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 args <- commandArgs(trailingOnly = TRUE)
-source("optim/policy-bootstrap-functions.R")
+source("R/policy/bootstrap.R")
 
 parameter_csv <- policy_option_value(args, "--parameter-csv")
 distance_data <- policy_option_value(args, "--distance-data", "optim/data/full-many-pots-experiment.rds")

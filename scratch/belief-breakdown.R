@@ -3,9 +3,9 @@
 ##
 library(tidyverse)
 
-source("analysis_util.R")
+source("R/common/analysis.R")
 source(file.path("multilvlr", "multilvlr_util.R"))
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 
 # Data --------------------------------------------------------------------
 

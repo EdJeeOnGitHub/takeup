@@ -31,7 +31,7 @@ params = lst(
     stat = "std.error" # "ci", "p", "std.error"
 )
 # Karim's helper functions
-source(file.path("analysis_util.R"))
+source(file.path("R/common/analysis.R"))
 # Load reduced form data
 source(file.path("scratch", "reduced-form-setup.R"))
 
@@ -91,7 +91,7 @@ externality_data = endline_data %>%
       fully_aware_externalities = case_when(
         neighbours_worms_affect == "yes" & worms_affect == "yes" ~ TRUE, 
         # Ed: 2025-08-08 NA in these two variables is actually "don't know" due to 
-        # a coding error in `analysis_util.R:129` in SurveyCTO these two 
+        # a coding error in `R/common/analysis.R:129` in SurveyCTO these two 
         # variables use different binary encoding for yes/no and the original 
         # code corrects this but doesn't correct "don't know" correctly
         is.na(neighbours_worms_affect) | is.na(worms_affect) ~ FALSE,

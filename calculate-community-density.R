@@ -9,7 +9,7 @@ library(sp)
 # library(rgeos)
 # library(econometr)
 
-source("analysis_util.R")
+source("R/common/analysis.R")
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"

@@ -37,7 +37,7 @@ set -e
 
 
 
-Rscript ./optim/create-distance-data.R \
+Rscript ./scripts/policy/create-distance-data.R \
     --output-name=${DATA_INPUT_NAME} \
     --num-extra-pots=100 \
     --county-subset=${COUNTY} \

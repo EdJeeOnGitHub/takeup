@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 args <- commandArgs(trailingOnly = TRUE)
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 source_path <- main_core_option_value(
   args, "--source-path", "temp-data/main-core-lambda-identification"
 )

@@ -83,7 +83,7 @@ If the server uses different fit numbers for the paper tables, use the fit versi
 
    - Read each model's `*_sm_summ_*.rds` and `*_sm_draws_*.rds`.
    - Use `sm_rescaled` as the primary social multiplier measure.
-   - Before reporting, confirm the sign convention against the existing main-model output from `structural_tables.R` / `temp-data/social-multiplier-decomposition-values.csv`.
+   - Before reporting, confirm the sign convention against the existing main-model output from `scripts/structural/render-paper.R` / `temp-data/social-multiplier-decomposition-values.csv`.
    - If the paper reports the multiplier with the opposite sign, transform all models consistently.
    - Restrict the comparison to the experimental support, `roc_distance <= 2500`.
    - Report values at `500m`, `1500m`, and `2500m`.

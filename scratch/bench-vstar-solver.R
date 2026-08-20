@@ -3,7 +3,7 @@ library(nleqslv)
 library(microbenchmark)
 library(owent)
 
-source("dist_structural_util.R")
+source("R/structural/legacy-utils.R")
 source("optim/optim-functions.R")
 
 # Realistic synthetic inputs: 1252 village-PoT pairs, unbounded (bounds = c(-Inf, Inf))

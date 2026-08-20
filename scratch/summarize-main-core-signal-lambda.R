@@ -5,7 +5,7 @@
 # relative to their prior and whether they trade off with private utilities.
 
 args <- commandArgs(trailingOnly = TRUE)
-source("scratch/main-core-data.R")
+source("R/structural/main-core-data.R")
 option_value <- function(name, default = NULL) {
   main_core_option_value(args, name, default)
 }

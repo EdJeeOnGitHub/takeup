@@ -118,12 +118,12 @@ entry point for this run. All 999 attempted refits completed with distinct
 weight vectors; the stable paper tables and local summaries use those refits.
 
 The policy-model robustness tables are regenerated with
-`Rscript optim/assemble-policy-model-robustness.R`. The concise contrast table
+`Rscript scripts/policy/assemble-model-robustness.R`. The concise contrast table
 is the paper-facing summary; the full table preserves the policy-level
 diagnostics for every model and counterfactual.
 
 The policy distance-cap diagnostic is regenerated locally with
-`Rscript optim/generate-policy-distance-cap-table.R`. It documents why a
+`Rscript scripts/policy/generate-distance-cap-table.R`. It documents why a
 2.5 km cap nearly reproduces the experimental cluster-separation constraint
 and therefore cannot identify meaningful consolidation differences. The local
 appendix retains 3.5 km as the maintained cap and reports the 2.5--3.5 km
@@ -131,17 +131,17 @@ feasibility gradient transparently. This module is not input by
 `ref-reports/ECM ReStud.tex`.
 
 Policy geography is built in the explicit `--all-pots` mode of
-`optim/create-distance-data.R`. The canonical object contains all 1,451
+`scripts/policy/create-distance-data.R`. The canonical object contains all 1,451
 documented candidate schools; the older 1,092-site object resulted from a
 row-index/`cluster.id` mismatch in the sampled-site path and is not used for
 the local appendix results.
 
 The population-weighted allocation and break-even calculations are generated
-with `optim/run-policy-population-cost.R`. Baseline posterior draws use
+with `scripts/policy/run-population-cost.R`. Baseline posterior draws use
 `--parameter-type=raw`; the preferred exponential cluster-weighted modes use
 the canonical parameter CSV produced by
-`optim/prepare-policy-cluster-bootstrap.R` and `--parameter-type=canonical`.
-`optim/assemble-policy-population-cost.R` combines every available inference
+`scripts/policy/prepare-cluster-bootstrap.R` and `--parameter-type=canonical`.
+`scripts/policy/assemble-population-cost.R` combines every available inference
 set into the appendix tables and break-even figure. Signal and travel costs
 are resource-cost scenarios applied to coverage-preserving allocations, not a
 Ramsey welfare calculation. The same runner also reports a prespecified
@@ -150,7 +150,7 @@ the experimental PoT moves 0, 50, or 100 percent toward Control observability.
 This is a conservative proxy for information dilution under consolidation,
 not an endogenous model of site traffic.
 
-`optim/predict-policy-cluster-bootstrap.R` stores policy demand as a numeric
+`scripts/policy/predict-cluster-bootstrap.R` stores policy demand as a numeric
 draw-by-edge matrix plus a two-column draw map. The compact representation was
 checked element-for-element and allocation-for-allocation against the older
 long data-frame representation; it is roughly fourteen times smaller in the
@@ -159,11 +159,11 @@ three-draw production smoke test.
 Local baseline reproduction is:
 
 ```bash
-Rscript optim/generate-policy-distance-cap-table.R
-Rscript optim/run-policy-population-cost.R \
+Rscript scripts/policy/generate-distance-cap-table.R
+Rscript scripts/policy/run-population-cost.R \
   --analysis-id=baseline-posterior --parameter-type=raw --cores=8
-Rscript optim/assemble-policy-population-cost.R
-Rscript optim/validate-policy-population-cost.R
+Rscript scripts/policy/assemble-population-cost.R
+Rscript scripts/policy/validate-population-cost.R
 ```
 
 When the exponential-mode parameter CSV is available, use the same runner
