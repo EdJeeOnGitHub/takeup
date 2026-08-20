@@ -271,6 +271,11 @@ if (length(status_files) > 0L) {
 multiplier_summary <- summary |>
   filter(estimand == "social_multiplier") |>
   mutate(
+    specification = recode(
+      specification,
+      "Exponential cluster weights" =
+        "Cluster weighted-likelihood bootstrap"
+    ),
     subgroup = factor(subgroup, levels = distance_labels),
     treatment = factor(treatment, levels = c("Control", "Ink", "Bracelet", "Calendar"))
   )
@@ -290,9 +295,8 @@ ggsave(figure_path, plot, width = 7.2, height = 5.2)
 
 escape_tex <- function(x) gsub("_", "\\\\_", x, fixed = TRUE)
 spec_order <- c(
-  "Baseline structural model", "Cluster bootstrap", "Cluster random shock",
-  "Cluster random shock: prior SD 0.25",
-  "Exponential cluster weights"
+  "Baseline structural model", "Cluster weighted-likelihood bootstrap",
+  "Cluster random shock", "Cluster random shock: prior SD 0.25"
 )
 table_data <- multiplier_summary |>
   mutate(specification = factor(specification, levels = spec_order)) |>
@@ -332,6 +336,11 @@ writeLines(c("\\bottomrule", "\\end{tabular}"), con)
 primary_contrast <- contrast_summary |>
   filter(contrast == "No Signal - Any Signal") |>
   mutate(
+    specification = recode(
+      specification,
+      "Exponential cluster weights" =
+        "Cluster weighted-likelihood bootstrap"
+    ),
     subgroup = factor(
       subgroup,
       levels = c(distance_labels, "500--2500m", "Minimum")

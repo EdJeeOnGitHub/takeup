@@ -11,6 +11,7 @@ script_options = docopt::docopt(
         --output-path=<path>  Path to find results [default: {file.path('optim', 'data')}]
         --output-name=<output-name>  Prepended to output file
         --num-extra-pots=<num-extra-pots>  How many extra PoTs to sample per village above experiment [default: 2]
+        --all-pots  Include every documented candidate PoT; ignores --num-extra-pots and --distance-cutoff
         --county-subset=<county-subset>  Which county to subset OA to
         --distance-cutoff=<distance-cutoff>  How close PoTs have to be to sample extra. [default: 3500]
     "),
@@ -36,6 +37,7 @@ script_options$distance_cutoff = as.numeric(script_options$distance_cutoff)
 source(file.path("multilvlr", "multilvlr_util.R"))
 
 full_experiment = ifelse(is.null(script_options$county_subset) | script_options$county_subset == "full", TRUE, FALSE)
+candidate_site_mode = ifelse(full_experiment, NA_character_, "county-subset")
 
 
 wgs.84 <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
@@ -160,17 +162,34 @@ if (full_experiment) {
             dist_km = as.numeric(dist/1000))
 
 
-    extra_pot_ids = long_add_distance_mat %>%
-        mutate(close = dist <= script_options$distance_cutoff) %>%
-        group_by(index_i) %>%
-        filter(close == TRUE) %>%
-        sample_n(script_options$num_extra_pots, replace = TRUE) %>%
-        pull(index_j) %>%
-        unique()
+    if (isTRUE(script_options$all_pots)) {
+        # The canonical policy opportunity set is every documented candidate
+        # school.  Keeping this as an explicit mode prevents a random sampled
+        # subset from being mistaken for the full universe in paper outputs.
+        pot_df = rct_school_df
+        candidate_site_mode = "all"
+    } else {
+        # index_j indexes rows of add_pot_df, not values of cluster.id.  The old
+        # code compared these row indices directly with rct_school_df$cluster.id,
+        # which silently selected the wrong candidate sites.
+        extra_pot_rows = long_add_distance_mat %>%
+            mutate(close = dist <= script_options$distance_cutoff) %>%
+            group_by(index_i) %>%
+            filter(close == TRUE) %>%
+            sample_n(script_options$num_extra_pots, replace = TRUE) %>%
+            pull(index_j) %>%
+            unique()
 
+        extra_pot_cluster_ids = add_pot_df$cluster.id[extra_pot_rows]
+        pot_df = rct_school_df %>%
+            filter(cluster.id %in% c(
+                rct_pot_cluster_ids, extra_pot_cluster_ids
+            ))
+        candidate_site_mode = "sampled"
+    }
 
-    pot_df = rct_school_df %>%
-        filter(cluster.id %in% c(rct_pot_cluster_ids, extra_pot_ids)) %>%
+    pot_df = pot_df %>%
+        arrange(cluster.id) %>%
         mutate(id = 1:n())
 
 
@@ -223,7 +242,8 @@ distance_data = lst(
     brms_long_distance_mat,
     pot_df, 
     village_df,
-    sd_of_dist
+    sd_of_dist,
+    candidate_site_mode
 )
 
 

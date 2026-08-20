@@ -1,0 +1,320 @@
+\documentclass[10pt]{article}
+
+\usepackage[margin=0.7in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{pdflscape}
+\usepackage{caption}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\renewcommand{\arraystretch}{1.12}
+
+\lstdefinestyle{diffstyle}{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  backgroundcolor=\color{gray!6},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em
+}
+
+\newcommand{\coderef}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\todoheading}[2]{\clearpage\section*{ToDo #1: #2}\addcontentsline{toc}{section}{ToDo #1: #2}}
+\newcommand{\commitline}[1]{\textbf{Commits.} #1\par}
+\newcommand{\diffsnippet}[1]{\lstinputlisting[style=diffstyle]{#1}}
+\newcommand{\beforeafter}[2]{%
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+Before & After\\
+\midrule
+#1 & #2\\
+\bottomrule
+\end{tabularx}}
+
+\begin{document}
+
+\begin{center}
+{\Large Refine Feedback ToDo Review Pack}\\
+\vspace{0.25em}
+Analysis branch: \coderef{ed-refine-todos} into \coderef{w-beliefs}\\
+Paper branch: \coderef{../overleaf/overleaf-takeup}, local branch \coderef{ed-refine-todos}
+\end{center}
+
+\tableofcontents
+
+\section*{How to read this}
+\addcontentsline{toc}{section}{How to read this}
+
+This packet is for reviewing the ToDos in \coderef{ref-reports/ed-todos-feedback-refine.md}. Each section states what changed, the relevant code/paper commits, and the most useful review artifact: a generated table, a before/after text snippet, or a compact code-output summary.
+
+Generated reduced-form table outputs are shown here for review but are intentionally not part of the GitHub PR. The PR contains generation code and the ToDo tracker, not the generated \coderef{presentations/rf-tables} artifacts.
+
+\todoheading{1}{Prior Deworming Robustness}
+\commitline{Analysis \coderef{54fa50d}; generated RF output removed from tracking in \coderef{7cfa8f3}. Paper \coderef{b78969a}.}
+
+\textbf{What changed.} Added \coderef{scratch/prior-deworming-robustness-table.R}. Because baseline survey IDs do not directly link to monitored take-up outcomes, the script builds cluster-level baseline shares for ever-dewormed and past-year-dewormed, merges them into the take-up sample, and estimates the full Bracelet/Calendar/Ink/Control by Close/Far reduced-form specification with those prior-deworming covariates shown at the bottom of the table. It also repeats the check for endline self-reported deworming.
+
+\textbf{Interpretation.} The reviewer concern predicts attenuation if prior deworming imbalance explains the main distance pattern. In the full specification with prior-deworming covariates, the Bracelet and Ink Far--Close interaction estimates remain positive, while Calendar remains small.
+
+\begin{landscape}
+\begin{table}[h!]
+\centering
+\caption*{Generated robustness table: full arm-by-distance specification}
+\resizebox{!}{0.46\textheight}{\input{presentations/rf-tables/main-specs/prior-deworming-robustness.tex}}
+\end{table}
+\end{landscape}
+
+\textbf{Exact paper diff.} The Overleaf edit defines the baseline prior-deworming variables, explains why the monitored outcome cannot be individually linked to baseline responses, invokes the Calendar placebo, and inputs \coderef{tables/prior-deworming-robustness}.
+
+\diffsnippet{presentations/refine-review-diffs/todo1-paper.diff}
+
+\todoheading{2}{Balance Table Control Means}
+\commitline{Analysis \coderef{f9d733e}. No paper-text commit.}
+
+\textbf{What changed.} \coderef{balance-functions.R} now computes displayed Control means as raw means from the relevant estimation sample. \coderef{balance.R} passes the underlying data into the balance-table helper for the main, appendix, attrition, monitoring-attrition, and SMS-enrollment balance paths.
+
+\beforeafter
+{Displayed ``Control mean'' was the omitted-county fixed-effect intercept from the balance regression. This could fall outside the range implied by the raw sample mean and treatment differences.}
+{Displayed ``Control mean'' is the raw Control mean in the estimation sample and distance cell being shown. The regression still uses the same fixed effects and standard errors for treatment differences.}
+
+\textbf{Old table excerpt.} The old table displayed a fixed-effect intercept as the Control mean, so the row could be read as internally inconsistent with the sample mean and treatment differences.
+
+\begin{table}[h!]
+\centering
+\caption*{Old balance table excerpt}
+\begin{tabular}{lccc}
+\toprule
+Variable & Sample mean & Control-Close mean & Control-Far mean\\
+\midrule
+Age & 39.8 & 38.126 & 37.995\\
+Female & row cited by reviewer & FE intercept & FE intercept\\
+Phone owner & row cited by reviewer & FE intercept & FE intercept\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption*{New balance table excerpt after raw Control-mean fix}
+\begin{tabular}{lccc}
+\toprule
+Variable & Sample mean & Control-Close mean & Control-Far mean\\
+\midrule
+Age & 39.8 & 40.3 & 40.2\\
+Female & from regenerated table & 0.565 & 0.562\\
+Phone owner & from regenerated table & 0.765 & 0.728\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\todoheading{4}{\texorpdfstring{$\psi$}{psi} Units}
+\commitline{Analysis \coderef{219dc73}. Paper \coderef{15fc692}.}
+
+\textbf{What changed.} \coderef{quick_param_postprocess.R} and \coderef{presentations/tables.Rmd} now label the WTP/structural valuation parameter as USD. The paper text and table notes define \(\psi\) in USD rather than KSh.
+
+\beforeafter
+{\(\psi\) was displayed or described as KSh in generated table labels, creating an apparent scale contradiction with 50 KSh offers and the text's US-dollar interpretation.}
+{\(\psi\) is labeled and described as USD in the generated tables and paper notes.}
+
+\begin{table}[h!]
+\centering
+\caption*{Old structural parameter table}
+\input{presentations/refine-review-artifacts/old-structural-parameters-table.tex}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption*{New structural parameter table}
+\input{presentations/refine-review-artifacts/new-structural-parameters-table.tex}
+\end{table}
+
+\todoheading{5 and 8}{Potential-Distance and Continuous-Distance Support}
+\commitline{Paper \coderef{9f5df01}. Related analysis for E3 in ToDo 12.}
+
+\textbf{What changed.} The paper now spells out that the diagnostic simulations hold the surveyed-community frame fixed, rerun PoT selection, Close/Far assignment, targeted-community pairing, and feasibility screening, then compare the induced potential distance distributions for the realized Close/Far groups.
+
+\beforeafter
+{The text said the design algorithm was rerun but did not make clear how fixed surveyed communities receive counterfactual PoT distances under simulated PoT selections and pairings.}
+{The text states that the simulations condition on realized surveyed communities and apply the full constrained assignment protocol to create counterfactual distances.}
+
+\begin{figure}[h!]
+\centering
+\begin{minipage}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{presentations/refine-review-artifacts/old-pot-distance-overlap.pdf}
+\caption*{Old potential-distance plot}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{presentations/refine-review-artifacts/new-pot-distance-overlap.pdf}
+\caption*{New potential-distance plot}
+\end{minipage}
+\end{figure}
+
+\textbf{Exact paper diff.}
+\diffsnippet{presentations/refine-review-diffs/todo5-8-paper.diff}
+
+\todoheading{6}{\texorpdfstring{$\sigma_u$}{sigma-u} Identification}
+\commitline{Analysis \coderef{fe9c8d8}. Paper \coderef{10cfa9c}.}
+
+\textbf{What changed.} Added \coderef{scratch/sigma-u-prior-posterior-plot.R}. The script reads only the Stan variable for \(\sigma_u\), writes a prior/posterior plot using the paper's Canva ``Primary colors with a vibrant twist'' palette, and writes a compact summary CSV. The paper now states that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells and the nonlinear normal-sum signal-extraction restriction.
+
+\begin{table}[h!]
+\centering
+\caption*{Prior/posterior summary for \(\sigma_u\)}
+\begin{tabular}{lrrrr}
+\toprule
+Distribution & Mean & Median & 2.5\% & 97.5\%\\
+\midrule
+Prior & 0.468 & 0.374 & 0.145 & 1.359\\
+Posterior & 0.302 & 0.278 & 0.127 & 0.583\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.72\linewidth]{../overleaf/overleaf-takeup/figures/sigma-u-prior-posterior.pdf}
+\caption*{New appendix figure included in the paper branch.}
+\end{figure}
+
+\textbf{Exact paper diff.}
+\diffsnippet{presentations/refine-review-diffs/todo6-paper.diff}
+
+\todoheading{10}{Figure 3(b) Curve Ordering}
+\commitline{Paper \coderef{c013bdb}. No analysis code change.}
+
+\textbf{What changed.} The current plotted curves were checked and do not cross on the common highlighted support. The paper now clarifies that the panel varies \(\mu(d)\) with distance and does not reverse the ordering of \(\Delta(w^\ast)\) across \(\sigma_u\) at a fixed cutoff.
+
+\beforeafter
+{The text could be read as allowing lower-noise and higher-noise curves to reverse order in Panel 3(b).}
+{The text explicitly states that, at fixed \(w^\ast\), lower-noise curves remain above higher-noise curves; Panel 3(b) reflects the decline in observability with distance.}
+
+\textbf{Exact paper diff.}
+\diffsnippet{presentations/refine-review-diffs/todo10-paper.diff}
+
+\todoheading{11}{HMC Diagnostics}
+\commitline{Analysis \coderef{e7e2ac1}. Paper \coderef{2a3ca83} and \coderef{9831b83}.}
+
+\textbf{What changed.} Added \coderef{scratch/stan-hmc-diagnostics.R}, a reusable diagnostics script that can restrict loaded Stan variables. The paper now reports stricter diagnostics rather than only saying split \(\hat R<1.1\).
+
+\begin{longtable}{p{0.22\linewidth}p{0.56\linewidth}p{0.14\linewidth}}
+\toprule
+Model/table & Reported diagnostics & Paper status\\
+\midrule
+Main structural/WTP-derived tables & Max split \(\hat R=1.011\), min bulk ESS 465, min tail ESS 602, zero divergences. & Added\\
+No-outlier appendix & Max split \(\hat R=1.018\), min bulk ESS 355, min tail ESS 309, zero divergences. & Added\\
+Community-FP appendix & Max split \(\hat R=1.022\), min bulk ESS 221, min tail ESS 212, zero divergences. & Added\\
+Full-info individual-FP appendix & Max split \(\hat R=1.022\), min bulk ESS 142, min tail ESS 132, two divergences. & Added\\
+\bottomrule
+\end{longtable}
+
+\beforeafter
+{``Sampler diagnostics show no divergent transitions and split \(\hat R<1.1\) for all parameters.''}
+{Table notes report model-specific max split \(\hat R\), minimum bulk/tail ESS, divergence counts, and where relevant maximum treedepth.}
+
+\todoheading{12}{E3 Continuous-Distance Randomization Inference}
+\commitline{Analysis \coderef{41873f6}. Paper \coderef{90a16d5}.}
+
+\textbf{What changed.} \coderef{balance.R} now uses feasible counterfactual distance pools from \coderef{data/simulated-counterfactual-treatment-assignment.csv} rather than freely permuting realized distances within counties. This better matches the constrained assignment design.
+
+\beforeafter
+{Placebo distances were generated by within-county permutation of realized distances.}
+{Placebo distances are sampled from feasible counterfactual PoT-community distances induced by the constrained assignment simulations.}
+
+\begin{figure}[h!]
+\centering
+\begin{minipage}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{presentations/refine-review-artifacts/old-dist-ri-plot.pdf}
+\caption*{Old E3 plot}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{presentations/refine-review-artifacts/new-dist-ri-plot.pdf}
+\caption*{New E3 plot}
+\end{minipage}
+\end{figure}
+
+\textbf{Exact paper diff.}
+\diffsnippet{presentations/refine-review-diffs/todo12-paper.diff}
+
+\todoheading{17}{Figure M1 Parameters}
+\commitline{Paper \coderef{7df4781}. No analysis code change.}
+
+\textbf{What changed.} Section M and the Figure M1 note now match the plotted distributions: the Gaussian benchmark is approximately \(N(0.4,0.2^2)\), and the bimodal case is approximately \(0.25N(-2,0.2^2)+0.75N(0.4,0.2^2)\). The note clarifies that the plotted \(V^\ast\) label corresponds to the \(w^\ast\) cutoff scale used in the text.
+
+\beforeafter
+{Text described a standard normal benchmark and an equally weighted symmetric bimodal mixture.}
+{Text describes the asymmetric, narrow distributions actually shown in Figure M1.}
+
+\textbf{Exact paper diff.}
+\diffsnippet{presentations/refine-review-diffs/todo17-paper.diff}
+
+\todoheading{18}{Closest PoT and Original-Distance ITT}
+\commitline{Analysis \coderef{fe26587} and \coderef{a22d7eb}. Paper \coderef{9195391}.}
+
+\textbf{What changed.} The paper distinguishes candidate PoT centers from finalized implemented PoT locations. The code adds \coderef{--itt} support to \coderef{scratch/reduced-form-bootstrap.R}, using original assigned Close/Far cells while keeping the existing reduced-form table writer.
+
+\textbf{Merge/data checks.} The generated diagnostics verify 9,805 take-up rows, 144 clusters, no missing original assignments, no treatment/distance mismatches against monitored and processed randomization data, and PoT distance differences only at floating-point tolerance. Observability checks similarly verify 1,141 rows and 144 clusters.
+
+\begin{landscape}
+\begin{table}[h!]
+\centering
+\caption*{Original-distance-assignment ITT: take-up}
+\input{presentations/rf-tables/main-specs/rf_original_distance_itt_tbl.tex}
+\end{table}
+\end{landscape}
+
+\begin{landscape}
+\begin{table}[h!]
+\centering
+\caption*{Original-distance-assignment ITT: first-order observability}
+\input{presentations/rf-tables/main-specs/rf_original_distance_itt_fob_tbl.tex}
+\end{table}
+\end{landscape}
+
+\todoheading{24}{Terminology: Normal Mixture}
+\commitline{Paper \coderef{0dbc7bb}. No analysis code change.}
+
+\textbf{What changed.} Replaced ``normal mixture'' with ``normal-sum specification'' because \(w_i=v_i+u_i\) is a sum of independent normal variables, not a mixture distribution.
+
+\beforeafter
+{``For the normal mixture, the type inference term is ...''}
+{``Under this normal-sum specification, the type inference term is ...''}
+
+\textbf{Exact paper diff.}
+\diffsnippet{presentations/refine-review-diffs/todo24-paper.diff}
+
+\todoheading{25}{SMS Control Mean Standard Error and Table Style}
+\commitline{Analysis \coderef{b59c86b}. No paper-text commit.}
+
+\textbf{What changed.} The SMS control mean parenthetical now reports a clustered standard error from an intercept-only regression rather than the binary outcome standard deviation. The same commit adds compact postprocessing for the SMS and heterogeneity table outputs so the generated LaTeX better matches the manually edited paper style.
+
+\beforeafter
+{Control mean parenthetical: 0.470, the binary outcome standard deviation.}
+{Control mean parenthetical: 0.032, the clustered standard error.}
+
+\begin{table}[h!]
+\centering
+\caption*{Generated SMS table after the fix}
+\input{presentations/rf-tables/main-specs/incentive-control-sms-te.tex}
+\end{table}
+
+\textbf{Heterogeneity table.} The \coderef{--heterogeneity} path now constructs the cleaned WTP \coderef{second_choice}/county fields before WTP checks, so table regeneration exits cleanly and writes \coderef{presentations/rf-tables/main-specs/het-tes.tex}.
+
+\end{document}

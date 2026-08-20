@@ -17,6 +17,11 @@ data {
   // Minimal-model extensions. Unit weights and a disabled shock recover the
   // original fit-105 target exactly.
   vector<lower=0>[num_clusters] core_cluster_weight;
+  // Multiplicative sensitivity control for the baseline N(0,1) intercept
+  // and N(0,0.5) treatment-contrast priors in the visibility schedule.
+  real<lower=0> core_visibility_prior_multiplier;
+  // Baseline is 2, matching the frozen fit-105 WTP location prior.
+  real<lower=0> core_wtp_mu_prior_sd;
   int<lower=0, upper=1> use_core_cluster_shock;
   real<lower=0> core_cluster_shock_sd_prior;
   // 0 = common; 1 = Any Signal (Ink/Bracelet) vs No Signal
@@ -443,10 +448,16 @@ model {
   #include wtp_model_core_weighted.stan
 
   // Beliefs model: exact global-coefficient branch.
-  hyper_beta_1ord[1] ~ normal(0, 1);
-  hyper_beta_1ord[2:] ~ normal(0, 0.5);
-  hyper_dist_beta_1ord[1] ~ normal(0, 1);
-  hyper_dist_beta_1ord[2:] ~ normal(0, 0.5);
+  hyper_beta_1ord[1] ~ normal(0, core_visibility_prior_multiplier);
+  hyper_beta_1ord[2:] ~ normal(
+    0, 0.5 * core_visibility_prior_multiplier
+  );
+  hyper_dist_beta_1ord[1] ~ normal(
+    0, core_visibility_prior_multiplier
+  );
+  hyper_dist_beta_1ord[2:] ~ normal(
+    0, 0.5 * core_visibility_prior_multiplier
+  );
   hyper_beta_2ord[1] ~ normal(0, 1);
   hyper_beta_2ord[2:] ~ normal(0, 0.5);
   hyper_dist_beta_2ord[1] ~ normal(0, 1);

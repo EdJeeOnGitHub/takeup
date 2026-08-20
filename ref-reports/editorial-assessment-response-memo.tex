@@ -1,0 +1,608 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array,longtable,makecell,threeparttable,multirow}
+\usepackage{graphicx,adjustbox}
+\usepackage[section]{placeins}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+
+% Pack floats more tightly so short figures don't claim a page of their own.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{5}
+
+% Compile from the takeup repo root, e.g.
+%   pdflatex -output-directory=ref-reports ref-reports/editorial-assessment-response-memo.tex
+% Redefine the path below if compiling elsewhere (e.g. after copying into Overleaf).
+\IfFileExists{ref-reports/rf-discrete-dist-covs-tbl-snapshot.tex}{
+  \providecommand{\RefReportsPath}{ref-reports}
+  \providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+}{
+  \providecommand{\RefReportsPath}{.}
+  \providecommand{\StructuralRobustnessPath}{../appendix/structural-robustness}
+}
+
+\newenvironment{decision}
+  {\par\medskip\noindent\begin{minipage}{\linewidth}\color{blue!50!black}\textbf{Decision.} }
+  {\end{minipage}\par\medskip}
+
+\title{Response plan: pre-submission editorial assessment\\
+  \large Working memo with supporting tables and figures}
+\author{TakeUp}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{itemize}[nosep]
+  \item Each section: the editor's problem, what we do (evidence shown), takeaway.
+    Numbered blue \textcolor{blue!50!black}{\textbf{Decision}} boxes (1--11) are the
+    points to settle.
+  \item Nothing from the robustness bundle is currently input by
+    \texttt{ECM ReStud.tex} --- every ``incorporate'' item is open manuscript work.
+  \item Sources:\\
+    \path{ref-reports/top-journal-pre-submission-editorial-assessment.md}\\
+    \path{appendix/structural-robustness/} (tables and figures reproduced below).
+\end{itemize}
+
+\tableofcontents
+
+%=====================================================================
+\clearpage
+\section{The reduced-form take-up interaction is less decisive than the framing suggests}
+
+\begin{itemize}[nosep]
+  \item \textbf{Problem.} The headline interaction rests on realized Close/Far: 6.8pp,
+    $p=0.083$. The original randomized assignment gives a stronger result, so the choice
+    of principal specification is consequential --- the editor wants the randomization
+    back at the center.
+  \item \textbf{What we worked on.} Swap the principal take-up specification to original
+    assignment. Table~\ref{tab:memo-itt-pair} shows the swap in the paper's own table
+    format: same specification, Any Signal $=$ No Signal (Far--Close) moves from
+    $p=0.083$ to $p=0.001$. The relative-multiplier analysis
+    (Table~\ref{tab:memo-rf-multiplier}, Figure~\ref{fig:memo-rf-curves}) turns this
+    into the paper's central object: signals remove 65\% of the No-Signal distance
+    response (39--44\% continuous).
+  \item \textbf{Takeaway.} Reorder Section 4 so original assignment is primary and
+    realized/continuous are sensitivity; flag PAP status at first use. Caution: the
+    Bracelet--Calendar take-up interaction is \emph{not} decisive even under original
+    assignment ($p=0.145$--$0.237$), so take-up claims stay pooled.
+\end{itemize}
+
+\begin{decision}
+  We will swap to original assignment -- need to re-run a lot of specs. Also add randomization inference p-values if we can.
+  \newline
+  TBD: If we should include attenuation results for binary, linear distance, and spline -- and whether these should be just signal/no signal or 
+  also bra-cal.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{The swap, in the paper's own table format: current principal specification
+    (realized Close/Far) vs original-assignment ITT}
+  \label{tab:memo-itt-pair}
+  \begin{minipage}[t]{0.49\linewidth}
+    \centering
+    \footnotesize \textbf{(a) Realized (paper Table 2)}\\[0.3em]
+    \adjustbox{max width=\linewidth}{%
+      \input{\RefReportsPath/rf-discrete-dist-covs-tbl-snapshot.tex}}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.49\linewidth}
+    \centering
+    \footnotesize \textbf{(b) Original assignment
+      (\texttt{tables/rf-original-distance-itt.tex})}\\[0.3em]
+    \adjustbox{max width=\linewidth}{%
+      \input{\StructuralRobustnessPath/tables/rf-original-distance-itt.tex}}
+  \end{minipage}
+  \begin{minipage}{0.96\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Identical specification and format; only the distance measure
+    changes. Any Signal $=$ No Signal, Far--Close: $p=0.083$ realized vs $p=0.001$
+    under original assignment. Panel (a) is a snapshot of
+    \path{rf-tables/main-specs/rf_discrete_dist_covs_tbl.tex} from the Overleaf.
+  \end{minipage}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Reduced-form distance responses and relative attenuation
+    (\texttt{sections/reduced-form-distance-multiplier.tex})}
+  \label{tab:memo-rf-multiplier}
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/reduced-form-distance-multiplier.tex}}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}[t]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/reduced-form-pooled-distance-curves.pdf}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/reduced-form-derivative-contrast.pdf}
+  \end{minipage}
+  \caption{Flexible distance responses by signal environment; derivative contrast with
+    pointwise and simultaneous bands.}
+  \label{fig:memo-rf-curves}
+\end{figure}
+
+\FloatBarrier
+\paragraph{Extra: randomization inference.} Already run
+(Table~\ref{tab:memo-ri}): Fisher, studentized, and Romano--Wolf stepdown, item arms
+re-randomized within county-by-distance strata. It confirms the swap: Fisher $p=0.006$
+(RW $0.006$) under original assignment vs $p=0.134$ under realized. The cell-means plot
+the editor asked for is Figure~\ref{fig:memo-ri-communities}.
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Randomization inference for treatment-by-distance effects
+    (\texttt{sections/randomization-inference.tex})}
+  \label{tab:memo-ri}
+  \adjustbox{max width=\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/randomization-inference.tex}}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/ri-takeup-original-assignment.pdf}
+  \end{minipage}
+  \begin{minipage}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/ri-takeup-realized-distance.pdf}
+  \end{minipage}
+  \caption{Community-level take-up by assigned and realized distance.}
+  \label{fig:memo-ri-communities}
+\end{figure}
+
+%=====================================================================
+\clearpage
+\section{The experiment changes more than observability}
+
+\begin{itemize}[nosep]
+  \item \textbf{Problem.} Arms differ in private value, message content, and salience,
+    not only visibility. Editor: temper the mechanism claim or bound signal-specific
+    utility and image content.
+  \item \textbf{What we do.} Arm-specific private utility was always in the model.
+    Arm-specific \emph{image weights} are now estimated (Table~\ref{tab:memo-lambda-mult}):
+    contrasts near zero, multiplier pattern unchanged. Campaign-day dynamics
+    (Table~\ref{tab:memo-campaign}, Figure~\ref{fig:memo-campaign}): two-thirds of the
+    endpoint differential by day 6, with the reminders/norms caveat stated.
+  \item \textbf{Takeaway.} Concede ``uniquely identifies''; claim ``consistent with
+    social image, and the only modeled mechanism that jointly fits take-up,
+    observability, and the calendar placebo.'' Add one paragraph on descriptive norms
+    and social proof, on our own terms.
+\end{itemize}
+
+\begin{decision}
+  Add arm and signal-specific $\lambda$ as a robustness check, note that the social multiplier is unchanged. No need to add 
+  campaign-day dynamics as a robustness check.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Social multipliers under alternative social-image weights
+    (\texttt{sections/signal-specific-lambda.tex})}
+  \label{tab:memo-lambda-mult}
+  \input{\StructuralRobustnessPath/tables/main-core-lambda-nested-multipliers.tex}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Evolution of treatment-by-Far interactions over the campaign
+    (\texttt{sections/campaign-day-dynamics.tex})}
+  \label{tab:memo-campaign}
+  \adjustbox{max width=\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/campaign-day-interaction-table.tex}}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\StructuralRobustnessPath/figures/campaign-day-cumulative.pdf}
+  \caption{Adjusted cumulative take-up over the campaign, original assignment.}
+  \label{fig:memo-campaign}
+\end{figure}
+
+%=====================================================================
+\clearpage
+\section{The observability measure does not match the theoretical object}
+
+\begin{itemize}[nosep]
+  \item \textbf{Problem.} Definite-answer share is not the probability of being
+    observed; bracelets and ink are one-sided noisy signals. A referee will demand an
+    asymmetric observation model.
+  \item \textbf{What we do.} Full model re-estimated under correct classification and
+    perceived second-order observability: stable (Table~\ref{tab:memo-obs-alt}). Explicit
+    asymmetric-reporting model --- truth-specific Yes/No/Don't-know matrix, false
+    positives and negatives separate, four regularizations
+    (Tables~\ref{tab:memo-asym}--\ref{tab:memo-asym-contrast}).
+  \item \textbf{Takeaway.} ATEs stable (Bracelet $+7.2$pp). The pooled No Signal $-$ Any
+    Signal contrast survives every reporting model (0.47 at 1500m; 0.45 finite). The
+    Bracelet-specific multiplier does not (finite 0.34, interval $(-0.04,0.82)$), and the
+    500m contrast is $\approx 0$. The robust object is the pooled contrast, not
+    arm-specific levels.
+\end{itemize}
+
+\begin{decision}
+  Do not include asymmetric model for now, report robustness in SM across all other observability models. Add Pr(amplification), Pr(mitigation) to 
+  all SM tables.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Multipliers under alternative observability measures
+    (\texttt{sections/observability-measurement.tex})}
+  \label{tab:memo-obs-alt}
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-observability-multipliers.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Multipliers with asymmetric classification, tighter reporting priors
+    (\texttt{sections/asymmetric-reporting-priors.tex})}
+  \label{tab:memo-asym}
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-tight-asymmetric-report-multipliers.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Paired No Signal $-$ Any Signal contrast across reporting models}
+  \label{tab:memo-asym-contrast}
+  {\setlength{\tabcolsep}{4pt}%
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-report-distance-contrasts.tex}}}
+\end{table}
+
+%=====================================================================
+\clearpage
+\section{The structural model is doing more work than the paper acknowledges}
+\label{sec:memo-structural}
+
+Four sub-points; each: issue, what we do, takeaway.
+
+\subsection{Common image weight}
+\begin{itemize}[nosep]
+  \item \textbf{Issue.} Common $\lambda$ across arms is a strong, untested restriction.
+  \item \textbf{What we do.} Nested $\lambda$ models plus prior grid, regularized
+    profile, and simulation recovery (Tables~\ref{tab:memo-lambda-mult},
+    \ref{tab:memo-lambda-recovery}; Figure~\ref{fig:memo-lambda-profile}): contrasts
+    $\approx 0$; recovery shows real heterogeneity would have been detected.
+  \item \textbf{Takeaway.} Restriction is now tested, not assumed. Cite from Section 6;
+    delete language implying it is innocuous.
+\end{itemize}
+
+
+\begin{decision}
+  Add results showing common $\lambda$ seems to be okay - also reference SM table showing that the social multiplier is unchanged under arm-specific $\lambda$. Evidence 
+  does not seem to support multiple $\lambda$'s - communicate this. Also show common lambda does okay in sims.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Simulation recovery of signal-specific image weights}
+  \label{tab:memo-lambda-recovery}
+  \input{\StructuralRobustnessPath/tables/main-core-lambda-recovery-table.tex}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.48\linewidth]{\StructuralRobustnessPath/figures/main-core-lambda-prior-sensitivity.pdf}
+  \hfill
+  \includegraphics[width=.48\linewidth]{\StructuralRobustnessPath/figures/main-core-lambda-profile.pdf}
+  \caption{Prior sensitivity and regularized profile support for the image-weight
+    contrast.}
+  \label{fig:memo-lambda-profile}
+\end{figure}
+
+\FloatBarrier
+\subsection{Valuation data barely discipline the multiplier}
+\begin{itemize}[nosep]
+  \item \textbf{Issue.} WTP likelihood barely moves the multiplier ($\rho \approx 0$);
+    the ``bounds'' language overclaims.
+  \item \textbf{What we do.} Likelihood-sensitivity diagnostic
+    (Table~\ref{tab:memo-object-sens}): WTP disciplines the private-value split; take-up
+    and observability beliefs discipline the multiplier.
+  \item \textbf{Takeaway.} Rewrite the identification prose (intro ``three
+    ingredients,'' Section 6); drop ``bounds.''
+\end{itemize}
+
+\begin{decision}
+(6) Sensitivity table in the main text (one table, preempts the B28 objection) or the
+appendix? Make it clear that making the prior translating KSH into walking distance stronger would hurt us more.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Which data discipline which structural objects (at 1.5 km;
+    \texttt{sections/structural-object-sensitivity.tex})}
+  \label{tab:memo-object-sens}
+  \adjustbox{max width=0.9\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/structural-object-sensitivity-1500m.tex}}
+\end{table}
+
+\FloatBarrier
+\subsection{Uncertainty too optimistic / pseudo-replication}
+\begin{itemize}[nosep]
+  \item \textbf{Issue.} Individual-level likelihood, 144-cluster design; structural
+    intervals implausibly tighter than the reduced form.
+  \item \textbf{What we do.} 999 weighted-likelihood refits with exponential cluster
+    weights, one weight per community across all likelihood blocks
+    (Tables~\ref{tab:memo-cluster-ate}--\ref{tab:memo-cluster-contrast}): ATE contrast
+    0.050 $[0.012, 0.098]$; multiplier contrast 0.47 $[0.12, 1.18]$ at 1500m, grid
+    minimum 0.42 $[0.10, 1.01]$, positive in every refit. Prior grid: 13 specifications,
+    medians move in the second decimal (Table~\ref{tab:memo-prior-grid}).
+  \item \textbf{Takeaway.} Intervals widen; conclusions stand. The community
+    random-shock model is the one specification that compresses multipliers toward one
+    (Table~\ref{tab:memo-cluster-mult}) --- discuss it in the text, don't leave it for a
+    referee.
+\end{itemize}
+
+\begin{decision}
+(7) Make weighted-bootstrap percentile intervals the default for every headline
+multiplier and policy number.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Structural treatment effects: cluster weighted-likelihood bootstrap
+    (\texttt{sections/cluster-inference.tex})}
+  \label{tab:memo-cluster-ate}
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-exponential-cluster-weight-overall-te-table.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Multipliers under alternative treatments of community dependence}
+  \label{tab:memo-cluster-mult}
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-cluster-robustness.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Paired multiplier contrasts across 999 weighted refits}
+  \label{tab:memo-cluster-contrast}
+  \adjustbox{max width=\textwidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-exponential-cluster-weight-multiplier-contrasts.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Prior sensitivity of the finite 0--2.5km multiplier, 13 specifications
+    (\texttt{sections/multiplier-prior-sensitivity.tex})}
+  \label{tab:memo-prior-grid}
+  \adjustbox{max width=\textwidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-prior-grid.tex}}
+\end{table}
+
+\begin{decision}
+  When discussing priors in appendix, reference prior sensitivity table.
+\end{decision}
+
+\FloatBarrier
+\subsection{Information structure}
+\begin{itemize}[nosep]
+  \item \textbf{Issue.} Full information eliminates Control amplification; dismissing it
+    on fit alone is not sufficient. The motivation-inference channel ($\Delta'$) remains
+    model-implied.
+  \item \textbf{What we did and archived.} We coded the only free-text block linking
+    inference content to randomized distance (endline item-meaning responses; two blind
+    LLM coders, 99.4\% agreement). Result: a denotational null --- 95--98\% bare
+    participation markers, 3 of 831 strings with any motivation content, no distance
+    gradient. Because the question elicits what the item \emph{means}, not what it says
+    about the wearer, this does not discipline $\Delta'$ either way; we decided not to
+    include it. Archived in \path{ref-reports/signal-meaning-coding/} for a ``did you
+    look?'' referee reply. One coding-free by-product is available if wanted: reported
+    item exposure falls with randomized distance (bracelet $-3.7$pp, ink $-12.3$pp,
+    calendar $-22.9$pp), a model-free observability fact.
+  \item \textbf{Takeaway.} Concede Control-arm \emph{amplification} is
+    information-structure dependent; the mitigation ordering is not. $\Delta'$ is
+    presented as a model-implied decomposition.
+\end{itemize}
+
+\begin{decision}
+  I think we leave this as is.
+\end{decision}
+
+\FloatBarrier
+\subsection{Type distribution (assessment requirement 4)}
+\begin{itemize}[nosep]
+  \item \textbf{Issue.} Results could hinge on Gaussian intrinsic motivation; editor
+    wants estimated alternatives, not illustrative simulations.
+  \item \textbf{What we do.} Estimated Student-$t(5)$ (Table~\ref{tab:memo-student-t})
+    and a normalized two-component mixture (Table~\ref{tab:memo-mixture},
+    Figure~\ref{fig:memo-mixture}).
+  \item \textbf{Takeaway.} Ordering unchanged; modest attenuation and wider intervals.
+    Replace the old simulation paragraph with these estimated results.
+\end{itemize}
+
+\begin{decision}
+  Add to structural robustness.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Multipliers under Gaussian vs Student-$t(5)$ types
+    (\texttt{sections/student-t-types.tex})}
+  \label{tab:memo-student-t}
+  \adjustbox{max width=0.9\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-student-t-multipliers.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Multipliers under Gaussian vs finite-mixture types
+    (\texttt{sections/finite-mixture-types.tex})}
+  \label{tab:memo-mixture}
+  \adjustbox{max width=0.9\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/main-core-finite-mixture-multipliers.tex}}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.6\textwidth]{\StructuralRobustnessPath/figures/finite-mixture-density.pdf}
+  \caption{Estimated finite-mixture type density vs the standard-normal benchmark.}
+  \label{fig:memo-mixture}
+\end{figure}
+
+%=====================================================================
+\clearpage
+\section{The policy exercise outruns the evidence}
+
+\begin{itemize}[nosep]
+  \item \textbf{Problem.} Extrapolates to 3.5km, ignores costs and weights, assumes
+    observability transports under consolidation; 108-vs-81 too prominent in the
+    abstract.
+  \item \textbf{What we do.} Population weighting: saving 25 sites $[16,31]$ (24
+    $[7,31]$ cluster-weighted; positive in every draw,
+    Table~\ref{tab:memo-policy-pop}). Observability dilution under pooling: saving 24
+    $\to$ 10 $[3,20]$ at 50\%, $\to$ 3 $[0,9]$ at 100\%
+    (Table~\ref{tab:memo-policy-pooling}). Costs priced, including the \$0.20 bracelet:
+    break-even site cost \$261 (travel unpriced) to \$483 (at \$0.10/km)
+    (Table~\ref{tab:memo-policy-breakeven}, Figure~\ref{fig:memo-policy-breakeven}). A
+    2.5km cap is shown mechanically infeasible (site floor 114 regardless of demand,
+    Table~\ref{tab:memo-policy-cap}). Contrast positive across all structural models
+    (Table~\ref{tab:memo-policy-models}).
+  \item \textbf{Takeaway.} The defensible claim is conditional: signals save sites in
+    every draw; the magnitude is 3--25 depending on observability transport, and
+    resource savings depend on site and travel costs. Before locking numbers: reconcile
+    main-text 108-vs-81 (fit105) with the corrected all-1{,}451-site geography
+    (101-vs-76/77) --- the old 1{,}092-site object was a row-index bug --- and fix the
+    80-vs-81 inconsistency.
+\end{itemize}
+
+\begin{decision}
+  Don't worry about observability transport. Update w/ population weighting as main version? Add break even part. Add discussion on georgraphic 
+  feasibility? Add robustness to alternative models.
+\end{decision}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Population weighting in the policy allocation
+    (\texttt{sections/policy-population-cost.tex})}
+  \label{tab:memo-policy-pop}
+  \adjustbox{max width=\textwidth}{%
+    \input{\StructuralRobustnessPath/tables/policy-population-weighted-allocations.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Sensitivity to observability dilution under site consolidation}
+  \label{tab:memo-policy-pooling}
+  \adjustbox{max width=\textwidth}{%
+    \input{\StructuralRobustnessPath/tables/policy-pooling-observability.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Break-even resource costs for the Bracelet allocation}
+  \label{tab:memo-policy-breakeven}
+  \adjustbox{max width=\textwidth}{%
+    \input{\StructuralRobustnessPath/tables/policy-break-even-costs.tex}}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{\StructuralRobustnessPath/figures/policy-break-even-site-cost.pdf}
+  \caption{Fixed-site cost required for the Bracelet allocation to break even.}
+  \label{fig:memo-policy-breakeven}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Distance caps and geographic feasibility of consolidation
+    (\texttt{sections/policy-distance-cap.tex})}
+  \label{tab:memo-policy-cap}
+  \adjustbox{max width=0.95\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/policy-distance-cap-feasibility.tex}}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Policy contrast across structural models
+    (\texttt{sections/policy-model-robustness.tex})}
+  \label{tab:memo-policy-models}
+  \adjustbox{max width=0.98\linewidth}{%
+    \input{\StructuralRobustnessPath/tables/optim-policy-model-robustness-contrasts.tex}}
+\end{table}
+
+%=====================================================================
+\clearpage
+\section{Presentation and manuscript readiness}
+
+\begin{itemize}[nosep]
+  \item \textbf{Problem.} Two \verb|(p=)| placeholders in the intro; Table F1 ``??'';
+    18\% (abstract) vs 25\% (intro/conclusion) for the same policy contrast; 80 vs 81
+    sites; Table B29 notation; observability terminology; 20--25\% length cut requested.
+  \item \textbf{What we do.} One sweep, \emph{after} the reframing edits --- they
+    rewrite the same paragraphs. Merge plan: RI, cluster inference, asymmetric
+    reporting, signal-specific $\lambda$, alternative observability, types, policy
+    population/cost/pooling $\to$ online appendix, cited at first relevance; prior grid,
+    cap diagnostic, full policy diagnostics $\to$ replication package.
+  \item \textbf{Takeaway.} These are desk-rejection-adjacent signals of an unfinished
+    draft; no robustness table compensates for them.
+\end{itemize}
+
+\begin{decision}
+(11) Who owns the sweep and the length cut; sequencing after the reframe.
+\end{decision}
+
+%=====================================================================
+\section{Status against the editor's five R\&R requirements}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabular}{p{0.28\linewidth}p{0.18\linewidth}p{0.44\linewidth}}
+    \toprule
+    Requirement & Status & Main gap \\
+    \midrule
+    1. Randomization at the center & Built, incl.\ RI + Romano--Wolf; not merged &
+      Section 4 ordering; PAP flags; optional wild bootstrap \\
+    2. Narrow/strengthen mechanism claim & Largely built &
+      Abstract/intro language; descriptive-norms paragraph \\
+    3. Rebuild structural uncertainty \& sensitivity & Strongest area; built &
+      Quote cluster-widened intervals as default; merge \\
+    4. Motivation-inference caution & Types done; meaning coding archived &
+      Reframe centroid vs full information as identification uncertainty \\
+    5. Strengthen or demote policy exercise & Built &
+      Conditional reframing; reconcile 108/81 with corrected geometry \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent
+The analysis is mostly done; what remains is writing. Move the headline from
+arm-specific multiplier levels and an unconditional 108-vs-81 to the pooled contrast,
+the design-based 65\% attenuation, and a conditional policy result --- the change the
+assessment identifies as separating ``likely rejection'' from ``strong R\&R.''
+
+\end{document}

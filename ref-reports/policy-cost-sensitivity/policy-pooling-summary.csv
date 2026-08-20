@@ -1,0 +1,4 @@
+"analysis_id","analysis_label","pooling_rho","attenuation_label","control_sites","bracelet_sites","sites_saved","median_sites_saved","lower_sites_saved","upper_sites_saved","probability_sites_saved","draws"
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0,"No attenuation","\makecell[c]{101\\{}[99, 103]}","\makecell[c]{78\\{}[71, 96]}","\makecell[c]{24\\{}[7, 31]}",24,6.95,31,0.997997997997998,999
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0.5,"50\% attenuation","\makecell[c]{101\\{}[99, 103]}","\makecell[c]{91\\{}[81, 99]}","\makecell[c]{10\\{}[3, 20]}",10,3,20,0.996996996996997,999
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",1,"Control observability","\makecell[c]{101\\{}[99, 103]}","\makecell[c]{99\\{}[93, 103]}","\makecell[c]{3\\{}[0, 9]}",3,-0.0499999999999972,9,0.895895895895896,999

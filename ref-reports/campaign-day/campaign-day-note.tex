@@ -1,0 +1,95 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{makecell}
+\usepackage{caption}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\title{Original Assignment ATEs and Campaign-Day Take-Up}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Original assignment effects}
+
+The endpoint analysis uses the originally randomized Close/Far assignment rather
+than the subsequently corrected distance classification. The existing estimates
+are reproduced below. Treatment rows are effects relative to Control; the Control
+row reports predicted levels.
+
+\begin{table}[htbp]
+\centering
+\caption{Original distance-assignment intention-to-treat estimates}
+\input{../../presentations/rf-tables/main-specs/rf_original_distance_itt_tbl.tex}
+\end{table}
+
+\clearpage
+\section{Campaign-day accumulation}
+
+For campaign day $t$, cumulative take-up is an indicator for directly recorded
+treatment on or before day $t$. Daily incidence is an indicator for directly
+recorded treatment exactly on day $t$. Both outcomes retain the full randomized
+sample; in particular, daily incidence is not conditioned on a post-treatment
+risk set. Day 12 therefore equals the endpoint used in the original-assignment
+ATE table exactly.
+
+We estimate the same linear specification used for that endpoint, including the
+four treatment arms interacted with original Close/Far assignment, gender, age,
+expected distance, and county fixed effects. Ribbons and table intervals are
+pointwise 95\% intervals from paired exponential cluster-weight draws at the 144
+randomization clusters. The same weights are used across all campaign days.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/campaign-day-cumulative.pdf}
+\caption{Adjusted cumulative take-up over the campaign. Shaded regions are
+pointwise 95\% cluster-weight intervals.}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{Adjusted cumulative take-up on selected campaign days}
+\resizebox{\linewidth}{!}{\input{tables/campaign-day-cumulative-table.tex}}
+\caption*{\footnotesize Notes: Cells report adjusted predictions or Far-minus-Close
+differences, with pointwise 95\% cluster-weight intervals in brackets. All
+estimands retain all 9,805 randomized observations.}
+\end{table}
+
+\clearpage
+\begin{table}[htbp]
+\centering
+\caption{Evolution of treatment-by-Far interaction effects}
+\resizebox{\linewidth}{!}{\input{tables/campaign-day-interaction-table.tex}}
+\caption*{\footnotesize Notes: Each arm-specific row is the treatment-versus-Control
+effect under Far assignment minus the corresponding effect under Close assignment.
+The pooled row compares the average of Ink and Bracelet with the average of Control
+and Calendar. Brackets contain pointwise 95\% cluster-weight intervals.}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/campaign-day-incidence.pdf}
+\caption{Adjusted unconditional daily take-up. Shaded regions are pointwise
+95\% cluster-weight intervals. These are unconditional daily probabilities, not
+hazards among those who have not yet participated.}
+\end{figure}
+
+\paragraph{Summary.}
+\input{campaign-day-generated-results.tex}
+
+The differential effect of public signals under Far assignment therefore develops
+over the campaign, rising from 2.9 percentage points on day 1 to 12.4 percentage
+points by day 12. This accumulation is consistent with the value of visible signals
+increasing as participation unfolds within communities, and provides additional
+support for the broad social-image or social-information mechanism. The timing
+evidence does not, however, separately identify social image from related mechanisms
+such as reminders, descriptive norms, or social learning. The arm-specific estimates
+also show that the aggregate timing pattern is driven most clearly by Ink; the
+Bracelet interaction moves in the same direction later in the campaign but remains
+imprecisely estimated.
+
+\end{document}

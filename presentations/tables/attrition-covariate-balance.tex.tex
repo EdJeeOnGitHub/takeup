@@ -1,0 +1,38 @@
+[htbp]
+\centering
+
+\label{tab:attrition-covariate-balance}
+\begin{tabular}{l ccccc}
+\hline\hline
+ & \multicolumn{1}{c}{Present} & \multicolumn{1}{c}{Missing} & \multicolumn{1}{c}{Difference} & \multicolumn{1}{c}{SE} & \multicolumn{1}{c}{N} \\
+\hline
+\addlinespace
+\textit{Demographics} \\
+\addlinespace
+Age & 41.177 & 42.578 & $1.229$ & $(1.231)$ & 2,312 \\
+Female & 0.625 & 0.722 & $0.097^{***}$ & $(0.032)$ & 2,312 \\
+Completed Primary & 0.486 & 0.380 & $-0.104^{***}$ & $(0.030)$ & 2,648 \\
+Tile/Cement Floor & 0.194 & 0.199 & $0.002$ & $(0.030)$ & 2,648 \\
+Luhya & 0.626 & 0.601 & $0.002$ & $(0.021)$ & 2,638 \\
+Christian & 0.974 & 0.972 & $-0.003$ & $(0.010)$ & 2,659 \\
+\addlinespace
+\textit{Cluster \& Program} \\
+\addlinespace
+Has Phone & 0.798 & 0.767 & $-0.043$ & $(0.026)$ & 2,312 \\
+Ever Dewormed & 0.353 & 0.389 & $0.039$ & $(0.032)$ & 2,659 \\
+Knows Age & 1.370 & 1.393 & $0.015$ & $(0.068)$ & 2,659 \\
+Cluster Size & 661.462 & 663.758 & $9.205$ & $(21.181)$ & 2,659 \\
+Dist.\ to POT (m) & 1189.343 & 1220.685 & $39.854$ & $(50.081)$ & 2,312 \\
+CHV Visit & 0.813 & 0.870 & $0.065^{**}$ & $(0.025)$ & 2,314 \\
+Received Flyer & 0.694 & 0.677 & $-0.002$ & $(0.036)$ & 2,314 \\
+\addlinespace
+\textit{Endline Knowledge} \\
+\addlinespace
+Aware of Externalities & 0.192 & 0.194 & $0.001$ & $(0.028)$ & 2,659 \\
+All Can Get Worms & 0.740 & 0.750 & $0.010$ & $(0.033)$ & 2,659 \\
+Correct When to Treat & 0.639 & 0.647 & $0.014$ & $(0.037)$ & 2,659 \\
+Worms Infectious & 0.307 & 0.321 & $0.016$ & $(0.031)$ & 2,659 \\
+\hline\hline
+\end{tabular}
+\par\smallskip\footnotesize\textit{Notes:} Columns ``Present'' and ``Missing'' report raw means for respondents present in and missing from the endline knowledge table, respectively. ``Difference'' reports the coefficient on a missing indicator from a regression with county fixed effects. Standard errors clustered at the cluster level. $^{*}$~$p<0.10$, $^{**}$~$p<0.05$, $^{***}$~$p<0.01$.
+

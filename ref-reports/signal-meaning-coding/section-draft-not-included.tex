@@ -1,0 +1,126 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,graphicx,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{What Do the Signals Mean? Coding the Free-Text Meaning Responses}
+\label{app:signal-meaning-coding}
+
+At endline, every respondent who reported having seen a bracelet, ink mark, or
+calendar was asked what the item means. This yields 2{,}239 free-text answers
+(950 bracelet, 620 ink, 669 calendar), each attributable to a community whose
+distance condition was randomized. We use these responses to ask two questions
+that bear directly on the interpretation of the structural decomposition.
+First, does the meaning respondents attach to a public signal include
+attributions about the participant's motivation or character, and does that
+content strengthen with randomized distance? Second, is the basic denotation
+of the signals stable across distance conditions?
+
+The coding is designed to be auditable. All 831 distinct response strings were
+extracted into a coding sheet containing only an identifier, the item, and the
+verbatim text---no treatment, distance, or community fields---so coders could
+not condition on the experimental assignment. A codebook fixed before any
+coding defines five non-exclusive categories: motivation or character
+attribution (M), participation marker (P), campaign or verification function
+(C), private or decorative item value (V), and other or uncodable (O), with a
+prespecified conservative rule that withholds M in borderline cases. Two
+independent language-model coders labeled every string from the codebook
+alone; they disagreed on 5 of 831 strings (exact five-label agreement 99.4
+percent; per-label agreement at least 99.6 percent). A third blind pass
+adjudicated the disagreements by majority vote. The coded artifacts are
+committed with the replication materials, so the analysis reproduces without
+re-running any coder.
+
+Table~\ref{tab:signal-meaning-shares} reports the category shares by item and
+original distance assignment; Table~\ref{tab:signal-meaning-quotes} gives the
+most common examples. The result is unambiguous: the meaning of every item is
+overwhelmingly a bare participation marker. Between 89 and 98 percent of
+responses in every item-by-distance cell state that the holder was dewormed,
+with small verification (C) and gift or reminder (V) components---the latter
+concentrated in the calendar arm, consistent with its private-value
+interpretation. Spontaneous motivation or character attributions are nearly
+absent: 3 of 831 distinct strings, or well under one percent of respondents in
+every cell.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Coded meaning content by item and original distance assignment}
+  \label{tab:signal-meaning-shares}
+  \begin{threeparttable}
+    \input{\StructuralRobustnessPath/tables/signal-meaning-shares.tex}
+    \begin{tablenotes}[flushleft]\footnotesize
+      \item \textit{Notes:} Entries are respondent-level shares of each coded
+      category among endline respondents who saw the item, by original
+      randomized Close/Far assignment. Categories are non-exclusive except O.
+      M: motivation or character attribution; P: participation marker; C:
+      campaign or verification function; V: private, decorative, or reminder
+      value; O: other or uncodable.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Distance contrasts in coded meaning content and item exposure}
+  \label{tab:signal-meaning-effects}
+  \resizebox{\linewidth}{!}{%
+    \input{\StructuralRobustnessPath/tables/signal-meaning-effects.tex}}
+  \begin{minipage}{0.96\linewidth}
+    \vspace{0.35em}\footnotesize
+    \textit{Notes:} Far $-$ Close contrasts under the original randomized
+    assignment unless labeled otherwise, adjusting for sex, age, expected
+    distance, and county fixed effects. Intervals are 95 percent percentile
+    intervals across 1{,}000 county-stratified exponential community-weight
+    draws. Randomization-inference $p$-values permute the Close/Far label
+    across the sample's communities within county; at the near-zero base rate
+    of M they are driven by one or two responses and are reported only for
+    completeness. The primary sample excludes SMS-treated respondents. ``Seen
+    item'' rows use all arm respondents and report whether the respondent
+    reported having seen the item.
+  \end{minipage}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Most common coded examples (bracelet arm)}
+  \label{tab:signal-meaning-quotes}
+  \input{\StructuralRobustnessPath/tables/signal-meaning-quotes.tex}
+\end{table}
+
+Table~\ref{tab:signal-meaning-effects} reports the experimental contrasts.
+Three findings follow. First, the near-zero motivation share does not differ
+by randomized distance for the bracelet (0.3 percentage points, interval
+$[0.0, 0.9]$), for ink, for the pooled signals, or for the calendar placebo;
+at this base rate the exercise cannot detect gradients, and none is visible.
+Second, the denotation of the signals is stable: the participation-marker
+share is 95 to 98 percent in every signal cell, Close and Far alike. The
+bracelet does not become a virtue badge at distance---or anywhere. This
+stability supports the structural model's maintained assumption that the
+public signals change the visibility of participation rather than the meaning
+of participating, and complements the signal-specific image-weight analysis in
+Section~\ref{app:signal-specific-lambda}. Third, reported exposure to the
+items declines with randomized distance (by 3.7 percentage points for the
+bracelet, 12.3 for ink, and 22.9 for the calendar), an independent,
+non-model-based corroboration that distance reduces the circulation of
+participation information.
+
+Two limitations define what this exercise can and cannot establish. The
+question elicits the signal's denotation, not an evaluation of its wearer;
+respondents who would judge a Far participant more favorably need not
+volunteer that judgment when asked what a bracelet means. And the contrasts
+condition on having seen the item, which itself responds to distance; the
+unconditional bracelet estimate, which codes non-seers as zero, is reported in
+Table~\ref{tab:signal-meaning-effects} and is unchanged. We therefore draw a
+deliberately limited conclusion: the free-text evidence shows no direct trace
+of distance-dependent motivation attribution, and the type-inference component
+of the multiplier should be read as a model-implied decomposition---while the
+meaning stability and exposure gradients independently support the
+observability channel on which that decomposition rests.
+
+\end{document}

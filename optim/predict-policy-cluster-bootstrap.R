@@ -8,7 +8,7 @@ distance_data <- policy_option_value(args, "--distance-data", "optim/data/full-m
 output_path <- policy_option_value(args, "--output-path")
 distance_cap <- as.numeric(policy_option_value(args, "--distance-cap", "3500"))
 num_cores <- as.integer(policy_option_value(args, "--num-cores", "1"))
-num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "210"))
+num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"))
 if (is.null(parameter_csv) || is.null(output_path)) {
   stop("--parameter-csv and --output-path are required.", call. = FALSE)
 }
@@ -32,18 +32,27 @@ edges <- edges[order(edges$village_i, edges$pot_j), ]
 if (!setequal(unique(edges$village_i), distance_object$village_df$id)) {
   stop("At least one village has no feasible PoT.", call. = FALSE)
 }
-unique_distances <- sort(unique(edges$distance))
 parameters$sd_of_dist <- distance_object$sd_of_dist
 
 started <- Sys.time()
 draw_predictions <- parallel::mclapply(
   seq_len(nrow(parameters)),
-  function(index) predict_policy_draw(parameters[index, ], unique_distances),
+  function(index) {
+    prediction <- predict_policy_draw(parameters[index, ], edges$distance)
+    list(
+      demand = prediction$demand,
+      fixedpoint_fallbacks = sum(vapply(
+        split(prediction$fixedpoint_fallbacks, prediction$scenario_id),
+        function(value) unique(value)[1L], numeric(1)
+      ))
+    )
+  },
   mc.cores = num_cores,
   mc.preschedule = TRUE
 )
-curves <- do.call(rbind, draw_predictions)
-if (any(!is.finite(curves$demand)) || any(curves$demand < 0 | curves$demand > 1)) {
+edge_demand <- do.call(rbind, lapply(draw_predictions, `[[`, "demand"))
+if (ncol(edge_demand) != nrow(edges) * nrow(policy_scenarios) ||
+    any(!is.finite(edge_demand)) || any(edge_demand < 0 | edge_demand > 1)) {
   stop("Non-finite or invalid predicted demand.", call. = FALSE)
 }
 
@@ -65,17 +74,23 @@ experimental <- do.call(rbind, parallel::mclapply(
 
 dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 saveRDS(edges, file.path(output_path, "policy-feasible-edges.rds"), compress = FALSE)
-saveRDS(curves, file.path(output_path, "policy-demand-curves.rds"), compress = FALSE)
+saveRDS(edge_demand, file.path(output_path, "policy-edge-demand-matrix.rds"), compress = FALSE)
+write.csv(
+  parameters[, c("draw", "replicate"), drop = FALSE],
+  file.path(output_path, "policy-edge-demand-draw-map.csv"), row.names = FALSE
+)
 saveRDS(experimental, file.path(output_path, "policy-experimental-demand.rds"), compress = FALSE)
 write.csv(data.frame(
   draws = nrow(parameters),
   scenarios = nrow(policy_scenarios),
   feasible_edges = nrow(edges),
-  unique_distances = length(unique_distances),
-  dense_rows_avoided = nrow(distance_object$long_distance_mat) * nrow(parameters) * nrow(policy_scenarios) - nrow(curves),
+  predicted_edge_values = length(edge_demand),
+  dense_rows_avoided = max(
+    0, nrow(distance_object$long_distance_mat) * nrow(parameters) *
+      nrow(policy_scenarios) - length(edge_demand)
+  ),
   fixedpoint_fallbacks = sum(vapply(
-    split(curves$fixedpoint_fallbacks, interaction(curves$draw, curves$scenario_id)),
-    function(value) unique(value)[1L], numeric(1)
+    draw_predictions, `[[`, numeric(1), "fixedpoint_fallbacks"
   )),
   elapsed_seconds = as.numeric(difftime(Sys.time(), started, units = "secs"))
 ), file.path(output_path, "policy-prediction-status.csv"), row.names = FALSE)

@@ -1,0 +1,27 @@
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}[t]{lccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{Cluster weighted-likelihood bootstrap} \\
+\cmidrule(l{3pt}r{3pt}){2-4}
+ & Combined & Close segment & Far segment \\ 
+Distance span & 0--2.5 km & 0--1.5 km & 1.5--2.5 km \\ 
+\midrule
+\multicolumn{4}{l}{\textit{Panel A: Treatment-specific finite multipliers}}\\
+\addlinespace
+Bracelet & \makecell[c]{0.863\\(0.580, 1.191)} & \makecell[c]{0.892\\(0.548, 1.230)} & \makecell[c]{0.819\\(0.611, 1.138)}\\
+\addlinespace
+Calendar & \makecell[c]{1.222\\(0.909, 1.792)} & \makecell[c]{1.235\\(0.951, 1.753)} & \makecell[c]{1.206\\(0.858, 1.924)}\\
+\addlinespace
+Ink & \makecell[c]{0.889\\(0.565, 1.190)} & \makecell[c]{0.915\\(0.559, 1.200)} & \makecell[c]{0.848\\(0.550, 1.208)}\\
+\addlinespace
+Control & \makecell[c]{1.452\\(1.035, 2.352)} & \makecell[c]{1.421\\(1.052, 2.226)} & \makecell[c]{1.500\\(1.008, 2.592)}\\
+\addlinespace
+\multicolumn{4}{l}{\textit{Panel B: Directional probabilities}}\\
+\addlinespace
+$\Pr(M_{\mathrm{No\ Signal}}>M_{\mathrm{Signal}})$ & 1.000 & 1.000 & 1.000\\
+\addlinespace
+$\Pr(M_{\mathrm{Calendar}}>M_{\mathrm{Bracelet}})$ & 0.969 & 0.966 & 0.972\\
+\bottomrule
+\end{tabular}%
+}

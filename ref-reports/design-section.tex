@@ -1,0 +1,154 @@
+
+\section{Experimental Design} \label{design}
+
+We implement a factorial design that orthogonally varies, at the cluster level, (i) travel distance to treatment sites and (ii) the observability of participation. A cluster is defined by a point of treatment (PoT) and one targeted community selected from the PoT's catchment. In addition, within each cluster we randomly assign a small subset of phone owners to receive SMS messages that either (i) remind them of the campaign or (ii) remind them and report current local take-up. The cluster level cross-randomization tests our core hypothesis---whether distance changes have different effects when participation is more observable---while the
+individual level SMS messages provide a robustness check for reminder and social-information channels. Figure~\ref{fig:design-schematic} summarizes the design and randomization hierarchy.
+
+
+\subsection{Distance Assignment}\label{sec:distance-treatment}
+
+Implementing the distance treatment required jointly selecting treatment locations and targeted communities under geographic and logistical constraints. We relied on geospatial data on primary schools, churches, and mosques as spatial reference points: areas around these locations provide feasible centralized locations for points of treatment (PoTs), and the dense geographic coverage of primary schools and religious centers in the study area provides a proxy for locating nearby communities, in the absence of geo-coded community locations.
+
+We proceed in three steps: (i) select PoT-centered clusters using a geographically constrained procedure, (ii) randomly assign each selected cluster to a Close or Far distance condition, (iii) randomly select one targeted community per cluster whose centroid lies in the assigned distance band relative to that cluster's PoT. Appendix~\ref{sec:site-selection} provides full details. %algorithmic 
+
+\vspace{0.4em}
+\noindent\textbf{1.\ Cluster (PoT) selection.} We begin from a sampling frame of 1{,}451 potential clusters, each defined by a 2.5~km radius catchment circle centered on a primary school/religious center (the candidate PoT). We select 158 clusters using a sequential acceptance--rejection algorithm: we repeatedly draw a candidate cluster at random and accept if, after accounting for overlap with previously selected clusters, all selected clusters retain a sufficiently large non-overlapping catchment.\footnote{We targeted 150 clusters and drew eight additional clusters as fallbacks. Field feasibility constraints limited implementation to 144 clusters. Eight clusters were dropped during mapping because the anchor school/religious center or its intended location could not be verified (this affected, two clusters in Busia ((far; bracelet/calendar), (close; ink/control)), two clusters in Siaya ((far; ink/control), (far; bracelet/calendar)) and four clusters in Kakamega (3 (far; bracelet/calendar), 1 (close; ink/control)) and six of the original 150 clusters were dropped because implementation was practically not feasible as CHVs were not available, the local chief was against, or community was adversarial towards the program: two clusters in Siaya (Far; ink and far; Ink/Control), two clusters in Busia (Close; Calendar, and Close; Control) and 2 cluster in Kakamega (Far; Calendar and Far; Control).} %TIGHTEN AND CHECK BALANCE -- WHAT IS IT THAT WE NEED TO SHOW? BASELINE BALANCE ACROSS 144 should be okay; however, could be useful to justify WHY we have so many fewer FAR clusters. We need the original assignment for that. 
+
+We operationalize this feasibility requirement by counting available primary schools/religious centers in the non-overlapping portion of each 2.5~km catchment: a location counts as available if at least 60\% of a 1~km radius circle around it lies within the non-overlapping portion of the catchment. We require each selected cluster to retain at least one such point. When assessing overlap, we use buffer circles larger than 2.5~km (3--4~km) to provide separation between nearby clusters. This implies that communities selected from the non-overlapping catchment are at least 0.5~km closer to their own assigned PoT than to the nearest alternative selected PoT. Figure~\ref{fig:sites} maps the selected PoTs and their non-overlapping catchment areas.
+
+\vspace{0.4em}
+\noindent\textbf{2.\ Close/Far assignment.}
+After selecting clusters, we randomly assign them, stratified by county, to a Close or Far distance condition. The distance category is defined in terms of the distance from the centroid of the ultimately selected community to the cluster's PoT: 0--1.25~km in Close clusters and 1.25--2.5~km in Far clusters. The 1.25~km cutoff was chosen ex ante as the midpoint of the 2.5~km catchment radius and corresponds to roughly half the upper range of distances adults were generally willing to travel for deworming treatment in our setting.
+
+\vspace{0.4em}
+\noindent\textbf{3.\ Targeted community selection.}
+To implement the assigned distance category, we selected for each cluster, from its non-overlapping area and according to its distance assignment, a primary school/religious center as an anchor to locate eligible communities to target. In Close clusters, the anchor is typically the PoT location (or a nearby school/religious center). In Far clusters, the anchor is chosen in the outer ring so that listed communities lie 1.25--2.5~km from the PoT. Enumerators listed all eligible communities near the anchor location and we randomly selected one targeted community per cluster. In all but two clusters, the assigned PoT was the closest deworming site to the community. 
+
+Random assignment produced an average distance difference of 1.02~km and doubled the median walking time from 15 to 30 minutes (Table~\ref{tab:dist-travel-treatment}).\footnote{Ninety percent of adults report walking to the PoT. The remainder travel mainly by bicycle.} Because PoT and community locations were finalized after enumeration, assignments were re-randomized in six communities due to logistical constraints in the realized PoT locations.
+Figure~\ref{fig:distance} shows the resulting distribution of centroid-to-PoT distances. 
+
+\vspace{0.5em}
+\textbf{Distance as a continuous measure.}
+Beyond the Close/Far indicator, we use centroid-to-PoT distance as a continuous measure in the reduced form and structural
+analyses, since it directly enters individuals' travel costs (and is common knowledge within the community). Specifically,
+we calculate the distance from each community's centroid to its assigned PoT.
+
+Because PoTs are selected using a geographically constrained procedure, the induced assignment mechanism could in principle
+depend on local geography (e.g., school density). Following \citet{borusyak2023nonrandom}, we re-run the full selection and
+assignment algorithm 100 times and find no evidence that potential centroid-to-PoT distance distributions differ between Close
+and Far assignments (Figure~\ref{fig:bh-dens-plot}). We further verify that realized centroid-to-PoT distance is uncorrelated
+with baseline covariates (Figure~\ref{fig:ri-baseline}). Taken together, these checks support treating distance as randomly assigned.
+
+\subsection{Incentive Treatments}
+
+We cross-randomize, at the cluster level, incentives that vary the observability of campaign participation:
+two publicly visible signals (a bracelet and indelible ink), a private reward with limited public display (a wall calendar), and a control with no item.\footnote{We piloted the incentives to choose acceptable colors and a private reward that is small, useful, and easy to implement. The color green was selected for both bracelets and ink because it avoids association with political parties and was favored during piloting.} Incentives were distributed by CHVs to adults who dewormed at the PoT, making receipt a credible signal of participation. Incentive arms were assigned with equal probability within each county $\times$ distance stratum:
+
+\begin{itemize}  
+\item[] \textbf{}
+\item \textbf{Bracelet (39 clusters; Close 21, Far 18).}
+  Adults received a green silicone bracelet reading ``Treat worms---improve the health of your community'' (Figure~\ref{fig:bracelet}).
+
+  \item \textbf{Ink (36 clusters; Close 21, Far 15).}
+  Adults received a green indelible ink mark on the thumb, similar to ink used in elections.\footnote{Our implementing partner was interested in ink due to its near zero unit cost, while bracelets cost approximately US\$0.20 each.}
+
+  \item \textbf{Calendar (35 clusters; Close 19, Far 16).}
+  Adults received a simple wall calendar containing no deworming message (Figure~\ref{fig:calendar}).\footnote{Wall calendars are popular decorative items in Kenya and cost approximately US\$0.50 each.}
+
+  \item \textbf{Control (34 clusters; Close 19, Far 15).}
+  No item was given upon deworming. \\
+\end{itemize}
+
+The Bracelet and Ink arms are designed to increase observability---how easily peers can learn about others' participation---and thus potentially strengthen social image incentives. The Calendar arm provides an active control that delivers a tangible private reward and a personal reminder of participation, but offers limited scope for public display, helping us distinguish the incremental effect of public observability from generic gift or self-image effects. At endline, we elicit willingness to pay to switch between a calendar and a bracelet in Control clusters to quantify their private value and help bound the extent to which Bracelet–Calendar differences reflect private utility rather than observability.
+
+\subsubsection{Reminder and Social Information Treatment}
+The majority of adults in our study area own a phone (75\%, see Table
+\ref{tab:baseline-bal}). We randomly assign SMS messages to a small share of phone owners (fewer than 10\%) to test whether reminders or social learning mechanisms help explain our treatment effects. Using the household census, we randomly sampled phone owners for SMS assignment: in each Control cluster, we sampled 15 phone owners for a Reminder Only SMS and 15 phone owners for a Social Info SMS; in each Incentive cluster, we sampled 25 phone owners for the Social Info SMS. Importantly, sampling was done without replacement at the household level: once an individual was selected for either SMS treatment arm, the entire household was removed from the SMS sampling frame. As a result, no household could have more than one adult assigned to SMS treatment, and no household with an SMS-treated adult could contribute a different adult to the SMS control group. Enumerators recruited selected individuals in-person prior to the campaign. In total, 3{,}022 adults enrolled in the SMS service: 387 adults in Reminder Only and 2{,}635 in Social Info.\footnote{Among adults reached for recruitment, 18 declined enrollment. Enrollment fell short of per cluster targets primarily because some sampled adults could not be reached during recruitment visits. Enrollment is balanced across incentive arms, with about 20 Social Info recipients per incentive cluster. In Control clusters, Reminder Only and Social Info each average about 11--12 recipients.}
+
+The Reminder Only message reminded individuals about the availability of free deworming at the local PoT, while the Social Info message additionally reported the current local take-up rate.\footnote{Reminder Only: ``Free
+deworming now at [Central Location]. Reply 111 to stop texts. All texts are free.'' Social Info: ``Free deworming now at [Central Location]. [No/few/almost half/half/more than half/almost all/all] of your village came, that is X in 10
+adults. Reply 111 to stop texts. All texts are free.''} Enrolled adults received a first SMS the evening before the campaign and follow-up messages on campaign days 2, 4, 6, 8, and 10. The service was free and recipients could unsubscribe at any time at no cost. To form an SMS control group, we randomly sampled 3{,}813 phone owners from the remaining sample of households (i.e., those not selected for SMS treatment). These individuals received no text messages and no recruitment visit.%ADD TO FLOW DIAGRAM??? To form an SMS control group, we randomly sampled from the remaining sample of households (i.e., those not selected for SMS treatment) 17 phone owners per cluster; we also sampled additional reserve individuals (from additional households and, where available, an additional phone owner within sampled households) to mitigate expected non-contact and to support endline follow-up. 
+
+
+\subsection{Information Outreach and Incentive Disclosure}\label{sec:info-campaign} 
+
+One week before the deworming campaign, Community Health Volunteers (CHVs) visited each of the 144 selected study communities to announce the program. These visits served two purposes: (i) ensure high awareness of campaign dates and locations, and (ii) publicly disclose the incentive that would be provided upon deworming in that area.
+
+CHVs are trusted local health workers who live in the communities they serve and support a range of public health activities, including Kenya’s school-based deworming program. During community visits, CHVs followed a standardized script that (i) announced the campaign dates and PoT location, (ii) described the assigned incentive, and (iii) explained that regular deworming---even in the absence of symptoms---benefits both children and adults and can reduce worm transmission within the community (Figure~\ref{fig:sensitization} reproduces the script). In addition, CHVs distributed flyers and posted posters displaying the campaign dates, location, and the relevant incentive (Figures~\ref{fig:flyers}). These materials 
+served as visual reminders and helped coordinate expectations about what the bracelet, ink mark, or calendar signified.
+
+
+
+%  APPENDIX STARTS HERE
+
+\subsection{PoT Selection and Distance Randomization}\label{sec:site-selection}
+
+This appendix provides implementation details on (i) the geographically constrained selection of PoT-centered clusters
+and (ii) the Close/Far distance assignment and targeted community selection. The notation used matches that used in the Cluster Selection Algorithm section 4.4 of the pre-analysis plan.
+
+\paragraph{Definitions.}
+A point of treatment (PoT) is the location at which CHVs delivered deworming during the campaign.
+We use geo-coded primary schools and religious centers as spatial reference points: these locations provide feasible centralized sites for PoTs
+and, because schools/centers are dense in the study area, a proxy for the location of nearby communities in the absence of geo-coded community boundaries. A cluster is defined by a PoT together with its surrounding 2.5~km catchment radius. This 2.5~km catchment delimits the set of communities eligible to be selected as the targeted community for that PoT.
+
+\paragraph{Sampling frame.}
+We begin from a sampling frame of 1{,}451 geo-coded primary schools/religious centers across the three study counties that could serve
+as candidate PoT locations.\footnote{Coordinates are from the Kenya Open Data Portal: \url{http://www.opendata.go.ke/}.}
+Each school/center defines a candidate cluster with a 2.5~km catchment radius. We selected 158 clusters (150 targets plus
+8 fallbacks) and field feasibility constraints limited implementation to 144 clusters.%%YOU NEED TO BE MORE SPECIFIC 
+
+\subsubsection*{PoT selection under spatial overlap constraints}
+
+We select clusters using a sequential acceptance--rejection algorithm. Let \(C\) denote the set of all candidate clusters
+(\(|C|=1{,}451\)) and let \(R\) denote the set of accepted clusters. The algorithm iterates through candidates drawn
+at random, adding a candidate cluster to \(R\) only if doing so satisfies a minimum non-overlapping catchment size
+requirement for all clusters in \(R\). If the algorithm cannot reach the target number of clusters under the
+constraints, the procedure restarts from the full candidate set.
+
+\paragraph{Non-overlapping catchment size (ClusterSize).}
+For a candidate cluster \(i\) and an accepted set \(R\), define the non-overlapping catchment of \(i\) as the
+portion of \(i\)'s 2.5~km catchment circle that does not lie within the (larger) catchment areas used to buffer
+already selected PoTs (described below). We operationalize the size of this non-overlapping catchment by counting
+``available'' primary school/religous center neighborhoods. Specifically, a location counts as available if at least 60\% of a 1~km radius
+circle around the center lies within the non-overlapping portion of the 2.5~km catchment. We require each selected cluster to retain at least one such
+available school/center neighborhood (i.e., \(\text{ThresholdClusterSize}=1\)). Intuitively, this ensures that overlap
+restrictions do not leave a cluster with an effectively empty area from which to list eligible communities.
+
+\paragraph{Buffers used for overlap checks.}
+Although the 2.5~km radius defines the eligibility region for selecting study communities, overlap restrictions are
+evaluated using larger catchment areas to create buffers between nearby PoTs. To fit the study area, candidate PoTs are randomly assigned a larger catchment radius of either 3~km or 4~km. Figure~\ref{fig:cluster-overlap-schematic} illustrates this geometry: the shaded region represents the portion of a catchment that is excluded because it falls within a neighbor's buffer. Study communities are selected from the remaining unshaded portion of the 2.5~km catchment. As a result, any selected study community is at least 0.5~km closer to its own PoT than to the nearest other selected PoT.
+
+\subsubsection*{Close/Far assignment}
+
+After PoT selection, clusters are randomly assigned, stratified by county, to Close or Far. The distance category is defined by the distance from the selected community centroid to its assigned PoT: 0--1.25~km in Close clusters and 1.25--2.5~km in Far clusters. This cutoff is depicted as the dotted circle in Figure~\ref{fig:cluster-overlap-schematic}, separating the inner (Close) and outer (Far) bands.%%ADDRESS IMBALANCE HERE
+
+\subsubsection*{Targeted community selection}
+Within each selected cluster, we select an anchor school/religious center as a field reference point for listing nearby communities. As shown in Figure~\ref{fig:cluster-overlap-schematic}, the anchor point is chosen to ensure that the randomly selected target community lies in the cluster's assigned distance band. In Close clusters, the anchor is typically the PoT. In Far clusters, the anchor is chosen in the outer ring so that listed communities lie 1.25--2.5~km from the PoT.
+
+Enumerators list all eligible communities near the anchor and we randomly select one as the study's targeted community. If the initially selected community was too small for surveying, an additional nearby community was included. In all but two clusters, the assigned PoT is the closest deworming site to the selected community. Because PoT and community locations were finalized after community enumeration, randomized re-assignment occurred in six communities due to logistical constraints in realized PoT locations.
+
+\input{anchor-diagram}
+\newpage 
+
+\subsubsection*{Potential distance balance under constrained PoT selection}
+
+A potential concern is that the acceptance-rejection algorithm may have introduced systematic differences in treatment probabilities, violating the assumption of random assignment. Following \citet{borusyak2023nonrandom}, we assess this by simulating the realized selection and assignment mechanism: we re-run the full algorithm 100 times and compute, for each study community, the implied distribution of centroid-to-PoT distances under these counterfactual re-draws. We implement this simulation after data collection, so the set of surveyed communities is fixed. We therefore compute potential distances using counterfactually selected PoTs and the already surveyed community centroids. We have broad geographic coverage, and each counterfactual PoT has at least one eligible surveyed community to map to under the simulated assignment. Figure~\ref{fig:bh-dens-plot} shows that the implied potential distance distributions are statistically indistinguishable for communities assigned Close versus Far.
+
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=4.8in]{misc-figures/counterfactual-assignment-density-close-far-dens.pdf}
+  \caption{Potential Distance Distributions under Constrained Randomization}
+  \label{fig:bh-dens-plot}
+  \floatfoot{\textit{Notes:} The figure plots the distribution of potential centroid-to-PoT distances implied by 100 re-runs of the full PoT selection and assignment algorithm \citep{borusyak2023nonrandom}. Red (blue) curves correspond to study communities assigned to Close (Far) in the realized experiment. A Kolmogorov--Smirnov test fails to reject equality of the two distributions (\(p=0.472\)), indicating no evidence of systematic differences in potential distances between communities assigned Close versus Far.}
+\end{figure}
+
+
+\clearpage 
+
+\newpage
+
+
+\FloatBarrier
+
+

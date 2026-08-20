@@ -1,0 +1,23 @@
+
+\centering
+
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: FOB (Lee lower bound) & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.122**\\{(0.041)}} & \makecell[c]{0.038\\{(0.049)}} & \makecell[c]{0.23**\\{(0.067)}} & \makecell[c]{0.192**\\{(0.081)}}\\
+Calendar & \makecell[c]{0.024\\{(0.047)}} & \makecell[c]{0.02\\{(0.057)}} & \makecell[c]{0.031\\{(0.082)}} & \makecell[c]{0.011\\{(0.101)}}\\
+Ink & \makecell[c]{0.085**\\{(0.042)}} & \makecell[c]{0.03\\{(0.056)}} & \makecell[c]{0.156**\\{(0.065)}} & \makecell[c]{0.126\\{(0.085)}}\\
+\midrule
+Control & \makecell[c]{0.681\\{(0.033)}} & \makecell[c]{0.745\\{(0.043)}} & \makecell[c]{0.6\\{(0.049)}} & \makecell[c]{-0.145**\\{(0.065)}}\\
+Observations & 1,057 & 1,057 & 1,057 & 1,057\\
+$H0$: Any Signal = No Signal, $p$-value & 0.001 & 0.525 & $<$0.001 & 0.007\\
+$H0$: Bracelet = Calendar, $p$-value & 0.006 & 0.706 & 0.001 & 0.026\\
+\bottomrule
+\end{tabular}}
+

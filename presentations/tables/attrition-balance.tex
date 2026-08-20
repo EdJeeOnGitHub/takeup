@@ -1,0 +1,25 @@
+
+\begin{table}[htbp]
+   \caption{\label{tab:attrition-balance} Covariate Balance: Respondents Missing vs.\ Present in Knowledge Table}
+   \bigskip
+   \centering
+   \begin{tabular}{lcccc}
+      \toprule
+                                  & Age           & Gender        & Distance to POT (m) & Has Phone \\   
+                                  & (1)           & (2)           & (3)                 & (4)\\  
+      \midrule 
+      not\_in\_know\_tableTRUE    & 0.8951        & 0.0612$^{**}$ & 18.07               & -0.0159\\   
+                                  & (0.9290)      & (0.0248)      & (53.64)             & (0.0225)\\   
+       \\
+      Observations                & 3,678         & 3,678         & 3,678               & 3,638\\  
+      R$^2$                       & 0.01493       & 0.00240       & 0.00538             & 0.00108\\  
+       \\
+      county fixed effects        & $\checkmark$  & $\checkmark$  & $\checkmark$        & $\checkmark$\\   
+      \bottomrule
+   \end{tabular}
+   
+   \par \raggedright 
+   Each column regresses the indicated covariate on an indicator for being missing from the knowledge table. County fixed effects included. Standard errors clustered at the cluster level.
+\end{table}
+
+

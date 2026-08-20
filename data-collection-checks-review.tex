@@ -1,0 +1,120 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{floatrow}
+\usepackage{graphicx}
+\usepackage{makecell}
+\usepackage[flushleft]{threeparttable}
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+
+\section*{Data collection checks}
+
+Two data collection issues affect the construction of the monitored take-up and observability samples. First, in the administrative take-up data, 989 individuals assigned to be monitored were omitted from the PoT monitoring lists because of a SurveyCTO list generation error.\footnote{The omission occurred during preparation of the monitoring list and was unrelated to observed outcomes, see Table~\ref{tab:takeup-attrit}.} Second, among endline respondents assigned to the observability module, 126 did not receive the module because of a programming error.
+
+The SurveyCTO monitoring list omission does not appear to have generated differential attrition from the administrative take-up sample. Table~\ref{tab:takeup-attrit} examines omission from the monitored take-up sample. Across the Bracelet, Calendar, and Ink arms, the estimated differences relative to Control are small and statistically indistinguishable from zero, both overall and within the Close and Far subsamples. The table shows a small distance imbalance in the no-item Control arm: omission is 9.7 percent in Close Control communities and 8.3 percent in Far Control communities, a Far--Close difference of \(-1.4\) percentage points. This difference is small relative to the 16.2 percentage point Control distance gap in take-up, and the item/signal-by-distance differences in omission are close to zero and statistically insignificant.
+
+Completion of the endline observability module is not fully balanced across arms, but the imbalance is partly mechanical and the main observability conclusions are robust to Lee bounds. Bracelet arm respondents are less likely to be missing the module, with a pooled gap of 6.1 percentage points and a Close distance gap of 8.8 percentage points (Table~\ref{tab:endline-obs-attrit}). The source of this issue is mechanical: the SurveyCTO knowledge list was pre-loaded only for primary endline respondents, so backup respondents surveyed when primary respondents could not be located had this section silently skipped. Backup rates were highest in Control communities, about 19 percent, compared with about 13 percent in Bracelet communities. Controlling for backup status absorbs roughly half of the Bracelet--Close gap (Table~\ref{tab:endline-obs-attrit-backup}). Importantly, own deworming status does not predict completion of the observability module. To account for the remaining imbalance, Table~\ref{tab:rf-fob-lee} reports Lee bounds for the observability outcomes. The bounds preserve the qualitative pattern of the main results: in Control, observability remains 14.3--14.6 percentage points lower in Far than Close communities, while the Far effects of the bracelet and ink remain bounded below by 23 and 15.5 percentage points, respectively.
+
+\clearpage
+
+\begin{table}[ht!]
+  \scriptsize
+  \caption{Monitored Take-up Attrition}
+  \label{tab:takeup-attrit}
+  \centering
+  \begin{threeparttable}
+  \centering
+  \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+  \begin{tabular}{lcc}
+     \tabularnewline \midrule \midrule
+                                                                & Treatment     & Treatment $\times$ Distance \\
+     Dependent variable: Missing from monitored take-up sample  & (1)           & (2)\\
+     \midrule
+     Ink                                                        & -0.005        &   \\
+                                                                & (0.005)       &   \\
+     Calendar                                                   & 0.004         &   \\
+                                                                & (0.005)       &   \\
+     Bracelet                                                   & 0.007         &   \\
+                                                                & (0.005)       &   \\
+     Far                                                        &               & 0.007\\
+                                                                &               & (0.007)\\
+     Ink $\times$ Close                                         &               & -0.002\\
+                                                                &               & (0.007)\\
+     Ink $\times$ Far                                           &               & -0.008\\
+                                                                &               & (0.006)\\
+     Calendar $\times$ Close                                    &               & 0.004\\
+                                                                &               & (0.007)\\
+     Calendar $\times$ Far                                      &               & 0.003\\
+                                                                &               & (0.005)\\
+     Bracelet $\times$ Close                                    &               & 0.008\\
+                                                                &               & (0.006)\\
+     Bracelet $\times$ Far                                      &               & 0.005\\
+                                                                &               & (0.008)\\
+     \addlinespace[0.4em]
+     Female                                                     & 0.015$^{***}$ & 0.015$^{***}$\\
+                                                                & (0.004)       & (0.004)\\
+     Age                                                        & 0.001$^{***}$ & 0.001$^{***}$\\
+                                                                & (0.0002)      & (0.0002)\\
+     Expected distance to PoT                                   & -0.004        & -0.004\\
+                                                                & (0.005)       & (0.005)\\
+     Control mean                                               & 0.091         & 0.091\\
+     County FEs                                                 & Yes           & Yes\\
+     RF controls                                                & Yes           & Yes\\
+     $H_0$: all displayed treatment coefficients = 0, $p$-value & 0.081         & 0.195\\
+     \midrule
+     Observations                                               & 10,794        & 10,794\\
+     R$^2$                                                      & 0.121         & 0.121\\
+     \midrule \midrule
+  \end{tabular}}
+  \floatfoot{\textit{Notes:}
+  The dependent variable is an indicator equal to one if an individual assigned to administrative take-up monitoring was omitted from the PoT monitoring list because of the SurveyCTO list generation error. The sample consists of the no-SMS take-up analysis sample (\(N=9{,}805\)) plus individuals omitted from monitoring because of this error (\(N=989\)), for a total of 10{,}794 observations. The Control mean row reports the no-item Control mean. Bracelet, Calendar, and Ink rows report differences relative to the no-item Control arm. The first column reports pooled treatment effects. The second column reports treatment-by-distance effects, with Close and Far treatment cells shown separately. Standard errors, in parentheses, are clustered at the community level. County fixed effects and the reduced-form controls are included throughout.}
+  \end{threeparttable}
+\end{table}
+
+\clearpage
+
+\begin{table}[ht!]
+  \scriptsize
+  \caption{Endline Observability Module Missingness}
+  \label{tab:endline-obs-attrit}
+  \centering
+  \begin{threeparttable}
+  \centering
+  \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+  \begin{tabular}[t]{lcc}
+  \toprule
+   & Treatment & Treatment $\times$ Distance \\
+  Dependent variable: Missing from Table A & (1) & (2) \\
+  \midrule
+  Ink & \makecell[c]{-0.038\\{(0.036)}} & \makecell[c]{} \\
+  Calendar & \makecell[c]{-0.030\\{(0.037)}} & \makecell[c]{} \\
+  Bracelet & \makecell[c]{-0.058\\{(0.037)}} & \makecell[c]{} \\
+  Far & \makecell[c]{} & \makecell[c]{0.005\\{(0.066)}} \\
+  Ink $\times$ Close & \makecell[c]{} & \makecell[c]{-0.046\\{(0.041)}} \\
+  Ink $\times$ Far & \makecell[c]{} & \makecell[c]{-0.025\\{(0.064)}} \\
+  Calendar $\times$ Close & \makecell[c]{} & \makecell[c]{-0.017\\{(0.046)}} \\
+  Calendar $\times$ Far & \makecell[c]{} & \makecell[c]{-0.044\\{(0.062)}} \\
+  Bracelet $\times$ Close & \makecell[c]{} & \makecell[c]{-0.088$^{**}$\\{(0.039)}} \\
+  Bracelet $\times$ Far & \makecell[c]{} & \makecell[c]{-0.026\\{(0.065)}} \\
+  \addlinespace[0.4em]
+  Female & \makecell[c]{0.035$^{*}$\\{(0.020)}} & \makecell[c]{0.037$^{*}$\\{(0.020)}} \\
+  Age & \makecell[c]{0.000\\{(0.001)}} & \makecell[c]{0.000\\{(0.001)}} \\
+  Expected distance to PoT & \makecell[c]{0.018\\{(0.033)}} & \makecell[c]{0.014\\{(0.034)}} \\
+  \midrule
+  Control mean & 0.135 & 0.135 \\
+  County FEs & Yes & Yes \\
+  RF controls & Yes & Yes \\
+  $H_0$: all displayed treatment coefficients = 0, $p$-value & 0.431 & 0.220 \\
+  Observations & 1,267 & 1,267 \\
+  Simulations & 1,000 & 1,000 \\
+  \bottomrule
+  \end{tabular}}
+  \floatfoot{\textit{Notes:}
+  The dependent variable is an indicator equal to one if an endline respondent is missing the observability module. The sample is the no-SMS endline sample (\(N=2{,}659\)). The Control row reports the no-item Control mean, with standard errors in parentheses. Bracelet, Calendar, and Ink rows report differences relative to the no-item Control arm. Columns report estimates for the pooled sample, the Close subsample, the Far subsample, and the Far--Close difference. Standard errors are clustered at the community level. County fixed effects are included to reflect stratification.}
+  \end{threeparttable}
+\end{table}
+
+\end{document}

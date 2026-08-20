@@ -1,0 +1,178 @@
+
+\subsection{Experiment Timeline and Data}
+
+Below, we detail the timeline of the experiment and main data collection activities. 
+
+\begin{figure}[H]
+\input{timeline-tikz}
+\label{fig:timeline}
+\end{figure}
+
+Our analysis combines administrative take-up data at treatment sites with surveys collected before and after the campaign. Appendix \ref{app:sample-construction} and Figure \ref{fig:sample-consort} provide additional details on how each sample was constructed and how they correspond to the surveys.
+
+
+\begin{enumerate} 
+\item \emph{Household census.}
+We conducted a census of all adults, aged 18 or older, in the 144 selected study communities. Enumerators visited each household to record geographic coordinates and collect data on basic demographics and phone ownership. We use the census data for random assignment of the SMS treatment, and to draw subsamples for the baseline survey and monitoring of deworming take-up. We further use the data to check for balance of individual and community characteristics across incentive and distance conditions and for control variables in the main estimation. 
+
+\item \emph{Baseline survey.} We surveyed a random sample of adults to measure prior deworming experience, knowledge about treatment, and social norms surrounding treatment. This data are used to provide descriptives of the context and for additional balance checks. 
+
+\item \emph{Administrative take-up data.} We directly monitored deworming take-up at PoTs, avoiding relying on individual self-reports for our primary outcome.\footnote{This is critical for that demand effects in survey responses cannot mechanically generate the main reduced form take-up results.} Enumerators used tablets pre-loaded with the census roster to confirm sampled adults' identity at the PoT and record whether they received deworming treatment. The monitoring sample consists of baseline individuals, SMS treatment and control individuals and an additional sample of non-SMS individuals, including phone and non-phone owners. This data are used to estimate main treatment effects on deworming take-up and to assess the correctness of adults' beliefs about peers' deworming take-up.
+
+
+  \item \emph{Endline survey.} We conducted an in-depth survey with a random subsample of adults whose take-up was monitored 2–14 days after the deworming campaign. It contains three key modules:
+  \begin{itemize} 
+      \item \emph{Observability module.} Half of respondents are
+  randomly assigned to an observability module eliciting beliefs
+  about peers' take-up decisions.\footnote{The remaining half are assigned to a perceived observability module, exploring respondents' beliefs about what others know about their own deworming status.} Respondents were shown a random subset of ten adults from their community and, for each person they recognized, asked: ``Do you think this person came for deworming?''. The module is designed to capture how much respondents know about others’ deworming behavior within their community, reflecting the extent to which such actions are visible.
+        
+      \item \emph{Gift choice and WTP modules.} All respondents
+  chose between a bracelet and a calendar as a thank-you gift. In
+  control communities we augmented this with a willingness-to-pay exercise, offering random cash incentives to switch items. Together these data test non-social-image mechanisms and pin down the private utility difference between incentives in the structural model.                                        
+  \end{itemize}
+  Endline data are also used to verify correct implementation of
+  the incentive treatments and to measure retention of the
+  incentive items.    
+
+\end{enumerate}
+
+\subsection{Sample Definition and Randomization Checks} 
+
+The analysis sample that measures our primary outcome, individuals' deworming status, comprises 9,805 adults who did not receive an SMS treatment and for which we monitored their take-up directly at the PoT (``Take-up analysis sample''). For observability and belief outcomes this is 1,141 individuals in the endline survey that receive the observability module but do not receive an SMS treatment (``Endline observability sample''). Table~\ref{tab:stacked-sample-balance-table} reports control group means and standard errors for the two main outcome samples across each baseline covariate, together with pairwise differences between treatment and control groups and the associated $p$‑values, presented separately for the Far and Close conditions. The final column shows $F$‑tests of joint significance across all treatments.  All $p$‑values exceed 0.10 except for two covariates: (i) Distance to PoT in both samples; and (ii) Female, driven by fewer women in the Far-Bracelet communities in the endline observability sample. 
+
+Focusing on the first imbalance, within the Far condition, communities assigned to Ink are on average 344 meters farther from the PoT than Far–Control communities ($p = 0.02$). To address this, we include continuous community‑to‑PoT distance as a control in robustness specifications of the reduced form analysis; the structural model conditions directly on continuous distance. The second imbalance only occurs in the smaller endline observability sample and is controlled for by a gender dummy included in the post-double LASSO selected set of controls in both take-up and observability regressions.
+
+Overall, sample characteristics are well balanced. Out of 80 comparisons in Table \ref{tab:stacked-sample-balance-table}, 8 differ at the 10 percent level and 5 at the 5 percent level---in line with the 8 and 4 differences expected by chance. Additionally, because our identification strategy exploits variation both within distance conditions (across incentive arms) and within incentive arms (across distance), Table \ref{tab:stacked-sample-dist-balance-table} reports balance across distance within each incentive arm.  Of these 32 additional comparisons, only one differs at the 10 percent level and none at the 5 percent level, again consistent with chance.
+
+\subsubsection{Sample Attrition}
+\label{sec:sample-attrit}
+We observe two instances of sample attrition. First, in the monitored deworming sample, 989 individuals assigned to be monitored were not, due to a SurveyCTO error.\footnote{EXPLAIN ERROR} Second, amongst the 3,729 individuals assigned to receive the endline observability module, 255 erroneously did not receive the component. Table~\ref{tab:takeup-attrit} examines whether treatment assignment predicts attrition from the monitored sample (shown in Figure \ref{fig:sample-consort}). The dependent variable is an indicator equal to one if an observation was dropped from the sample. Across all treatment arms---Bracelet, Calendar, and Ink---the estimated coefficients are small in magnitude and statistically indistinguishable from zero, both in the combined specification and when the sample is split by distance. Taken together, these results provide no evidence that treatment assignment induced differential attrition, supporting the integrity of the experimental sample.
+
+Table~\ref{tab:endline-obs-attrit} shows that attrition into the endline observability sample is more complex. Bracelet-arm respondents are significantly less likely to be missing from the observability survey module, with a pooled gap of 6.1 percentage points and a close-distance gap of 8.9 percentage points. This differential is primarily mechanical and pre-determined: the SurveyCTO knowledge list was pre-loaded only for primary endline respondents, so backup households---surveyed when a primary respondent could not be located---had this section silently skipped. Control households had the highest backup rates $(\approx19\%)$ compared to bracelet households $(\approx13\%)$, plausibly because bracelet participants were more engaged and easier to locate. Controlling for backup status absorbs roughly half the treatment gap, and crucially, own deworming status does not predict selection into the sample (coefficient = 0.011, $p = 0.37$). A residual gap of approximately 4.5 percentage points remains after conditioning on backup status, though this is unlikely to reflect endogenous selection on deworming behavior. To account for this residual imbalance, we present Lee bounds on the observability outcomes in the appendix.
+
+\subsection{Implementation Fidelity and Adoption of Signals} %UNDERSTANDING OF INCENTIVES -- TO WHAT EXTENT want to presuppose SIGNAL HERE instead of INCENTIVES
+
+
+
+\label{tab:incentive_check_smscontrol}
+Endline survey responses confirm that the deworming campaign was implemented as intended
+(Table \ref{tab:implement-bal}). Across both Close and Far distance groups, treatment arms
+show no statistically significant differences from the control in CHV visitation rates
+(joint $p$-values of 0.809 and 0.613, respectively), with an overall sample mean of 82
+percent. Rates of community announcement, CHV sharing of deworming practices, and CHV
+communication of treatment locations are similarly balanced across arms, with all joint
+tests yielding $p > 0.28$.
+
+
+Similarly, table \ref{tab:incentive-check} demonstrates that the three incentive items were distributed correctly at the point of treatment (PoT): more than 95 percent 
+of respondents in each respective arm reported receiving their assigned item. Recognition of 
+item meaning was similarly high, with 94–97 percent of respondents correctly associating the 
+ink and bracelet with deworming participation, and 89 percent identifying the calendar 
+as a signal of treatment attendance.
+
+Given that indelible ink fades within approximately three days on skin and two weeks on nails, 
+only 14 percent of respondents displayed a visible ink mark at endline. Retention of the 
+remaining incentives was substantially higher: 79 percent of respondents still possessed the 
+bracelet and 87 percent retained the calendar. Among bracelet recipients, 46 percent were still 
+wearing it on their wrist at endline, and 74\% of calendar recipients had it displayed on their 
+wall (Table \ref{tab:incentive_check_smscontrol}).
+
+The high rates of bracelet retention and active wearing suggest that the incentive was 
+positively valued by recipients, rather than carrying negative utility through embarrassment 
+or social stigma. The bracelet was also the most publicly visible incentive: 95 percent of 
+endline respondents—irrespective of own deworming status—reported observing it within their 
+community. The calendar, by contrast, exhibited high retention but limited public visibility, 
+making it an appropriate active-control comparison for isolating any self-signaling 
+(self-image) effects attributable to the bracelet.
+
+
+% APPENDIX STARTS HERE
+
+\subsection{Sample Construction}
+\label{app:sample-construction}
+\begin{landscape}
+    \begin{figure}
+      \centering                                                   
+      \adjustbox{max width=\linewidth}{\input{_sample-consort}}
+      \caption{Sample Construction Diagram}    
+      \label{fig:sample-consort}
+    \end{figure}  
+  \end{landscape}
+
+
+\clearpage
+\newpage
+
+% ── Baseline sample ───────────────────────────────────────────────
+Figure \ref{fig:sample-consort} displays how each survey maps onto our main analysis samples:
+
+\emph{Baseline survey.} The baseline sampling frame was drawn from the household
+census roster of 39{,}301 adults across 144 clusters.  From this frame, 4{,}185
+individuals were selected by randomly drawing 15 households per cluster (additionally, we drew two backup 
+households per cluster).  Enumerators attempted to reach a
+target of 2{,}160 individuals; of the 2{,}062 successfully located, 38 were
+unable to participate (e.g. due to illness or language barriers) and 29
+refused consent, yielding 1{,}995 completed baseline interviews that
+constitute the ``Baseline sample''.
+
+The full 4{,}185-person baseline roster plays a second role beyond the baseline
+survey itself: it was added to the administrative monitoring lists used to
+record deworming take-up at points of treatment on the day of the campaign.  As
+a result, the baseline roster contributes approximately one-fifth of the broader
+monitored take-up sample, discussed in the next section.
+
+% ── Endline sample ────────────────────────────────────────────────
+
+\emph{Endline survey.} The endline sampling roster consisted of 11{,}166
+individuals drawn from the household census roster.  From this roster, 4{,}220
+individuals were selected, comprising a main roster of approximately 25 per
+cluster plus roughly two backup individuals per cluster, and enumerators
+successfully located 3{,}830 of them.  Of those reached, 78 were unable to
+participate and 23 refused consent, yielding 3{,}729 completed endline
+interviews.  The PAP pre-specified 3{,}600 completions (25 per cluster $\times$
+144 clusters), the overshoot is driven by the (mistaken) systematic surveying of
+all backup individuals. Excluding the SMS treatment arm, which is set aside for
+the SMS analysis, the ``Endline sample'' used for the main analysis comprises
+2{,}659 respondents.  The full 11{,}166-person endline roster is added to the
+administrative monitoring lists for their deworming status to be recorded at
+points of treatment during the campaign.
+
+
+The endline survey generates three further subsamples used throughout the
+analysis.  First, a random half of endline respondents were assigned to an
+observability module eliciting beliefs about peers' deworming take-up (1{,}784
+respondents), of whom 1{,}141 remain after excluding the SMS treatment arm,
+the ``Endline observability sample''. There are 255 individuals with
+missing observability module data due to a programming error, discussed in Section \ref{sec:sample-attrit}.  Second, all endline respondents stated a preference between a
+bracelet and a calendar as a thank-you gift (\emph{gift choice}).  Our analysis 
+using this gift-choice data focuses on individuals that did not choose to deworm
+in the control group (1{,}350 individuals). Third, we conducted a
+willingness-to-pay (WTP) exercise for the bracelet gift in the control clusters,
+which is used to estimate a WTP model for the bracelet.  In this WTP exercise,
+we attempted to reach 600 individuals across 34 control clusters, of whom we
+successfully reached 474 and obtained completed WTP data from 467, ``WTP sample''.
+
+
+Because the endline roster is drawn randomly from the household census, endline
+respondents partly overlap with the baseline sample, but we are unable to link
+baseline and endline records at the household level.  The two surveys therefore
+provide independent cross-sectional snapshots of the same communities rather
+than a panel.
+
+% ── Take-up analysis sample ───────────────────────────────────────
+
+\emph{Take-up analysis sample.}
+Deworming take-up was recorded administratively at points of treatment for all
+individuals on the monitoring lists, which were assembled from the baseline
+roster (4{,}185 individuals) and the endline roster (11{,}166 individuals). Unfortunately, 
+a SurveyCTO coding error caused 989 individuals from the endline roster to be omitted from the 
+administrative monitoring lists, and thus they are absent from the take-up analysis sample, further discussion including differential attrition tests can be found in Section \ref{sec:sample-attrit}.
+Because the two rosters were drawn independently from the same census, some
+individuals appear on both lists; after deduplication the combined monitoring
+universe comprises 12{,}827 unique individuals.
+Excluding the SMS treatment arm, which was assigned to receive social
+information or reminder messages and is reserved for the SMS analysis, yields
+the take-up analysis sample of 9{,}805 individuals used throughout the
+main results.
+
+  

@@ -1,0 +1,23 @@
+
+\centering
+
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Observability & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.131**\\{(0.04)}} & \makecell[c]{0.022\\{(0.06)}} & \makecell[c]{0.253***\\{(0.047)}} & \makecell[c]{0.231**\\{(0.074)}}\\
+Calendar & \makecell[c]{0.035\\{(0.044)}} & \makecell[c]{0.041\\{(0.062)}} & \makecell[c]{0.03\\{(0.059)}} & \makecell[c]{-0.011\\{(0.084)}}\\
+Ink & \makecell[c]{0.089**\\{(0.044)}} & \makecell[c]{0.075\\{(0.056)}} & \makecell[c]{0.104\\{(0.067)}} & \makecell[c]{0.029\\{(0.085)}}\\
+\midrule
+Control & \makecell[c]{0.69\\{(0.035)}} & \makecell[c]{0.738\\{(0.052)}} & \makecell[c]{0.636\\{(0.042)}} & \makecell[c]{-0.102\\{(0.066)}}\\
+Observations & 1,141 & 1,141 & 1,141 & 1,141\\
+$H0$: Any Signal = No Signal, $p$-value & 0.001 & 0.437 & $<$0.001 & 0.01\\
+$H0$: Bracelet = Calendar, $p$-value & 0.002 & 0.655 & $<$0.001 & $<$0.001\\
+\bottomrule
+\end{tabular}}
+

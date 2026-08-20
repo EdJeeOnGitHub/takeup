@@ -2,20 +2,15 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 source("optim/policy-bootstrap-functions.R")
-
-suppressPackageStartupMessages({
-  library(Matrix)
-  library(ROI)
-  library(ROI.plugin.gurobi)
-  library(slam)
-})
+source("optim/policy-cost-sensitivity-functions.R")
 
 input_path <- policy_option_value(args, "--input-path")
 target_csv <- policy_option_value(args, "--target-csv")
 scenario_id <- as.integer(policy_option_value(args, "--scenario-id"))
-num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "210"))
+num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"))
 time_limit <- as.numeric(policy_option_value(args, "--time-limit", "10000"))
 target_tolerance <- as.numeric(policy_option_value(args, "--target-tolerance", "1e-5"))
+solver <- policy_option_value(args, "--solver", "auto")
 if (is.null(input_path) || is.null(target_csv) || !scenario_id %in% policy_scenarios$scenario_id) {
   stop("--input-path, --target-csv, and a valid --scenario-id are required.", call. = FALSE)
 }
@@ -62,47 +57,9 @@ if ("draw" %in% names(target_data)) {
 if (!is.finite(target)) stop("Non-finite policy target.", call. = FALSE)
 
 village_ids <- sort(unique(edges$village_i))
-pot_ids <- sort(unique(edges$pot_j))
 num_villages <- length(village_ids)
-num_pots <- length(pot_ids)
 num_edges <- nrow(edges)
 village_index <- match(edges$village_i, village_ids)
-pot_index <- match(edges$pot_j, pot_ids)
-
-build_sparse_problem <- function(demand) {
-  assignment_rows <- village_index
-  availability_rows <- num_villages + seq_len(num_edges)
-  target_row <- num_villages + num_edges + 1L
-  x_columns <- num_pots + seq_len(num_edges)
-  constraint_matrix <- sparseMatrix(
-    i = c(
-      assignment_rows,
-      availability_rows, availability_rows,
-      rep.int(target_row, num_edges)
-    ),
-    j = c(
-      x_columns,
-      x_columns, pot_index,
-      x_columns
-    ),
-    x = c(
-      rep(1, num_edges),
-      rep(1, num_edges), rep(-1, num_edges),
-      demand
-    ),
-    dims = c(target_row, num_pots + num_edges)
-  )
-  OP(
-    objective = L_objective(c(rep(1, num_pots), rep(0, num_edges))),
-    constraints = L_constraint(
-      L = as.simple_triplet_matrix(constraint_matrix),
-      dir = c(rep("==", num_villages), rep("<=", num_edges), ">="),
-      rhs = c(rep(1, num_villages), rep(0, num_edges), target)
-    ),
-    types = rep("B", num_pots + num_edges),
-    maximum = FALSE
-  )
-}
 
 scenario_dir <- file.path(input_path, "allocations", scenario$scenario)
 dir.create(scenario_dir, recursive = TRUE, showWarnings = FALSE)
@@ -170,22 +127,22 @@ for (draw in draws) {
     status_code <- NA_integer_
     run_status <- "target_infeasible"
   } else {
-    fit <- ROI_solve(
-      build_sparse_problem(demand), solver = "gurobi",
-      control = list(TimeLimit = time_limit, OutputFlag = 0)
+    fit <- policy_cost_solve(
+      edges = edges, demand = demand,
+      population = rep(1, num_villages),
+      target_rate = target / num_villages,
+      site_cost = 1, solver = solver, time_limit = time_limit,
+      work_path = scenario_dir
     )
-    status_code <- fit$status$code
-    if (!identical(as.integer(status_code), 0L)) {
-      stop("Gurobi failed for scenario ", scenario$scenario, ", draw ", draw,
-           " (status ", status_code, ").", call. = FALSE)
-    }
-    solution <- fit$solution
-    selected <- which(solution[num_pots + seq_len(num_edges)] > 0.5)
+    status_code <- 0L
+    allocation <- fit$allocation
     run_status <- "complete"
   }
   elapsed <- as.numeric(difftime(Sys.time(), started, units = "secs"))
-  allocation <- edges[selected, ]
-  allocation$demand <- demand[selected]
+  if (run_status == "target_infeasible") {
+    allocation <- edges[selected, ]
+    allocation$demand <- demand[selected]
+  }
   if (nrow(allocation) != num_villages || anyDuplicated(allocation$village_i)) {
     stop("Invalid sparse allocation for draw ", draw, call. = FALSE)
   }

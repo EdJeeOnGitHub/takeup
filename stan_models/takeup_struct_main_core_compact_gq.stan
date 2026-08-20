@@ -565,6 +565,8 @@ functions {
 data {
   #include struct_section_data.stan
   vector<lower=0>[num_clusters] core_cluster_weight;
+  real<lower=0> core_visibility_prior_multiplier;
+  real<lower=0> core_wtp_mu_prior_sd;
   int<lower=0, upper=1> use_core_cluster_shock;
   real<lower=0> core_cluster_shock_sd_prior;
   int<lower=0, upper=2> core_lambda_structure;
@@ -711,6 +713,10 @@ generated quantities {
   // Secant multiplier from 500m to 2500m, normalized by the direct distance
   // cost change. This is reported beside the local derivative multiplier.
   vector[num_treatments] core_compact_sm_finite;
+  // Gaussian-baseline finite multipliers over 0--2500m, 0--1500m, and
+  // 1500--2500m. The prior grid uses this exact compact-GQ object.
+  matrix[3, num_treatments] core_compact_gaussian_sm_finite_segments =
+    rep_matrix(0, 3, num_treatments);
   // Rows are 500m, 1500m, 2500m; columns are treatment arms. Truth-specific
   // recognition and the equilibrium information factor make the fitted
   // response channel directly auditable without retaining latent arrays.
@@ -1396,6 +1402,46 @@ generated quantities {
         (dist_beta_v[1] *
          (roc_distances[compact_sm_roc_index[3]] -
           roc_distances[compact_sm_roc_index[1]]));
+    }
+    if (core_observation_model == 0 && core_type_distribution == 0) {
+      real zero_distance = roc_distances[1];
+      if (abs(zero_distance) > 1e-12) {
+        reject("Finite-segment GQ requires roc_distances[1] == 0.");
+      }
+      for (treatment_index in 1:num_treatments) {
+        int treatment_cell = 0;
+        real zero_mu = core_compact_signal_lambda[treatment_index] *
+          inv_logit(rep_intercept[treatment_index]);
+        vector[num_clusters] zero_cutoff;
+        for (candidate_index in 1:num_dist_group_treatments) {
+          if (cluster_treatment_map[candidate_index, 1] == treatment_index) {
+            treatment_cell = candidate_index;
+          }
+        }
+        for (cluster_index in 1:num_clusters) {
+          real zero_benefit =
+            structural_treatment_effect[treatment_cell] +
+            cluster_shock[cluster_index];
+          zero_cutoff[cluster_index] = core_gq_find_fixedpoint_safe(
+            zero_benefit, zero_mu, total_error_sd, u_sd, use_u_in_delta,
+            alg_sol_rel_tol, alg_sol_f_tol, alg_sol_max_steps
+          );
+        }
+        core_compact_gaussian_sm_finite_segments[1, treatment_index] =
+          (core_compact_cutoff[3, treatment_index] - mean(zero_cutoff)) /
+          (dist_beta_v[1] *
+           (roc_distances[compact_sm_roc_index[3]] - zero_distance));
+        core_compact_gaussian_sm_finite_segments[2, treatment_index] =
+          (core_compact_cutoff[2, treatment_index] - mean(zero_cutoff)) /
+          (dist_beta_v[1] *
+           (roc_distances[compact_sm_roc_index[2]] - zero_distance));
+        core_compact_gaussian_sm_finite_segments[3, treatment_index] =
+          (core_compact_cutoff[3, treatment_index] -
+           core_compact_cutoff[2, treatment_index]) /
+          (dist_beta_v[1] *
+           (roc_distances[compact_sm_roc_index[3]] -
+            roc_distances[compact_sm_roc_index[2]]));
+      }
     }
   }
 }

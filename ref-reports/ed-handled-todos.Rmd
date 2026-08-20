@@ -1,0 +1,539 @@
+---
+title: "ToDos Handled by Ed"
+subtitle: "Extracted from edited-feedback-refine.md"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: false
+    fig_caption: true
+  html_document:
+    toc: true
+    number_sections: false
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{makecell}
+  - \usepackage{graphicx}
+  - \usepackage{pdfpages}
+  - \usepackage{pdflscape}
+  - \usepackage{longtable}
+  - \usepackage{xcolor}
+  - \usepackage{listings}
+  - \lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,columns=fullflexible,keepspaces=true,frame=single,backgroundcolor=\color{gray!6}}
+---
+
+This document collects the completed numbered ToDos attributable to Ed in
+`ref-reports/edited-feedback-refine.md`. Items assigned to AK or left pending
+are excluded. Text under **ToDo**, **Status**, and **Recorded output** is copied
+from the source report. **Actual output located** adds the underlying generated
+tables, figures, diagnostics, or manuscript changes found in the analysis and
+paper repositories.
+
+Links labeled **Where in the paper** open a review copy compiled from the
+current Overleaf source at the relevant PDF page. Intermediate generated
+`.tex`, CSV, and code-file links are intentionally omitted from this review
+version.
+
+\newpage
+
+# Detailed comment 1: Severe baseline imbalance in past deworming
+
+## ToDo
+
+> Check if previous worming is predictive of takeup in the paper (my guess no
+> based on double lasso), bound TEs if so.
+>
+> Check definition of dewormed in the past year/dewormed in the past.
+>
+> Within 1,995 check if predictive within that sample.
+>
+> Use calendar as argument against:
+>
+> Before you move to your second step of bounding the treatment effect, you have
+> a very powerful conceptual defense already in the paper: the Calendar arm. The
+> baseline data shows that the Calendar arm has largely the same Far-Close
+> imbalance in past deworming as the Bracelet and Ink arms. Yet, in the main
+> results, the Calendar arm yields completely flat take-up across distance (it
+> acts as a clean placebo). If the reviewer were correct that this specific
+> baseline imbalance mechanically drives the take-up gap, the Calendar arm
+> should have shown the same attenuated distance gradient as the public-signal
+> arms. It did not.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> **Prior deworming experience.** The baseline survey also shows some arm
+> differences in deworming knowledge and prior deworming experience (Appendix
+> `Table~\ref{tab:baseline-bal}`). Because baseline survey records cannot be linked
+> at the individual level to administrative take-up records, we address these
+> differences by constructing community-level baseline shares for the imbalanced
+> measures and merging them into the take-up and endline observability analyses.
+> The results are stable. For administrative take-up, controlling for these
+> baseline-survey community shares increases the Bracelet and Ink Far--Close
+> interactions from 7.5 and 5.7 percentage points in the main specification to
+> 12.1 and 10.7 percentage points, while the Calendar interaction remains small
+> at 2.9 percentage points (`Appendix
+> Table~\ref{tab:prior-deworming-robustness}`). For reported knowledge of peers'
+> deworming status, the corresponding Far--Close interactions are nearly
+> unchanged: 17.5 percentage points for Bracelet, 11.5 percentage points for
+> Ink, and 2.4 percentage points for Calendar (`Appendix
+> Table~\ref{tab:fob-baseline-imbalance-robustness}`). These checks suggest that
+> the take-up and observability patterns are not driven by pre-existing
+> differences in deworming knowledge or prior deworming experience across
+> communities.
+
+## Actual output located
+
+The analysis produced both robustness tables referenced in the manuscript.
+
+### Administrative take-up robustness
+
+```{=latex}
+\includepdf[pages=75,pagecommand={}]{ECM-ReStud-current.pdf}
+```
+
+### Observability robustness
+
+```{=latex}
+\includepdf[pages=70,pagecommand={}]{ECM-ReStud-current.pdf}
+```
+
+The tables show that the Bracelet and Ink Far--Close interactions remain
+positive after adding the imbalanced baseline covariates, while the Calendar
+interaction remains small.
+
+**Where in the paper:** [Table B22, take-up robustness (p. 75)](ECM-ReStud-current.pdf#page=75)
+and [Table B15, observability robustness (p. 70)](ECM-ReStud-current.pdf#page=70).
+
+\newpage
+
+# Detailed comment 2: Mathematically impossible sample means
+
+## ToDo
+
+> Rerun balance with control mean fixed for held out county strata.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+No output block is recorded in the feedback file.
+
+## Actual output located
+
+The regenerated stacked balance table now reports raw Control means, rather
+than the fixed-effect intercept for an omitted county stratum. The rows singled
+out in the feedback are:
+
+| Variable | Sample mean | Control--Close mean | Control--Far mean |
+|:--|--:|--:|--:|
+| Age | 39.8 | 40.324 | 40.215 |
+| Female | 0.553 | 0.565 | 0.562 |
+| Phone owner | 0.751 | 0.765 | 0.728 |
+
+```{=latex}
+\includepdf[pages=62,pagecommand={}]{ECM-ReStud-current.pdf}
+```
+
+**Where in the paper:** [Table B1, Balance for Main Analysis Samples
+(p. 62)](ECM-ReStud-current.pdf#page=62).
+
+\newpage
+
+# Detailed comment 4: Unit error in relative valuation scale
+
+## ToDo
+
+> Change B23 to report \(\psi\) in USD.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+No output block is recorded in the feedback file.
+
+## Actual output located
+
+The generated structural-parameter table now labels the valuation parameter as
+`\(\psi\) (USD)`; the estimate is 0.472 with a 95 percent credible interval of
+(0.403, 0.547).
+
+```{=latex}
+\includepdf[pages=81,pagecommand={}]{ECM-ReStud-current.pdf}
+```
+
+**Where in the paper:** [Table B28, Structural Parameters (p.
+81)](ECM-ReStud-current.pdf#page=81).
+
+\newpage
+
+# Detailed comment 5: Appendix E potential-distance check
+
+## ToDo
+
+> Flesh this out and explain, make clear how we generate.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Reran the distance simulations using actual randomization alg.
+
+## Actual output located
+
+The revised diagnostic holds the surveyed-community frame fixed and reruns PoT
+selection, Close/Far assignment, targeted-community pairing, and feasibility
+screening. Each community is weighted equally within each simulation draw. The
+revised figure note reports a Kolmogorov--Smirnov test of \(p=0.501\).
+
+```{=latex}
+\begin{figure}[htbp]
+\centering
+\begin{minipage}{0.48\linewidth}
+\includegraphics[width=\linewidth]{../presentations/refine-review-artifacts/old-pot-distance-overlap.pdf}
+\caption*{Previous potential-distance output}
+\end{minipage}\hfill
+\begin{minipage}{0.48\linewidth}
+\includegraphics[width=\linewidth]{../presentations/refine-review-artifacts/new-pot-distance-overlap.pdf}
+\caption*{Rerun using the constrained assignment algorithm}
+\end{minipage}
+\end{figure}
+
+\textbf{Exact manuscript change}
+\lstinputlisting{../presentations/refine-review-diffs/todo5-8-paper.diff}
+```
+
+**Where in the paper:** [Figure E2, Potential Distance Distributions (p.
+96)](ECM-ReStud-current.pdf#page=96). The corresponding design explanation is
+in Section 3.1 on [p. 11](ECM-ReStud-current.pdf#page=11).
+
+\newpage
+
+# Detailed comment 6: Identification of the noise parameter
+
+## ToDo
+
+> it's the first two (curvature in takeup across cells + nonlinear normal
+> specification). Plot prior and posterior for \(\sigma_u\).
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Tweaked writeup, added plots comparing prior and posterior:
+>
+> `Appendix~\ref{priors}` shows that the data are informative about this parameter
+> by comparing the prior and posterior distributions for \(\sigma_u\).
+
+## Actual output located
+
+The prior/posterior output is:
+
+| Distribution | Mean | Median | 2.5% | 97.5% |
+|:--|--:|--:|--:|--:|
+| Prior | 0.468 | 0.374 | 0.145 | 1.359 |
+| Posterior | 0.302 | 0.278 | 0.127 | 0.583 |
+
+```{=latex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\linewidth]{../presentations/figures/sigma-u-prior-posterior.pdf}
+\caption{Prior and posterior distributions for $\sigma_u$}
+\end{figure}
+
+\textbf{Exact manuscript change}
+\lstinputlisting{../presentations/refine-review-diffs/todo6-paper.diff}
+```
+
+**Where in the paper:** [Figure K1, Prior and Posterior Distributions for
+\(\sigma_u\) (p. 114)](ECM-ReStud-current.pdf#page=114). The identification
+discussion begins on [p. 34](ECM-ReStud-current.pdf#page=34).
+
+\newpage
+
+# Detailed comment 8: Continuous-distance exogeneity
+
+## ToDo
+
+> Take Refine's sentence and add to 3.1
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Clarified that we condition on realized survey geography.
+
+## Actual output located
+
+The Section 3.1 revision now states that the simulations condition on the fixed
+surveyed-community frame and reproduce the PoT selection, Close/Far assignment,
+targeted-community pairing, and feasibility restrictions. It concludes that
+realized centroid-to-PoT distance can be interpreted as the continuous travel
+distance variation induced by the design, conditional on that frame and the
+constrained assignment protocol.
+
+The exact edit is reproduced with the potential-distance figure under ToDo 5.
+
+**Where in the paper:** Section 3.1 on [p.
+11](ECM-ReStud-current.pdf#page=11), with supporting Figures E2 and E3 on
+[pp. 96 and 98](ECM-ReStud-current.pdf#page=96).
+
+\newpage
+
+# Detailed comment 10: Alleged crossing of Figure 3(b) curves
+
+## ToDo
+
+> This seems wrong, the curves don't cross?
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> This was incorrect by refine.
+
+## Actual output located
+
+The plotted curves were checked and do not cross on their common highlighted
+support. The paper text now makes the comparison explicit: at a fixed cutoff
+\(w^*\), the lower-noise curve remains above the higher-noise curve; Panel 3(b)
+shows the additional decline in observability with distance.
+
+```{=latex}
+\textbf{Exact manuscript change}
+\lstinputlisting{../presentations/refine-review-diffs/todo10-paper.diff}
+```
+
+**Where in the paper:** [Figure 3, including Panel 3(b) (p.
+29)](ECM-ReStud-current.pdf#page=29).
+
+\newpage
+
+# Detailed comment 11: HMC convergence threshold
+
+## ToDo
+
+> Check whatever latest value is and verify we reach.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> All structural models report actual mixing.
+
+## Actual output located
+
+The diagnostics routine produced model-specific results rather than relying on
+the former \(\hat R<1.1\) threshold.
+
+| Model | Max split \(\hat R\) | Min bulk ESS | Min tail ESS | Divergences |
+|:--|--:|--:|--:|--:|
+| Main structural/WTP-derived tables | 1.011 | 465 | 602 | 0 |
+| No-outlier appendix | 1.018 | 355 | 309 | 0 |
+| Community-FP appendix | 1.022 | 221 | 212 | 0 |
+| Full-info individual-FP appendix | 1.022 | 142 | 132 | 2 |
+
+The paper table notes now report the maximum split \(\hat R\), minimum
+bulk/tail effective sample sizes, divergence counts, and maximum treedepth where
+relevant.
+
+**Where in the paper:** the main structural results and diagnostic note begin
+with [Table B28 (p. 81)](ECM-ReStud-current.pdf#page=81); the following appendix
+tables report diagnostics for the robustness models.
+
+\newpage
+
+# Detailed comment 12: Appendix E.1 permutation test
+
+## ToDo
+
+> Re-run figure E.3 using the algorithm.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Reran with RCT algo for distance assignment. Still no imbalances.
+
+## Actual output located
+
+The updated routine uses feasible counterfactual distance pools instead of
+freely permuting realized distances within counties.
+
+```{=latex}
+\begin{figure}[htbp]
+\centering
+\begin{minipage}{0.48\linewidth}
+\includegraphics[width=\linewidth]{../presentations/refine-review-artifacts/old-dist-ri-plot.pdf}
+\caption*{Previous within-county permutation output}
+\end{minipage}\hfill
+\begin{minipage}{0.48\linewidth}
+\includegraphics[width=\linewidth]{../presentations/refine-review-artifacts/new-dist-ri-plot.pdf}
+\caption*{Updated constrained-assignment output}
+\end{minipage}
+\end{figure}
+
+\textbf{Exact manuscript change}
+\lstinputlisting{../presentations/refine-review-diffs/todo12-paper.diff}
+```
+
+**Where in the paper:** [Figure E3, Randomization Inference (p.
+98)](ECM-ReStud-current.pdf#page=98).
+
+\newpage
+
+# Detailed comment 17: Text and Figure M1 contradiction
+
+## ToDo
+
+> Add correct numerical figures to text.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Updated figure text with correct sim spec.
+
+## Actual output located
+
+The revised Section M text and Figure M1 note now describe the distributions
+actually plotted:
+
+- Gaussian benchmark: approximately \(N(0.4,0.2^2)\).
+- Bimodal case: approximately
+  \(0.25N(-2,0.2^2)+0.75N(0.4,0.2^2)\).
+- The plotted \(V^*\) label is identified with the \(w^*\) cutoff scale used in
+  the text.
+
+```{=latex}
+\textbf{Exact manuscript change}
+\lstinputlisting{../presentations/refine-review-diffs/todo17-paper.diff}
+```
+
+**Where in the paper:** [Figure M1 and its discussion (pp.
+118--119)](ECM-ReStud-current.pdf#page=118).
+
+\newpage
+
+# Detailed comment 18: Closest PoT
+
+## ToDo
+
+> Ed check whether each community is closest to it's own PoT.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Each PoT is closest to it's own - in only two cases is there less than the
+> 0.5km buffer but that's it. (i.e. they are all closest to their own, but
+> sometimes (twice) second closest is <0.5km).
+
+## Actual output located
+
+The merge and distance diagnostics verify:
+
+- 9,805 take-up rows across 144 clusters;
+- no missing original assignments;
+- no treatment or distance-assignment mismatches against the monitored and
+  processed randomization data;
+- PoT-distance differences only at floating-point tolerance; and
+- 1,141 observability rows across the same 144 clusters.
+
+The paper now distinguishes candidate PoT centers from finalized implemented
+PoT locations. The related original-distance-assignment ITT output is shown
+below.
+
+```{=latex}
+\includepdf[pages={74,69},pagecommand={}]{ECM-ReStud-current.pdf}
+```
+
+**Where in the paper:** [Table B21, take-up ITT (p.
+74)](ECM-ReStud-current.pdf#page=74), [Table B14, observability ITT (p.
+69)](ECM-ReStud-current.pdf#page=69), and the PoT assignment discussion on
+[pp. 93--96](ECM-ReStud-current.pdf#page=93).
+
+\newpage
+
+# Detailed comment 24: Incorrect “normal mixture” terminology
+
+## ToDo
+
+> Ed edit the term.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Edited the term.
+
+## Actual output located
+
+The manuscript now uses “normal-sum specification,” which correctly describes
+\(w_i=v_i+u_i\) as the sum of two independent normal variables.
+
+| Before | After |
+|:--|:--|
+| “For the normal mixture, the type inference term is ...” | “Under this normal-sum specification, the type inference term is ...” |
+
+```{=latex}
+\textbf{Exact manuscript change}
+\lstinputlisting{../presentations/refine-review-diffs/todo24-paper.diff}
+```
+
+**Where in the paper:** the normal-sum identification discussion on [p.
+34](ECM-ReStud-current.pdf#page=34).
+
+\newpage
+
+# Detailed comment 25: Standard error in Table B21
+
+## ToDo
+
+> Swap to standard error.
+
+## Status
+
+> [DONE]
+
+## Recorded output
+
+> Edited the table.
+
+## Actual output located
+
+The Control mean remains 0.330, but the parenthetical is now 0.032—the clustered
+standard error from an intercept-only regression—rather than 0.470, the binary
+outcome standard deviation.
+
+```{=latex}
+\includepdf[pages=77,pagecommand={}]{ECM-ReStud-current.pdf}
+```
+
+**Where in the paper:** [Table B24, SMS effects in Control communities (p.
+77)](ECM-ReStud-current.pdf#page=77).

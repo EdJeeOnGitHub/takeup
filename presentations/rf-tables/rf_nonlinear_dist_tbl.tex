@@ -1,0 +1,22 @@
+
+\centering
+
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.103***\\{(0.026)}} & \makecell[c]{0.066**\\{(0.031)}} & \makecell[c]{0.15***\\{(0.039)}} & \makecell[c]{0.084*\\{(0.047)}}\\
+Calendar & \makecell[c]{0.037\\{(0.026)}} & \makecell[c]{0.027\\{(0.03)}} & \makecell[c]{0.05\\{(0.033)}} & \makecell[c]{0.024\\{(0.037)}}\\
+Ink & \makecell[c]{-0.014\\{(0.032)}} & \makecell[c]{-0.055*\\{(0.033)}} & \makecell[c]{0.036\\{(0.044)}} & \makecell[c]{0.091**\\{(0.042)}}\\
+\midrule
+Control & \makecell[c]{0.328\\{(0.022)}} & \makecell[c]{0.409\\{(0.024)}} & \makecell[c]{0.227\\{(0.03)}} & \makecell[c]{-0.183***\\{(0.032)}}\\
+$H0$: Any Signal $\neq$ No Signal, $p$-value & 0.162 & 0.699 & 0.012 & 0.009\\
+$H0$: Bracelet $\neq$ Calendar, $p$-value & 0.002 & 0.152 & 0.002 & 0.134\\
+\bottomrule
+\end{tabular}}
+

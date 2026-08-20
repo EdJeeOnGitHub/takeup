@@ -1,0 +1,85 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,graphicx,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{Robustness to a Finite-Mixture Distribution of Intrinsic Motivation}
+\label{app:finite-mixture-types}
+
+The heavy-tail exercise retains a symmetric, unimodal distribution. We also
+estimate a two-component Gaussian mixture for intrinsic motivation, allowing
+the data to generate asymmetry, shoulders, or bimodality. To preserve the
+scale normalization of the baseline model, the mixture is parameterized to
+have mean zero and variance one. Its free shape parameters are the mass on the
+lower component and the share of total variance attributable to separation
+between the component means. We assign these parameters $\operatorname{Beta}
+(2,2)$ and $\operatorname{Beta}(2,4)$ priors, respectively. The remaining
+structural model and all other priors are unchanged.
+
+The mixture fit uses four chains with 800 warmup and 800 retained draws per
+chain. The maximum split $\widehat R$ is 1.004, the minimum bulk and tail
+effective sample sizes are 852 and 1,180, respectively, and there are no
+divergences or maximum-treedepth transitions. The posterior median mass on the
+lower component is 0.61 (95 percent credible interval 0.12--0.92), and the
+median between-component share of variance is 0.31 (0.05--0.68). The broad
+shape intervals are appropriate here: the exercise deliberately allows a
+richer latent distribution rather than presuming that two sharply separated
+classes are present.
+
+Figure~\ref{fig:finite-mixture-density} shows the estimated latent-type
+density and its pointwise 95 percent posterior interval. The standard-normal
+benchmark is shown for comparison. The posterior permits appreciable
+non-Gaussian shape but places its central density close to the Gaussian
+benchmark; thus the exercise is flexible without mechanically forcing a
+second mode.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.72\textwidth]{\StructuralRobustnessPath/figures/finite-mixture-density.pdf}
+  \caption{Estimated finite-mixture distribution of intrinsic motivation}
+  \label{fig:finite-mixture-density}
+  \begin{minipage}{0.88\textwidth}\footnotesize
+    \textit{Notes:} The solid line is the pointwise posterior median density
+    and the shaded region is its pointwise 95 percent posterior interval. The
+    dashed line is the standard-normal density used in the baseline model;
+    dotted lines show the two weighted components evaluated at the posterior
+    median mixture parameters. Every mixture draw is normalized to mean zero
+    and variance one.
+  \end{minipage}
+\end{figure}
+
+Table~\ref{tab:finite-mixture-multipliers} compares social multipliers from
+the baseline and mixture specifications. The posterior medians and arm
+ordering are similar at all three distances: multipliers are largest for
+Control, remain above one for Calendar, and are attenuated below one for Ink
+and Bracelet. At 1.5 km the 95 percent intervals exclude one for Control and
+just exclude one for Bracelet, while those for Calendar and Ink include one;
+at 2.5 km the intervals exclude one for Control, Ink, and Bracelet. The
+mixture fit is less precise, especially for the local 500-meter derivative,
+whose intervals can include negative values. We therefore interpret this
+exercise as evidence that the median multiplier pattern is not an artifact of
+imposing a single Gaussian latent type, while recognizing the additional
+uncertainty introduced by flexibly estimating the latent distribution.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Social multipliers under Gaussian and finite-mixture intrinsic motivation}
+  \label{tab:finite-mixture-multipliers}
+  \begin{threeparttable}
+    \input{\StructuralRobustnessPath/tables/main-core-finite-mixture-multipliers.tex}
+    \begin{tablenotes}\footnotesize
+      \item \textit{Notes:} Entries are posterior medians of the point social
+      multiplier evaluated at the indicated distance. Parentheses contain 95
+      percent posterior credible intervals. The mixture has two Gaussian
+      components and is constrained to have mean zero and variance one.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\clearpage
+
+\end{document}

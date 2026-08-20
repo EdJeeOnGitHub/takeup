@@ -1,5 +1,5 @@
 \small
-\begin{longtable}{p{0.30\linewidth}cccc}
+\begin{longtable}{p{0.34\linewidth}cccc}
 \caption{Optimal policy robustness across structural models}\label{tab:policy-model-robustness}\\
 \toprule
 Policy information & \makecell{Assigned\\PoTs} & \makecell{Mean\\take-up} & \makecell{Mean distance\\(km)} & \makecell{Undefined /\\infeasible (\%)} \\
@@ -10,14 +10,6 @@ Policy information & \makecell{Assigned\\PoTs} & \makecell{Mean\\take-up} & \mak
 Policy information & \makecell{Assigned\\PoTs} & \makecell{Mean\\take-up} & \makecell{Mean distance\\(km)} & \makecell{Undefined /\\infeasible (\%)} \\
 \midrule
 \endhead
-\multicolumn{5}{l}{\textit{Baseline model (cluster bootstrap)}} \\
-Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.327\\(0.291, 0.373)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
-Control & \makecell[c]{109\\(94, 126)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.26\\(0.92, 1.59)} & 0.00 / 0.00 \\
-Bracelet & \makecell[c]{81\\(76, 107)} & \makecell[c]{0.328\\(0.327, 0.368)} & \makecell[c]{1.91\\(1.30, 2.44)} & 0.00 / 0.00 \\
-Control social image returns at 0.5km & \makecell[c]{97\\(76, 120)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.52\\(1.03, 2.23)} & 0.00 / 0.00 \\
-Bracelet social image returns at 0.5km & \makecell[c]{88\\(76, 118)} & \makecell[c]{0.328\\(0.327, 0.345)} & \makecell[c]{1.73\\(1.07, 2.42)} & 0.00 / 0.00 \\
-No social image returns & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.082\\(0.017, 0.213)} & \makecell[c]{0.64\\(0.64, 0.64)} & 0.00 / 100.00 \\
-\addlinespace
 \multicolumn{5}{l}{\textit{Correct classification}} \\
 Experimental allocation & \makecell[c]{144\\(144, 144)} & \makecell[c]{0.332\\(0.314, 0.350)} & \makecell[c]{1.18\\(1.18, 1.18)} & 0.00 / 0.00 \\
 Control & \makecell[c]{107\\(100, 114)} & \makecell[c]{0.328\\(0.327, 0.329)} & \makecell[c]{1.29\\(1.14, 1.44)} & 0.00 / 0.00 \\
@@ -68,6 +60,6 @@ No social image returns & \makecell[c]{144\\(109, 144)} & \makecell[c]{0.223\\(0
 \addlinespace
 \bottomrule
 \end{longtable}
-\noindent\begin{minipage}{\linewidth}
-\footnotesize \textit{Notes:} Each panel applies the same five policy counterfactuals, 3.5 km feasible-site cap, and baseline experimental-allocation welfare target. Parentheses contain 2.5th and 97.5th percentiles. The baseline panel uses county-stratified cluster-bootstrap mode refits; alternative-model panels use all retained HMC posterior draws. The final column reports, respectively, the percent of draws with an undefined counterfactual equilibrium and the percent with an unattainable welfare target. Target-infeasible draws report the allocation that maximizes attainable take-up; undefined-equilibrium draws are retained in the diagnostic denominator but excluded from that scenario's quantiles.
+\begin{minipage}{\linewidth}
+\footnotesize \textit{Notes:} Each panel applies the same five policy counterfactuals, 3.5 km feasible-site cap, and baseline experimental-allocation welfare target. Parentheses contain 2.5th and 97.5th percentiles. Displayed panels use all retained HMC posterior draws. The final column reports, respectively, the percent of draws with an undefined counterfactual equilibrium and the percent with an unattainable welfare target. Target-infeasible draws report the allocation that maximizes attainable take-up; undefined-equilibrium draws are retained in the diagnostic denominator but excluded from that scenario's quantiles.
 \end{minipage}

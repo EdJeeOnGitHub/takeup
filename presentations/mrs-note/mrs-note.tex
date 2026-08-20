@@ -1,0 +1,124 @@
+
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+\title{}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+
+\subsection{A Simple Model of Bracelets, Calendars, and Distance}
+We consider a simple Probit model where deworming behavior is driven by private material incentives - either a Bracelet or a Calendar - and the Distance an individual must walk to the deworming treatment location. The underlying latent variable for the decision to deworm is modeled as:
+\[
+\begin{aligned}
+\text{Deworming}^* = & \ \beta_0 + \beta_1 \cdot \text{Bracelet} + \beta_2 \cdot \text{Calendar} \\
+& + \beta_3 \cdot \text{Distance} + \beta_4 \cdot (\text{Bracelet} \times \text{Distance}) \\
+& + \beta_5 \cdot (\text{Calendar} \times \text{Distance}) + \epsilon
+\end{aligned}
+\]
+where $\epsilon$ is normally distributed with mean zero. The observable deworming decision is given by:
+\[
+\text{Deworming} = \mathbb{I}\{\text{Deworming}^* > 0\}
+\]
+and
+\[
+\text{Pr}(\text{Deworming}) = \Phi(\text{Deworming}^*)
+\]
+where $\Phi$ represents the cumulative distribution function (CDF) of the standard normal distribution.
+
+\subsubsection*{Marginal Rate of Substitution (MRS)}
+
+\paragraph{MRS between Bracelet and Distance:}
+
+The MRS between Bracelet and Distance is given by the ratio of the marginal utility of a Bracelet to the marginal utility of Distance:
+
+\[
+MRS_{\text{Bracelet, Distance}} = -\frac{\frac{\partial \text{Deworming}^*}{\partial \text{Bracelet}}}{\frac{\partial \text{Deworming}^*}{\partial \text{Distance}}}
+\]
+
+Taking the partial derivatives, we have:
+
+\[
+\frac{\partial \text{Deworming}^*}{\partial \text{Bracelet}} = \beta_1 + \beta_4 \cdot \text{Distance}
+\]
+\[
+\frac{\partial \text{Deworming}^*}{\partial \text{Distance}} = \beta_3 + \beta_4 \cdot \text{Bracelet} + \beta_5 \cdot \text{Calendar}
+\]
+
+Thus, the MRS between Bracelet and Distance is:
+
+\[
+MRS_{\text{Bracelet, Distance}} = -\frac{\beta_1 + \beta_4 \cdot \text{Distance}}{\beta_3 + \beta_4 \cdot \text{Bracelet} + \beta_5 \cdot \text{Calendar}}
+\]
+
+\paragraph{MRS between Calendar and Distance:}
+
+The MRS between Calendar and Distance is:
+
+\[
+MRS_{\text{Calendar, Distance}} = -\frac{\frac{\partial \text{Deworming}^*}{\partial \text{Calendar}}}{\frac{\partial \text{Deworming}^*}{\partial \text{Distance}}}
+\]
+
+The relevant partial derivative is:
+
+\[
+\frac{\partial \text{Deworming}^*}{\partial \text{Calendar}} = \beta_2 + \beta_5 \cdot \text{Distance}
+\]
+
+Hence, the MRS between Calendar and Distance becomes:
+
+\[
+MRS_{\text{Calendar, Distance}} = -\frac{\beta_2 + \beta_5 \cdot \text{Distance}}{\beta_3 + \beta_4 \cdot \text{Bracelet} + \beta_5 \cdot \text{Calendar}}
+\]
+
+\paragraph{MRS between Bracelet and Calendar:}
+
+The MRS between Bracelet and Calendar is derived similarly:
+
+\[
+MRS_{\text{Bracelet, Calendar}} = -\frac{\frac{\partial \text{Deworming}^*}{\partial \text{Bracelet}}}{\frac{\partial \text{Deworming}^*}{\partial \text{Calendar}}}
+\]
+
+This simplifies to:
+
+\[
+MRS_{\text{Bracelet, Calendar}} = -\frac{\beta_1 + \beta_4 \cdot \text{Distance}}{\beta_2 + \beta_5 \cdot \text{Distance}}
+\]
+
+\subsubsection*{Predictions}
+
+Consider the case where the MRS for Bracelet varies with Distance, but the MRS for Calendar remains fixed. Specifically:
+
+\begin{itemize}
+    \item The MRS between Bracelet and Distance varies with Distance due to $\beta_4 \neq 0$, indicating that the marginal utility of a Bracelet changes with Distance.
+    \item The MRS between Calendar and Distance is constant when $\beta_5 = 0$, meaning that the marginal utility of a Calendar does not vary with Distance.
+\end{itemize}
+
+\begin{prediction}
+Therefore, the MRS between Bracelet and Calendar is:
+
+\[
+MRS_{\text{Bracelet, Calendar}} = -\frac{\beta_1 + \beta_4 \cdot \text{Distance}}{\beta_2}
+\]
+
+Since the MRS for Bracelet changes over Distance while the MRS for Calendar is fixed, 
+the MRS between Bracelet and Calendar also varies with Distance due to the interaction 
+term $\beta_4 \cdot \text{Distance}$.
+\end{prediction}
+
+However, the WTP data finds individuals value the private incentive from the Bracelets 
+and Calendars identically 
+at all distances. In a simple model composed of only private material incentives and distance 
+it is impossible for the two private incentives to have differential responses to distance but the 
+same MRS across all distances. This suggests that patterns of substitution between the two incentives 
+and distance alone are not enough to explain the observed patterns in the data - some other factor,
+such as social image concerns, can generate identical marginal utilities for the 
+private components of the incentives whilst allowing the overall marginal rate of 
+substitution to vary, including both private and signalling utilities.
+
+\end{document}

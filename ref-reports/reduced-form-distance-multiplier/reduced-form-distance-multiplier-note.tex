@@ -1,0 +1,83 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+
+\section*{A Reduced-Form Relative Distance Multiplier}
+
+This note asks how much of the paper's multiplier result can be recovered
+without the structural latent-type and reporting models.  We use the canonical
+no-SMS take-up sample of 9,805 adults in 144 communities.  The primary
+comparison pools Control and Calendar as No Signal and Ink and Bracelet as Any
+Signal.  All specifications include arm indicators, county fixed effects,
+sex, age, and the design-based expected-distance control.  Uncertainty comes
+from 1,000 county-stratified exponential community-weight draws.
+
+Table~\ref{tab:rf-distance-multiplier} reports three versions of the distance
+response.  The original-assignment column uses the randomized Close/Far
+assignment.  The linear column estimates an arm-group-specific slope in
+realized community-centroid distance.  The spline column uses a three-degree
+natural spline and reports the average finite slope from 0.5 to 2.0 km, an
+interval inside the common empirical support of all four arms.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Reduced-form distance responses and relative attenuation}
+  \label{tab:rf-distance-multiplier}
+  \resizebox{\linewidth}{!}{\input{ref-reports/reduced-form-distance-multiplier/tables/reduced-form-distance-multiplier.tex}}
+  \begin{minipage}{0.97\linewidth}
+    \vspace{0.4em}\footnotesize
+    \textit{Notes:} Entries are point estimates; parentheses contain 95
+    percent percentile intervals across county-stratified exponential
+    community-weight draws. Distance responses in the continuous-distance
+    columns are changes in take-up per kilometer. The original-assignment
+    responses are randomized Far-minus-Close effects. Relative distance
+    response divides the Any Signal response by the No Signal response;
+    attenuation is one minus this ratio.
+  \end{minipage}
+\end{table}
+
+The design-based result is especially clear.  Moving from Close to Far lowers
+take-up by 18.8 percentage points in No Signal communities and by 6.7
+percentage points in Any Signal communities.  The difference is 12.2
+percentage points, with a 95 percent interval of 5.2 to 19.3 percentage
+points.  Public signals therefore leave 35 percent of the no-signal distance
+response, corresponding to 65 percent attenuation.  The continuous-distance
+specifications are more conservative but tell the same qualitative story:
+the linear estimate implies 39 percent attenuation and the flexible finite
+change implies 44 percent attenuation.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.76\linewidth]{ref-reports/reduced-form-distance-multiplier/figures/pooled-distance-curves.pdf}
+  \caption{Flexible reduced-form take-up curves by signal environment}
+  \label{fig:rf-distance-curves}
+  \begin{minipage}{0.90\linewidth}
+    \vspace{0.3em}\footnotesize
+    \textit{Notes:} Curves are standardized predictions from a natural-spline
+    specification over the common 0.4--2.0 km support. Shaded regions are
+    pointwise 95 percent intervals from the same community-weight draws.
+  \end{minipage}
+\end{figure}
+
+This exercise directly identifies total equilibrium distance responses.  If
+the underlying direct access-cost response is common across randomized signal
+environments, their ratio identifies the relative multiplier,
+\[
+  \frac{\partial E[Y\mid d,\text{Any Signal}]/\partial d}
+       {\partial E[Y\mid d,\text{No Signal}]/\partial d}
+  =
+  \frac{M_{\text{Any Signal}}(d)}{M_{\text{No Signal}}(d)}.
+\]
+It does not identify an absolute multiplier relative to zero observability,
+because every experimental arm retains positive observability.  The flexible
+derivative difference is also not uniformly separated from zero at every
+point in the distance interval.  The defensible reduced-form finding is the
+finite-change ordering: public signals substantially flatten the take-up
+response to distance.  Absolute arm-specific multiplier levels remain the
+additional contribution of the structural model.
+
+\end{document}

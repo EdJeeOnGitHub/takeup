@@ -1,0 +1,22 @@
+diff --git a/ECM ReStud.tex b/ECM ReStud.tex
+index c4639cf..d4c654f 100644
+--- a/ECM ReStud.tex	
++++ b/ECM ReStud.tex	
+@@ -2520,7 +2520,7 @@ The main specification assumes that the composite type \(w=v+u\) is Gaussian. Th
+ With observability held fixed at a positive level, a social multiplier different from one requires a type inference function that is not locally flat, \(\Delta'(w)\neq0\). More generally, when observability varies with distance, changes in either \(\mu(z,d)\) or \(\Delta(w^\ast)\) can generate a multiplier different from one. The purpose of the simulations below is to show that the multiplier is not specific to the Gaussian benchmark. It equals one only over regions where the induced type inference function is locally flat.
+ 
+ \paragraph{Simulation design.}
+-We compare two type distributions. The first is the Gaussian benchmark, \(w\sim N(0,1)\). The second is an equally weighted bimodal mixture of \(N(-\eta,1)\) and \(N(\eta,1)\), with \(\eta\) large enough that the two modes are distinct. For each distribution, we vary the net private benefit shifter \(b\) and compute (i) the equilibrium participation rate \(\bar y(b)\), (ii) the social image return \(\Delta(w^\ast(b))\), and (iii) the implied social multiplier \(M(b)\).
++We compare two type index distributions on the scale shown in Figure~\ref{fig:robustness-bimodal}. The first is a concentrated Gaussian benchmark, approximately \(w\sim N(0.4,0.2^2)\). The second is an asymmetric bimodal mixture, approximately \(0.25\,N(-2,0.2^2)+0.75\,N(0.4,0.2^2)\). For each distribution, we vary the net private benefit shifter \(b\) and compute (i) the equilibrium participation rate \(\bar y(b)\), (ii) the social image return \(\Delta(w^\ast(b))\), and (iii) the implied social multiplier \(M(b)\).
+ 
+ \paragraph{Results.}
+ Figure~\ref{fig:robustness-bimodal} shows the results. Under the bimodal distribution, there are intervals in which the cutoff moves through the low density gap between the two modes. In those intervals, the participation curve is locally flat, \(\Delta(w^\ast)\) is locally constant, and the social multiplier equals one. Outside these locally flat regions, the multiplier differs from one. Under the Gaussian benchmark, there is no such gap, and \(\Delta(w^\ast)\) varies smoothly with the cutoff.
+@@ -2556,7 +2556,7 @@ These simulations clarify the role of the distributional assumption. The multipl
+   \caption{Simulation under Gaussian and Bimodal Type Distributions}
+   \label{fig:robustness-bimodal}
+   \floatfoot{\textit{Notes:}  
+-    Panel (a) plots the assumed densities for \(w\): Gaussian in red and bimodal in blue. Panel (b) shows the participation rate as the net private benefit shifter \(b\) changes. Panel (c) traces the implied social image return. Panel (d) gives the resulting social multiplier. Flat segments, visible only in the bimodal case, occur where the cutoff type moves through the low density gap between the two modes. In those intervals, \(\Delta(w^\ast)\) is locally constant and \(M(b)\) equals one.}
++    Panel (a) plots the assumed densities for the type index \(w\): a concentrated Gaussian benchmark in red, approximately \(N(0.4,0.2^2)\), and an asymmetric bimodal mixture in blue, approximately \(0.25\,N(-2,0.2^2)+0.75\,N(0.4,0.2^2)\). The axis label \(V^\ast\) in the plotted figure denotes the cutoff/type index scale \(w^\ast\) used in the text. Panel (b) shows the participation rate as the net private benefit shifter \(b\) changes. Panel (c) traces the implied social image return. Panel (d) gives the resulting social multiplier. Flat segments, visible only in the bimodal case, occur where the cutoff type moves through the low density gap between the two modes. In those intervals, \(\Delta(w^\ast)\) is locally constant and \(M(b)\) equals one.}
+ \end{figure}
+ 
+ 

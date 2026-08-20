@@ -1,0 +1,39 @@
+{
+  "name": "takeup",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "options": ["--network=host"]
+  },
+
+  "containerEnv": {
+    "RENV_PATHS_CACHE": "/renv/cache",
+    // use a container-specific library so Ubuntu binaries don't overwrite host Arch binaries
+    "RENV_PATHS_LIBRARY": "/renv/library",
+    "RENV_CONFIG_REPOS_OVERRIDE": "https://packagemanager.posit.co/cran/__linux__/noble/latest"
+  },
+
+  "runArgs": ["--network=host"],
+
+  "mounts": [
+    "source=takeup-renv-cache,target=/renv/cache,type=volume",
+    "source=takeup-renv-library,target=/renv/library,type=volume",
+    "source=claude-code-config,target=/home/ed/.claude,type=volume"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["REditorSupport.r"],
+      "settings": {
+        "r.rterm.linux": "/usr/local/bin/radian",
+        "r.bracketedPaste": true,
+        "r.sessionWatcher": true,
+        "r.plot.useHttpgd": true
+      }
+    }
+  },
+
+  "remoteUser": "ed",
+  "updateRemoteUserUID": false,
+
+  "postCreateCommand": "R -e \"renv::restore()\""
+}

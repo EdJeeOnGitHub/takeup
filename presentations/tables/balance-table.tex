@@ -1,0 +1,50 @@
+
+
+
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lccccccccccc}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{5}{c}{Close} & \multicolumn{5}{c}{Far} & \multicolumn{1}{c}{} \\
+\cmidrule(l{3pt}r{3pt}){2-6} \cmidrule(l{3pt}r{3pt}){7-11}
+ & Control & Ink & Calendar & Bracelet & F-test $p$-value & Control & Ink & Calendar & Bracelet & F-test $p$-value & Joint F-test $p$-value\\
+\midrule
+\addlinespace[0.3em]
+\multicolumn{12}{l}{\textbf{Individual-level Covariates}}\\
+\hline
+\hspace{1em}Female & \makecell[c]{0.565\\(0.015)} & \makecell[c]{0.558\\(0.009)} & \makecell[c]{0.564\\(0.013)} & \makecell[c]{0.528\\(0.016)} & 0.3233 & \makecell[c]{0.562\\(0.01)} & \makecell[c]{0.548\\(0.011)} & \makecell[c]{0.564\\(0.01)} & \makecell[c]{0.539\\(0.007)} & 0.2322 & 0.6527\\
+\hspace{1em}Phone owner & \makecell[c]{0.765\\(0.058)} & \makecell[c]{0.771\\(0.042)} & \makecell[c]{0.752\\(0.06)} & \makecell[c]{0.757\\(0.042)} & 0.8478 & \makecell[c]{0.728\\(0.048)} & \makecell[c]{0.73\\(0.036)} & \makecell[c]{0.755\\(0.05)} & \makecell[c]{0.739\\(0.037)} & 0.5135 & 0.9960\\
+\hspace{1em}Age & \makecell[c]{41.854\\(0.598)} & \makecell[c]{41.953\\(0.897)} & \makecell[c]{42.076\\(1.268)} & \makecell[c]{43.269\\(1.947)} & 0.5756 & \makecell[c]{42.17\\(0.839)} & \makecell[c]{42.28\\(0.75)} & \makecell[c]{40.621\\(1.05)} & \makecell[c]{41.093\\(1.838)} & 0.3043 & 0.3353\\
+\hspace{1em}Cluster distance to PoT & \makecell[c]{611.037\\(5.464)} & \makecell[c]{620.992\\(118.928)} & \makecell[c]{674.822\\(76.669)} & \makecell[c]{762.683\\(50.661)} & 0.4134 & \makecell[c]{1735.174\\(63.645)} & \makecell[c]{2064.899\\(5.606)} & \makecell[c]{1792.425\\(33.202)} & \makecell[c]{1667.729\\(107.333)} & 0.2482 & 0.0020\\
+\hspace{1em}Years schooling & \makecell[c]{6.912\\(0.158)} & \makecell[c]{6.75\\(0.3)} & \makecell[c]{7.171\\(0.164)} & \makecell[c]{7.179\\(0.091)} & 0.6777 & \makecell[c]{5.985\\(0.053)} & \makecell[c]{6.6\\(0.279)} & \makecell[c]{7.581\\(0.505)} & \makecell[c]{7.356\\(0.324)} & 0.0470 & 0.6937\\
+\hspace{1em}Knowledge of deworming medication & \makecell[c]{0.713\\(0.06)} & \makecell[c]{0.854\\(0.021)} & \makecell[c]{0.75\\(0.017)} & \makecell[c]{0.741\\(0.016)} & 0.2492 & \makecell[c]{0.773\\(0.044)} & \makecell[c]{0.75\\(0.06)} & \makecell[c]{0.865\\(0.012)} & \makecell[c]{0.787\\(0.029)} & 0.2643 & 0.7758\\
+\hspace{1em}Dewormed self & \makecell[c]{0.732\\(0.03)} & \makecell[c]{0.661\\(0.041)} & \makecell[c]{0.643\\(0.024)} & \makecell[c]{0.677\\(0.042)} & 0.6306 & \makecell[c]{0.653\\(0.055)} & \makecell[c]{0.686\\(0.043)} & \makecell[c]{0.708\\(0.03)} & \makecell[c]{0.701\\(0.046)} & 0.0881 & 0.4234\\
+\hspace{1em}Dewormed last 12 & \makecell[c]{0.587\\(0.02)} & \makecell[c]{0.519\\(0.034)} & \makecell[c]{0.577\\(0.044)} & \makecell[c]{0.535\\(0.053)} & 0.6226 & \makecell[c]{0.445\\(0.034)} & \makecell[c]{0.605\\(0.031)} & \makecell[c]{0.485\\(0.046)} & \makecell[c]{0.573\\(0.035)} & 0.3353 & 0.4354\\
+\hspace{1em}Floor tile cement & \makecell[c]{0.216\\(0.012)} & \makecell[c]{0.2\\(0.02)} & \makecell[c]{0.127\\(0.002)} & \makecell[c]{0.2\\(0.041)} & 0.2913 & \makecell[c]{0.167\\(0.03)} & \makecell[c]{0.161\\(0.007)} & \makecell[c]{0.214\\(0.032)} & \makecell[c]{0.246\\(0.025)} & 0.6677 & 0.7357\\
+\hspace{1em}Know everyone can be infected & \makecell[c]{0.348\\(0.017)} & \makecell[c]{0.472\\(0.023)} & \makecell[c]{0.371\\(0.043)} & \makecell[c]{0.341\\(0.044)} & 0.5846 & \makecell[c]{0.273\\(0.076)} & \makecell[c]{0.33\\(0.013)} & \makecell[c]{0.302\\(0.055)} & \makecell[c]{0.468\\(0.103)} & 0.4775 & 0.9930\\
+\hspace{1em}Know bi-yearly treatment recommended & \makecell[c]{0.128\\(0.038)} & \makecell[c]{0.105\\(0.014)} & \makecell[c]{0.131\\(0.035)} & \makecell[c]{0.106\\(0.029)} & 0.8759 & \makecell[c]{0.072\\(0.019)} & \makecell[c]{0.106\\(0.048)} & \makecell[c]{0.084\\(0.013)} & \makecell[c]{0.076\\(0.027)} & 0.1091 & 0.7948\\
+\hspace{1em}Understand deworming externality, baseline & \makecell[c]{0.243\\(0.051)} & \makecell[c]{0.277\\(0.018)} & \makecell[c]{0.263\\(0.036)} & \makecell[c]{0.263\\(0.017)} & 0.9269 & \makecell[c]{0.22\\(0.039)} & \makecell[c]{0.25\\(0.022)} & \makecell[c]{0.255\\(0.047)} & \makecell[c]{0.313\\(0.026)} & 0.1371 & 0.7157\\
+\addlinespace[0.3em]
+\multicolumn{12}{l}{\textbf{Baseline Sample}}\\
+\hline
+\hspace{1em}Number of individuals recognised in community & \makecell[c]{0.355\\(0.008)} & \makecell[c]{0.516\\(0.064)} & \makecell[c]{0.522\\(0.065)} & \makecell[c]{0.536\\(0.059)} & 0.3163 & \makecell[c]{0.383\\(0.048)} & \makecell[c]{0.508\\(0.055)} & \makecell[c]{0.522\\(0.017)} & \makecell[c]{0.568\\(0.043)} & 0.0571 & 0.0951\\
+\hspace{1em}N individuals & 230 & 246 & 224 & 256 &  & 198 & 189 & 192 & 235 &  & \\
+\addlinespace[0.3em]
+\multicolumn{12}{l}{\textbf{Takeup Sample}}\\
+\hline
+\hspace{1em}N points of treatment & 19 & 20 & 19 & 21 &  & 15 & 15 & 16 & 18 &  & \\
+\hspace{1em}N individuals & 1306 & 1418 & 1273 & 1425 &  & 1054 & 1038 & 1086 & 1205 &  & \\
+\addlinespace[0.3em]
+\multicolumn{12}{l}{\textbf{Belief Sample}}\\
+\hline
+\hspace{1em}N points of treatment & 19 & 21 & 19 & 21 &  & 15 & 15 & 16 & 18 &  \vphantom{1} & \\
+\hspace{1em}N individuals & 100 & 150 & 136 & 161 &  & 83 & 104 & 128 & 137 &  & \\
+\addlinespace[0.3em]
+\multicolumn{12}{l}{\textbf{WTP Sample}}\\
+\hline
+\hspace{1em}N points of treatment & 19 & 21 & 19 & 21 &  & 15 & 15 & 16 & 18 &  & \\
+\hspace{1em}N individuals & 245 & - & - & - &  & 213 & - & - & - &  & \\
+N points of treatment & 19 & - & - & - &  & 15 & - & - & - &  & \\
+\bottomrule
+\end{tabular}}
+

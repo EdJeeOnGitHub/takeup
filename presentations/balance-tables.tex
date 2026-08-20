@@ -1,0 +1,319 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage[utf8]{inputenc}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{pdflscape}
+\newcommand{\blandscape}{\begin{landscape}}
+\newcommand{\elandscape}{\end{landscape}}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Balance Tables},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Balance Tables}
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+\maketitle
+
+\begin{verbatim}
+## Rows: 288 Columns: 5
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (2): lhs, term
+## dbl (3): estimate, std.error, p.value
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## Rows: 551 Columns: 14
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (7): lhs, term, lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, comp_type
+## dbl (7): estimate, std.error, statistic, p.value, s.value, conf.low, conf.high
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+\end{verbatim}
+
+\subsection{Balance}\label{balance}
+
+\begin{verbatim}
+## Rows: 361 Columns: 14
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (7): lhs, term, lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, comp_type
+## dbl (7): estimate, std.error, statistic, p.value, s.value, conf.low, conf.high
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## Joining with `by = join_by(lhs)`
+\end{verbatim}
+
+\begin{table}
+\centering
+\caption{\label{tab:attrition-treat-balance}Attrition Treatment Balance}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccccccccccccc}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{6}{c}{Close} & \multicolumn{6}{c}{Far} & \multicolumn{1}{c}{} \\
+\cmidrule(l{3pt}r{3pt}){3-8} \cmidrule(l{3pt}r{3pt}){9-14}
+ & Sample Mean & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Joint Test\\
+\midrule
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel A: Takeup sample, $N=252$}}}\\
+\hline
+\hspace{1em}Age & 42.6 & \makecell[c]{41.839\\(4.053)} & \makecell[c]{5.529\\{[0.222]}} & \makecell[c]{-5.629\\{[0.121]}} & \makecell[c]{10.786\\{[0.045]}} & \makecell[c]{16.415\\{[0.002]}} & 0.0054 & \makecell[c]{40.335\\(4.84)} & \makecell[c]{5.691\\{[0.203]}} & \makecell[c]{6.317\\{[0.262]}} & \makecell[c]{1.125\\{[0.82]}} & \makecell[c]{-5.192\\{[0.337]}} & 0.4495 & 0.0226\\
+\hspace{1em}Female & 0.722 & \makecell[c]{0.67\\(0.102)} & \makecell[c]{0.088\\{[0.385]}} & \makecell[c]{0.087\\{[0.343]}} & \makecell[c]{0.08\\{[0.62]}} & \makecell[c]{-0.007\\{[0.964]}} & 0.7756 & \makecell[c]{0.588\\(0.092)} & \makecell[c]{0.183\\{[0.1]}} & \makecell[c]{-0.015\\{[0.922]}} & \makecell[c]{0.009\\{[0.942]}} & \makecell[c]{0.024\\{[0.888]}} & 0.3564 & 0.3971\\
+\hspace{1em}Phone owner & 0.767 & \makecell[c]{0.807\\(0.08)} & \makecell[c]{0.034\\{[0.675]}} & \makecell[c]{-0.007\\{[0.936]}} & \makecell[c]{0.127\\{[0.288]}} & \makecell[c]{0.134\\{[0.286]}} & 0.7071 & \makecell[c]{0.89\\(0.092)} & \makecell[c]{-0.049\\{[0.684]}} & \makecell[c]{-0.077\\{[0.453]}} & \makecell[c]{-0.048\\{[0.675]}} & \makecell[c]{0.029\\{[0.768]}} & 0.9042 & 0.9676\\
+\hspace{1em}Number of individuals per community & 664 & \makecell[c]{765.439\\(91.34)} & \makecell[c]{-126.299\\{[0.137]}} & \makecell[c]{1.848\\{[0.986]}} & \makecell[c]{-52.433\\{[0.571]}} & \makecell[c]{-54.282\\{[0.59]}} & 0.3238 & \makecell[c]{774.435\\(135.585)} & \makecell[c]{-49.271\\{[0.741]}} & \makecell[c]{-55.499\\{[0.686]}} & \makecell[c]{-149.543\\{[0.313]}} & \makecell[c]{-94.045\\{[0.234]}} & 0.6084 & 0.6250\\
+\hspace{1em}Distance to PoT & 1220 & \makecell[c]{848.4\\(134.494)} & \makecell[c]{-166.456\\{[0.161]}} & \makecell[c]{64.85\\{[0.616]}} & \makecell[c]{131.279\\{[0.421]}} & \makecell[c]{66.429\\{[0.681]}} & 0.1338 & \makecell[c]{1647.781\\(126.519)} & \makecell[c]{435.243\\{[0.015]}} & \makecell[c]{458.083\\{[0.003]}} & \makecell[c]{220.599\\{[0.063]}} & \makecell[c]{-237.483\\{[0.141]}} & 0.0058 & 0.0000\\
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel B: Baseline demographics, $N=252$}}}\\
+\hline
+\hspace{1em}Floor made of tile/cement & 0.199 & \makecell[c]{0.404\\(0.099)} & \makecell[c]{-0.073\\{[0.456]}} & \makecell[c]{-0.065\\{[0.431]}} & \makecell[c]{0.051\\{[0.701]}} & \makecell[c]{0.116\\{[0.396]}} & 0.7226 & \makecell[c]{0.43\\(0.167)} & \makecell[c]{-0.044\\{[0.802]}} & \makecell[c]{-0.173\\{[0.205]}} & \makecell[c]{-0.144\\{[0.324]}} & \makecell[c]{0.029\\{[0.731]}} & 0.5026 & 0.5486\\
+\hspace{1em}Completed primary schooling & 0.38 & \makecell[c]{0.279\\(0.097)} & \makecell[c]{0.02\\{[0.853]}} & \makecell[c]{-0.085\\{[0.431]}} & \makecell[c]{-0.05\\{[0.708]}} & \makecell[c]{0.036\\{[0.783]}} & 0.7781 & \makecell[c]{0.248\\(0.089)} & \makecell[c]{-0.02\\{[0.837]}} & \makecell[c]{0.194\\{[0.13]}} & \makecell[c]{0.146\\{[0.175]}} & \makecell[c]{-0.048\\{[0.708]}} & 0.1734 & 0.4437\\
+\hspace{1em}Main ethnicity/Luhya & 0.601 & \makecell[c]{0.482\\(0.106)} & \makecell[c]{0.011\\{[0.887]}} & \makecell[c]{0.046\\{[0.59]}} & \makecell[c]{0.037\\{[0.754]}} & \makecell[c]{-0.009\\{[0.937]}} & 0.9319 & \makecell[c]{0.534\\(0.099)} & \makecell[c]{-0.063\\{[0.509]}} & \makecell[c]{-0.124\\{[0.223]}} & \makecell[c]{-0.103\\{[0.336]}} & \makecell[c]{0.021\\{[0.861]}} & 0.6168 & 0.9129\\
+\hspace{1em}Christian & 0.972 & \makecell[c]{0.956\\(0.053)} & \makecell[c]{-0.011\\{[0.879]}} & \makecell[c]{0.052\\{[0.214]}} & \makecell[c]{0.052\\{[0.215]}} & \makecell[c]{0\\{[0.972]}} & 0.4357 & \makecell[c]{0.988\\(0.031)} & \makecell[c]{0.02\\{[0.427]}} & \makecell[c]{0.012\\{[0.645]}} & \makecell[c]{-0.032\\{[0.447]}} & \makecell[c]{-0.044\\{[0.185]}} & 0.3345 & 0.3970\\
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel C: Deworming knowledge, $N=252$}}}\\
+\hline
+\hspace{1em}Know adults get worms & 0.762 & \makecell[c]{0.774\\(0.101)} & \makecell[c]{-0.211\\{[0.12]}} & \makecell[c]{-0.057\\{[0.586]}} & \makecell[c]{0.092\\{[0.386]}} & \makecell[c]{0.149\\{[0.112]}} & 0.0960 & \makecell[c]{0.697\\(0.114)} & \makecell[c]{0.12\\{[0.292]}} & \makecell[c]{0.095\\{[0.468]}} & \makecell[c]{0.173\\{[0.148]}} & \makecell[c]{0.078\\{[0.492]}} & 0.5443 & 0.2108\\
+\hspace{1em}Know children get worms & 0.944 & \makecell[c]{0.896\\(0.06)} & \makecell[c]{0.035\\{[0.451]}} & \makecell[c]{0.017\\{[0.721]}} & \makecell[c]{0.067\\{[0.105]}} & \makecell[c]{0.049\\{[0.086]}} & 0.1242 & \makecell[c]{0.89\\(0.06)} & \makecell[c]{-0.031\\{[0.638]}} & \makecell[c]{-0.006\\{[0.932]}} & \makecell[c]{0.019\\{[0.8]}} & \makecell[c]{0.025\\{[0.745]}} & 0.9296 & 0.0930\\
+\hspace{1em}Believe deworming is for the sick & 0.016 & \makecell[c]{0.039\\(0.049)} & \makecell[c]{-0.022\\{[0.696]}} & \makecell[c]{-0.05\\{[0.318]}} & \makecell[c]{-0.051\\{[0.317]}} & \makecell[c]{0\\{[0.95]}} & 0.6110 & \makecell[c]{-0.016\\(0.011)} & \makecell[c]{0.004\\{[0.589]}} & \makecell[c]{0.005\\{[0.708]}} & \makecell[c]{0.032\\{[0.24]}} & \makecell[c]{0.027\\{[0.425]}} & 0.5306 & 0.8702\\
+\hspace{1em}Know medication treats worms & 0.845 & \makecell[c]{0.858\\(0.084)} & \makecell[c]{-0.067\\{[0.392]}} & \makecell[c]{-0.103\\{[0.144]}} & \makecell[c]{0.033\\{[0.702]}} & \makecell[c]{0.136\\{[0.1]}} & 0.2870 & \makecell[c]{0.699\\(0.147)} & \makecell[c]{0.116\\{[0.408]}} & \makecell[c]{0.042\\{[0.762]}} & \makecell[c]{0.141\\{[0.289]}} & \makecell[c]{0.099\\{[0.278]}} & 0.6056 & 0.5113\\
+\hspace{1em}Know bi-yearly treatment recommended & 0.647 & \makecell[c]{0.565\\(0.121)} & \makecell[c]{0.184\\{[0.111]}} & \makecell[c]{-0.043\\{[0.736]}} & \makecell[c]{0.306\\{[0.032]}} & \makecell[c]{0.349\\{[0.013]}} & 0.0363 & \makecell[c]{0.647\\(0.142)} & \makecell[c]{-0.067\\{[0.649]}} & \makecell[c]{-0.048\\{[0.76]}} & \makecell[c]{0.081\\{[0.588]}} & \makecell[c]{0.129\\{[0.391]}} & 0.7208 & 0.1856\\
+\hspace{1em}Know worms impose externality & 0.341 & \makecell[c]{0.29\\(0.089)} & \makecell[c]{0.255\\{[0.005]}} & \makecell[c]{0.088\\{[0.35]}} & \makecell[c]{0.014\\{[0.922]}} & \makecell[c]{-0.074\\{[0.613]}} & 0.0434 & \makecell[c]{0.41\\(0.132)} & \makecell[c]{-0.045\\{[0.77]}} & \makecell[c]{-0.047\\{[0.768]}} & \makecell[c]{0.079\\{[0.62]}} & \makecell[c]{0.126\\{[0.307]}} & 0.7084 & 0.1942\\
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel D: Implementation, $N=252$}}}\\
+\hline
+\hspace{1em}Did a CHV visit you? & 0.87 & \makecell[c]{0.962\\(0.06)} & \makecell[c]{0.026\\{[0.736]}} & \makecell[c]{0.034\\{[0.613]}} & \makecell[c]{0.04\\{[0.681]}} & \makecell[c]{0.006\\{[0.953]}} & 0.9523 & \makecell[c]{0.825\\(0.061)} & \makecell[c]{0.018\\{[0.871]}} & \makecell[c]{0.213\\{[0.003]}} & \makecell[c]{0.146\\{[0.019]}} & \makecell[c]{-0.067\\{[0.278]}} & 0.0219 & 0.1268\\
+\hspace{1em}Announcement about MDA in your community? & 0.789 & \makecell[c]{0.831\\(0.122)} & \makecell[c]{-0.034\\{[0.756]}} & \makecell[c]{0.054\\{[0.629]}} & \makecell[c]{0.065\\{[0.549]}} & \makecell[c]{0.011\\{[0.914]}} & 0.7103 & \makecell[c]{0.841\\(0.163)} & \makecell[c]{-0.092\\{[0.628]}} & \makecell[c]{0.009\\{[0.962]}} & \makecell[c]{-0.186\\{[0.37]}} & \makecell[c]{-0.195\\{[0.22]}} & 0.6117 & 0.7620\\
+\hspace{1em}CHV share deworming practices? & 0.975 & \makecell[c]{0.993\\(0.032)} & \makecell[c]{0.045\\{[0.203]}} & \makecell[c]{0.011\\{[0.785]}} & \makecell[c]{0.035\\{[0.264]}} & \makecell[c]{0.024\\{[0.333]}} & 0.4045 & \makecell[c]{1\\(0.017)} & \makecell[c]{-0.003\\{[0.814]}} & \makecell[c]{-0.008\\{[0.81]}} & \makecell[c]{-0.088\\{[0.202]}} & \makecell[c]{-0.079\\{[0.389]}} & 0.3485 & 0.6207\\
+\hspace{1em}CHV share where to get dewormed? & 0.974 & \makecell[c]{1\\(0.037)} & \makecell[c]{0.001\\{[0.968]}} & \makecell[c]{-0.126\\{[0.174]}} & \makecell[c]{0.006\\{[0.816]}} & \makecell[c]{0.132\\{[0.116]}} & 0.3810 & \makecell[c]{1\\(0.037)} & \makecell[c]{-0.023\\{[0.112]}} & \makecell[c]{-0.024\\{[0.189]}} & \makecell[c]{-0.019\\{[0.159]}} & \makecell[c]{0.005\\{[0.746]}} & 0.3952 & 0.7528\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{verbatim}
+## Rows: 361 Columns: 14
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (7): lhs, term, lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, comp_type
+## dbl (7): estimate, std.error, statistic, p.value, s.value, conf.low, conf.high
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## Joining with `by = join_by(lhs)`
+\end{verbatim}
+
+\begin{table}
+\centering
+\caption{\label{tab:non-attrition-treat-balance}Non-Attrited Treatment Balance}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccccccccccccc}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{6}{c}{Close} & \multicolumn{6}{c}{Far} & \multicolumn{1}{c}{} \\
+\cmidrule(l{3pt}r{3pt}){3-8} \cmidrule(l{3pt}r{3pt}){9-14}
+ & Sample Mean & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Joint Test\\
+\midrule
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel A: Takeup sample, $N=2,407$}}}\\
+\hline
+\hspace{1em}Age & 41.2 & \makecell[c]{39.269\\(1.56)} & \makecell[c]{-0.109\\{[0.948]}} & \makecell[c]{-0.476\\{[0.768]}} & \makecell[c]{0.485\\{[0.783]}} & \makecell[c]{0.961\\{[0.498]}} & 0.9267 & \makecell[c]{38.319\\(1.363)} & \makecell[c]{1.029\\{[0.529]}} & \makecell[c]{-1.471\\{[0.385]}} & \makecell[c]{-0.074\\{[0.97]}} & \makecell[c]{1.397\\{[0.483]}} & 0.5205 & 0.7674\\
+\hspace{1em}Female & 0.625 & \makecell[c]{0.651\\(0.045)} & \makecell[c]{-0.008\\{[0.878]}} & \makecell[c]{-0.078\\{[0.154]}} & \makecell[c]{-0.093\\{[0.044]}} & \makecell[c]{-0.014\\{[0.736]}} & 0.0463 & \makecell[c]{0.655\\(0.046)} & \makecell[c]{-0.069\\{[0.155]}} & \makecell[c]{-0.052\\{[0.286]}} & \makecell[c]{-0.083\\{[0.088]}} & \makecell[c]{-0.03\\{[0.421]}} & 0.3757 & 0.1337\\
+\hspace{1em}Phone owner & 0.798 & \makecell[c]{0.948\\(0.018)} & \makecell[c]{0.012\\{[0.644]}} & \makecell[c]{0.002\\{[0.927]}} & \makecell[c]{-0.026\\{[0.21]}} & \makecell[c]{-0.027\\{[0.097]}} & 0.2337 & \makecell[c]{0.929\\(0.02)} & \makecell[c]{-0.004\\{[0.888]}} & \makecell[c]{0.016\\{[0.516]}} & \makecell[c]{0.017\\{[0.454]}} & \makecell[c]{0\\{[0.985]}} & 0.7607 & 0.5971\\
+\hspace{1em}Number of individuals per community & 661 & \makecell[c]{816.502\\(68.838)} & \makecell[c]{-115.519\\{[0.136]}} & \makecell[c]{-111.011\\{[0.195]}} & \makecell[c]{-89.076\\{[0.203]}} & \makecell[c]{21.934\\{[0.758]}} & 0.4585 & \makecell[c]{728.416\\(64.986)} & \makecell[c]{14.34\\{[0.873]}} & \makecell[c]{-48.647\\{[0.46]}} & \makecell[c]{-76.831\\{[0.264]}} & \makecell[c]{-28.184\\{[0.628]}} & 0.5969 & 0.5166\\
+\hspace{1em}Distance to PoT & 1190 & \makecell[c]{716.095\\(80.501)} & \makecell[c]{0.507\\{[0.996]}} & \makecell[c]{89.087\\{[0.351]}} & \makecell[c]{141.183\\{[0.146]}} & \makecell[c]{52.096\\{[0.604]}} & 0.3727 & \makecell[c]{1841.432\\(97.755)} & \makecell[c]{353.267\\{[0.018]}} & \makecell[c]{29.827\\{[0.806]}} & \makecell[c]{-103.845\\{[0.303]}} & \makecell[c]{-133.671\\{[0.241]}} & 0.0164 & 0.0000\\
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel B: Baseline demographics, $N=2,407$}}}\\
+\hline
+\hspace{1em}Floor made of tile/cement & 0.194 & \makecell[c]{0.241\\(0.045)} & \makecell[c]{-0.071\\{[0.11]}} & \makecell[c]{0.008\\{[0.876]}} & \makecell[c]{-0.031\\{[0.497]}} & \makecell[c]{-0.04\\{[0.41]}} & 0.2379 & \makecell[c]{0.256\\(0.056)} & \makecell[c]{-0.082\\{[0.092]}} & \makecell[c]{-0.004\\{[0.949]}} & \makecell[c]{-0.059\\{[0.305]}} & \makecell[c]{-0.055\\{[0.287]}} & 0.1613 & 0.2313\\
+\hspace{1em}Completed primary schooling & 0.486 & \makecell[c]{0.498\\(0.041)} & \makecell[c]{-0.024\\{[0.549]}} & \makecell[c]{-0.016\\{[0.735]}} & \makecell[c]{-0.057\\{[0.201]}} & \makecell[c]{-0.041\\{[0.364]}} & 0.6161 & \makecell[c]{0.415\\(0.033)} & \makecell[c]{0.031\\{[0.487]}} & \makecell[c]{0.106\\{[0.022]}} & \makecell[c]{0.063\\{[0.182]}} & \makecell[c]{-0.042\\{[0.439]}} & 0.1274 & 0.3082\\
+\hspace{1em}Main ethnicity/Luhya & 0.626 & \makecell[c]{0.485\\(0.07)} & \makecell[c]{0.029\\{[0.636]}} & \makecell[c]{0.034\\{[0.572]}} & \makecell[c]{-0.059\\{[0.402]}} & \makecell[c]{-0.093\\{[0.171]}} & 0.5351 & \makecell[c]{0.495\\(0.078)} & \makecell[c]{-0.105\\{[0.093]}} & \makecell[c]{-0.075\\{[0.23]}} & \makecell[c]{-0.057\\{[0.382]}} & \makecell[c]{0.019\\{[0.751]}} & 0.4025 & 0.2229\\
+\hspace{1em}Christian & 0.974 & \makecell[c]{0.991\\(0.013)} & \makecell[c]{0.006\\{[0.733]}} & \makecell[c]{0.005\\{[0.759]}} & \makecell[c]{0.018\\{[0.249]}} & \makecell[c]{0.012\\{[0.404]}} & 0.6336 & \makecell[c]{1.008\\(0.01)} & \makecell[c]{-0.025\\{[0.262]}} & \makecell[c]{0.012\\{[0.29]}} & \makecell[c]{-0.029\\{[0.191]}} & \makecell[c]{-0.041\\{[0.052]}} & 0.0858 & 0.1781\\
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel C: Deworming knowledge, $N=2,407$}}}\\
+\hline
+\hspace{1em}Know adults get worms & 0.756 & \makecell[c]{0.749\\(0.041)} & \makecell[c]{-0.08\\{[0.134]}} & \makecell[c]{0.03\\{[0.507]}} & \makecell[c]{-0.01\\{[0.821]}} & \makecell[c]{-0.04\\{[0.363]}} & 0.2493 & \makecell[c]{0.732\\(0.04)} & \makecell[c]{0.024\\{[0.561]}} & \makecell[c]{-0.006\\{[0.905]}} & \makecell[c]{0.012\\{[0.818]}} & \makecell[c]{0.018\\{[0.762]}} & 0.9204 & 0.7038\\
+\hspace{1em}Know children get worms & 0.935 & \makecell[c]{0.944\\(0.016)} & \makecell[c]{-0.014\\{[0.47]}} & \makecell[c]{-0.025\\{[0.234]}} & \makecell[c]{-0.044\\{[0.028]}} & \makecell[c]{-0.019\\{[0.449]}} & 0.1541 & \makecell[c]{0.923\\(0.022)} & \makecell[c]{0.035\\{[0.048]}} & \makecell[c]{-0.013\\{[0.552]}} & \makecell[c]{-0.018\\{[0.39]}} & \makecell[c]{-0.005\\{[0.812]}} & 0.0031 & 0.0066\\
+\hspace{1em}Believe deworming is for the sick & 0.027 & \makecell[c]{0.02\\(0.014)} & \makecell[c]{0\\{[0.995]}} & \makecell[c]{0.015\\{[0.507]}} & \makecell[c]{-0.005\\{[0.82]}} & \makecell[c]{-0.019\\{[0.405]}} & 0.8629 & \makecell[c]{0.019\\(0.017)} & \makecell[c]{-0.005\\{[0.773]}} & \makecell[c]{-0.004\\{[0.81]}} & \makecell[c]{-0.012\\{[0.4]}} & \makecell[c]{-0.008\\{[0.517]}} & 0.7763 & 0.8265\\
+\hspace{1em}Know medication treats worms & 0.811 & \makecell[c]{0.776\\(0.049)} & \makecell[c]{0.001\\{[0.976]}} & \makecell[c]{0.009\\{[0.889]}} & \makecell[c]{-0.018\\{[0.712]}} & \makecell[c]{-0.027\\{[0.648]}} & 0.9481 & \makecell[c]{0.717\\(0.078)} & \makecell[c]{0.07\\{[0.303]}} & \makecell[c]{0.082\\{[0.212]}} & \makecell[c]{0.013\\{[0.857]}} & \makecell[c]{-0.069\\{[0.093]}} & 0.2710 & 0.7255\\
+\hspace{1em}Know bi-yearly treatment recommended & 0.639 & \makecell[c]{0.605\\(0.052)} & \makecell[c]{-0.015\\{[0.784]}} & \makecell[c]{0.024\\{[0.724]}} & \makecell[c]{0.014\\{[0.791]}} & \makecell[c]{-0.01\\{[0.862]}} & 0.8871 & \makecell[c]{0.55\\(0.057)} & \makecell[c]{0.009\\{[0.877]}} & \makecell[c]{0.081\\{[0.141]}} & \makecell[c]{-0.051\\{[0.337]}} & \makecell[c]{-0.131\\{[0.003]}} & 0.0342 & 0.0590\\
+\hspace{1em}Know worms impose externality & 0.343 & \makecell[c]{0.417\\(0.053)} & \makecell[c]{0.097\\{[0.093]}} & \makecell[c]{0.04\\{[0.499]}} & \makecell[c]{0.003\\{[0.95]}} & \makecell[c]{-0.036\\{[0.423]}} & 0.1565 & \makecell[c]{0.407\\(0.043)} & \makecell[c]{0.091\\{[0.15]}} & \makecell[c]{0.037\\{[0.463]}} & \makecell[c]{0.084\\{[0.092]}} & \makecell[c]{0.047\\{[0.377]}} & 0.2954 & 0.2576\\
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel D: Implementation, $N=2,407$}}}\\
+\hline
+\hspace{1em}Did a CHV visit you? & 0.813 & \makecell[c]{0.838\\(0.038)} & \makecell[c]{0.003\\{[0.953]}} & \makecell[c]{0.03\\{[0.417]}} & \makecell[c]{0.019\\{[0.642]}} & \makecell[c]{-0.011\\{[0.757]}} & 0.8481 & \makecell[c]{0.788\\(0.052)} & \makecell[c]{0.048\\{[0.399]}} & \makecell[c]{0.009\\{[0.89]}} & \makecell[c]{0.056\\{[0.335]}} & \makecell[c]{0.047\\{[0.36]}} & 0.6707 & 0.7649\\
+\hspace{1em}Announcement about MDA in your community? & 0.813 & \makecell[c]{0.773\\(0.098)} & \makecell[c]{0.057\\{[0.595]}} & \makecell[c]{0.069\\{[0.565]}} & \makecell[c]{0.055\\{[0.631]}} & \makecell[c]{-0.014\\{[0.901]}} & 0.9396 & \makecell[c]{0.972\\(0.07)} & \makecell[c]{-0.113\\{[0.212]}} & \makecell[c]{-0.08\\{[0.358]}} & \makecell[c]{-0.118\\{[0.196]}} & \makecell[c]{-0.038\\{[0.701]}} & 0.4983 & 0.5905\\
+\hspace{1em}CHV share deworming practices? & 0.98 & \makecell[c]{0.995\\(0.015)} & \makecell[c]{0.022\\{[0.163]}} & \makecell[c]{0.009\\{[0.668]}} & \makecell[c]{0.02\\{[0.185]}} & \makecell[c]{0.011\\{[0.405]}} & 0.3700 & \makecell[c]{1\\(0.009)} & \makecell[c]{-0.002\\{[0.756]}} & \makecell[c]{-0.008\\{[0.559]}} & \makecell[c]{-0.09\\{[0.143]}} & \makecell[c]{-0.082\\{[0.214]}} & 0.2982 & 0.5150\\
+\hspace{1em}CHV share where to get dewormed? & 0.964 & \makecell[c]{1\\(0.024)} & \makecell[c]{-0.004\\{[0.78]}} & \makecell[c]{-0.165\\{[0.057]}} & \makecell[c]{-0.003\\{[0.82]}} & \makecell[c]{0.161\\{[0.051]}} & 0.2709 & \makecell[c]{1\\(0.026)} & \makecell[c]{-0.103\\{[0.228]}} & \makecell[c]{-0.009\\{[0.444]}} & \makecell[c]{-0.02\\{[0.139]}} & \makecell[c]{-0.01\\{[0.408]}} & 0.4062 & 0.5586\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{verbatim}
+## Rows: 76 Columns: 14
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (7): lhs, term, lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, comp_type
+## dbl (7): estimate, std.error, statistic, p.value, s.value, conf.low, conf.high
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## Joining with `by = join_by(lhs)`
+\end{verbatim}
+
+\begin{table}
+\centering
+\caption{\label{tab:monitoring-attrition-treat-balance}Monitoring Attrition Treatment Balance}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccccccccccccc}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{6}{c}{Close} & \multicolumn{6}{c}{Far} & \multicolumn{1}{c}{} \\
+\cmidrule(l{3pt}r{3pt}){3-8} \cmidrule(l{3pt}r{3pt}){9-14}
+ & Sample Mean & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Joint Test\\
+\midrule
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel A: Census variables, $N=989$}}}\\
+\hline
+\hspace{1em}Age & 45.5 & \makecell[c]{47.653\\(2.084)} & \makecell[c]{-3.445\\{[0.299]}} & \makecell[c]{-0.817\\{[0.794]}} & \makecell[c]{-4.147\\{[0.106]}} & \makecell[c]{-3.33\\{[0.23]}} & 0.3476 & \makecell[c]{45.589\\(2.637)} & \makecell[c]{2.199\\{[0.658]}} & \makecell[c]{-1.9\\{[0.628]}} & \makecell[c]{0.159\\{[0.965]}} & \makecell[c]{2.059\\{[0.588]}} & 0.8746 & 0.7769\\
+\hspace{1em}Female & 0.596 & \makecell[c]{0.585\\(0.021)} & \makecell[c]{0.019\\{[0.585]}} & \makecell[c]{0.017\\{[0.689]}} & \makecell[c]{0.038\\{[0.204]}} & \makecell[c]{0.022\\{[0.603]}} & 0.6553 & \makecell[c]{0.544\\(0.039)} & \makecell[c]{0.056\\{[0.412]}} & \makecell[c]{0.097\\{[0.028]}} & \makecell[c]{0.002\\{[0.969]}} & \makecell[c]{-0.095\\{[0.004]}} & 0.0167 & 0.0987\\
+\hspace{1em}Number of individuals per community & 633 & \makecell[c]{809.265\\(92.537)} & \makecell[c]{-166.03\\{[0.202]}} & \makecell[c]{-244.047\\{[0.043]}} & \makecell[c]{-149.871\\{[0.163]}} & \makecell[c]{94.175\\{[0.321]}} & 0.2494 & \makecell[c]{650.422\\(106.949)} & \makecell[c]{28.515\\{[0.863]}} & \makecell[c]{-130.545\\{[0.272]}} & \makecell[c]{-157.456\\{[0.215]}} & \makecell[c]{-26.911\\{[0.755]}} & 0.4082 & 0.0973\\
+\hspace{1em}Distance to PoT & 1130 & \makecell[c]{579.135\\(105.206)} & \makecell[c]{9.524\\{[0.948]}} & \makecell[c]{59.226\\{[0.696]}} & \makecell[c]{127.506\\{[0.342]}} & \makecell[c]{68.28\\{[0.619]}} & 0.7472 & \makecell[c]{1809.391\\(155.021)} & \makecell[c]{272.475\\{[0.296]}} & \makecell[c]{27.093\\{[0.899]}} & \makecell[c]{-10.262\\{[0.953]}} & \makecell[c]{-37.355\\{[0.822]}} & 0.6554 & 0.0000\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{verbatim}
+## Rows: 76 Columns: 14
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (7): lhs, term, lhs_treatment, rhs_treatment, lhs_dist, rhs_dist, comp_type
+## dbl (7): estimate, std.error, statistic, p.value, s.value, conf.low, conf.high
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## Joining with `by = join_by(lhs)`
+\end{verbatim}
+
+\begin{table}
+\centering
+\caption{\label{tab:mon-non-attrition-treat-balance}Monitoring Non-Dropped Treatment Balance}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccccccccccccc}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{6}{c}{Close} & \multicolumn{6}{c}{Far} & \multicolumn{1}{c}{} \\
+\cmidrule(l{3pt}r{3pt}){3-8} \cmidrule(l{3pt}r{3pt}){9-14}
+ & Sample Mean & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Con & Ink - Con & Cal - Con & Bra - Con & Bra - Cal & Joint Test & Joint Test\\
+\midrule
+\addlinespace[0.3em]
+\hline
+\multicolumn{15}{l}{\textit{\textbf{Panel A: Census variables, $N=1,352$}}}\\
+\hline
+\hspace{1em}Age & 40.8 & \makecell[c]{40.721\\(1.982)} & \makecell[c]{0.309\\{[0.916]}} & \makecell[c]{0.635\\{[0.824]}} & \makecell[c]{1.986\\{[0.496]}} & \makecell[c]{1.351\\{[0.649]}} & 0.9142 & \makecell[c]{39.673\\(1.604)} & \makecell[c]{0.542\\{[0.819]}} & \makecell[c]{-0.053\\{[0.978]}} & \makecell[c]{1.321\\{[0.631]}} & \makecell[c]{1.375\\{[0.575]}} & 0.9468 & 0.9362\\
+\hspace{1em}Female & 0.6 & \makecell[c]{0.606\\(0.053)} & \makecell[c]{-0.016\\{[0.787]}} & \makecell[c]{0\\{[0.996]}} & \makecell[c]{-0.026\\{[0.678]}} & \makecell[c]{-0.026\\{[0.551]}} & 0.9335 & \makecell[c]{0.636\\(0.038)} & \makecell[c]{-0.084\\{[0.122]}} & \makecell[c]{0.009\\{[0.816]}} & \makecell[c]{-0.049\\{[0.31]}} & \makecell[c]{-0.058\\{[0.062]}} & 0.0460 & 0.0918\\
+\hspace{1em}Number of individuals per community & 694 & \makecell[c]{735.503\\(67.732)} & \makecell[c]{-69.78\\{[0.423]}} & \makecell[c]{-71.253\\{[0.48]}} & \makecell[c]{-49.868\\{[0.551]}} & \makecell[c]{21.385\\{[0.811]}} & 0.8600 & \makecell[c]{727.71\\(65.044)} & \makecell[c]{-19.084\\{[0.834]}} & \makecell[c]{-29.445\\{[0.726]}} & \makecell[c]{-56.233\\{[0.512]}} & \makecell[c]{-26.788\\{[0.729]}} & 0.9277 & 0.9880\\
+\hspace{1em}Distance to PoT & 1220 & \makecell[c]{622.691\\(78.295)} & \makecell[c]{-27.382\\{[0.788]}} & \makecell[c]{95.379\\{[0.396]}} & \makecell[c]{198.434\\{[0.109]}} & \makecell[c]{103.054\\{[0.411]}} & 0.2116 & \makecell[c]{1681.102\\(82.021)} & \makecell[c]{377.442\\{[0.021]}} & \makecell[c]{107.326\\{[0.43]}} & \makecell[c]{-69.278\\{[0.556]}} & \makecell[c]{-176.603\\{[0.199]}} & 0.0472 & 0.0000\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\end{document}

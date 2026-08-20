@@ -1,0 +1,67 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,makecell,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\subsection{The Geographic Support of the Policy Exercise}
+\label{app:policy-distance-cap}
+
+Our maintained policy exercise permits assignments up to 3.5 km. A seemingly
+natural alternative would cap assignments at 2.5 km, near the upper end of the
+experimental distance distribution. In this setting, however, a 2.5 km cap is
+not an informative structural-policy robustness check because it nearly
+recreates the geographic separation built into the experimental design.
+
+The experimental clusters were constructed from 2.5 km inner buffers around
+candidate points of treatment. The selection algorithm used 3 km outer radii
+for the Control/Ink group and 4 km outer radii for the Bracelet/Calendar group,
+and removed overlapping pieces of candidate cluster areas. This design helped
+separate experimental clusters, but it also means that distinct experimental
+communities rarely share a feasible distribution site within 2.5 km.
+
+This limitation does not arise because the policy exercise retained only
+schools from a 2.5 or 3 km search radius. Its candidate-site file contains all
+1,451 documented schools and was generated using an unrestricted
+candidate-distance cutoff. The binding restriction is instead the overlap of the villages'
+feasible-site neighborhoods. Table~\ref{tab:policy-distance-cap-feasibility}
+shows this directly. At 2.5 km, only 53 candidate sites are feasible for more
+than one village. Even if demand were identical at every site and the planner
+only minimized the number of sites, the exact geographic minimum would be 114
+sites for 144 villages. Both policy regimes attain this same floor. The zero
+Control--Bracelet difference at 2.5 km therefore follows mechanically from the
+experimental geography rather than from a failure of the social-image demand
+mechanism.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{threeparttable}
+    \caption{Distance caps and the geographic feasibility of site consolidation}
+    \label{tab:policy-distance-cap-feasibility}
+    \input{\StructuralRobustnessPath/tables/policy-distance-cap-feasibility.tex}
+    \begin{tablenotes}[flushleft]
+      \footnotesize
+      \item \textit{Notes:} ``Feasible links'' counts village--candidate-site
+      pairs within the cap; ``shareable sites'' are feasible for at least two
+      villages. ``Geographic minimum'' is the exact site-count minimum with
+      identical demand. Control and Bracelet preserve population-weighted
+      experimental-allocation take-up using the component-wise posterior
+      median of 1,600 retained baseline draws. The exercise covers 144
+      villages and 1,451 candidate schools.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+Feasible consolidation rises rapidly just beyond the design radius. At 3
+km---close to the maximum experimental assignment distance of 2.85
+km---Bracelet observability saves 17 sites. At the maintained 3.5 km cap, the
+geographic minimum is 71 sites and the structural allocations use 101 sites
+under Control observability versus 76 under Bracelet observability, saving 25.
+We retain 3.5 km as a modest spatial extrapolation needed for cross-community
+consolidation. The 2.5 km result is a design diagnostic, not evidence against
+the policy mechanism.
+
+\end{document}

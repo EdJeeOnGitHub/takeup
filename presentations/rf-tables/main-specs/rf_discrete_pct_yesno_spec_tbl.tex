@@ -1,0 +1,23 @@
+
+\centering
+
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Conditional accuracy (Yes/No) & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{-0.042\\{(0.027)}} & \makecell[c]{-0.007\\{(0.039)}} & \makecell[c]{-0.088**\\{(0.038)}} & \makecell[c]{-0.081\\{(0.055)}}\\
+Calendar & \makecell[c]{-0.049\\{(0.031)}} & \makecell[c]{-0.027\\{(0.04)}} & \makecell[c]{-0.078\\{(0.049)}} & \makecell[c]{-0.051\\{(0.063)}}\\
+Ink & \makecell[c]{-0.089**\\{(0.035)}} & \makecell[c]{-0.105**\\{(0.048)}} & \makecell[c]{-0.067\\{(0.049)}} & \makecell[c]{0.038\\{(0.067)}}\\
+\midrule
+Control & \makecell[c]{0.656\\{(0.019)}} & \makecell[c]{0.652\\{(0.024)}} & \makecell[c]{0.661\\{(0.031)}} & \makecell[c]{0.009\\{(0.04)}}\\
+Observations & 1,035 & 1,035 & 1,035 & 1,035\\
+$H0$: Any Signal = No Signal, $p$-value & 0.086 & 0.204 & 0.225 & 0.927\\
+$H0$: Bracelet = Calendar, $p$-value & 0.819 & 0.655 & 0.818 & 0.63\\
+\bottomrule
+\end{tabular}}
+

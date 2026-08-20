@@ -1,0 +1,654 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage[utf8]{inputenc}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{pdflscape}
+\newcommand{\blandscape}{\begin{landscape}}
+\newcommand{\elandscape}{\end{landscape}}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Reduced Form Tables},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Reduced Form Tables}
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+\maketitle
+
+\paragraph{Frequentist Estimates}\label{frequentist-estimates}
+
+\begin{verbatim}
+## # A tibble: 4 x 3
+##   contrast               assigned_dist_group pval_onesided
+##   <chr>                  <chr>                       <dbl>
+## 1 Any signal - no signal close                      0.698 
+## 2 Any signal - no signal far                        0.0236
+## 3 Any signal - no signal combined                   0.186 
+## 4 Any signal - no signal far - close                0.0373
+\end{verbatim}
+
+\begin{table}
+
+\caption{\label{tab:signal-dist-estimates}Frequentist Probit with Signal (Clustering + Distance)}
+\centering
+\begin{tabular}[t]{l|l|l|l|l}
+\hline
+contrast & combined & close & far & far - close\\
+\hline
+signal & \makecell[c]{0.018\\(-0.022, 0.058)\\pval: 0.186} & \makecell[c]{-0.015\\(-0.07, 0.04)\\pval: 0.698} & \makecell[c]{0.058\\(0.001, 0.116)\\pval: 0.024} & \makecell[c]{0.073\\(-0.007, 0.153)\\pval: 0.037}\\
+\hline
+no signal & \makecell[c]{0.342\\(0.231, 0.469)\\pval: 0.992} & \makecell[c]{0.42\\(0.295, 0.554)\\pval: 0.878} & \makecell[c]{0.254\\(0.159, 0.374)\\pval: 1} & \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:signal-estimates}Frequentist Probit with Signal (Clustering)}
+\centering
+\begin{tabular}[t]{l|l|l|l|l}
+\hline
+contrast & combined & close & far & far - close\\
+\hline
+signal & \makecell[c]{0.011\\(-0.032, 0.053)\\pval: 0.31} & \makecell[c]{-0.02\\(-0.078, 0.038)\\pval: 0.75} & \makecell[c]{0.049\\(-0.013, 0.11)\\pval: 0.061} & \makecell[c]{0.069\\(-0.016, 0.153)\\pval: 0.055}\\
+\hline
+no signal & \makecell[c]{0.347\\(0.292, 0.407)\\pval: 1} & \makecell[c]{0.423\\(0.36, 0.489)\\pval: 0.989} & \makecell[c]{0.261\\(0.204, 0.327)\\pval: 1} & \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist Probit (Clustering)}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.074\\{[0.031]}} & \makecell[c]{0.041\\{[0.041]}} & \makecell[c]{0.116\\{[0.048]}} & \makecell[c]{0.075\\{[0.063]}}\\
+Calendar & \makecell[c]{0.022\\{[0.03]}} & \makecell[c]{0.02\\{[0.04]}} & \makecell[c]{0.025\\{[0.045]}} & \makecell[c]{0.005\\{[0.06]}}\\
+Ink & \makecell[c]{-0.035\\{[0.033]}} & \makecell[c]{-0.061\\{[0.041]}} & \makecell[c]{-0.002\\{[0.053]}} & \makecell[c]{0.059\\{[0.066]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.052\\{[0.026]}} & \makecell[c]{0.021\\{[0.039]}} & \makecell[c]{0.091\\{[0.03]}} & \makecell[c]{0.07\\{[0.049]}}\\
+Any Signal - No Signal & \makecell[c]{0.018\\{[0.02]}} & \makecell[c]{-0.015\\{[0.028]}} & \makecell[c]{0.058\\{[0.029]}} & \makecell[c]{0.073\\{[0.041]}}\\
+Control & 0.336 & 0.407 & 0.407 & 0\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist Probit with Distance (Clustering)}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.083\\{[0.029]}} & \makecell[c]{0.062\\{[0.038]}} & \makecell[c]{0.108\\{[0.046]}} & \makecell[c]{0.046\\{[0.062]}}\\
+Calendar & \makecell[c]{0.033\\{[0.028]}} & \makecell[c]{0.031\\{[0.036]}} & \makecell[c]{0.035\\{[0.042]}} & \makecell[c]{0.003\\{[0.056]}}\\
+Ink & \makecell[c]{-0.017\\{[0.031]}} & \makecell[c]{-0.06\\{[0.04]}} & \makecell[c]{0.036\\{[0.048]}} & \makecell[c]{0.096\\{[0.062]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.05\\{[0.023]}} & \makecell[c]{0.031\\{[0.033]}} & \makecell[c]{0.073\\{[0.034]}} & \makecell[c]{0.042\\{[0.048]}}\\
+Any Signal - No Signal & \makecell[c]{0.018\\{[0.02]}} & \makecell[c]{-0.015\\{[0.028]}} & \makecell[c]{0.058\\{[0.029]}} & \makecell[c]{0.073\\{[0.041]}}\\
+Control & 0.325 & 0.398 & 0.254 & -0.144\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist Probit with Distance (Clustering + P-Value)}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.083\\{[0.029]}} & \makecell[c]{0.062\\{[0.038]}} & \makecell[c]{0.108\\{[0.046]}} & \makecell[c]{0.046\\{[0.062]}}\\
+Calendar & \makecell[c]{0.033\\{[0.028]}} & \makecell[c]{0.031\\{[0.036]}} & \makecell[c]{0.035\\{[0.042]}} & \makecell[c]{0.003\\{[0.056]}}\\
+Ink & \makecell[c]{-0.017\\{[0.031]}} & \makecell[c]{-0.06\\{[0.04]}} & \makecell[c]{0.036\\{[0.048]}} & \makecell[c]{0.096\\{[0.062]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.05\\{[0.023]}} & \makecell[c]{0.031\\{[0.033]}} & \makecell[c]{0.073\\{[0.034]}} & \makecell[c]{0.042\\{[0.048]}}\\
+Control & 0.325 & 0.398 & 0.254 & -0.144\\
+$p$(Any signal > No signal) & 0.186 & 0.698 & 0.024 & 0.037\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist Probit with Distance (Clustering + P-Value) Only P-values}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.083\\{[0.004]}} & \makecell[c]{0.062\\{[0.102]}} & \makecell[c]{0.108\\{[0.02]}} & \makecell[c]{0.046\\{[0.459]}}\\
+Calendar & \makecell[c]{0.033\\{[0.239]}} & \makecell[c]{0.031\\{[0.393]}} & \makecell[c]{0.035\\{[0.413]}} & \makecell[c]{0.003\\{[0.95]}}\\
+Ink & \makecell[c]{-0.017\\{[0.579]}} & \makecell[c]{-0.06\\{[0.13]}} & \makecell[c]{0.036\\{[0.449]}} & \makecell[c]{0.096\\{[0.12]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.05\\{[0.032]}} & \makecell[c]{0.031\\{[0.343]}} & \makecell[c]{0.073\\{[0.033]}} & \makecell[c]{0.042\\{[0.379]}}\\
+Control & 0.325 & 0.398 & 0.254 & -0.144\\
+$p$(Any signal > No signal) & 0.186 & 0.698 & 0.024 & 0.037\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist Probit with Controls (Clustering)}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.081\\{[0.029]}} & \makecell[c]{0.06\\{[0.037]}} & \makecell[c]{0.107\\{[0.048]}} & \makecell[c]{0.048\\{[0.062]}}\\
+Calendar & \makecell[c]{0.031\\{[0.027]}} & \makecell[c]{0.029\\{[0.035]}} & \makecell[c]{0.033\\{[0.043]}} & \makecell[c]{0.004\\{[0.055]}}\\
+Ink & \makecell[c]{-0.016\\{[0.03]}} & \makecell[c]{-0.063\\{[0.037]}} & \makecell[c]{0.041\\{[0.048]}} & \makecell[c]{0.104\\{[0.061]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.05\\{[0.024]}} & \makecell[c]{0.031\\{[0.032]}} & \makecell[c]{0.075\\{[0.038]}} & \makecell[c]{0.044\\{[0.051]}}\\
+Control & 0.32 & 0.465 & 0.303 & -0.162\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist OLS (Clustering)}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.075\\{[0.032]}} & \makecell[c]{0.041\\{[0.041]}} & \makecell[c]{0.116\\{[0.05]}} & \makecell[c]{0.074\\{[0.065]}}\\
+Calendar & \makecell[c]{0.022\\{[0.03]}} & \makecell[c]{0.02\\{[0.04]}} & \makecell[c]{0.024\\{[0.045]}} & \makecell[c]{0.004\\{[0.06]}}\\
+Ink & \makecell[c]{-0.034\\{[0.032]}} & \makecell[c]{-0.061\\{[0.041]}} & \makecell[c]{-0.001\\{[0.052]}} & \makecell[c]{0.059\\{[0.066]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.052\\{[0.026]}} & \makecell[c]{0.021\\{[0.039]}} & \makecell[c]{0.091\\{[0.033]}} & \makecell[c]{0.07\\{[0.051]}}\\
+Control & 0.34 & 0.407 & 0.407 & 0\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:freq-estimates}Frequentist OLS with Distance (Clustering)}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.082\\{[0.03]}} & \makecell[c]{0.061\\{[0.038]}} & \makecell[c]{0.108\\{[0.049]}} & \makecell[c]{0.047\\{[0.062]}}\\
+Calendar & \makecell[c]{0.032\\{[0.028]}} & \makecell[c]{0.03\\{[0.036]}} & \makecell[c]{0.034\\{[0.043]}} & \makecell[c]{0.004\\{[0.056]}}\\
+Ink & \makecell[c]{-0.015\\{[0.03]}} & \makecell[c]{-0.061\\{[0.039]}} & \makecell[c]{0.042\\{[0.047]}} & \makecell[c]{0.102\\{[0.061]}}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.05\\{[0.025]}} & \makecell[c]{0.031\\{[0.033]}} & \makecell[c]{0.074\\{[0.037]}} & \makecell[c]{0.044\\{[0.05]}}\\
+Control & 0.332 & 0.399 & 0.258 & -0.142\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-21}Bayesian Probit: No Clustering}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.074\\(0.049, 0.101)} & \makecell[c]{0.041\\(0.005, 0.078)} & \makecell[c]{0.116\\(0.077, 0.154)} & \makecell[c]{0.075\\(0.021, 0.126)}\\
+Calendar & \makecell[c]{0.023\\(-0.005, 0.049)} & \makecell[c]{0.02\\(-0.018, 0.058)} & \makecell[c]{0.025\\(-0.012, 0.062)} & \makecell[c]{0.005\\(-0.049, 0.059)}\\
+Ink & \makecell[c]{-0.035\\(-0.06, -0.008)} & \makecell[c]{-0.061\\(-0.097, -0.025)} & \makecell[c]{-0.002\\(-0.038, 0.034)} & \makecell[c]{0.059\\(0.008, 0.111)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.052\\(0.026, 0.078)} & \makecell[c]{0.021\\(-0.017, 0.058)} & \makecell[c]{0.091\\(0.054, 0.129)} & \makecell[c]{0.069\\(0.018, 0.124)}\\
+Control & \makecell[c]{0.34\\(0.321, 0.359)} & \makecell[c]{0.414\\(0.388, 0.441)} & \makecell[c]{0.25\\(0.224, 0.276)} & \makecell[c]{-0.164\\(-0.201, -0.128)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-22}Bayesian Probit: Hierarchical Clustering}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.077\\(0.018, 0.133)} & \makecell[c]{0.036\\(-0.049, 0.114)} & \makecell[c]{0.127\\(0.044, 0.209)} & \makecell[c]{0.091\\(-0.023, 0.212)}\\
+Calendar & \makecell[c]{0.033\\(-0.029, 0.09)} & \makecell[c]{0.02\\(-0.067, 0.103)} & \makecell[c]{0.048\\(-0.035, 0.128)} & \makecell[c]{0.028\\(-0.09, 0.149)}\\
+Ink & \makecell[c]{-0.028\\(-0.086, 0.028)} & \makecell[c]{-0.061\\(-0.14, 0.017)} & \makecell[c]{0.013\\(-0.07, 0.095)} & \makecell[c]{0.074\\(-0.044, 0.188)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.044\\(-0.018, 0.106)} & \makecell[c]{0.017\\(-0.073, 0.1)} & \makecell[c]{0.079\\(-0.007, 0.165)} & \makecell[c]{0.064\\(-0.059, 0.182)}\\
+Control & \makecell[c]{0.336\\(0.302, 0.373)} & \makecell[c]{0.415\\(0.365, 0.467)} & \makecell[c]{0.236\\(0.19, 0.291)} & \makecell[c]{-0.179\\(-0.251, -0.102)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-23}Bayesian Probit: Flat Priors + Distance}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.083\\(0.024, 0.143)} & \makecell[c]{0.054\\(-0.029, 0.14)} & \makecell[c]{0.12\\(0.041, 0.198)} & \makecell[c]{0.066\\(-0.047, 0.18)}\\
+Calendar & \makecell[c]{0.041\\(-0.02, 0.102)} & \makecell[c]{0.029\\(-0.058, 0.114)} & \makecell[c]{0.057\\(-0.021, 0.133)} & \makecell[c]{0.027\\(-0.09, 0.152)}\\
+Ink & \makecell[c]{-0.012\\(-0.07, 0.046)} & \makecell[c]{-0.062\\(-0.144, 0.022)} & \makecell[c]{0.049\\(-0.029, 0.125)} & \makecell[c]{0.112\\(-0.005, 0.223)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.042\\(-0.014, 0.099)} & \makecell[c]{0.026\\(-0.058, 0.109)} & \makecell[c]{0.063\\(-0.019, 0.144)} & \makecell[c]{0.037\\(-0.079, 0.155)}\\
+Control & \makecell[c]{0.328\\(0.291, 0.367)} & \makecell[c]{0.408\\(0.354, 0.464)} & \makecell[c]{0.227\\(0.184, 0.279)} & \makecell[c]{-0.179\\(-0.254, -0.108)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-24}Bayesian Probit: Tight Hierarchical Clustering}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.075\\(0.019, 0.133)} & \makecell[c]{0.034\\(-0.049, 0.113)} & \makecell[c]{0.128\\(0.051, 0.203)} & \makecell[c]{0.095\\(-0.017, 0.206)}\\
+Calendar & \makecell[c]{0.032\\(-0.026, 0.088)} & \makecell[c]{0.02\\(-0.062, 0.102)} & \makecell[c]{0.046\\(-0.032, 0.123)} & \makecell[c]{0.028\\(-0.085, 0.14)}\\
+Ink & \makecell[c]{-0.03\\(-0.087, 0.024)} & \makecell[c]{-0.063\\(-0.141, 0.014)} & \makecell[c]{0.011\\(-0.067, 0.087)} & \makecell[c]{0.073\\(-0.034, 0.186)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.044\\(-0.013, 0.101)} & \makecell[c]{0.014\\(-0.069, 0.096)} & \makecell[c]{0.081\\(-0.002, 0.162)} & \makecell[c]{0.069\\(-0.049, 0.187)}\\
+Control & \makecell[c]{0.336\\(0.301, 0.372)} & \makecell[c]{0.416\\(0.366, 0.468)} & \makecell[c]{0.237\\(0.193, 0.288)} & \makecell[c]{-0.179\\(-0.247, -0.107)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-25}Bayesian Probit: Tight Hierarchical Clustering + County}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.069\\(0.013, 0.125)} & \makecell[c]{0.032\\(-0.046, 0.11)} & \makecell[c]{0.114\\(0.039, 0.19)} & \makecell[c]{0.081\\(-0.025, 0.191)}\\
+Calendar & \makecell[c]{0.027\\(-0.025, 0.083)} & \makecell[c]{0.017\\(-0.061, 0.1)} & \makecell[c]{0.039\\(-0.034, 0.112)} & \makecell[c]{0.023\\(-0.088, 0.13)}\\
+Ink & \makecell[c]{-0.027\\(-0.081, 0.028)} & \makecell[c]{-0.056\\(-0.133, 0.023)} & \makecell[c]{0.01\\(-0.064, 0.08)} & \makecell[c]{0.067\\(-0.04, 0.171)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.041\\(-0.014, 0.098)} & \makecell[c]{0.015\\(-0.064, 0.094)} & \makecell[c]{0.074\\(-0.004, 0.153)} & \makecell[c]{0.061\\(-0.052, 0.166)}\\
+Control & \makecell[c]{0.338\\(0.304, 0.373)} & \makecell[c]{0.414\\(0.364, 0.465)} & \makecell[c]{0.244\\(0.2, 0.293)} & \makecell[c]{-0.17\\(-0.237, -0.1)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-26}Bayesian Probit: Non-Flat Priors}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.071\\(0.016, 0.124)} & \makecell[c]{0.051\\(-0.017, 0.118)} & \makecell[c]{0.095\\(0.023, 0.166)} & \makecell[c]{0.044\\(-0.044, 0.129)}\\
+Calendar & \makecell[c]{0.027\\(-0.027, 0.082)} & \makecell[c]{0.031\\(-0.037, 0.099)} & \makecell[c]{0.022\\(-0.048, 0.092)} & \makecell[c]{-0.009\\(-0.091, 0.078)}\\
+Ink & \makecell[c]{-0.03\\(-0.081, 0.024)} & \makecell[c]{-0.039\\(-0.103, 0.025)} & \makecell[c]{-0.017\\(-0.083, 0.051)} & \makecell[c]{0.022\\(-0.056, 0.102)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.044\\(-0.014, 0.1)} & \makecell[c]{0.02\\(-0.053, 0.096)} & \makecell[c]{0.072\\(-0.003, 0.15)} & \makecell[c]{0.052\\(-0.051, 0.154)}\\
+Control & \makecell[c]{0.338\\(0.305, 0.373)} & \makecell[c]{0.402\\(0.363, 0.443)} & \makecell[c]{0.26\\(0.219, 0.305)} & \makecell[c]{-0.142\\(-0.192, -0.093)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}
+
+\caption{\label{tab:unnamed-chunk-27}Bayesian Probit: Non-Flat Priors - Distance}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.078\\(0.029, 0.129)} & \makecell[c]{0.063\\(-0.002, 0.124)} & \makecell[c]{0.098\\(0.035, 0.163)} & \makecell[c]{0.036\\(-0.045, 0.117)}\\
+Calendar & \makecell[c]{0.037\\(-0.013, 0.089)} & \makecell[c]{0.037\\(-0.029, 0.101)} & \makecell[c]{0.039\\(-0.026, 0.101)} & \makecell[c]{0.003\\(-0.078, 0.081)}\\
+Ink & \makecell[c]{-0.013\\(-0.064, 0.038)} & \makecell[c]{-0.044\\(-0.107, 0.019)} & \makecell[c]{0.024\\(-0.041, 0.09)} & \makecell[c]{0.069\\(-0.012, 0.148)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.041\\(-0.012, 0.092)} & \makecell[c]{0.026\\(-0.042, 0.097)} & \makecell[c]{0.06\\(-0.011, 0.13)} & \makecell[c]{0.034\\(-0.064, 0.131)}\\
+Control & \makecell[c]{0.331\\(0.299, 0.362)} & \makecell[c]{0.399\\(0.363, 0.439)} & \makecell[c]{0.244\\(0.206, 0.284)} & \makecell[c]{-0.155\\(-0.202, -0.109)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\paragraph{Stan}\label{stan}
+
+\begin{verbatim}
+## [1] "temp-data/rvar_processed_dist_fit98_ates_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_DIFFUSE_BETA_DIFFUSE_CLUSTER_1-4.rds"
+\end{verbatim}
+
+\begin{table}
+
+\caption{\label{tab:stan}Stan: REDUCED FORM NO RESTRICT, Version: 97}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.075\\(0.048, 0.1)} & \makecell[c]{0.05\\(0.014, 0.082)} & \makecell[c]{0.106\\(0.069, 0.142)} & \makecell[c]{0.056\\(0.007, 0.107)}\\
+Calendar & \makecell[c]{0.018\\(-0.007, 0.045)} & \makecell[c]{0.021\\(-0.016, 0.059)} & \makecell[c]{0.015\\(-0.023, 0.052)} & \makecell[c]{-0.006\\(-0.058, 0.044)}\\
+Ink & \makecell[c]{-0.034\\(-0.058, -0.009)} & \makecell[c]{-0.052\\(-0.086, -0.018)} & \makecell[c]{-0.01\\(-0.049, 0.025)} & \makecell[c]{0.042\\(-0.009, 0.091)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.056\\(0.028, 0.084)} & \makecell[c]{0.029\\(-0.01, 0.068)} & \makecell[c]{0.091\\(0.053, 0.129)} & \makecell[c]{0.062\\(0.009, 0.116)}\\
+Control mean & \makecell[c]{0.341\\(0.324, 0.361)} & \makecell[c]{0.408\\(0.384, 0.434)} & \makecell[c]{0.258\\(0.234, 0.285)} & \makecell[c]{-0.15\\(-0.185, -0.115)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: REDUCED FORM NO RESTRICT, Version: 98}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.075\\(0.049, 0.1)} & \makecell[c]{0.05\\(0.016, 0.086)} & \makecell[c]{0.106\\(0.069, 0.142)} & \makecell[c]{0.056\\(0.009, 0.106)}\\
+Calendar & \makecell[c]{0.019\\(-0.008, 0.046)} & \makecell[c]{0.022\\(-0.014, 0.059)} & \makecell[c]{0.015\\(-0.022, 0.052)} & \makecell[c]{-0.007\\(-0.059, 0.043)}\\
+Ink & \makecell[c]{-0.033\\(-0.058, -0.005)} & \makecell[c]{-0.05\\(-0.084, -0.016)} & \makecell[c]{-0.01\\(-0.046, 0.025)} & \makecell[c]{0.04\\(-0.007, 0.087)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.056\\(0.029, 0.083)} & \makecell[c]{0.028\\(-0.01, 0.065)} & \makecell[c]{0.091\\(0.053, 0.129)} & \makecell[c]{0.063\\(0.012, 0.113)}\\
+Control mean & \makecell[c]{0.341\\(0.323, 0.36)} & \makecell[c]{0.408\\(0.382, 0.432)} & \makecell[c]{0.258\\(0.232, 0.284)} & \makecell[c]{-0.149\\(-0.185, -0.115)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: REDUCED FORM NO RESTRICT, Version: 99}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.075\\(0.048, 0.1)} & \makecell[c]{0.05\\(0.014, 0.088)} & \makecell[c]{0.106\\(0.069, 0.142)} & \makecell[c]{0.056\\(0.006, 0.105)}\\
+Calendar & \makecell[c]{0.019\\(-0.009, 0.046)} & \makecell[c]{0.022\\(-0.016, 0.06)} & \makecell[c]{0.015\\(-0.02, 0.05)} & \makecell[c]{-0.007\\(-0.056, 0.041)}\\
+Ink & \makecell[c]{-0.033\\(-0.06, -0.008)} & \makecell[c]{-0.052\\(-0.088, -0.017)} & \makecell[c]{-0.01\\(-0.048, 0.026)} & \makecell[c]{0.041\\(-0.008, 0.093)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.056\\(0.028, 0.083)} & \makecell[c]{0.028\\(-0.013, 0.066)} & \makecell[c]{0.091\\(0.053, 0.128)} & \makecell[c]{0.063\\(0.012, 0.119)}\\
+Control mean & \makecell[c]{0.341\\(0.322, 0.36)} & \makecell[c]{0.408\\(0.381, 0.435)} & \makecell[c]{0.258\\(0.234, 0.283)} & \makecell[c]{-0.15\\(-0.183, -0.114)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: REDUCED FORM NO RESTRICT DIFFUSE BETA, Version: 99}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.076\\(0.05, 0.104)} & \makecell[c]{0.047\\(0.009, 0.086)} & \makecell[c]{0.113\\(0.075, 0.15)} & \makecell[c]{0.066\\(0.012, 0.12)}\\
+Calendar & \makecell[c]{0.02\\(-0.008, 0.047)} & \makecell[c]{0.019\\(-0.019, 0.058)} & \makecell[c]{0.02\\(-0.018, 0.058)} & \makecell[c]{0.001\\(-0.052, 0.052)}\\
+Ink & \makecell[c]{-0.032\\(-0.059, -0.006)} & \makecell[c]{-0.055\\(-0.092, -0.018)} & \makecell[c]{-0.004\\(-0.041, 0.032)} & \makecell[c]{0.051\\(-0.003, 0.101)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.057\\(0.029, 0.084)} & \makecell[c]{0.028\\(-0.009, 0.066)} & \makecell[c]{0.093\\(0.054, 0.131)} & \makecell[c]{0.065\\(0.01, 0.119)}\\
+Control mean & \makecell[c]{0.341\\(0.321, 0.36)} & \makecell[c]{0.411\\(0.382, 0.438)} & \makecell[c]{0.253\\(0.227, 0.278)} & \makecell[c]{-0.158\\(-0.197, -0.12)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: REDUCED FORM NO RESTRICT NO GP, Version: 98}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.074\\(0.047, 0.101)} & \makecell[c]{0.05\\(0.012, 0.085)} & \makecell[c]{0.105\\(0.065, 0.143)} & \makecell[c]{0.055\\(0.005, 0.106)}\\
+Calendar & \makecell[c]{0.018\\(-0.008, 0.045)} & \makecell[c]{0.022\\(-0.014, 0.06)} & \makecell[c]{0.014\\(-0.021, 0.052)} & \makecell[c]{-0.007\\(-0.059, 0.042)}\\
+Ink & \makecell[c]{-0.033\\(-0.058, -0.008)} & \makecell[c]{-0.051\\(-0.085, -0.017)} & \makecell[c]{-0.01\\(-0.048, 0.026)} & \makecell[c]{0.041\\(-0.007, 0.088)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.056\\(0.029, 0.082)} & \makecell[c]{0.028\\(-0.01, 0.063)} & \makecell[c]{0.091\\(0.053, 0.128)} & \makecell[c]{0.062\\(0.011, 0.117)}\\
+Control mean & \makecell[c]{0.341\\(0.322, 0.361)} & \makecell[c]{0.408\\(0.382, 0.434)} & \makecell[c]{0.258\\(0.233, 0.284)} & \makecell[c]{-0.15\\(-0.185, -0.113)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: STRUCTURAL LINEAR U SHOCKS PHAT MU REP DIFFUSE BETA DIFFUSE CLUSTER, Version: 98}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.073\\(0.049, 0.098)} & \makecell[c]{0.056\\(0.029, 0.082)} & \makecell[c]{0.095\\(0.066, 0.124)} & \makecell[c]{0.039\\(0.016, 0.065)}\\
+Calendar & \makecell[c]{0.04\\(0.017, 0.064)} & \makecell[c]{0.036\\(0.009, 0.063)} & \makecell[c]{0.045\\(0.021, 0.068)} & \makecell[c]{0.008\\(-0.01, 0.029)}\\
+Ink & \makecell[c]{-0.02\\(-0.045, 0.006)} & \makecell[c]{-0.041\\(-0.07, -0.011)} & \makecell[c]{0.007\\(-0.019, 0.035)} & \makecell[c]{0.048\\(0.025, 0.073)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.033\\(0.017, 0.051)} & \makecell[c]{0.019\\(0.006, 0.036)} & \makecell[c]{0.05\\(0.027, 0.074)} & \makecell[c]{0.031\\(0.013, 0.052)}\\
+Control mean & \makecell[c]{0.332\\(0.313, 0.351)} & \makecell[c]{0.399\\(0.377, 0.421)} & \makecell[c]{0.249\\(0.227, 0.271)} & \makecell[c]{-0.15\\(-0.173, -0.129)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: STRUCTURAL LINEAR U SHOCKS PHAT MU REP HIER FOB, Version: 98}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.06\\(-0.017, 0.126)} & \makecell[c]{0.058\\(-0.004, 0.115)} & \makecell[c]{0.064\\(-0.041, 0.155)} & \makecell[c]{0.006\\(-0.049, 0.071)}\\
+Calendar & \makecell[c]{0.049\\(-0.027, 0.117)} & \makecell[c]{0.052\\(-0.01, 0.11)} & \makecell[c]{0.046\\(-0.054, 0.133)} & \makecell[c]{-0.006\\(-0.058, 0.049)}\\
+Ink & \makecell[c]{-0.014\\(-0.098, 0.071)} & \makecell[c]{-0.021\\(-0.092, 0.057)} & \makecell[c]{-0.006\\(-0.111, 0.102)} & \makecell[c]{0.015\\(-0.038, 0.069)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.011\\(-0.036, 0.068)} & \makecell[c]{0.006\\(-0.018, 0.034)} & \makecell[c]{0.018\\(-0.061, 0.109)} & \makecell[c]{0.012\\(-0.042, 0.077)}\\
+Control mean & \makecell[c]{0.333\\(0.29, 0.401)} & \makecell[c]{0.392\\(0.349, 0.441)} & \makecell[c]{0.26\\(0.212, 0.356)} & \makecell[c]{-0.132\\(-0.163, -0.081)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+\begin{table}
+
+\caption{\label{tab:stan}Stan: STRUCTURAL LINEAR U SHOCKS PHAT MU REP HIER SOB, Version: 98}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+Dependent variable: Take-up & (1) & (2) & (3) & (4)\\
+\midrule
+Bracelet & \makecell[c]{0.055\\(-0.037, 0.123)} & \makecell[c]{0.056\\(-0.01, 0.113)} & \makecell[c]{0.054\\(-0.074, 0.143)} & \makecell[c]{-0.003\\(-0.066, 0.055)}\\
+Calendar & \makecell[c]{0.049\\(-0.039, 0.116)} & \makecell[c]{0.056\\(-0.011, 0.111)} & \makecell[c]{0.04\\(-0.081, 0.128)} & \makecell[c]{-0.016\\(-0.077, 0.04)}\\
+Ink & \makecell[c]{-0.017\\(-0.11, 0.066)} & \makecell[c]{-0.021\\(-0.093, 0.051)} & \makecell[c]{-0.014\\(-0.137, 0.094)} & \makecell[c]{0.007\\(-0.058, 0.058)}\\
+\midrule
+Bracelet - Calendar & \makecell[c]{0.006\\(-0.042, 0.057)} & \makecell[c]{0\\(-0.022, 0.026)} & \makecell[c]{0.013\\(-0.064, 0.095)} & \makecell[c]{0.013\\(-0.045, 0.07)}\\
+Control mean & \makecell[c]{0.336\\(0.291, 0.421)} & \makecell[c]{0.392\\(0.35, 0.452)} & \makecell[c]{0.266\\(0.216, 0.381)} & \makecell[c]{-0.126\\(-0.157, -0.069)}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+{[}{[}1{]}{]} NULL
+
+{[}{[}2{]}{]} NULL
+
+{[}{[}3{]}{]} NULL
+
+{[}{[}4{]}{]} NULL
+
+{[}{[}5{]}{]} NULL
+
+{[}{[}6{]}{]} NULL
+
+{[}{[}7{]}{]} NULL
+
+{[}{[}8{]}{]} NULL
+
+\subsection{Frequentist Probit
+(p-values)}\label{frequentist-probit-p-values}
+
+\end{document}

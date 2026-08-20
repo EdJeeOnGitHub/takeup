@@ -1,0 +1,21 @@
+diff --git a/ECM ReStud.tex b/ECM ReStud.tex
+index 346bfff..ff0154b 100644
+--- a/ECM ReStud.tex	
++++ b/ECM ReStud.tex	
+@@ -1947,14 +1947,14 @@ A potential concern is that the acceptance-rejection algorithm may have introduc
+ \subsubsection{Continuous Distance Randomization Inference}
+ \label{sec:distance-random}
+ 
+-As an additional check that our continuous distance measure is orthogonal to pre-treatment characteristics, we regress each baseline covariate on the distance from the community centroid to its assigned point of treatment (PoT), controlling for county fixed effects and clustering standard errors at the community level. We then permute community-level distances across communities within county strata 500 times and recompute the associated test statistic. Figure~\ref{fig:ri-baseline} plots the resulting randomization distribution for each covariate under the null of no association. The vertical line marks the realized value, and permutation \(p\)-values based on the 500 draws are reported in the upper right-hand corner of each panel. For all 15 covariates, the $p$-value exceeds 0.10, indicating that realized centroid-to-PoT distance is not systematically related to observable characteristics.
++As an additional check that our continuous distance measure is orthogonal to pre-treatment characteristics, we regress each baseline covariate on the distance from the community centroid to its assigned point of treatment (PoT), controlling for county fixed effects and clustering standard errors at the community level. We then use the constrained assignment simulations described above to construct placebo continuous-distance draws. For each placebo draw, each surveyed community receives a centroid-to-PoT distance sampled from the feasible PoT-community pairings generated for that community by re-running the PoT selection, Close/Far assignment, targeted-community pairing, and feasibility-screening algorithm. We then recompute the associated test statistic. Figure~\ref{fig:ri-baseline} plots the resulting placebo distribution for each covariate under the null of no association. The vertical line marks the realized value, and simulation-based \(p\)-values based on the 500 draws are reported in the upper right-hand corner of each panel. For all 15 covariates, the $p$-value exceeds 0.10, indicating that realized centroid-to-PoT distance is not systematically related to observable characteristics.
+ 
+ \begin{figure}[htbp]
+   \centering
+   \includegraphics[width=5.2in]{figures/dist-ri-plot.pdf}
+   \caption{Randomization Inference: Baseline Covariates and Centroid-to-PoT Distance}
+   \label{fig:ri-baseline}
+-   \floatfoot{\textit{Notes:} Each histogram shows the randomization distribution of the OLS \(t\)-statistic from 500 within-county permutations of community centroid-to-PoT distances. Regressions include county fixed effects. Standard errors are clustered by community. The vertical line is the realized statistic from the actual experiment, and each panel reports the corresponding randomization-inference \(p\)-value.}
++   \floatfoot{\textit{Notes:} Each histogram shows the placebo distribution of the OLS \(t\)-statistic from 500 counterfactual continuous-distance draws based on simulated feasible PoT-community pairings under the constrained assignment algorithm. Regressions include county fixed effects. Standard errors are clustered by community. The vertical line is the realized statistic from the actual experiment, and each panel reports the corresponding simulation-based \(p\)-value.}
+ \end{figure}
+ 
+ \FloatBarrier

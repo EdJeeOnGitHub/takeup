@@ -1,0 +1,13 @@
+"outcome","distance_specification","statistic","randomization_p"
+"Administrative take-up","Original assigned Close/Far",13.5766544084465,0.00982
+"Administrative take-up","Final realized Close/Far",3.04084159569085,0.43221
+"Administrative take-up","Realized distance (per km)",4.85245988207414,0.26263
+"Definite peer classification","Original assigned Close/Far",22.7474484568314,0.00049
+"Definite peer classification","Final realized Close/Far",8.2912709028669,0.06379
+"Definite peer classification","Realized distance (per km)",12.2755092882059,0.0228
+"Correct classification","Original assigned Close/Far",8.7659431503445,0.05028
+"Correct classification","Final realized Close/Far",5.63390191745414,0.17064
+"Correct classification","Realized distance (per km)",6.47598863476375,0.13908
+"Perceived own observability","Original assigned Close/Far",10.5074993503913,0.03363
+"Perceived own observability","Final realized Close/Far",2.21607123772372,0.57926
+"Perceived own observability","Realized distance (per km)",5.431697568855,0.20973

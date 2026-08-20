@@ -1,0 +1,12 @@
+diff --git a/ECM ReStud.tex b/ECM ReStud.tex
+index dbce50d..0f17e78 100644
+--- a/ECM ReStud.tex	
++++ b/ECM ReStud.tex	
+@@ -656,6 +656,7 @@ Figure~\ref{fig:harmonized-delta} illustrates how social image returns, \(\mu(d)
+ Idiosyncratic shocks \(u_i\) blur type inference. When the dispersion of \(u_i\) is small, actions closely reveal \(v_i\). As this dispersion rises, observers cannot tell whether an individual deworms because of intrinsic motivation or because of a favorable shock. Social image returns fall at every cutoff, and the returns curve flattens.
+ 
+ Panel (b) allows observability to fall with distance, \(\mu'(d)<0\). If the decline in \(\mu(d)\) dominates the rise in \(\Delta\), then the social image return can fall with distance: at large \(d\), only highly motivated individuals deworm, but their action is less visible, so the reputational return \(\mu(d)\Delta(w^\ast(d))\) is small.
++For any fixed cutoff in the plotted range, the lower-noise curves remain above the higher-noise curves; Panel (b) changes the level and slope of the return by allowing \(\mu(d)\) to vary with distance, not by reversing the ordering of \(\Delta(w^\ast)\) across \(\sigma_u\).
+ 
+ \begin{figure}[htbp]
+     \centering

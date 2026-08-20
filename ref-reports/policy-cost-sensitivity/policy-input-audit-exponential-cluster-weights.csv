@@ -1,0 +1,2 @@
+"analysis_id","parameter_type","parameter_rows","successful_rows","failed_rows","villages","candidate_sites","feasible_links_3500m","census_adults","max_experimental_distance_km","signal_cost_per_taker","pooling_rhos","travel_cost_grid","fixed_site_cost_grid"
+"exponential-cluster-weights","canonical",999,999,0,144,1451,1639,96052,2.84818449597509,0.2,"0;0.5;1","0;0.05;0.1;0.15;0.2;0.25","100;250;500;1000"

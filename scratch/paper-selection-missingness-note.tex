@@ -1,0 +1,72 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{hyperref}
+\newcommand{\makecell}[2][]{\begin{tabular}{@{}c@{}}#2\end{tabular}}
+
+\title{Selection into the Endline Observability Module}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Concern}
+
+There are two related selection concerns. The first is selection into the main administrative take-up analysis sample: some monitored SMS-control non-phone respondents were dropped from the SurveyCTO monitoring roster before entering the realized main analysis sample. The second is selection into the endline observability module: among cleaned endline respondents, some are missing the knowledge-table module used to measure what respondents know about others' deworming status.
+
+The first concern matters for the main take-up sample. The second matters for the endline observability outcome. For observability, there is an additional measurement issue: the main observability outcome uses Table A, but for respondents missing the knowledge-table module we do not observe whether they would have been assigned to Table A or Table B. Thus a Table-A-specific attrition check requires an assumption or sensitivity exercise.
+
+\section*{Evidence}
+
+Table~\ref{tab:main-analysis-sample-attrition-paper} examines selection into the main administrative take-up analysis sample. It combines monitored SMS-control non-phone respondents who were dropped from the SurveyCTO monitoring roster with the realized main take-up analysis sample, and regresses an indicator for being dropped on randomized treatment assignment. Both columns include county fixed effects and the reduced-form controls. The pooled treatment indicators are marginally significant ($p=0.081$), but the magnitudes are small: the control mean is 9.1 percent, the Ink coefficient is -0.5 percentage points, the Calendar coefficient is 0.4 percentage points, and the Bracelet coefficient is 0.7 percentage points. In the treatment-by-distance specification the joint test is not significant ($p=0.195$).
+
+\begin{table}[htbp]
+\caption{Main Analysis Sample Attrition}
+\label{tab:main-analysis-sample-attrition-paper}
+\scriptsize
+\input{../presentations/rf-tables/main-specs/paper_main_analysis_sample_attrition_tbl.tex}
+\end{table}
+
+\clearpage
+
+Table~\ref{tab:full-knowledge-table-attrition} turns to the endline observability module. It uses the full cleaned endline sample and avoids any Table A/Table B imputation. The outcome is missing from any knowledge table. Both columns include county fixed effects and the reduced-form controls. In the pooled treatment specification, treatment indicators are not jointly significant ($p=0.161$). This suggests there is not strong evidence that knowledge-table missingness differs by treatment arm on average.
+
+The treatment-by-distance specification does show differential missingness ($p=0.002$). This result is driven by the Bracelet $\times$ Close cell, which has lower missingness than Control $\times$ Close. The sign matters: the issue is not excess attrition in the Bracelet-Close cell, but treatment-correlated observability-module completion. That pattern is relevant because the main observability effects are also concentrated in the close/public-signal cells.
+
+\begin{table}[htbp]
+\caption{Knowledge-Table Attrition: Full Endline Sample}
+\label{tab:full-knowledge-table-attrition}
+\scriptsize
+\input{../presentations/rf-tables/main-specs/paper_full_knowledge_table_attrition_tbl.tex}
+\end{table}
+
+\clearpage
+
+Table~\ref{tab:simulated-table-a-attrition-paper} targets the Table A analysis sample. It begins with the 1,141 observed Table A respondents and then, in each of 1,000 simulations, randomly assigns exactly half of the 252 SMS-control respondents missing from any knowledge table to Table A. The estimates average over these simulated assignments, and the standard errors and joint tests include both clustered regression variance and simulation variance.
+
+This Table-A-specific sensitivity check weakens the selection concern. Bracelet $\times$ Close remains negative and statistically significant, but the joint treatment tests are not significant once uncertainty over Table A assignment is incorporated: $p=0.431$ in the pooled treatment specification and $p=0.220$ in the treatment-by-distance specification. Both columns include county fixed effects and the reduced-form controls.
+
+\begin{table}[htbp]
+\caption{Knowledge-Table Attrition: Simulated Table A Sample}
+\label{tab:simulated-table-a-attrition-paper}
+\scriptsize
+\input{../presentations/rf-tables/main-specs/paper_simulated_table_A_attrition_tbl.tex}
+\end{table}
+
+\clearpage
+
+\section*{Interpretation}
+
+The most defensible reading is that missingness deserves to be disclosed, but the evidence is not consistent with a large, uncontrolled selection problem. For the main administrative take-up analysis sample, treatment assignment marginally predicts SurveyCTO roster attrition in the pooled controlled specification, but the differences are small in magnitude and the treatment-by-distance joint test is not significant. For the observability module, the full-endline diagnostic finds a treatment-by-distance missingness pattern, concentrated in Bracelet-Close and in the direction of lower missingness. The simulated Table A diagnostic shows the same directional pattern but does not reject joint equality of treatment coefficients after incorporating uncertainty over unobserved Table A/Table B assignment.
+
+This addresses the main concern in the feedback note as follows. The evidence does not support treating first-responder or completed-observability samples as automatically free of selection. Instead, the attrition checks directly test selection into the main analysis sample and missingness into the knowledge-table module. The main-analysis-sample attrition table shows small treatment differences and no significant controlled treatment-by-distance pattern. The pooled full-endline knowledge-table check is reassuring; the treatment-by-distance full-endline check flags a real pattern; and the Table A simulation shows that the flagged pattern is not robustly significant for the exact Table A sample once the A/B ambiguity is handled honestly.
+
+For the paper, the clean framing is therefore:
+
+\begin{quote}
+We first assess selection into the realized administrative take-up analysis sample by regressing an indicator for being dropped from the monitoring roster on randomized treatment assignment. With county fixed effects and the reduced-form controls, treatment differences are small in magnitude, and the treatment-by-distance joint test is not significant. We then assess selection into the endline observability module by regressing knowledge-table missingness on treatment assignment. In the full cleaned endline sample, treatment arms do not jointly predict missingness in the pooled controlled specification, though treatment-by-distance cells do, driven by lower missingness in Bracelet-Close communities. Because the main observability outcome uses Table A and missing respondents' Table A/Table B assignment is unobserved, we conduct a simulation that assigns half of the ambiguous missing cases to Table A across 1,000 draws. In this Table-A-specific sensitivity analysis, the Bracelet-Close coefficient remains negative, but the joint treatment tests are not statistically significant after incorporating simulation uncertainty.
+\end{quote}
+
+\end{document}

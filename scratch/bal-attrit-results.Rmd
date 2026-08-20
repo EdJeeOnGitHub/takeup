@@ -1,0 +1,124 @@
+---
+title: "Balance and Attrition Results"
+output:
+  pdf_document:
+    keep_tex: yes
+knit: (function(input, ...) rmarkdown::render(input, knit_root_dir = here::here(), ...))
+header-includes:
+    - \usepackage{booktabs}
+    - \usepackage{longtable}
+    - \usepackage{array}
+    - \usepackage{multirow}
+    - \usepackage{wrapfig}
+    - \usepackage{float}
+    - \usepackage{placeins}
+    - \usepackage{colortbl}
+    - \usepackage{tabu}
+    - \usepackage{threeparttable}
+    - \usepackage{threeparttablex}
+    - \usepackage[normalem]{ulem}
+    - \usepackage[utf8]{inputenc}
+    - \usepackage{makecell}
+    - \usepackage{xcolor}
+params:
+    cache: FALSE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  cache   = params$cache,
+  warning = FALSE,
+  message = FALSE
+)
+
+# Helper: wrap a stripped-table .tex file back into a float with a caption
+include_tex_table = function(path, caption = NULL) {
+  lines = readLines(path)
+  out = c(
+    "\\begin{table}[htbp]",
+    if (!is.null(caption)) sprintf("\\caption{%s}", caption),
+    lines,
+    "\\end{table}"
+  )
+  cat(out, sep = "\n")
+}
+```
+
+## Main Balance Table
+
+
+This is unchanged - I still need to edit the layout and move sections, I've just included it for completeness.
+```{r main-balance-table, results="asis"}
+include_tex_table("presentations/tables/comp-balance-table.tex", "Balance Table")
+```
+
+\FloatBarrier
+
+## Endline Belief Sample Balance
+
+This is the balance on the census/monitored variables for the HHs in the belief sample. It's  
+possible we might be able to add a couple more variables here. 
+
+```{r belief-balance-table, results="asis"}
+include_tex_table(
+  "presentations/tables/belief-sample-balance-table.tex",
+  "Belief Sample Balance"
+)
+```
+
+\FloatBarrier
+
+## Baseline Sample Balance
+
+We can match the _sampling frame_ of 4,185 into the monitored sample, but we
+cannot match the 1,995 individuals that _completed the baseline survey_ into the
+monitored sample. Therefore, we cannot directly recreate balance using the same
+outcomes for the 1,995. We could use a mix of other variables to get as close as
+possible. I haven't done this yet.
+
+
+
+## Knowledge Table Attrition
+
+This tests for differential attrition into the knowledge table sample for the 255 
+that do not have a knowledge table entry. The sample matches our analysis sample - i.e. 
+all 2,659 that are in the endline sample with SMS control.
+
+```{r knowledge-attrition, results="asis"}
+include_tex_table(
+  "presentations/rf-tables/main-specs/know_table_attrition_spec_tbl.tex",
+  "Knowledge Table Attrition by Treatment"
+)
+```
+
+
+## Knowledge Table Attrition - Different Sample
+
+The 1,141 (although actually slightly larger as we don't subset to knowing people > 0, so 1204) + 252
+
+```{r knowledge-attrition-diff-sample, results="asis"}
+include_tex_table(
+  "presentations/rf-tables/main-specs/know_table_A_attrition_spec_tbl.tex",
+  "Knowledge Table Attrition by Treatment"
+)
+```
+
+
+
+
+\FloatBarrier
+## Monitoring Attrition (Dropped from SurveyCTO)
+
+This table tests for differential attrition into the monitored sample for the
+989 that do not have a monitoring entry. The sample matches our analysis sample
+- i.e. 9,805 + 989 = 10,794. 
+
+```{r monitoring-attrition, results="asis"}
+include_tex_table(
+  "presentations/rf-tables/main-specs/rf_attrition_cto_tbl.tex",
+  "Monitoring Attrition by Treatment"
+)
+```
+
+\FloatBarrier

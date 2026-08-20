@@ -1,0 +1,6 @@
+"cap_m","feasible_links","mean_options_per_village","villages_with_at_most_two_options","sites_feasible_for_multiple_villages","geographic_minimum_sites","control_sites","bracelet_sites","sites_saved"
+2500,914,6.34722222222222,11,53,114,114,114,0
+2750,1085,7.53472222222222,6,109,99,108,99,9
+3000,1256,8.72222222222222,2,186,89,106,89,17
+3250,1430,9.93055555555556,2,272,81,105,81,24
+3500,1639,11.3819444444444,2,398,71,101,76,25

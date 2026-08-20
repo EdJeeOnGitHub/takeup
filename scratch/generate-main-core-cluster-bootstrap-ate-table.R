@@ -9,16 +9,25 @@ draws_path <- main_core_option_value(
 )
 table_path <- main_core_option_value(
   args, "--table-path",
-  "presentations/tables/fit105/main-core-cluster-bootstrap-overall-te-table.tex"
+  "presentations/tables/fit105/main-core-exponential-cluster-weight-overall-te-table.tex"
 )
 summary_path <- main_core_option_value(
   args, "--summary-path",
-  "temp-data/main-core-cluster-robustness/cluster-bootstrap-structural-results.csv"
+  "temp-data/main-core-cluster-robustness/exponential-cluster-weight-structural-results.csv"
+)
+method <- main_core_option_value(args, "--method", "exponential")
+specification <- switch(
+  method,
+  exponential = "Exponential cluster weights",
+  multinomial = "Cluster bootstrap",
+  stop("--method must be exponential or multinomial.", call. = FALSE)
 )
 
 draws <- read.csv(draws_path, stringsAsFactors = FALSE)
-draws <- draws[draws$specification == "Cluster bootstrap", ]
-if (nrow(draws) == 0L) stop("No cluster-bootstrap draws found.", call. = FALSE)
+draws <- draws[draws$specification == specification, ]
+if (nrow(draws) == 0L) {
+  stop("No draws found for ", specification, ".", call. = FALSE)
+}
 
 id <- c("replicate", "subgroup")
 ates <- draws[
@@ -39,8 +48,13 @@ contrast_cells <- rbind(
     replicate = ate_wide$replicate,
     column = ate_wide$subgroup,
     row = "Signal - No Signal",
-    value = (ate_wide$value.Bracelet + ate_wide$value.Ink) / 2 -
-      ate_wide$value.Calendar
+    # ATEs are relative to Control. Therefore
+    # mean(Ink, Bracelet) - mean(Control, Calendar) equals
+    # (ATE_Ink + ATE_Bracelet - ATE_Calendar) / 2.
+    value = (
+      ate_wide$value.Bracelet + ate_wide$value.Ink -
+        ate_wide$value.Calendar
+    ) / 2
   ),
   data.frame(
     replicate = ate_wide$replicate,
@@ -133,7 +147,11 @@ lines <- c(
   "\\toprule",
   paste0(
     "\\multicolumn{1}{c}{ } & ",
-    "\\multicolumn{4}{c}{County-stratified cluster bootstrap} \\\\"
+    if (method == "exponential") {
+      "\\multicolumn{4}{c}{Cluster weighted-likelihood bootstrap} \\\\"
+    } else {
+      "\\multicolumn{4}{c}{County-stratified cluster bootstrap} \\\\"
+    }
   ),
   "\\cmidrule(l{3pt}r{3pt}){2-5}",
   paste0(
@@ -154,4 +172,4 @@ for (row in row_order) {
 }
 lines <- c(lines, "\\bottomrule", "\\end{tabular}%", "}")
 writeLines(lines, table_path)
-message("Wrote cluster-bootstrap structural table: ", table_path)
+message("Wrote ", method, " cluster-weight structural table: ", table_path)

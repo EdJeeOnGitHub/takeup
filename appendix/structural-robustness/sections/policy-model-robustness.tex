@@ -15,16 +15,14 @@ the same welfare target---predicted take-up under the experimental
 allocation---and the same information counterfactuals. The specifications vary
 the observability measure, permit signal-specific social-image weights, replace
 Gaussian intrinsic motivation with a variance-normalized Student-$t(5)$
-distribution, or add a community random shock. The baseline row instead
-re-estimates the main specification in 210 successful county-stratified
-cluster-bootstrap samples.
+distribution, or add a community random shock. We omit rather than relabel the
+older multinomial cluster-resampling policy output, so this table focuses on
+the alternative structural-model posteriors.
 
 Table~\ref{tab:policy-model-robustness-contrasts} reports the principal policy
-contrast. Under the baseline cluster bootstrap, giving the policymaker the
-Bracelet rather than Control observability profile reduces the median required
-number of points of treatment (PoTs) by 25, with a 95 percent percentile
-interval of 10--42. The median saving remains positive and economically large
-under correct classification, perceived second-order observability, the
+contrast. Giving the policymaker the Bracelet rather than Control observability
+profile produces a positive and economically large median saving under correct
+classification, perceived second-order observability, the
 Any-Signal/No-Signal social-image specification, Student-$t$ types, and the
 community random-shock model. The fully treatment-specific social-image model
 has a similar median but a much wider interval, consistent with the weaker
@@ -45,11 +43,10 @@ between the two columns indicates that the larger policy savings arise through
 the endogenous interaction between distance and social image, rather than
 through a mechanical level difference between observability regimes.
 
-The alternative-model calculations use every retained HMC draw: 800 draws for
+The calculations use every retained HMC draw: 800 draws for
 each observability fit, 1,600 for each signal-specific-lambda and Student-$t$
-fit, and 4,000 for the community-shock fit. Thus, the alternative-model
-intervals summarize posterior uncertainty, whereas the baseline interval
-summarizes cluster-bootstrap variation. For a draw whose welfare target cannot
+fit, and 4,000 for the community-shock fit. Thus, the displayed intervals
+summarize posterior uncertainty. For a draw whose welfare target cannot
 be attained, we retain the best feasible allocation and flag the draw as
 target-infeasible. If a counterfactual has no fixed point, we retain the draw in
 the diagnostic denominator, mark its equilibrium as undefined, and exclude it

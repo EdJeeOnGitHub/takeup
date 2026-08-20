@@ -9,6 +9,7 @@ suppressPackageStartupMessages({
   library(cmdstanr)
   library(posterior)
   library(dplyr)
+  library(ggplot2)
 })
 
 baseline_gq_dir <- option_value("--baseline-gq-dir")
@@ -96,14 +97,98 @@ write.csv(shape_summary, file.path(output_path, "finite-mixture-shape-summary.cs
           row.names = FALSE)
 
 diagnostics <- data.frame(
+  max_rhat_variable = fit_summary$variable[which.max(fit_summary$rhat)],
   max_rhat = max(fit_summary$rhat, na.rm = TRUE),
+  min_ess_bulk_variable = fit_summary$variable[which.min(fit_summary$ess_bulk)],
   min_ess_bulk = min(fit_summary$ess_bulk, na.rm = TRUE),
+  min_ess_tail_variable = fit_summary$variable[which.min(fit_summary$ess_tail)],
   min_ess_tail = min(fit_summary$ess_tail, na.rm = TRUE),
   divergences = sum(sampler$divergent__, na.rm = TRUE),
   max_treedepth = sum(sampler$treedepth__ >= 12, na.rm = TRUE)
 )
 write.csv(diagnostics, file.path(output_path, "finite-mixture-fit-diagnostics.csv"),
           row.names = FALSE)
+
+# Plot the estimated standardized intrinsic-motivation distribution. The
+# parameterization fixes its mean at zero and variance at one; the mixture
+# flexibly changes skewness, shoulders, and modality relative to N(0,1).
+density_grid <- seq(-3.5, 3.5, length.out = 281L)
+density_draws <- vapply(seq_len(nrow(shape_draws)), function(draw_index) {
+  draw <- shape_draws[draw_index, ]
+  draw$mixture_weight * dnorm(
+    density_grid, draw$lower_component_mean, draw$within_component_sd
+  ) + (1 - draw$mixture_weight) * dnorm(
+    density_grid, draw$upper_component_mean, draw$within_component_sd
+  )
+}, numeric(length(density_grid)))
+density_summary <- data.frame(
+  intrinsic_motivation = density_grid,
+  mixture_median = apply(density_draws, 1, median),
+  mixture_q025 = apply(density_draws, 1, quantile, probs = 0.025),
+  mixture_q975 = apply(density_draws, 1, quantile, probs = 0.975),
+  gaussian_density = dnorm(density_grid)
+)
+median_shape <- vapply(shape_draws, median, numeric(1))
+density_summary$lower_component <-
+  median_shape[["mixture_weight"]] * dnorm(
+    density_grid,
+    median_shape[["lower_component_mean"]],
+    median_shape[["within_component_sd"]]
+  )
+density_summary$upper_component <-
+  (1 - median_shape[["mixture_weight"]]) * dnorm(
+    density_grid,
+    median_shape[["upper_component_mean"]],
+    median_shape[["within_component_sd"]]
+  )
+write.csv(
+  density_summary,
+  file.path(output_path, "finite-mixture-density-summary.csv"),
+  row.names = FALSE
+)
+
+density_plot <- ggplot(
+  density_summary, aes(x = .data$intrinsic_motivation)
+) +
+  geom_ribbon(
+    aes(ymin = .data$mixture_q025, ymax = .data$mixture_q975),
+    fill = "#8172B2", alpha = 0.20
+  ) +
+  geom_line(
+    aes(y = .data$mixture_median, color = "Estimated mixture"),
+    linewidth = 1
+  ) +
+  geom_line(
+    aes(y = .data$gaussian_density, color = "Standard normal"),
+    linewidth = 0.9, linetype = "longdash"
+  ) +
+  geom_line(
+    aes(y = .data$lower_component, color = "Weighted components"),
+    linewidth = 0.55, linetype = "dotted"
+  ) +
+  geom_line(
+    aes(y = .data$upper_component, color = "Weighted components"),
+    linewidth = 0.55, linetype = "dotted"
+  ) +
+  scale_color_manual(values = c(
+    "Estimated mixture" = "#6A51A3",
+    "Standard normal" = "#333333",
+    "Weighted components" = "#4C72B0"
+  )) +
+  labs(
+    x = "Standardized intrinsic motivation",
+    y = "Density",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank()
+  )
+ggsave(
+  file.path(output_path, "finite-mixture-density.pdf"),
+  density_plot, width = 6.4, height = 4.2
+)
 
 fmt <- function(x) sprintf("%.2f", x)
 ci <- function(lo, hi) paste0("(", fmt(lo), ", ", fmt(hi), ")")
@@ -112,9 +197,11 @@ lines <- c(
   "Treatment & 500m & 1500m & 2500m \\\\",
   "\\midrule"
 )
-for (specification in c("Gaussian", "Two-component mixture")) {
-  block <- results |> filter(.data$specification == .env$specification)
-  panel <- if (specification == "Gaussian") {
+for (specification_name in c("Gaussian", "Two-component mixture")) {
+  block <- results[
+    results[["specification"]] == specification_name, , drop = FALSE
+  ]
+  panel <- if (specification_name == "Gaussian") {
     "Panel A: Gaussian intrinsic motivation"
   } else {
     "Panel B: Two-component Gaussian-mixture intrinsic motivation"
@@ -132,7 +219,7 @@ for (specification in c("Gaussian", "Two-component mixture")) {
              " \\\\ ")
     )
   }
-  if (specification == "Gaussian") lines <- c(lines, "\\addlinespace")
+  if (specification_name == "Gaussian") lines <- c(lines, "\\addlinespace")
 }
 lines <- c(lines, "\\bottomrule", "\\end{tabular}")
 writeLines(lines, file.path(output_path, "main-core-finite-mixture-multipliers.tex"))

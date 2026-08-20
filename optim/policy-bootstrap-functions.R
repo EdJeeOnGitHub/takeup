@@ -82,6 +82,10 @@ canonical_policy_parameters <- function(mode, replicate, mode_csv) {
     draw = as.integer(replicate),
     replicate = as.integer(replicate),
     mode_csv = mode_csv,
+    # Optimizer modes used by the cluster bootstrap are draws from the
+    # Gaussian-type baseline model.  Record that family explicitly so the
+    # shared prediction code follows the same branch as retained HMC draws.
+    model_family = "gaussian",
     beta_control = mode_scalar(mode, "beta_intercept"),
     beta_ink = mode_scalar(mode, "beta_ink_effect"),
     beta_calendar = bracelet_beta +
@@ -521,6 +525,9 @@ solve_policy_student_t_fixedpoint <- function(benefit, mu_rep, u_sd, mixture) {
 
 predict_policy_draw <- function(
     parameter, distances, scenarios = policy_scenarios, village_ids = NULL) {
+  # Older canonical parameter files predate the explicit family column and
+  # are draws from the Gaussian baseline model.
+  model_family <- parameter$model_family %||% "gaussian"
   distance_sd <- distances / parameter$sd_of_dist
   benefit <- parameter$beta_control - parameter$dist_beta * distance_sd
   if (!is.null(parameter$cluster_shock)) {
@@ -531,7 +538,7 @@ predict_policy_draw <- function(
   }
   dynamic_cache <- list()
   for (visibility in unique(scenarios$visibility[!scenarios$suppress_reputation])) {
-    asymmetric <- parameter$model_family %in% policy_asymmetric_families
+    asymmetric <- model_family %in% policy_asymmetric_families
     mu <- if (asymmetric) {
       rep(parameter$base_mu_rep, length(distance_sd))
     } else {
@@ -542,7 +549,7 @@ predict_policy_draw <- function(
         benefit, parameter$base_mu_rep, parameter$u_sd,
         policy_noisy_channel(distance_sd, parameter, visibility)
       )
-    } else if (identical(parameter$model_family, "student_t5")) {
+    } else if (identical(model_family, "student_t5")) {
       solve_policy_student_t_fixedpoint(
         benefit, mu, parameter$u_sd, policy_student_t_mixture()
       )
@@ -557,7 +564,7 @@ predict_policy_draw <- function(
     if (!is.null(parameter$cluster_shock)) {
       benefit_500 <- benefit_500 + parameter$cluster_shock[village_ids]
     }
-    asymmetric <- parameter$model_family %in% policy_asymmetric_families
+    asymmetric <- model_family %in% policy_asymmetric_families
     mu_500 <- if (asymmetric) parameter$base_mu_rep else
       policy_mu_rep(distance_500_sd, parameter, visibility)
     if (!is.null(parameter$cluster_shock)) {
@@ -573,7 +580,7 @@ predict_policy_draw <- function(
       signal <- parameter$base_mu_rep * policy_noisy_information(
         cutoff_500, parameter$total_error_sd, channel_500
       ) * policy_delta(cutoff_500, parameter$u_sd)
-    } else if (identical(parameter$model_family, "student_t5")) {
+    } else if (identical(model_family, "student_t5")) {
       mixture <- policy_student_t_mixture()
       cutoff_500 <- solve_policy_student_t_fixedpoint(
         benefit_500, mu_500, parameter$u_sd, mixture
@@ -616,7 +623,7 @@ predict_policy_draw <- function(
       village_i = if (is.null(village_ids)) NA_integer_ else village_ids,
       distance = distances,
       distance_km = distances / 1000,
-      demand = if (identical(parameter$model_family, "student_t5")) {
+      demand = if (identical(model_family, "student_t5")) {
         1 - policy_student_t_moments(
           cutoff, parameter$u_sd, policy_student_t_mixture()
         )$probability_below

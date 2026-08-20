@@ -84,7 +84,7 @@ set -e
 
 Rscript ./optim/create-distance-data.R \
     --output-name=${DATA_INPUT_NAME} \
-    --num-extra-pots=100 \
+    --all-pots \
     --county-subset=${COUNTY} \
     --distance-cutoff=Inf 
 

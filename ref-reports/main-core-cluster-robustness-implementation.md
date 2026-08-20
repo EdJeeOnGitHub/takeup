@@ -1,4 +1,4 @@
-# Minimal main model: cluster heterogeneity and cluster-robust inference
+# Minimal main model: cluster heterogeneity and cluster-weighted inference
 
 ## Implemented design
 
@@ -24,8 +24,8 @@ incorrectly.
 From `~/projects/takeup`:
 
 ```bash
-# Submit data preparation, the unweighted initializer, 200 county-stratified
-# cluster-bootstrap refits, and paper-output generation with dependencies.
+# Submit data preparation, the unweighted initializer, cluster-weighted
+# refits, and paper-output generation with dependencies.
 bash submit_main_core_cluster_bootstrap.sh
 ```
 
@@ -63,8 +63,10 @@ initial state; it does not constrain or modify the sampled posterior.
   retained draws. It had zero divergences and zero maximum-treedepth hits. The
   cluster-shock SD posterior had median 0.347, 5th--95th percentiles
   0.304--0.396, R-hat 1.00, and bulk ESS 1,810.
-- The completed workflow produced 211 successful multinomial refits. Reporting
-  deliberately uses the first 200 successful replicates.
+- The preferred paper-facing workflow uses 999 successful exponential
+  cluster-weighted refits. All 999 attempted refits completed, all 999 weight
+  vectors were distinct, and no refit was excluded. Conventional multinomial
+  resampling remains an archived internal sensitivity check.
 - All 16 short-MCMC audit cases completed. The combined audit passed the
   prespecified threshold: 289 of 304 reported cells (95.1%) differed from the
   short-MCMC posterior median by less than 10% of the corresponding refit
@@ -76,9 +78,10 @@ initial state; it does not constrain or modify the sampled posterior.
 ## Paper-facing outputs
 
 - `presentations/tables/fit105/main-core-cluster-robustness.tex` compares the
-  social multipliers, with the cluster bootstrap immediately after baseline.
-- `presentations/tables/fit105/main-core-cluster-bootstrap-overall-te-table.tex`
-  reports the bootstrap structural take-up results in the same Combined,
+  social multipliers, with the exponential weighted-likelihood bootstrap
+  immediately after baseline.
+- `presentations/tables/fit105/main-core-exponential-cluster-weight-overall-te-table.tex`
+  reports the weighted structural take-up results in the same Combined,
   Close, Far, and Far-minus-Close layout as the main structural table.
 - `presentations/misc-figures/main-core-cluster-robustness.pdf` is the matching
   multiplier figure.
@@ -94,7 +97,8 @@ initial state; it does not constrain or modify the sampled posterior.
 - The cluster shock changes the structural model; weighted refits adjust the
   baseline model's sampling uncertainty. They should not be described as the
   same robustness check.
-- The county-stratified multinomial cluster bootstrap is the primary
-  cluster-robust inference path. The exponential weights are corroborating
-  generalized-Bayes sensitivity results, and the cluster random intercept is
-  a separate structural robustness specification.
+- The exponential cluster weighted-likelihood bootstrap is the preferred
+  generalized-Bayesian cluster adjustment. Conventional multinomial
+  resampling is retained internally but is not promoted in the paper-facing
+  appendix. The cluster random intercept remains a separate structural
+  robustness specification.

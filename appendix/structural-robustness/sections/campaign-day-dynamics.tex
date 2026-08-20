@@ -1,0 +1,121 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,graphicx,makecell,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\clearpage
+\subsection{Campaign-Day Evolution of the Reduced-Form Effects}
+\label{app:campaign-day-dynamics}
+
+Adults could seek treatment on twelve consecutive campaign days. We therefore
+examine when the experimental effects emerge, without using an instrumental-variable
+or conditional-hazard specification. The analysis uses the originally randomized
+Close/Far assignment and the same 9,805-person sample and covariate adjustment as
+the reduced-form endpoint analysis. Table~\ref{tab:campaign-original-assignment}
+reproduces that endpoint: treatment rows are effects relative to Control, while
+the Control row reports predicted take-up levels.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Original distance-assignment intention-to-treat estimates}
+  \label{tab:campaign-original-assignment}
+  \input{\StructuralRobustnessPath/tables/rf-original-distance-itt.tex}
+\end{table}
+
+For campaign day $t$, cumulative take-up is an indicator for directly recorded
+treatment on or before day $t$. Daily incidence is an indicator for directly
+recorded treatment exactly on day $t$. Both outcomes retain the complete randomized
+sample, so daily incidence is an unconditional probability rather than a hazard
+among the post-treatment-selected set of people who have not yet participated.
+Day 12 consequently reproduces the original endpoint exactly.
+
+We estimate the four treatment arms interacted with original Close/Far assignment,
+adjusting for gender, age, expected distance, and county fixed effects. Inference
+uses 1,000 paired exponential cluster-weight draws at the 144 randomization clusters.
+The same cluster weights are used for every campaign day and derived contrast.
+Figure~\ref{fig:campaign-cumulative} reports adjusted cumulative take-up; ribbons
+are pointwise 95 percent intervals.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/campaign-day-cumulative.pdf}
+  \caption{Adjusted cumulative take-up over the campaign}
+  \label{fig:campaign-cumulative}
+  \begin{minipage}{0.94\linewidth}
+    \vspace{0.3em}\footnotesize
+    \textit{Notes:} Shaded regions are pointwise 95 percent intervals from
+    paired exponential cluster-weight draws. All estimands retain the full
+    randomized sample.
+  \end{minipage}
+\end{figure}
+
+Table~\ref{tab:campaign-interactions} shows the treatment-by-Far interactions
+at four campaign milestones. The pooled Any Signal--No Signal Far--Close effect
+grows from 0.029 on day 1 to 0.082 on day 6 and 0.124 on day 12. Thus approximately
+two-thirds of the endpoint differential has emerged by day 6. The arm-specific
+results show that the pattern is clearest for Ink. The Bracelet interaction moves
+in the same direction later in the campaign but remains imprecisely estimated,
+while Calendar shows no comparable pattern.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Evolution of treatment-by-Far interaction effects}
+  \label{tab:campaign-interactions}
+  \resizebox{\linewidth}{!}{%
+    \input{\StructuralRobustnessPath/tables/campaign-day-interaction-table.tex}}
+  \begin{minipage}{0.94\linewidth}
+    \vspace{0.3em}\footnotesize
+    \textit{Notes:} Each arm-specific row is the treatment-versus-Control effect
+    under Far assignment minus the corresponding effect under Close assignment.
+    The pooled row compares the average of Ink and Bracelet with the average of
+    Control and Calendar. Brackets contain pointwise 95 percent cluster-weight
+    intervals.
+  \end{minipage}
+\end{table}
+
+For completeness, Table~\ref{tab:campaign-cumulative-levels} reports adjusted
+levels and within-arm Far-minus-Close differences on the same milestone days.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Adjusted cumulative take-up on selected campaign days}
+  \label{tab:campaign-cumulative-levels}
+  \resizebox{\linewidth}{!}{%
+    \input{\StructuralRobustnessPath/tables/campaign-day-cumulative-table.tex}}
+  \begin{minipage}{0.94\linewidth}
+    \vspace{0.3em}\footnotesize
+    \textit{Notes:} Cells report adjusted predictions or Far-minus-Close
+    differences. Brackets contain pointwise 95 percent cluster-weight intervals.
+  \end{minipage}
+\end{table}
+
+Figure~\ref{fig:campaign-incidence} shows the corresponding unconditional daily
+take-up probabilities. The differential effect of public signals under Far
+assignment develops over the campaign rather than appearing only as an endpoint
+contrast. This accumulation is consistent with the value of visible signals
+increasing as participation unfolds within communities and provides additional
+support for the broad social-image or social-information mechanism. Timing alone
+does not, however, separately identify social image from related mechanisms such
+as reminders, descriptive norms, or social learning.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/campaign-day-incidence.pdf}
+  \caption{Adjusted unconditional daily take-up}
+  \label{fig:campaign-incidence}
+  \begin{minipage}{0.94\linewidth}
+    \vspace{0.3em}\footnotesize
+    \textit{Notes:} Shaded regions are pointwise 95 percent cluster-weight
+    intervals. These are unconditional daily probabilities, not hazards among
+    those who have not yet participated.
+  \end{minipage}
+\end{figure}
+
+\clearpage
+\end{document}

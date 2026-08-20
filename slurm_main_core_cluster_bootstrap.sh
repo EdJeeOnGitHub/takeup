@@ -14,12 +14,12 @@ set -euo pipefail
 STAGE=${STAGE:?Set STAGE to prepare, baseline, bootstrap, or summarize}
 ANALYSIS_ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data}
 WORKSPACE_DIR=${WORKSPACE_DIR:-${ANALYSIS_ROOT}/main-core-bootstrap-input}
-OUTPUT_PATH=${OUTPUT_PATH:-${ANALYSIS_ROOT}/main-core-cluster-bootstrap}
+OUTPUT_PATH=${OUTPUT_PATH:-${ANALYSIS_ROOT}/main-core-exponential-cluster-weights}
 STAN_PATH=${STAN_PATH:-stan_models_fit105}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 MANIFEST=${MANIFEST:-${WORKSPACE_DIR}/cluster-weights/weight-manifest.csv}
 BASELINE_INIT=${BASELINE_INIT:-${OUTPUT_PATH}/unweighted/mode-init.json}
-PAPER_OUTPUT=${PAPER_OUTPUT:-${ANALYSIS_ROOT}/main-core-cluster-bootstrap-results}
+PAPER_OUTPUT=${PAPER_OUTPUT:-${ANALYSIS_ROOT}/main-core-exponential-cluster-weight-results}
 
 mkdir -p temp/log "${WORKSPACE_DIR}" "${OUTPUT_PATH}" "${PAPER_OUTPUT}"
 if [[ "${STAGE}" == "prepare" ]]; then
@@ -42,7 +42,7 @@ case "${STAGE}" in
       scratch/generate-main-core-cluster-weights.R \
       "--workspace=${WORKSPACE_DIR}/dist_fit105.RData" \
       "--output-path=${WORKSPACE_DIR}/cluster-weights" \
-      --methods=multinomial --replicates=200 --seed=20260802
+      --methods=exponential --replicates=200 --seed=20260802
     ;;
   baseline)
     Rscript --no-save --no-restore --no-init-file \
@@ -66,13 +66,14 @@ case "${STAGE}" in
     Rscript --no-save --no-restore --no-init-file \
       scratch/summarize-main-core-cluster-robustness.R \
       "--weighted-path=${OUTPUT_PATH}" "--output-path=${PAPER_OUTPUT}" \
-      "--table-path=${PAPER_OUTPUT}/main-core-cluster-bootstrap-multipliers.tex" \
-      "--figure-path=${PAPER_OUTPUT}/main-core-cluster-bootstrap-multipliers.pdf"
+      "--table-path=${PAPER_OUTPUT}/main-core-exponential-cluster-weight-multipliers.tex" \
+      "--figure-path=${PAPER_OUTPUT}/main-core-exponential-cluster-weight-multipliers.pdf"
     Rscript --no-save --no-restore --no-init-file \
       scratch/generate-main-core-cluster-bootstrap-ate-table.R \
       "--draws=${PAPER_OUTPUT}/estimand-draws.csv" \
-      "--table-path=${PAPER_OUTPUT}/main-core-cluster-bootstrap-overall-te-table.tex" \
-      "--summary-path=${PAPER_OUTPUT}/cluster-bootstrap-structural-results.csv"
+      "--table-path=${PAPER_OUTPUT}/main-core-exponential-cluster-weight-overall-te-table.tex" \
+      "--summary-path=${PAPER_OUTPUT}/exponential-cluster-weight-structural-results.csv" \
+      --method=exponential
     ;;
   *)
     echo "Unknown STAGE=${STAGE}" >&2

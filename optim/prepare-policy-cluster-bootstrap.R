@@ -5,19 +5,23 @@ source("optim/policy-bootstrap-functions.R")
 
 weighted_path <- policy_option_value(
   args, "--weighted-path",
-  "/project/akaring/takeup-data/data/stan_analysis_data/main-core-weighted-modes"
+  "/project/akaring/takeup-data/data/stan_analysis_data/main-core-exponential-cluster-weights"
 )
 output_path <- policy_option_value(
   args, "--output-path",
-  "optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-cluster-bootstrap"
+  "optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-exponential-cluster-weights"
 )
-num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "210"))
+num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"))
+method <- policy_option_value(args, "--method", "exponential")
+if (!method %in% c("exponential", "multinomial")) {
+  stop("--method must be exponential or multinomial.", call. = FALSE)
+}
 
 status_files <- Sys.glob(file.path(weighted_path, "*", "status.csv"))
 if (length(status_files) == 0L) stop("No bootstrap status files found.", call. = FALSE)
 statuses <- do.call(rbind, lapply(status_files, read.csv, stringsAsFactors = FALSE))
 statuses <- statuses[
-  statuses$method == "multinomial" & statuses$status == "complete" &
+  statuses$method == method & statuses$status == "complete" &
     file.exists(statuses$mode_csv),
 ]
 statuses <- statuses[order(statuses$replicate), ]
@@ -64,4 +68,5 @@ write.csv(
   ), names(statuses)), drop = FALSE],
   file.path(output_path, "policy-bootstrap-draw-map.csv"), row.names = FALSE
 )
-message("Prepared ", nrow(parameters), " cluster-bootstrap policy modes.")
+message("Prepared ", nrow(parameters), " ", method,
+        " cluster-weighted policy modes.")

@@ -1,0 +1,42 @@
+
+\centering
+
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{4}{c}{Reduced Form} \\
+\cmidrule(l{3pt}r{3pt}){2-5}
+\multicolumn{1}{c}{ } & \multicolumn{1}{c}{Combined} & \multicolumn{1}{c}{Close} & \multicolumn{1}{c}{Far} & \multicolumn{1}{c}{Far - Close} \\
+\midrule
+\multicolumn{5}{l}{\textit{Panel A: Definite-answer rate (Table 1 observability)}} \\
+Bracelet & \makecell[c]{0.145***\\{(0.038)}} & \makecell[c]{0.064\\{(0.05)}} & \makecell[c]{0.248***\\{(0.056)}} & \makecell[c]{0.184**\\{(0.073)}}\\
+Calendar & \makecell[c]{0.043\\{(0.042)}} & \makecell[c]{0.027\\{(0.059)}} & \makecell[c]{0.063\\{(0.063)}} & \makecell[c]{0.036\\{(0.088)}}\\
+Ink & \makecell[c]{0.103**\\{(0.04)}} & \makecell[c]{0.052\\{(0.054)}} & \makecell[c]{0.169**\\{(0.058)}} & \makecell[c]{0.117\\{(0.079)}}\\
+\midrule
+Control mean & \makecell[c]{0.681\\{(0.033)}} & \makecell[c]{0.745\\{(0.043)}} & \makecell[c]{0.599\\{(0.049)}} & \makecell[c]{-0.146**\\{(0.064)}}\\
+Observations & 1,141 & 1,141 & 1,141 & 1,141\\
+$H0$: Any Signal = No Signal, $p$-value & $<$0.001 & 0.213 & $<$0.001 & 0.009\\
+$H0$: Bracelet = Calendar, $p$-value & 0.001 & 0.414 & $<$0.001 & 0.029\\
+\midrule
+\multicolumn{5}{l}{\textit{Panel B: Conditional accuracy (given definite answer)}} \\
+Bracelet & \makecell[c]{-0.042\\{(0.027)}} & \makecell[c]{-0.007\\{(0.039)}} & \makecell[c]{-0.088**\\{(0.038)}} & \makecell[c]{-0.081\\{(0.055)}}\\
+Calendar & \makecell[c]{-0.049\\{(0.031)}} & \makecell[c]{-0.027\\{(0.04)}} & \makecell[c]{-0.078\\{(0.049)}} & \makecell[c]{-0.051\\{(0.063)}}\\
+Ink & \makecell[c]{-0.089**\\{(0.035)}} & \makecell[c]{-0.105**\\{(0.048)}} & \makecell[c]{-0.067\\{(0.049)}} & \makecell[c]{0.038\\{(0.067)}}\\
+\midrule
+Control mean & \makecell[c]{0.656\\{(0.019)}} & \makecell[c]{0.652\\{(0.024)}} & \makecell[c]{0.661\\{(0.031)}} & \makecell[c]{0.009\\{(0.04)}}\\
+Observations & 1,035 & 1,035 & 1,035 & 1,035\\
+$H0$: Any Signal = No Signal, $p$-value & 0.086 & 0.204 & 0.225 & 0.927\\
+$H0$: Bracelet = Calendar, $p$-value & 0.819 & 0.655 & 0.818 & 0.63\\
+\midrule
+\multicolumn{5}{l}{\textit{Panel C: Correct observability}} \\
+Bracelet & \makecell[c]{0.066**\\{(0.032)}} & \makecell[c]{0.027\\{(0.044)}} & \makecell[c]{0.115**\\{(0.044)}} & \makecell[c]{0.087\\{(0.06)}}\\
+Calendar & \makecell[c]{-0.005\\{(0.032)}} & \makecell[c]{-0.009\\{(0.047)}} & \makecell[c]{0.001\\{(0.044)}} & \makecell[c]{0.011\\{(0.065)}}\\
+Ink & \makecell[c]{-0.012\\{(0.031)}} & \makecell[c]{-0.067\\{(0.044)}} & \makecell[c]{0.057\\{(0.043)}} & \makecell[c]{0.125**\\{(0.062)}}\\
+\midrule
+Control mean & \makecell[c]{0.438\\{(0.024)}} & \makecell[c]{0.485\\{(0.033)}} & \makecell[c]{0.378\\{(0.033)}} & \makecell[c]{-0.107**\\{(0.046)}}\\
+Observations & 1,134 & 1,134 & 1,134 & 1,134\\
+$H0$: Any Signal = No Signal, $p$-value & 0.182 & 0.62 & 0.003 & 0.016\\
+$H0$: Bracelet = Calendar, $p$-value & 0.015 & 0.386 & 0.005 & 0.201\\
+\bottomrule
+\end{tabular}}

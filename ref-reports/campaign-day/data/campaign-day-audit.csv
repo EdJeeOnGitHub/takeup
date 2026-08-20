@@ -1,0 +1,10 @@
+check,value
+analysis_rows,9805
+analysis_clusters,144
+direct_recorded_takers,3500
+campaign_days,12
+bootstrap_seed,20260807
+bootstrap_attempted,1000
+bootstrap_successful,1000
+bootstrap_failed,0
+max_endpoint_abs_difference,1.6581180872776713e-13

@@ -1,0 +1,75 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,graphicx}
+
+\begin{document}
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\clearpage
+\subsection{Randomization Inference for the Reduced-Form Interactions}
+\label{app:randomization-inference}
+
+We complement conventional clustered inference with randomization inference that
+reproduces the assignment of the four item arms. In each draw, we reallocate
+Control, Calendar, Ink, and Bracelet across communities within the six county by
+finalized-distance strata, preserving the realized number assigned to every arm
+in every stratum. Outcomes and all distance measures remain fixed. The exercise
+therefore uses only the randomized item assignment; it does not treat realized
+distance as if it had itself been permuted.
+
+Table~\ref{tab:randomization-inference} presents three specifications. The first,
+and primary, specification interacts item assignment with the originally assigned
+Close/Far condition. The second uses the final realized Close/Far classification,
+and the third uses continuous realized centroid-to-PoT distance. These latter two
+specifications are sensitivity analyses: their randomization-based content comes
+from item assignment conditional on the displayed distance measure.
+
+\begin{table}[htbp]
+  \centering
+  \scriptsize
+  \caption{Randomization inference for treatment-by-distance effects}
+  \label{tab:randomization-inference}
+  \resizebox{\linewidth}{!}{%
+    \input{\StructuralRobustnessPath/tables/randomization-inference.tex}}
+  \begin{minipage}{0.96\linewidth}
+    \vspace{0.3em}\footnotesize
+    \textit{Notes:} Any Signal is the average of Ink and Bracelet; No Signal is
+    the average of Control and Calendar. Binary-distance estimates are
+    differences-in-differences; continuous-distance estimates are differences
+    in gradients per kilometer. All regressions adjust for gender, age, expected
+    distance, and county fixed effects. The 95 percent intervals use community-
+    clustered CR1 standard errors. Fisher columns compare the unstudentized
+    statistic with its sharp-null randomization distribution. Studentized RI
+    recomputes the clustered standard error under every allocation. RW denotes
+    Romano--Wolf stepdown adjustment. Primary original-assignment and secondary
+    realized-distance hypotheses are adjusted in separate, prespecified outcome
+    families. All tests are two-sided.
+  \end{minipage}
+\end{table}
+
+The Fisher calculation is finite-sample exact for the sharp null that item
+assignment has no effect on any outcome. The studentized calculation targets the
+weaker null of a zero average interaction and is asymptotically justified; it is
+not described as an exact weak-null test. Observability estimates are conditional
+on respondents with a usable Table-A peer-knowledge module. We therefore report
+the available sample for each measurement outcome and interpret this exercise
+together with the appendix's selection and Lee-bound analyses.
+
+Figure~\ref{fig:ri-community-takeup} displays the underlying community means. It
+makes clear both the number of independent assignment units and the distinction
+between the randomized binary assignment and realized continuous distance.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/ri-takeup-original-assignment.pdf}
+  \end{minipage}
+  \begin{minipage}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{\StructuralRobustnessPath/figures/ri-takeup-realized-distance.pdf}
+  \end{minipage}
+  \caption{Community-level take-up by assigned and realized distance}
+  \label{fig:ri-community-takeup}
+\end{figure}
+
+\clearpage
+\end{document}

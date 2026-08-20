@@ -1,0 +1,57 @@
+
+ 
+\caption{\label{tab:conservative-table-a-attrition-regression} Knowledge-Table Attrition}
+\centering
+\begin{tabular}{lcccccc}
+   \tabularnewline \midrule \midrule
+                                                         & Full: Pooled & Full: Treat. $\times$ Dist.  & Cons.: Pooled & Cons.: Treat. $\times$ Dist.  & Cons.: Pooled & Cons.: Treat. $\times$ Dist. \\    
+   Model:                                                & (1)          & (2)                          & (3)           & (4)                           & (5)           & (6)\\  
+   \midrule
+   \emph{Variables}\\
+   Ink                                                   & 0.025        &                              & -0.063        &                               & -0.065        &   \\   
+                                                         & (0.023)      &                              & (0.041)       &                               & (0.042)       &   \\   
+   Calendar                                              & 0.0003       &                              & -0.053        &                               & -0.052        &   \\   
+                                                         & (0.021)      &                              & (0.042)       &                               & (0.043)       &   \\   
+   Bracelet                                              & -0.023       &                              & -0.106$^{**}$ &                               & -0.099$^{**}$ &   \\   
+                                                         & (0.021)      &                              & (0.044)       &                               & (0.044)       &   \\   
+   Far                                                   &              & -0.006                       &               & 0.014                         &               & 0.009\\   
+                                                         &              & (0.036)                      &               & (0.079)                       &               & (0.082)\\   
+   Ink $\times$ Close                                    &              & 0.018                        &               & -0.073$^{*}$                  &               & -0.078$^{*}$\\   
+                                                         &              & (0.024)                      &               & (0.041)                       &               & (0.042)\\   
+   Ink $\times$ Far                                      &              & 0.036                        &               & -0.046                        &               & -0.044\\   
+                                                         &              & (0.042)                      &               & (0.079)                       &               & (0.080)\\   
+   Calendar $\times$ Close                               &              & 0.012                        &               & -0.029                        &               & -0.030\\   
+                                                         &              & (0.024)                      &               & (0.045)                       &               & (0.047)\\   
+   Calendar $\times$ Far                                 &              & -0.012                       &               & -0.081                        &               & -0.076\\   
+                                                         &              & (0.037)                      &               & (0.077)                       &               & (0.079)\\   
+   Bracelet $\times$ Close                               &              & -0.055$^{***}$               &               & -0.155$^{***}$                &               & -0.151$^{***}$\\   
+                                                         &              & (0.019)                      &               & (0.042)                       &               & (0.042)\\   
+   Bracelet $\times$ Far                                 &              & 0.015                        &               & -0.057                        &               & -0.045\\   
+                                                         &              & (0.039)                      &               & (0.080)                       &               & (0.082)\\   
+   Female                                                &              &                              &               &                               & 0.059$^{***}$ & 0.061$^{***}$\\   
+                                                         &              &                              &               &                               & (0.021)       & (0.021)\\   
+   Age                                                   &              &                              &               &                               & 0.0004        & 0.0004\\   
+                                                         &              &                              &               &                               & (0.0006)      & (0.0006)\\   
+   Expected distance to PoT                              &              &                              &               &                               & 0.034         & 0.027\\   
+                                                         &              &                              &               &                               & (0.040)       & (0.043)\\   
+   Control mean                                          & 0.103        &                              & 0.240         &                               & 0.240         & \\  
+   Control mean, Close                                   &              & 0.103                        &               & 0.236                         &               & 0.236\\  
+   Control mean, Far                                     &              & 0.103                        &               & 0.246                         &               & 0.246\\  
+   County FEs                                            & Yes          & Yes                          & Yes           & Yes                           & Yes           & Yes\\  
+   RF controls                                           & No           & No                           & No            & No                            & Yes           & Yes\\  
+   $H_0$: Ink = Calendar = Bracelet = Control, $p$-value & 0.111        &                              & 0.089         &                               & 0.149         & \\  
+   $H_0$: All Close treatment cells = Control, $p$-value &              & $<$0.001                     &               & $<$0.001                      &               & $<$0.001\\  
+   $H_0$: All Far treatment cells = Control, $p$-value   &              & 0.466                        &               & 0.709                         &               & 0.738\\  
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                                          & 3,678        & 3,678                        & 1,393         & 1,393                         & 1,393         & 1,393\\  
+   R$^2$                                                 & 0.012        & 0.016                        & 0.010         & 0.017                         & 0.016         & 0.024\\  
+   \midrule \midrule
+   \multicolumn{7}{l}{\emph{Clustered (cluster.id) standard-errors in parentheses}}\\
+   \multicolumn{7}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+ 
+\par \raggedright 
+Columns 1--2 use the full cleaned endline sample and define attrition as missing from any knowledge table. Columns 3--6 restrict to the conservative Table A frame, treating all 252 SMS-control respondents missing from any knowledge table as missing from Table A. Standard errors clustered by community.
+
+

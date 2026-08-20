@@ -1,7 +1,7 @@
 // Fit-105 WTP likelihood with cluster likelihood weights. Priors are not
 // weighted. With unit weights this is identical to wtp_model_section.stan.
 
-hyper_wtp_mu ~ normal(0, 2);
+hyper_wtp_mu ~ normal(0, core_wtp_mu_prior_sd);
 strata_wtp_mu_tau ~ normal(0, 1);
 wtp_sigma ~ normal(0, 1);
 

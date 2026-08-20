@@ -1,0 +1,256 @@
+\documentclass[10pt]{article}
+
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{makecell}
+\usepackage{pdflscape}
+\usepackage{tabularx}
+\usepackage{xcolor}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\renewcommand{\arraystretch}{1.12}
+
+\lstdefinestyle{diffstyle}{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  backgroundcolor=\color{gray!6},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em
+}
+
+\newcommand{\sym}[1]{#1}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\todosection}[2]{\clearpage\section*{ToDo #1: #2}\addcontentsline{toc}{section}{ToDo #1: #2}}
+\newcommand{\commitline}[1]{\textbf{Landed commits.} #1\par}
+\newcommand{\changed}[1]{\textbf{What changed.} #1\par}
+\newcommand{\artifact}[1]{\textbf{Review artifact.} #1\par}
+\newcommand{\diffsnippet}[1]{\IfFileExists{#1}{\lstinputlisting[style=diffstyle]{#1}}{\emph{Diff file not found: \code{#1}}}}
+\newcommand{\inputtable}[1]{\IfFileExists{#1}{\resizebox{\linewidth}{!}{\input{#1}}}{\emph{Table file not found: \code{#1}}}}
+
+\begin{document}
+
+\begin{center}
+{\Large Refine Feedback ToDo Change Review}\\
+\vspace{0.25em}
+Generated for review of code and paper changes\\
+\vspace{0.25em}
+Main repo branch: \code{ed-refine-todos}. Paper repo: \code{../overleaf/overleaf-takeup}, \code{master}.
+\end{center}
+
+\tableofcontents
+
+\section*{Notes}
+\addcontentsline{toc}{section}{Notes}
+
+This file summarizes each non-AK ToDo, where the change landed, and the table, figure, or text diff most useful for review. Generated reduced-form and presentation table outputs are shown here as review artifacts. They are not all intended to be source-controlled in the main analysis repo.
+
+\todosection{1}{Prior Deworming Robustness}
+\commitline{Analysis: \code{54fa50d}, \code{7705024}, \code{7cfa8f3}, \code{373a0b7}. Overleaf master: \code{0d33595}.}
+\changed{Added a generated robustness table using cluster-level baseline shares of ever-dewormed and past-year-dewormed, merged into the monitored take-up sample. Removed the self-reported deworming robustness from the final paper version.}
+\artifact{The table now shows the full Bracelet/Calendar/Ink/Control by Combined/Close/Far/Far--Close specification, with prior-deworming covariates at the bottom.}
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption*{ToDo 1 table: prior-deworming robustness}
+\inputtable{presentations/rf-tables/main-specs/prior-deworming-robustness.tex}
+\end{table}
+\end{landscape}
+
+\textbf{Paper text diff used for review.}
+\diffsnippet{presentations/refine-review-diffs/todo1-paper.diff}
+
+\todosection{2}{Balance Table Control Means}
+\commitline{Analysis: \code{f9d733e}. Overleaf master rendered tables: \code{4640975}.}
+\changed{\code{balance-functions.R} now reports raw Control means from the relevant estimation sample instead of the omitted-county fixed-effect intercept. \code{balance.R} passes the underlying data into the balance helper so the same fix applies across main, appendix, attrition, monitoring-attrition, and SMS-enrollment paths.}
+\artifact{The regenerated balance table now has raw Control means such as Age Control-Close \(40.324\), Age Control-Far \(40.215\), Female Control-Close \(0.565\), Female Control-Far \(0.562\), Phone owner Control-Close \(0.765\), and Phone owner Control-Far \(0.728\).}
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption*{ToDo 2 table: corrected stacked sample balance table}
+\inputtable{presentations/tables/stacked-sample-balance-table.tex}
+\end{table}
+\end{landscape}
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption*{ToDo 2 table: corrected stacked distance balance table}
+\inputtable{presentations/tables/stacked-sample-dist-balance-table.tex}
+\end{table}
+\end{landscape}
+
+\todosection{4}{\texorpdfstring{\(\psi\)}{psi} Units}
+\commitline{Analysis: \code{219dc73}. Overleaf master: \code{0de254e}.}
+\changed{Generated WTP and structural output now label the valuation difference in USD. The paper wording and table notes now describe \(\psi\) on the USD scale.}
+\artifact{Old and new structural parameter table excerpts are shown below.}
+
+\begin{table}[p]
+\centering
+\caption*{ToDo 4 old structural parameter table excerpt}
+\inputtable{presentations/refine-review-artifacts/old-structural-parameters-table.tex}
+\end{table}
+
+\begin{table}[p]
+\centering
+\caption*{ToDo 4 new structural parameter table excerpt}
+\inputtable{presentations/refine-review-artifacts/new-structural-parameters-table.tex}
+\end{table}
+
+\todosection{5 and 8}{Potential-Distance and Continuous-Distance Support}
+\commitline{Overleaf master: \code{905c279}.}
+\changed{The paper now explains that the simulations condition on the realized surveyed-community frame and rerun PoT selection, Close/Far assignment, targeted-community pairing, and feasibility screening to construct counterfactual potential distances.}
+\artifact{The new design-matched counterfactual assignment density is shown. It uses counterfactual distance assignments generated by rerunning the experiment's constrained assignment procedure.}
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.72\linewidth]{presentations/refine-review-artifacts/new-pot-distance-overlap.pdf}
+\caption*{New potential-distance plot using counterfactual distance assignments from the experiment assignment procedure}
+\end{figure}
+
+\textbf{Paper text diff used for review.}
+\diffsnippet{presentations/refine-review-diffs/todo5-8-paper.diff}
+
+\todosection{6}{\texorpdfstring{\(\sigma_u\)}{sigma-u} Identification}
+\commitline{Analysis: \code{fe9c8d8}, refined in \code{7705024}. Overleaf master: \code{68712c0}; terminology cleanup: \code{30215bd}.}
+\changed{Added \code{scratch/sigma-u-prior-posterior-plot.R}, which reads only the \(\sigma_u\) Stan variable, writes a prior/posterior comparison plot, and writes a summary CSV. The paper now explains that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells and the normal-sum signal-extraction restriction.}
+\artifact{The new appendix figure compares the prior and posterior distributions for \(\sigma_u\).}
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.72\linewidth]{presentations/figures/sigma-u-prior-posterior.pdf}
+\caption*{ToDo 6 figure: prior and posterior distributions for \(\sigma_u\)}
+\end{figure}
+
+\begin{table}[h!]
+\centering
+\caption*{ToDo 6 summary: prior/posterior for \(\sigma_u\)}
+\begin{tabular}{lrrrr}
+\toprule
+Distribution & Mean & Median & 2.5\% & 97.5\%\\
+\midrule
+Prior & 0.468 & 0.374 & 0.145 & 1.359\\
+Posterior & 0.302 & 0.278 & 0.127 & 0.583\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Paper text diff used for review.}
+\diffsnippet{presentations/refine-review-diffs/todo6-paper.diff}
+
+\todosection{10}{Figure 3(b) Curve Ordering}
+\commitline{Decision: no final paper change needed after review; earlier review-branch text was not retained on Overleaf master.}
+\changed{Checked the plotted data and confirmed the highlighted curves do not cross on their common support. We marked the reviewer concern as not requiring a final paper edit.}
+\artifact{No table or figure changed in the final paper for this ToDo.}
+
+\todosection{11}{HMC Diagnostics}
+\commitline{Analysis: \code{e7e2ac1}. Overleaf master: \code{9126723}, \code{4d1722e}.}
+\changed{Added \code{scratch/stan-hmc-diagnostics.R}, a reusable diagnostics script that can load only selected Stan variables. The paper now reports max split \(\hat R\), minimum bulk/tail ESS, and divergence counts for the main structural fit and the appendix structural robustness fits.}
+\artifact{Diagnostic values added to paper table notes are summarized below.}
+
+\begin{longtable}{p{0.24\linewidth}p{0.58\linewidth}p{0.12\linewidth}}
+\toprule
+Fit/table family & Diagnostics reported & Status\\
+\midrule
+Main structural fit and downstream WTP/ATE/optimization tables & Max split \(\hat R=1.011\), min bulk ESS 465, min tail ESS 602, zero divergent transitions. & Added\\
+No-outlier structural appendix & Max split \(\hat R=1.018\), min bulk ESS 355, min tail ESS 309, zero divergent transitions. & Added\\
+Community-FP individual-distance appendix & Max split \(\hat R=1.022\), min bulk ESS 221, min tail ESS 212, zero divergent transitions. & Added\\
+Full-information individual-distance appendix & Max split \(\hat R=1.022\), min bulk ESS 142, min tail ESS 132, two divergent transitions. & Added\\
+\bottomrule
+\end{longtable}
+
+\todosection{12}{E3 Continuous-Distance Randomization Inference}
+\commitline{Analysis: \code{41873f6}. Overleaf master: \code{da36a88}.}
+\changed{\code{balance.R} now samples placebo distances from feasible counterfactual PoT-community distances induced by the constrained assignment simulations instead of freely permuting realized distances within county.}
+\artifact{Old and new E3 randomization-inference plots are shown side by side.}
+
+\begin{figure}[p]
+\centering
+\begin{minipage}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{presentations/refine-review-artifacts/old-dist-ri-plot.pdf}
+\caption*{Old E3 plot}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{presentations/refine-review-artifacts/new-dist-ri-plot.pdf}
+\caption*{New E3 plot}
+\end{minipage}
+\end{figure}
+
+\textbf{Paper text diff used for review.}
+\diffsnippet{presentations/refine-review-diffs/todo12-paper.diff}
+
+\todosection{17}{Figure M1 Parameters}
+\commitline{Overleaf master: \code{b05d100}.}
+\changed{Section M and the Figure M1 note now match the plotted distributions: approximately \(N(0.4,0.2^2)\) for the Gaussian benchmark and \(0.25N(-2,0.2^2)+0.75N(0.4,0.2^2)\) for the bimodal distribution. The note also clarifies that the plotted \(V^\ast\) label corresponds to the cutoff/type-index scale \(w^\ast\).}
+\artifact{The paper text changed; no generated table changed.}
+
+\textbf{Paper text diff used for review.}
+\diffsnippet{presentations/refine-review-diffs/todo17-paper.diff}
+
+\todosection{18}{Closest PoT and Original-Distance ITT}
+\commitline{Analysis: \code{fe26587}, \code{a22d7eb}, \code{88d3540}, \code{c7e69f4}. Overleaf master: \code{d4e36e4}, \code{30215bd}, \code{206d986}.}
+\changed{The paper now distinguishes candidate PoT centers used by the assignment algorithm from finalized implemented PoT locations. The realized implementation data show that each selected community's assigned finalized PoT is the closest finalized deworming site. The code adds an \code{--itt} path to \code{scratch/reduced-form-bootstrap.R} to regenerate original-distance-assignment ITT reduced-form tables with the existing table writer.}
+\artifact{The take-up and first-order observability ITT tables are included in the paper robustness section.}
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption*{ToDo 18 table: original-distance-assignment ITT, take-up}
+\inputtable{presentations/rf-tables/main-specs/rf_original_distance_itt_tbl.tex}
+\end{table}
+\end{landscape}
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption*{ToDo 18 table: original-distance-assignment ITT, first-order observability}
+\inputtable{presentations/rf-tables/main-specs/rf_original_distance_itt_fob_tbl.tex}
+\end{table}
+\end{landscape}
+
+\todosection{24}{Normal-Sum Terminology}
+\commitline{Overleaf master: \code{30215bd}.}
+\changed{Replaced ``normal mixture'' with ``normal-sum specification'' because \(w_i=v_i+u_i\) is a sum of independent normal variables, not a mixture distribution.}
+\artifact{Text-only change.}
+
+\begin{quote}
+Old: ``For the normal mixture, the type inference term is \(\ldots\)''
+
+New: ``Under this normal-sum specification, the type inference term is \(\ldots\)''
+\end{quote}
+
+\todosection{25}{SMS Control-Mean Standard Error and Table Style}
+\commitline{Analysis: \code{b59c86b}. Overleaf master: \code{ade3758}.}
+\changed{The SMS control mean parenthetical now reports a clustered standard error from an intercept-only regression rather than the binary outcome standard deviation. The table generator also postprocesses the SMS and heterogeneity outputs so the generated LaTeX is closer to the manually edited paper style.}
+\artifact{The SMS treatment-effect table now reports \(0.330\) with parenthetical \(0.032\), replacing the old \(0.470\) standard deviation. The regenerated heterogeneity table is also shown.}
+
+\begin{table}[h!]
+\centering
+\caption*{ToDo 25 table: SMS treatment effects after SE fix}
+\input{presentations/rf-tables/main-specs/incentive-control-sms-te.tex}
+\end{table}
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption*{ToDo 25 table: regenerated heterogeneity table}
+\inputtable{presentations/rf-tables/main-specs/het-tes.tex}
+\end{table}
+\end{landscape}
+
+\end{document}

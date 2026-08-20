@@ -1,0 +1,4 @@
+specification,draws,calendar_positive_share,calendar_near_zero_share,calendar_p025,calendar_p975
+Linear,1000,0,0,-0.17218403147024008,-0.09902088538237215
+Original assignment,1000,0,0,-0.2368032332801944,-0.1474828051064439
+"Spline, 0.5--2.0 km",1000,0,0,-0.18147307050412023,-0.10505006567707735

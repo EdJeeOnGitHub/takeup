@@ -4,3 +4,6 @@
 *.log
 *.out
 structural-robustness-appendix.pdf
+!figures/finite-mixture-density.pdf
+!figures/ri-takeup-original-assignment.pdf
+!figures/ri-takeup-realized-distance.pdf

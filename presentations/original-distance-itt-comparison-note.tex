@@ -1,0 +1,51 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.7in,landscape]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{makecell}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{float}
+
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\newcommand{\tablepanel}[2]{%
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\textbf{#1}\par\vspace{0.4em}
+\scriptsize
+\begin{adjustbox}{max width=\linewidth}
+\input{#2}
+\end{adjustbox}
+\end{minipage}
+}
+
+\begin{document}
+
+\begin{center}
+{\Large Original-Distance Assignment ITT Comparison}
+\end{center}
+
+\begin{table}[H]
+\centering
+\caption*{Take-up}
+\tablepanel{Current distance assignment}{rf-tables/main-specs/rf_discrete_dist_covs_tbl}
+\hfill
+\tablepanel{Original distance assignment ITT}{rf-tables/main-specs/rf_original_distance_itt_tbl}
+\end{table}
+
+\clearpage
+
+\begin{table}[H]
+\centering
+\caption*{First-order observability}
+\tablepanel{Current distance assignment}{rf-tables/main-specs/rf_discrete_fob_spec_tbl}
+\hfill
+\tablepanel{Original distance assignment ITT}{rf-tables/main-specs/rf_original_distance_itt_fob_tbl}
+\end{table}
+
+\end{document}

@@ -1,0 +1,28 @@
+diff --git a/ECM ReStud.tex b/ECM ReStud.tex
+index 4025960..41e9b0d 100644
+--- a/ECM ReStud.tex	
++++ b/ECM ReStud.tex	
+@@ -877,7 +877,7 @@ The parameter \(\sigma_u\) governs how informative deworming decisions are about
+ x\equiv \frac{w}{\sqrt{1+\sigma_u^{2}}},
+ \]
+ where \(\phi\) and \(\Phi\) denote the standard normal pdf and cdf.\footnote{A derivation of this expression, and an analogous expression with bounded \(v\), appears in Appendix~\ref{delta-deriv}.}
+-When \(\sigma_u\) is small, deworming choices reveal more about \(v_i\), so \(\Delta(w^\ast)\) varies sharply with the cutoff. When \(\sigma_u\) is large, choices are noisy signals of type and \(\Delta(w^\ast)\) becomes flatter, pushing the multiplier toward one. Because latent utility is normalized by \(\operatorname{Var}(v_i)=1\), \(\sigma_u\) is interpreted as idiosyncratic decision noise relative to intrinsic motivation. The joint likelihood pins down the implied social image return, \(\lambda p_{\mathrm{Observed}}(z,d)\Delta(w^\ast)\), and how it changes with distance. These are the objects needed for the unitless social multiplier.
++When \(\sigma_u\) is small, deworming choices reveal more about \(v_i\), so \(\Delta(w^\ast)\) varies sharply with the cutoff. When \(\sigma_u\) is large, choices are noisy signals of type and \(\Delta(w^\ast)\) becomes flatter, pushing the multiplier toward one. Because latent utility is normalized by \(\operatorname{Var}(v_i)=1\), \(\sigma_u\) is interpreted as idiosyncratic decision noise relative to intrinsic motivation. Empirically, \(\sigma_u\) is disciplined by the curvature of take-up across arm-by-distance cells together with the nonlinear normal signal-extraction restriction above: changing \(\sigma_u\) changes both the level and curvature of \(\Delta(w^\ast)\), so it changes the social-image return needed to rationalize the observed take-up gradients at the estimated observability probabilities. The prior regularizes this scale parameter, and Appendix~\ref{priors} reports prior predictive checks. The joint likelihood pins down the implied social image return, \(\lambda p_{\mathrm{Observed}}(z,d)\Delta(w^\ast)\), and how it changes with distance. These are the objects needed for the unitless social multiplier.
+ 
+ \emph{Remaining parameters.}
+ Conditional on the relative valuation parameter \(\psi\), the noise parameter \(\sigma_u\), and the observability parameters \(\beta^O_z\) and \(\gamma^O_z\), the remaining take-up parameters are identified through the take-up likelihood. The distance cost coefficient \(\delta\) is identified by distance induced variation in take-up. The social image weight \(\lambda\) is identified on the normalized latent utility scale by how take-up varies with estimated observability across item/signal arms and distances. The arm specific non social payoff coefficients \(\beta_z\) are identified by residual take-up differences across item/signal arms, subject to the bracelet versus calendar relative valuation restriction.
+@@ -2371,6 +2371,14 @@ The priors on the arm specific take-up coefficients are centered at zero, reflec
+ 
+ The parameters \(\rho\) and \(\sigma_u\) require additional regularization. The parameter \(\rho\) maps monetary values from the relative valuation exercise into the latent utility units of the take-up model. Because this scale conversion is weakly disciplined by the data, we use a positive regularizing prior. The parameter \(\sigma_u\) governs how noisy deworming choices are as signals of intrinsic motivation. We use an inverse Gamma prior to keep this scale parameter away from degenerate values near zero. Prior predictive checks, described in Section~\ref{structural}, assess whether these priors mechanically impose the posterior patterns.
+ 
++\begin{figure}[ht!]
++\centering
++\includegraphics[width=0.62\linewidth]{figures/sigma-u-prior-posterior.pdf}
++\caption{Prior and Posterior Distributions for \(\sigma_u\)}
++\label{fig:sigma-u-prior-posterior}
++\floatfoot{\textit{Notes:} The prior distribution is computed from prior-predictive draws and the posterior distribution from the baseline structural model. Dashed vertical lines mark medians. The posterior median is 0.278, compared with a prior median of 0.374.}
++\end{figure}
++
+ \newpage
+ 
+ \subsection{Alternative Structural Models}

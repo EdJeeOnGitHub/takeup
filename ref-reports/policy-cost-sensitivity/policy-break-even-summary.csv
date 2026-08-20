@@ -1,0 +1,13 @@
+"analysis_id","analysis_label","travel_cost","break_even","median_break_even","lower_break_even","upper_break_even","probability_sites_saved","probability_cost_saving_100","probability_cost_saving_250","probability_cost_saving_500","probability_cost_saving_1000"
+"baseline-posterior","Baseline posterior",0,"\makecell[c]{\$261\\{}[\$205, \$414]}",260.580083841758,204.61323463843,413.567209215291,1,0,0.410625,0.996875,1
+"baseline-posterior","Baseline posterior",0.05,"\makecell[c]{\$370\\{}[\$325, \$514]}",370.372331748884,325.305208791984,513.966711732258,1,0,0,0.96625,1
+"baseline-posterior","Baseline posterior",0.1,"\makecell[c]{\$483\\{}[\$438, \$611]}",482.524651252334,438.160506476411,610.713797317259,1,0,0,0.66,0.999375
+"baseline-posterior","Baseline posterior",0.15,"\makecell[c]{\$593\\{}[\$544, \$736]}",593.484025960571,543.905918080073,736.330776338642,1,0,0,0,0.99875
+"baseline-posterior","Baseline posterior",0.2,"\makecell[c]{\$704\\{}[\$646, \$876]}",703.890364470354,646.282920634747,876.002913873277,1,0,0,0,0.996875
+"baseline-posterior","Baseline posterior",0.25,"\makecell[c]{\$813\\{}[\$746, \$1,028]}",813.102084668029,745.721342569034,1028.27053654794,1,0,0,0,0.96625
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0,"\makecell[c]{\$270\\{}[\$195, \$940]}",270.478569004668,194.580427749622,939.70953509561,0.997997997997998,0,0.415415415415415,0.878878878878879,0.974974974974975
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0.05,"\makecell[c]{\$392\\{}[\$314, \$1,022]}",391.978071883176,313.550096272614,1021.57905294363,0.997997997997998,0,0,0.785785785785786,0.970970970970971
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0.1,"\makecell[c]{\$519\\{}[\$420, \$1,126]}",518.504216731782,419.537214952403,1125.84705118408,0.997997997997998,0,0,0.41041041041041,0.95995995995996
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0.15,"\makecell[c]{\$635\\{}[\$519, \$1,243]}",635.446545543331,519.386067675832,1242.74127647853,0.997997997997998,0,0,0.00700700700700701,0.947947947947948
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0.2,"\makecell[c]{\$749\\{}[\$613, \$1,344]}",748.9178571695,613.20356821028,1343.70296700267,0.997997997997998,0,0,0,0.903903903903904
+"exponential-cluster-weights","Cluster weighted-likelihood bootstrap",0.25,"\makecell[c]{\$862\\{}[\$706, \$1,455]}",861.533381196714,705.570358676712,1454.62879186976,0.997997997997998,0,0,0,0.783783783783784

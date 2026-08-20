@@ -83,6 +83,8 @@ if (sample_data$num_optim_distances == 1L) {
   sample_data$optim_distances <- array(sample_data$optim_distances, dim = 1L)
 }
 sample_data$core_cluster_weight <- rep(1, sample_data$num_clusters)
+sample_data$core_visibility_prior_multiplier <- 1
+sample_data$core_wtp_mu_prior_sd <- 2
 sample_data$use_core_cluster_shock <- 0L
 sample_data$core_cluster_shock_sd_prior <- 0.1
 sample_data$core_lambda_structure <- 0L
@@ -91,7 +93,7 @@ sample_data$core_profile_group_lambda <- 0L
 sample_data$core_profile_group_log_ratio <- 0
 sample_data$core_gq_override_lambda <- 0L
 sample_data$core_gq_lambda_override <- rep(0, sample_data$num_treatments)
-type_mixture <- main_core_student_t_mixture(5, 12)
+type_mixture <- main_core_type_mixture_data(0L, 5, 12)
 sample_data$core_type_distribution <- 0L
 sample_data$core_student_t_df <- type_mixture$df
 sample_data$core_type_scale_sq <- type_mixture$scale_sq

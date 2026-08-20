@@ -1,0 +1,36 @@
+\centering
+\caption{Simulated Table A Knowledge-Table Attrition}
+\label{tab:simulated-table-a-attrition}
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lcccc}
+\toprule
+ & Pooled & Treatment $\times$ Distance & Pooled & Treatment $\times$ Distance \\
+Dependent variable: Missing from Table A & (1) & (2) & (3) & (4) \\
+\midrule
+Ink & \makecell[c]{-0.038\\{(0.036)}} & \makecell[c]{} & \makecell[c]{-0.038\\{(0.036)}} & \makecell[c]{} \\
+Calendar & \makecell[c]{-0.031\\{(0.037)}} & \makecell[c]{} & \makecell[c]{-0.030\\{(0.037)}} & \makecell[c]{} \\
+Bracelet & \makecell[c]{-0.063$^{*}$\\{(0.036)}} & \makecell[c]{} & \makecell[c]{-0.058\\{(0.037)}} & \makecell[c]{} \\
+Ink $\times$ Close & \makecell[c]{} & \makecell[c]{-0.048\\{(0.038)}} & \makecell[c]{} & \makecell[c]{-0.049\\{(0.038)}} \\
+Ink $\times$ Far & \makecell[c]{} & \makecell[c]{-0.023\\{(0.045)}} & \makecell[c]{} & \makecell[c]{-0.022\\{(0.045)}} \\
+Calendar $\times$ Close & \makecell[c]{} & \makecell[c]{-0.021\\{(0.042)}} & \makecell[c]{} & \makecell[c]{-0.019\\{(0.042)}} \\
+Calendar $\times$ Far & \makecell[c]{} & \makecell[c]{-0.044\\{(0.042)}} & \makecell[c]{} & \makecell[c]{-0.042\\{(0.042)}} \\
+Bracelet $\times$ Close & \makecell[c]{} & \makecell[c]{-0.095$^{***}$\\{(0.036)}} & \makecell[c]{} & \makecell[c]{-0.090$^{**}$\\{(0.036)}} \\
+Bracelet $\times$ Far & \makecell[c]{} & \makecell[c]{-0.029\\{(0.044)}} & \makecell[c]{} & \makecell[c]{-0.023\\{(0.044)}} \\
+Female & \makecell[c]{} & \makecell[c]{} & \makecell[c]{0.035$^{*}$\\{(0.020)}} & \makecell[c]{0.037$^{*}$\\{(0.020)}} \\
+Age & \makecell[c]{} & \makecell[c]{} & \makecell[c]{0.000\\{(0.001)}} & \makecell[c]{0.000\\{(0.001)}} \\
+Expected distance to PoT & \makecell[c]{} & \makecell[c]{} & \makecell[c]{0.018\\{(0.033)}} & \makecell[c]{0.015\\{(0.033)}} \\
+\midrule
+Control mean & 0.135 &  & 0.135 &  \\
+Control mean, Close &  & 0.132 &  & 0.132 \\
+Control mean, Far &  & 0.139 &  & 0.139 \\
+County FEs & Yes & Yes & Yes & Yes \\
+RF controls & No & No & Yes & Yes \\
+$H_0$: Bracelet = Calendar, $p$-value & 0.246 &  & 0.316 &  \\
+$H_0$: Bracelet $\times$ Close = Calendar $\times$ Close, $p$-value &  & 0.031 &  & 0.041 \\
+$H_0$: Bracelet $\times$ Far = Calendar $\times$ Far, $p$-value &  & 0.726 &  & 0.656 \\
+Observations & 1,267 & 1,267 & 1,267 & 1,267 \\
+Simulations & 1,000 & 1,000 & 1,000 & 1,000 \\
+\bottomrule
+\end{tabular}}
+\\[0.5em]
+\footnotesize{Each simulation randomly assigns exactly 126 of the 252 missing knowledge-table respondents to Table A and treats them as missing Table A observations. Point estimates average across simulations. Standard errors combine clustered regression variance and simulation variance.}

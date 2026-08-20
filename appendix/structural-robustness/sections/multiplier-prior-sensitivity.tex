@@ -1,0 +1,75 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,graphicx,makecell,threeparttable}
+
+\begin{document}
+
+\providecommand{\StructuralRobustnessPath}{appendix/structural-robustness}
+
+\section{Prior sensitivity of the social multiplier}
+\label{app:multiplier-prior-sensitivity}
+
+We assess whether the estimated level and treatment ordering of the social
+multiplier are driven by the maintained priors.  The exercise varies five
+modules separately: the social-image weight, the direct distance cost, the
+scale of idiosyncratic heterogeneity, the first-order visibility schedule, and
+private utility (including the WTP link).  For each module we halve and double
+the baseline scale, where applicable.  The inverse-gamma alternatives for the
+heterogeneity scale hold its prior mean fixed, so that they vary concentration
+rather than location.  We also report joint tight and joint diffuse stress
+tests that move all five modules together.
+
+Concretely, the baseline/tight/diffuse scales are $1/0.5/2$ for the
+social-image weight, $0.25/0.125/0.5$ for the direct distance coefficient,
+and $1/0.5/2$ for the visibility intercepts (with the corresponding contrast
+scales always one half as large).  The inverse-gamma shape--scale priors for
+idiosyncratic heterogeneity are $(3.3,1.1)$, $(8,3.348)$, and
+$(2.5,0.717)$;
+all have mean 0.478.  For private utility, the baseline/tight/diffuse scales
+are $1/0.5/2$ for the intercept, $0.25/0.125/0.5$ for treatment effects, and
+$2/1/4$ for the WTP location.  The positive WTP-to-utility link uses
+$N^+(0,10^{-4})$, $N^+(0,5\times10^{-5})$, and, as a deliberately broad
+tail stress test, $\operatorname{lognormal}(-10,4)$.
+
+This is an ordinary-posterior prior sensitivity exercise, separate from the
+preferred exponential community-weight analysis in
+Section~\ref{app:cluster-inference}.  Every specification uses the same data,
+likelihood, common social-image weight, and Gaussian type distribution as the
+main structural model.  The primary estimand is the finite multiplier over
+0--2.5 km, which summarizes the economically relevant function over one
+prespecified distance span rather than making simultaneous claims at each
+point of a dense grid.  In addition to arm-specific levels and 95 percent
+equal-tailed credible intervals, we report the posterior probabilities that
+the average No Signal multiplier exceeds the average Signal multiplier and
+that the Calendar multiplier exceeds the Bracelet multiplier.
+
+\IfFileExists{\StructuralRobustnessPath/tables/main-core-prior-grid.tex}{%
+\begin{table}[htbp]
+  \centering
+  \caption{Prior sensitivity of the finite social multiplier}
+  \label{tab:main-core-prior-grid}
+  \begin{threeparttable}
+    \input{\StructuralRobustnessPath/tables/main-core-prior-grid.tex}
+    \begin{tablenotes}[flushleft]\footnotesize
+      \item Notes: Entries in the four arm columns are posterior medians with
+      95 percent equal-tailed credible intervals in parentheses.  The last two
+      columns are directional posterior probabilities.  The finite multiplier
+      is calculated over 0--2.5 km.  Tight and diffuse specifications change
+      only the named prior module; the joint rows change all modules together.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+}{}
+
+The result is highly stable within this maintained likelihood.  Across all 13
+specifications, posterior medians range from 0.83 to 0.89 for Bracelet, 0.87
+to 0.91 for Ink, 1.18 to 1.25 for Calendar, and 1.30 to 1.55 for Control.  The
+smallest posterior probability that Calendar exceeds Bracelet is 0.999, and
+the posterior probability that the average No Signal multiplier exceeds the
+average Signal multiplier is greater than 0.999 in every row.  Thus the level
+and ordering of the finite multiplier are not artifacts of any one baseline
+prior module.  This exercise is conditional on the baseline observation
+model, however, and does not undo the separate sensitivity to asymmetric
+reporting documented in Section~\ref{app:asymmetric-reporting-priors}.
+
+\end{document}

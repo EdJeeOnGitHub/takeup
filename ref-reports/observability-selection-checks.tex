@@ -1,0 +1,188 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{makecell}
+\usepackage[section]{placeins}
+\usepackage{threeparttable}
+
+\title{Observability Selection and Missingness Checks}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Purpose}
+
+This note summarizes what the existing diagnostics say about selection into the endline knowledge-table/first-order-observability module. The main issue is not attrition from the administrative take-up outcome. The issue is missingness in the observability module, especially because follow-up success differs across treatment cells and backup respondents may differ from first responders.
+
+
+\section{Treatment Predicts Knowledge-Table Missingness}
+
+\paragraph{Concern.}
+If treatment assignment predicts whether a respondent is missing from the knowledge table, then first-order observability is estimated on a selected sample. This is the first diagnostic for whether the observed FOB sample differs systematically across arms.
+
+\begin{table}[!htbp]
+\centering
+\input{../presentations/tables/attrition-by-treatment.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:attrition-treatment} shows that treatment does predict knowledge-table missingness. In the pooled specification, Bracelet lowers missingness by 5.9 percentage points relative to control. In the treatment-by-distance specification, Bracelet $\times$ Close is the sharpest cell: missingness is 8.9 percentage points lower than control and precisely estimated. Ink and Calendar are negative but smaller and imprecise. The fuller SMS-included specification attenuates the raw treatment-by-distance coefficients but still leaves Bracelet $\times$ Close negative and significant. The evidence therefore supports acknowledging differential observability-module missingness, concentrated in the close bracelet/public-signal cells.
+
+\section{Missing Versus Non-Missing Observable Balance}
+
+\paragraph{Concern.}
+Even if missingness is treatment-correlated, selection is less worrying if missing and observed respondents look similar on pretreatment demographics, baseline knowledge, distance, and implementation/contact measures. If they differ substantially, the observability sample may not represent the intended endline knowledge-table sample.
+
+\begin{table}[!htbp]
+\centering
+\caption{Observable balance between respondents present and missing from the knowledge table}
+\label{tab:attrition-covariate-balance}
+\input{../presentations/tables/attrition-covariate-balance.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:attrition-covariate-balance} shows that missing respondents differ on some observables. They are more likely to be female, less likely to have completed primary school, and more likely to report a CHV visit. Baseline deworming knowledge is mostly similar: adults-can-get-worms, children-get-worms, sick-worms-only, medication-treats-worms, correct-treatment-frequency, and externality knowledge are all close between present and missing respondents. The evidence therefore does not support a claim that missingness is ignorable, but it does suggest that observable selection is concentrated in a few demographic/contact variables rather than broad baseline deworming-knowledge differences.
+
+\section{Balance Among Missing Households by Treatment}
+
+\paragraph{Concern.}
+The sharper selection concern is not only that missing respondents differ from observed respondents. It is that missing control respondents may differ from missing treatment respondents. If so, differential composition among the unobserved cases could explain some of the observed FOB treatment effects.
+
+\begin{table}[!htbp]
+\centering
+\caption{Covariate balance among knowledge-table-missing households by treatment assignment}
+\label{tab:attrition-treat-balance}
+\input{../presentations/tables/attrition-treat-balance-table.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:attrition-treat-balance} shows that the missing subsample is not perfectly balanced by treatment. The balance table and joint tests show some evidence of imbalance, especially for age in close communities and distance-to-PoT in far communities. Individual contrasts also flag some knowledge/contact measures. This means the data do not let us dismiss selection purely by saying the missing treatment and control households look the same. The right use of this table is more modest: it identifies where selection could matter and motivates the first-responder, Lee-bound, and structural robustness checks below.
+
+\section{Balance Among Observed Households by Treatment}
+
+\paragraph{Concern.}
+The FOB regressions are estimated on respondents observed in the knowledge table. Even if missing cases are not balanced, the analysis sample itself should remain broadly balanced across treatment and distance cells.
+
+\begin{table}[!htbp]
+\centering
+\caption{Covariate balance among knowledge-table-observed households by treatment assignment}
+\label{tab:nonattrition-treat-balance}
+\input{../presentations/tables/non-attrition-treat-balance-table.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:nonattrition-treat-balance} shows that the observed sample is more reassuring than the missing subsample, but it is not pristine. Age and phone ownership are broadly balanced. Some knowledge variables show imbalance, especially knowledge that children get worms, and there are marginal differences in female share and correct treatment-frequency knowledge in some cells. These imbalances are not large enough by themselves to explain the full FOB treatment-effect pattern, but they argue for presenting the observed-sample balance table alongside the main observability estimates rather than treating sample selection as a non-issue.
+
+\section{First-Responder-Only Robustness}
+
+\paragraph{Concern.}
+If control households were harder to follow up and required more backup respondents, then the FOB effects could be partly driven by replacing unreachable original respondents with different backup respondents. Restricting to first responders is therefore informative, but it is not a standalone solution to selection: first-responder status is itself a realized survey-process outcome. If treatment changes who is reached as the first respondent, conditioning on that margin can move the selection problem rather than eliminate it.
+
+\begin{table}[!htbp]
+\centering
+\input{../presentations/tables/first-responder-selection-diagnostics.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the selection margins say.}
+Table~\ref{tab:first-responder-selection-diagnostics} confirms that the first-responder restriction should be interpreted cautiously. In the conservative Table A frame, Bracelet $\times$ Close raises the probability of being observed in Table A by 16.1 percentage points and raises realized first-responder status by 17.5 percentage points; both differences are precisely estimated. The Bracelet--Calendar difference is also sharp in the close cell for both margins. By contrast, the census first-responder flag used to construct the first-responder-only FOB table is nearly balanced: control means are about 0.96 in close communities and 0.95 in far communities, and Bracelet--Calendar differences are small and imprecise. This means Table~\ref{tab:rf-discrete-fob-first-responder} is useful as a stability check, but it should not be described as eliminating selection through conditioning on a clean pre-treatment variable.
+
+\begin{table}[!htbp]
+\centering
+\input{../presentations/tables/first-responder-balance-diagnostics.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What first-responder balance says.}
+Table~\ref{tab:first-responder-balance-diagnostics} tests the related composition concern directly in the Table~\ref{tab:rf-discrete-fob-first-responder} sample. Age, phone ownership, and expected distance to the point of treatment are broadly similar across treatment-by-distance cells. The main imbalance is female share: Calendar $\times$ Close and Bracelet $\times$ Close are about 10 percentage points less female than close control, and Bracelet $\times$ Far is about 16 percentage points less female than far control. The first-responder sample therefore is not compositionally pristine, but the imbalance is concentrated in one demographic margin rather than broad differences in age, phone ownership, or expected distance.
+
+\begin{table}[!htbp]
+\centering
+\caption{Reduced-form FOB effects among first responders only}
+\label{tab:rf-discrete-fob-first-responder}
+\input{../presentations/rf-tables/main-specs/rf_discrete_fob_first_responder_spec_tbl.tex}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Knowledge-table missingness and backup-respondent status}
+\label{tab:know-attrition-backup-dworm}
+\input{../presentations/tables/know-attrition-backup-dworm-table.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:rf-discrete-fob-first-responder} shows that the first-responder-only FOB estimates are very close to the full-sample estimates. Public signal effects remain positive: about 0.105 combined, 0.176 in far communities, and 0.125 for far-minus-close. Bracelet--Calendar is also stable: about 0.104 combined and 0.175 in far communities. Table~\ref{tab:know-attrition-backup-dworm} confirms that backup status strongly predicts missingness, but conditioning on backup does not eliminate the Bracelet $\times$ Close missingness pattern. Taken together, these results support a narrower interpretation: first-responder-only FOB estimates are a useful point-estimate complement to the missingness, balance, and Lee-bound checks, but they do not by themselves identify away the selection concern.
+
+\section{Lee Bounds for FOB Observability}
+
+\paragraph{Concern.}
+Even if first-responder results are stable, treatment-correlated missingness can still bias observed FOB outcomes. Lee-style bounds ask how far the FOB effects could move under monotone selection.
+
+\begin{table}[!htbp]
+\centering
+\caption{Lee bounds for reduced-form FOB effects}
+\label{tab:fob-lee-bounds}
+\input{../presentations/rf-tables/main-specs/fob_lee_bounds_tbl.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:fob-lee-bounds} shows that the Lee bounds preserve the main observability result. Public-signal and Bracelet effects remain positive in the combined and far samples under the lower and upper trimming exercises. The far-minus-close public-signal contrast is more sensitive to trimming direction, but it remains positive. Bracelet--Calendar also remains positive, especially in far communities. The missingness correction changes magnitudes but does not overturn the substantive FOB pattern.
+
+\section{Calendar Active-Control Checks}
+
+\paragraph{Concern.}
+Calendar is useful as an active control only if it helps separate generic follow-up/gift effects from the public-signal effect. If Calendar has the same missingness and observability pattern as Bracelet, then the Bracelet--Calendar comparison is less informative.
+
+\begin{table}[!htbp]
+\centering
+\caption{Knowledge-table missingness by treatment assignment}
+\label{tab:know-table-attrition-spec}
+\input{../presentations/rf-tables/main-specs/know_table_attrition_spec_tbl.tex}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Main reduced-form FOB effects}
+\label{tab:rf-discrete-fob-main}
+\input{../presentations/rf-tables/main-specs/rf_discrete_fob_spec_tbl.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:know-table-attrition-spec} shows that Calendar-control missingness differences are small relative to the Bracelet-close missingness pattern. At the same time, Table~\ref{tab:rf-discrete-fob-main} shows a positive Bracelet--Calendar contrast, especially in far communities. This supports using Calendar as an active-control argument: generic gift/follow-up effects alone do not reproduce the Bracelet observability pattern. The strongest evidence is the far-cell Bracelet--Calendar FOB effect, which also remains positive under first-responder and Lee-bound checks.
+
+\section{Structural Robustness to Missing Beliefs}
+
+\paragraph{Concern.}
+The reduced-form checks diagnose selection in the observability outcome. The downstream concern is whether the structural conclusions depend on the particular observability input or on dropping respondents with missing beliefs.
+
+\begin{table}[p]
+\centering
+\caption{Structural treatment-effect robustness to alternative observability inputs}
+\label{tab:struct-observability-robustness}
+\scriptsize
+\input{../presentations/tables/fit106/struct-observability-robustness-overall-te-table.tex}
+\end{table}
+\FloatBarrier
+
+\paragraph{What the data say.}
+Table~\ref{tab:struct-observability-robustness} shows stable treatment-effect conclusions across alternative observability inputs. Bracelet--Calendar effects are similar under correct observability, perceived observability, and first-order observability with missing data marginalized. The far-cell Bracelet--Calendar effect is also stable across panels. This means the structural results are not fragile to the particular observability measure or the missing-data treatment shown in Table~\ref{tab:struct-observability-robustness}.
+
+\section*{Overall Interpretation}
+
+The data support a candid but reassuring interpretation. There is treatment-correlated missingness in the observability module, and missing respondents are not identical to observed respondents. Balance within the missing and observed subsamples is not perfect. These facts should be acknowledged directly.
+
+The robustness checks address the concern in the ways that matter most for the paper's conclusions. First-responder-only FOB estimates are stable in Table~\ref{tab:rf-discrete-fob-first-responder}. Lee bounds preserve the combined and far public-signal effects in Table~\ref{tab:fob-lee-bounds}. Bracelet--Calendar comparisons remain positive, especially in far communities, supporting the active-control interpretation in Table~\ref{tab:rf-discrete-fob-main}. Table~\ref{tab:struct-observability-robustness} shows that downstream treatment-effect conclusions are stable under alternative observability inputs and missing-data marginalization. The evidence therefore supports presenting observability selection as a real measurement issue that has been stress-tested, rather than as a threat that overturns the FOB or structural results.
+
+\end{document}

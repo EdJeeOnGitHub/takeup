@@ -1,0 +1,59 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{booktabs,graphicx}
+\begin{document}
+
+\section*{Preliminary policy-cost and consolidation sensitivity}
+
+This note is a review artifact and is not included in the paper. It uses the
+component-wise posterior median of all 1,600 retained draws from the baseline
+structural model. It therefore isolates policy assumptions but does not yet
+propagate posterior or cluster uncertainty. The latter should use the preferred
+exponential cluster-weighted likelihood modes once the server is available.
+
+We minimize the number or illustrative resource cost of distribution sites
+while preserving predicted take-up under the experimental allocation. The
+population-weighted specifications use census adult population for all 144
+communities. Costs include a fixed site cost, the documented \$0.20 Bracelet
+cost per expected participant, and a grid for household round-trip travel. The
+travel grid is illustrative rather than an estimated welfare parameter.
+
+Population weighting leaves the 3.5 km site-count comparison similar to the
+legacy calculation: Bracelet observability requires 78 sites versus 104 under
+Control observability, a saving of 26 sites. Restricting assignments to 2.5 km,
+the upper end of experimental distance support, is much more consequential:
+both regimes require 121 sites. The extensive-margin consolidation result is
+therefore driven by allowing assignments between 2.5 and 3.5 km.
+
+At 3.5 km, adding the Bracelet's unit cost reverses the cost comparison under
+an illustrative \$100 fixed cost per site. Bracelet saves 26 sites but costs
+about \$3,928 more in total; for these allocations, the fixed cost would need
+to be about \$251 per site to offset the signal expense. Valuing round-trip
+travel at \$0.10 per participant-kilometre raises this local break-even value
+to about \$471. At \$0.25, the optimizer opens substantially more sites to
+shorten travel, so the site-saving interpretation no longer applies. These are
+scenario results, not estimates of welfare.
+
+For the consolidation-information check, every experimental PoT is matched to
+its nearest candidate site (all 144 matches are unique). Assignments to any
+other site receive a Bracelet observability schedule moved toward Control.
+Moving halfway toward Control reduces the site saving from 26 to 13; replacing
+Bracelet observability by Control observability on those assignments reduces it
+to 4. Thus, the geometric result survives weakly under the most conservative
+case but is highly sensitive to assuming that observability is invariant under
+site consolidation.
+
+\begin{table}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{policy-cost-sensitivity-table.tex}}
+\caption{Review-only policy sensitivity. Dollar values are illustrative.}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{policy-cost-sensitivity-figure.pdf}
+\caption{Site and illustrative cost differences under Bracelet rather than
+Control observability.}
+\end{figure}
+
+\end{document}

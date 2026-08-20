@@ -1,0 +1,114 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.7in,landscape]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{makecell}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{threeparttable}
+\usepackage{float}
+
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\newcommand{\comparisonnote}{%
+Point estimates are posterior means; parentheses contain 95 percent credible
+intervals. The left table is the prior draft output. The right table is the
+newly generated output for comparison.
+}
+
+\newcommand{\tablepanel}[2]{%
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\textbf{#1}\par\vspace{0.4em}
+\scriptsize
+\begin{adjustbox}{max width=\linewidth}
+\input{#2}
+\end{adjustbox}
+\end{minipage}
+}
+
+\newcommand{\figurepanel}[2]{%
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{#2}
+\captionof*{figure}{#1}
+\end{minipage}
+}
+
+\begin{document}
+
+\begin{center}
+{\Large Structural Robustness Results Comparison}\\
+\vspace{0.3em}
+{\small Main structural tables and results listed under \texttt{structural\_robustness} in
+\texttt{recreate\_structural\_robustness\_and\_optimization.csv}}
+\end{center}
+
+\section*{Main Structural Average Treatment Effects}
+\comparisonnote
+
+\begin{table}[H]
+\centering
+\caption*{Structural Average Treatment Effects}
+\tablepanel{Prior draft table}{tables/struct-overall-te-table}
+\hfill
+\tablepanel{New generated table}{tables/fit105/struct-overall-te-table}
+\end{table}
+
+\clearpage
+
+\section*{Private and Signal Decomposition}
+\comparisonnote
+
+\begin{table}[H]
+\centering
+\caption*{Structural Decomposition}
+\tablepanel{Prior draft table}{tables/private-signal-te-table}
+\hfill
+\tablepanel{New generated table}{tables/fit105/private-signal-te-table}
+\end{table}
+
+\clearpage
+
+\section*{Private Distance Costs with Community-Level Social Image Returns}
+\comparisonnote
+
+\begin{table}[H]
+\centering
+\caption*{Structural Average Treatment Effects}
+\tablepanel{Prior draft table}{tables/indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table}
+\hfill
+\tablepanel{New generated table}{tables/fit105/indiv-dist-community-fp-indiv-vis-robust-struct-overall-te-table}
+\end{table}
+
+\clearpage
+
+\section*{Private Distance Costs with Household-Level Social Image Returns}
+\comparisonnote
+
+\begin{table}[H]
+\centering
+\caption*{Structural Average Treatment Effects}
+\tablepanel{Prior draft table}{tables/indiv-dist-indiv-fp-robust-struct-overall-te-table}
+\hfill
+\tablepanel{New generated table}{tables/fit105/indiv-dist-indiv-fp-robust-struct-overall-te-table}
+\end{table}
+
+\clearpage
+
+\section*{Excluding Spatially Dispersed Clusters}
+\comparisonnote
+
+\begin{table}[H]
+\centering
+\caption*{Structural Average Treatment Effects}
+\tablepanel{Prior draft table}{tables/struct-robustness-nooutliers-overall-te-table}
+\hfill
+\tablepanel{New generated table}{tables/fit105/struct-robustness-nooutliers-overall-te-table}
+\end{table}
+
+\end{document}

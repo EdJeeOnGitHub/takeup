@@ -6,9 +6,13 @@ source("optim/policy-bootstrap-functions.R")
 input_path <- policy_option_value(args, "--input-path")
 table_path <- policy_option_value(
   args, "--table-path",
-  "presentations/tables/fit105/optim-summ-cluster-bootstrap.tex"
+  "presentations/tables/fit105/optim-summ-exponential-cluster-weights.tex"
 )
-num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "210"))
+num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"))
+method <- policy_option_value(args, "--method", "exponential")
+if (!method %in% c("exponential", "multinomial")) {
+  stop("--method must be exponential or multinomial.", call. = FALSE)
+}
 if (is.null(input_path)) stop("--input-path is required.", call. = FALSE)
 
 scenario_results <- do.call(rbind, lapply(seq_len(nrow(policy_scenarios)), function(index) {
@@ -17,12 +21,12 @@ scenario_results <- do.call(rbind, lapply(seq_len(nrow(policy_scenarios)), funct
   )
   if (!file.exists(path)) stop("Missing scenario status: ", path, call. = FALSE)
   value <- read.csv(path, stringsAsFactors = FALSE)
-  expected_status <- if (policy_scenarios$suppress_reputation[index]) {
-    "target_infeasible"
+  allowed_status <- if (policy_scenarios$suppress_reputation[index]) {
+    c("complete", "target_infeasible")
   } else {
     "complete"
   }
-  value <- value[value$status == expected_status, ]
+  value <- value[value$status %in% allowed_status, ]
   value <- value[order(value$draw), ]
   if (nrow(value) != num_replicates || anyDuplicated(value$draw)) {
     stop("Expected exactly ", num_replicates, " completed draws in ", path, call. = FALSE)
@@ -77,6 +81,10 @@ summary_rows <- do.call(rbind, lapply(split(all_results, all_results$scenario_id
 }))
 summary_rows <- summary_rows[order(summary_rows$scenario_id), ]
 write.csv(summary_rows, file.path(input_path, "policy-cluster-bootstrap-summary.csv"), row.names = FALSE)
+no_image_infeasible <- sum(
+  all_results$scenario == "suppress-reputation" &
+    all_results$status == "target_infeasible"
+)
 
 format_cell <- function(estimate, lower, upper, digits, integer = FALSE) {
   if (integer) {
@@ -115,14 +123,21 @@ lines <- c(
   "\\end{tabular}}",
   "\\begin{minipage}{0.98\\linewidth}",
   "\\footnotesize \\textit{Notes:} Entries are medians across",
-  paste0(num_replicates, " county-stratified cluster-bootstrap mode refits;"),
+  if (method == "exponential") {
+    paste0(num_replicates, " exponential cluster-weighted mode refits;")
+  } else {
+    paste0(num_replicates, " county-stratified cluster-bootstrap mode refits;")
+  },
   "parentheses are 2.5th and 97.5th percentiles. The welfare target is fixed",
   "at the baseline experimental-allocation target. The no-social-image target",
-  "is infeasible in every replicate, so that row reports the best/closest-site",
-  "benchmark. The mode approximation passed 93.4 percent of its prespecified",
+  paste0("is infeasible in ", no_image_infeasible, " of ", num_replicates,
+         " refits; in those refits that row reports the best/closest-site"),
+  paste0("benchmark. The mode approximation passed ",
+         if (method == "exponential") "96.7" else "93.4",
+         " percent of its prespecified"),
   "short-MCMC audit cells.",
   "\\end{minipage}"
 )
 dir.create(dirname(table_path), recursive = TRUE, showWarnings = FALSE)
 writeLines(lines, table_path)
-message("Wrote cluster-bootstrap policy table: ", table_path)
+message("Wrote ", method, " cluster-weighted policy table: ", table_path)
