@@ -66,9 +66,9 @@ This is the source of the 26 mismatches documented below: `assigned.dist.cat` (S
 
 ## Feasibility Drops (158 → 144)
 
-Source: `scratch/randomization-checks.R`
+Source: `archive/code/scratch/randomization-checks.R`
 
-14 clusters were dropped before the analysis, reducing the sample from 158 to 144. Reasons are documented in `scratch/distance/distance-recreation-attempt.Rmd` (lines 49–53) and `rct-design-fieldwork/takeup_rct_target_villages.R` (lines 6–7).
+14 clusters were dropped before the analysis, reducing the sample from 158 to 144. Reasons are documented in `archive/code/scratch/distance/distance-recreation-attempt.Rmd` (lines 49–53) and `rct-design-fieldwork/takeup_rct_target_villages.R` (lines 6–7).
 
 | Cluster | Original cat | Reason |
 |---|---|---|
@@ -102,7 +102,7 @@ Note the coincidence: 6 close clusters dropped but 16 far→close switches, leav
 
 ## Randomization Mismatches
 
-Source: `scratch/randomization-checks.R` (output saved to `docs/randomization-mismatches.csv`)
+Source: `archive/code/scratch/randomization-checks.R` (output saved to `docs/randomization-mismatches.csv`)
 
 26 clusters where `processed_cat` (from `takeup_processed_cluster_strat.rds`) differs from `clust_randomization_cat` (the original `assigned.dist.cat` from `rct_targetable_schools_2.0.rds`): 10 close -> far, 16 far -> close. In every case, `swap_cat` (from `rct_target_villages_2.0.rds`) matches the original randomization, confirming the swap in Step 3 was never persisted.
 

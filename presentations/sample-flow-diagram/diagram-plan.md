@@ -82,7 +82,7 @@ Drop the PAP-target and code-note boxes entirely; move to footnotes.
 
 ## Proposed simplified counts
 
-(From the Mermaid prototype; verify against `prepare_analysis_data.R` output.)
+(From the Mermaid prototype; verify against `scripts/design/prepare-analysis-data.R` output.)
 
 **Shared top: Census frame**
 - 144 clusters, 39,301 adults (18+)

@@ -1266,7 +1266,7 @@ hh_f_know <- enable_fast_continuous_wls(
 
 #### FOB Discrete Distance + LASSO Covs + Cluster Expected Distance
 
-# source("scratch/old-knowledge-reduced-form-code.R")
+# source("archive/code/scratch/old-knowledge-reduced-form-code.R")
 
 
 discrete_fob_output = wrapper_function(

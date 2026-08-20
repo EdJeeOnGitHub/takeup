@@ -22,7 +22,7 @@ observability are also separate multiplicity families.
 Smoke test:
 
 ```sh
-Rscript scratch/randomization-inference.R \
+Rscript scripts/appendix/randomization-inference.R \
   --permutations=999 \
   --output-dir=/tmp/takeup-ri-smoke \
   --appendix-dir=/tmp/takeup-ri-appendix
@@ -31,7 +31,7 @@ Rscript scratch/randomization-inference.R \
 Production:
 
 ```sh
-Rscript scratch/randomization-inference.R --permutations=99999 --cores=4
+Rscript scripts/appendix/randomization-inference.R --permutations=99999 --cores=4
 ```
 
 The fixed default seed is `20260812`. The runner uses base R and community-level

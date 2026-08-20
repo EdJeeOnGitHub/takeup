@@ -39,14 +39,14 @@ and no-social-image predictions use their exact closed forms.
 Submit the complete dependency chain from the Midway repository root:
 
 ```bash
-bash submit_policy_cluster_bootstrap.sh
+bash hpc/policy/submit_policy_cluster_bootstrap.sh
 ```
 
 For a five-mode recovery test:
 
 ```bash
 NUM_REPLICATES=5 OUTPUT_PATH=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots-cluster-bootstrap-smoke \
-  bash submit_policy_cluster_bootstrap.sh
+  bash hpc/policy/submit_policy_cluster_bootstrap.sh
 ```
 
 The production table is

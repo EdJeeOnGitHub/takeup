@@ -17,7 +17,7 @@ difference.
 The robustness workflow is:
 
 ```bash
-bash submit_main_core_student_t.sh
+bash hpc/structural/submit_main_core_student_t.sh
 ```
 
 It first computes a mode, then runs four 400-warmup/400-sampling chains,

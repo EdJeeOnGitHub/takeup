@@ -2,7 +2,7 @@
 
 ## Summary
 
-Use the server/raw Stan outputs to test whether the structural robustness specifications recover the paper's social multiplier, not just the ATEs. The implementation should reuse the existing postprocessing path in `quick_roc_postprocess.R --sm`, then produce a compact paper-style robustness table comparing the multiplier across the structural models already used in the paper.
+Use the server/raw Stan outputs to test whether the structural robustness specifications recover the paper's social multiplier, not just the ATEs. The implementation should reuse the existing postprocessing path in `scripts/structural/postprocess-roc.R --sm`, then produce a compact paper-style robustness table comparing the multiplier across the structural models already used in the paper.
 
 This should not re-estimate the models unless the needed generated quantities are absent.
 
@@ -57,7 +57,7 @@ If the server uses different fit numbers for the paper tables, use the fit versi
    Main example:
 
    ```bash
-   Rscript quick_roc_postprocess.R 105 \
+   Rscript scripts/structural/postprocess-roc.R 105 \
      --input-path=data/stan_analysis_data \
      --output-path=temp-data/struct-postprocess \
      --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
@@ -76,7 +76,7 @@ If the server uses different fit numbers for the paper tables, use the fit versi
 3. Create one comparison script, for example:
 
    ```text
-   scratch/struct-social-multiplier-robustness.R
+   scripts/appendix/struct-social-multiplier-robustness.R
    ```
 
    The script should:

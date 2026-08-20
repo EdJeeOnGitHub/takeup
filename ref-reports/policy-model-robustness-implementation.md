@@ -60,7 +60,7 @@ positions differ, so positional indexing would be invalid.
 Run all models with:
 
 ```bash
-bash submit_policy_model_robustness.sh
+bash hpc/policy/submit_policy_model_robustness.sh
 ```
 
 After the model summaries have been copied back locally, assemble the combined

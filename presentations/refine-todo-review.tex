@@ -64,7 +64,7 @@ Generated reduced-form table outputs are shown here for review but are intention
 \todoheading{1}{Prior Deworming Robustness}
 \commitline{Analysis \coderef{54fa50d}; generated RF output removed from tracking in \coderef{7cfa8f3}. Paper \coderef{b78969a}.}
 
-\textbf{What changed.} Added \coderef{scratch/prior-deworming-robustness-table.R}. Because baseline survey IDs do not directly link to monitored take-up outcomes, the script builds cluster-level baseline shares for ever-dewormed and past-year-dewormed, merges them into the take-up sample, and estimates the full Bracelet/Calendar/Ink/Control by Close/Far reduced-form specification with those prior-deworming covariates shown at the bottom of the table. It also repeats the check for endline self-reported deworming.
+\textbf{What changed.} Added \coderef{scripts/appendix/prior-deworming-robustness-table.R}. Because baseline survey IDs do not directly link to monitored take-up outcomes, the script builds cluster-level baseline shares for ever-dewormed and past-year-dewormed, merges them into the take-up sample, and estimates the full Bracelet/Calendar/Ink/Control by Close/Far reduced-form specification with those prior-deworming covariates shown at the bottom of the table. It also repeats the check for endline self-reported deworming.
 
 \textbf{Interpretation.} The reviewer concern predicts attenuation if prior deworming imbalance explains the main distance pattern. In the full specification with prior-deworming covariates, the Bracelet and Ink Far--Close interaction estimates remain positive, while Calendar remains small.
 
@@ -122,7 +122,7 @@ Phone owner & from regenerated table & 0.765 & 0.728\\
 \todoheading{4}{\texorpdfstring{$\psi$}{psi} Units}
 \commitline{Analysis \coderef{219dc73}. Paper \coderef{15fc692}.}
 
-\textbf{What changed.} \coderef{quick_param_postprocess.R} and \coderef{presentations/tables.Rmd} now label the WTP/structural valuation parameter as USD. The paper text and table notes define \(\psi\) in USD rather than KSh.
+\textbf{What changed.} \coderef{scripts/structural/postprocess-parameters.R} and \coderef{presentations/tables.Rmd} now label the WTP/structural valuation parameter as USD. The paper text and table notes define \(\psi\) in USD rather than KSh.
 
 \beforeafter
 {\(\psi\) was displayed or described as KSh in generated table labels, creating an apparent scale contradiction with 50 KSh offers and the text's US-dollar interpretation.}
@@ -170,7 +170,7 @@ Phone owner & from regenerated table & 0.765 & 0.728\\
 \todoheading{6}{\texorpdfstring{$\sigma_u$}{sigma-u} Identification}
 \commitline{Analysis \coderef{fe9c8d8}. Paper \coderef{10cfa9c}.}
 
-\textbf{What changed.} Added \coderef{scratch/sigma-u-prior-posterior-plot.R}. The script reads only the Stan variable for \(\sigma_u\), writes a prior/posterior plot using the paper's Canva ``Primary colors with a vibrant twist'' palette, and writes a compact summary CSV. The paper now states that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells and the nonlinear normal-sum signal-extraction restriction.
+\textbf{What changed.} Added \coderef{scripts/appendix/sigma-u-prior-posterior-plot.R}. The script reads only the Stan variable for \(\sigma_u\), writes a prior/posterior plot using the paper's Canva ``Primary colors with a vibrant twist'' palette, and writes a compact summary CSV. The paper now states that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells and the nonlinear normal-sum signal-extraction restriction.
 
 \begin{table}[h!]
 \centering
@@ -209,7 +209,7 @@ Posterior & 0.302 & 0.278 & 0.127 & 0.583\\
 \todoheading{11}{HMC Diagnostics}
 \commitline{Analysis \coderef{e7e2ac1}. Paper \coderef{2a3ca83} and \coderef{9831b83}.}
 
-\textbf{What changed.} Added \coderef{scratch/stan-hmc-diagnostics.R}, a reusable diagnostics script that can restrict loaded Stan variables. The paper now reports stricter diagnostics rather than only saying split \(\hat R<1.1\).
+\textbf{What changed.} Added \coderef{archive/code/scratch/stan-hmc-diagnostics.R}, a reusable diagnostics script that can restrict loaded Stan variables. The paper now reports stricter diagnostics rather than only saying split \(\hat R<1.1\).
 
 \begin{longtable}{p{0.22\linewidth}p{0.56\linewidth}p{0.14\linewidth}}
 \toprule

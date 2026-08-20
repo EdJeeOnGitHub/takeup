@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 
 stage <- file.path("build", "replication-package")
+if (dir.exists(stage)) unlink(stage, recursive = TRUE)
 dir.create(stage, recursive = TRUE, showWarnings = FALSE)
 
 collect_stan_dependencies <- function(entrypoints, stan_dir = "stan_models") {
@@ -42,26 +43,20 @@ contract_files <- c(
 
 include <- c(
   "README.md", "Makefile", "_targets.R", "renv.lock", "takeup.Rproj",
-  "R/distance/spec.R", "R/workflow/pipeline.R", "replication/README.md",
+  "R/README.md", "scripts/README.md", "stan_models/README.md",
+  "docs/repository-layout.md", "docs/path-migration.md",
+  "replication/README.md",
   "replication/data-manifest.csv", "replication/paper-artifact-contract.csv",
-  "scripts/checks/validate-distance-spec.R",
-  "scripts/workflow/prepare-structural-distance-data.R",
-  "scripts/workflow/run-structural-fit.sh", "scripts/workflow/build-paper-artifact-registry.R",
-  "scripts/checks/audit-paper-pipeline-coverage.R",
-  "scripts/checks/build-stan-artifact-inventory.R",
-  "scripts/checks/check-replication-build.R", "scripts/workflow/stage-paper.R",
-  "scripts/workflow/manage-paper-artifacts.R",
-  "scripts/workflow/stage-replication-package.R",
-  "scripts/checks/test-distance-spec.R",
-  "scripts/reduced-form/bootstrap.R", "scripts/reduced-form/setup.R",
-  "R/reduced-form/functions.R", "tests/benchmarks/rf-direct-wls.R",
-  "R/structural/main-core-data.R",
-  "scripts/structural/sample-main-core.R",
-  "scripts/structural/generate-compact-gq.R",
-  "R/policy/bootstrap.R", "R/policy/cost-sensitivity.R",
-  "scripts/policy/predict-cluster-bootstrap.R",
-  "scripts/policy/optimize-cluster-bootstrap.R",
-  "scripts/policy/summarize-cluster-bootstrap.R",
+  list.files("R", recursive = TRUE, full.names = TRUE),
+  unlist(lapply(
+    file.path("scripts", c(
+      "balance", "checks", "policy", "reduced-form", "shared",
+      "structural", "workflow"
+    )),
+    list.files, recursive = TRUE, full.names = TRUE
+  )),
+  list.files("tests/benchmarks", recursive = TRUE, full.names = TRUE),
+  list.files("tests/smoke", recursive = TRUE, full.names = TRUE),
   list.files("replication/inputs/policy", full.names = TRUE),
   "ref-reports/ECM ReStud.tex",
   stan_sources, contract_files

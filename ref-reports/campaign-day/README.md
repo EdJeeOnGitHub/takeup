@@ -6,7 +6,7 @@ enter the main paper.
 Run the estimator from the repository root in the pinned R environment:
 
 ```sh
-Rscript scratch/campaign-day-original-assignment.R \
+Rscript scripts/appendix/campaign-day-original-assignment.R \
   --bootstrap-draws=1000 \
   --seed=20260807
 ```

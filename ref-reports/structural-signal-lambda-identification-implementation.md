@@ -10,7 +10,7 @@ defined on pairwise log-lambda ratios.
 On Midway, run:
 
 ```bash
-bash submit_main_core_lambda_identification.sh core
+bash hpc/structural/submit_main_core_lambda_identification.sh core
 ```
 
 The submission helper reuses the four completed common-lambda production
@@ -22,14 +22,14 @@ pending array element against the per-user submission limit, recovery is
 submitted only after the core/profile queue drains, in these phases:
 
 ```bash
-bash submit_main_core_lambda_identification.sh recovery-generate
-bash submit_main_core_lambda_identification.sh recovery-fit-a
+bash hpc/structural/submit_main_core_lambda_identification.sh recovery-generate
+bash hpc/structural/submit_main_core_lambda_identification.sh recovery-fit-a
 # after fit-a completes
-bash submit_main_core_lambda_identification.sh recovery-fit-b
+bash hpc/structural/submit_main_core_lambda_identification.sh recovery-fit-b
 # after fit-b completes
-bash submit_main_core_lambda_identification.sh recovery-hmc
+bash hpc/structural/submit_main_core_lambda_identification.sh recovery-hmc
 # after the HMC audit completes
-bash submit_main_core_lambda_identification.sh recovery-finish
+bash hpc/structural/submit_main_core_lambda_identification.sh recovery-finish
 ```
 
 Recovery modes and HMC chains are throttled to 40 and 20 concurrent jobs.
@@ -56,11 +56,11 @@ paper file.
 
 ## Validation
 
-- `scratch/validate-main-core-target.R` compares the common-lambda minimal
+- `scripts/appendix/validate-main-core-target.R` compares the common-lambda minimal
   model with the original fit-105 target at zero and random parameter points.
   The maximum target-gradient difference is zero; the Bernoulli-to-binomial
   aggregation identity also has zero residual.
-- `scratch/test-main-core-lambda-transform.R` checks the grouped geometric-mean
+- `tests/smoke/test-main-core-lambda-transform.R` checks the grouped geometric-mean
   parameterization and the arm-specific Helmert basis, including its stated
   pairwise log-ratio prior standard deviation.
 - All three Stan programs (sampler, compact generated quantities, and hybrid

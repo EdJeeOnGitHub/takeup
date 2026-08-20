@@ -26,12 +26,12 @@ From `~/projects/takeup`:
 ```bash
 # Submit data preparation, the unweighted initializer, cluster-weighted
 # refits, and paper-output generation with dependencies.
-bash submit_main_core_cluster_bootstrap.sh
+bash hpc/structural/submit_main_core_cluster_bootstrap.sh
 ```
 
-`slurm_main_core_cluster_bootstrap.sh` is the only production worker and uses
-the `STAGE` variable internally. `submit_main_core_cluster_bootstrap.sh` is the
-small submission wrapper. The generic `slurm_main_core.sh` remains available
+`hpc/structural/slurm_main_core_cluster_bootstrap.sh` is the only production worker and uses
+the `STAGE` variable internally. `hpc/structural/submit_main_core_cluster_bootstrap.sh` is the
+small submission wrapper. The generic `hpc/structural/slurm_main_core.sh` remains available
 for a full posterior run of the minimal main model when needed.
 
 Optimizer JSON files are sanitized before HMC warm starts. In particular, an

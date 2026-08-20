@@ -8,7 +8,7 @@
 #     --fit-version=104 \
 #     --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 #
-# Requires quick_roc_postprocess.R --sm to have been run first (for sm-decomp figure).
+# Requires scripts/structural/postprocess-roc.R --sm to have been run first (for sm-decomp figure).
 #
 # Outputs (to presentations/tables/fit<VERSION>/):
 #   struct-overall-te-table.tex
@@ -614,7 +614,7 @@ if (isTRUE(script_options$write_beliefs_robustness)) {
 
 # ---------------------------------------------------------------------------
 # Figure: Social Multiplier Decomposition (sm-decomp-annotated)
-# Requires: quick_roc_postprocess.R --sm has been run first.
+# Requires: scripts/structural/postprocess-roc.R --sm has been run first.
 # ---------------------------------------------------------------------------
 cat("Writing sm-decomp-annotated.pdf ...\n")
 

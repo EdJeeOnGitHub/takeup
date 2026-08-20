@@ -140,14 +140,14 @@ frozen generic sampler agree exactly at the zero initialization and two seeded
 random initializations. Both asymmetric modes pass data initialization and
 gradient evaluation; the conditional mode also passes an HMC and compact-GQ
 smoke run. The unit test is
-`scratch/test-main-core-asymmetric-observability.R`.
+`tests/smoke/test-main-core-asymmetric-observability.R`.
 
 Production commands use `CORE_OBSERVATION_MODEL=1` (primary) or `2`
-(unrecognized null signal) with `slurm_main_core.sh`. Start at 400 warmup and
+(unrecognized null signal) with `hpc/structural/slurm_main_core.sh`. Start at 400 warmup and
 400 retained draws in four array tasks, then run
 `scripts/structural/generate-compact-gq.R` with the matching observation-model
 switch. The summary script
-`scratch/summarize-main-core-asymmetric-observability.R` produces diagnostics,
+`scripts/appendix/summarize-main-core-asymmetric-observability.R` produces diagnostics,
 response-channel, ATE, and multiplier CSVs plus the two panelled LaTeX tables.
 The production fits themselves are intentionally not marked complete until all
 four chains pass the stated diagnostic gates.

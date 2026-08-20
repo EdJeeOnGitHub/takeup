@@ -124,7 +124,7 @@ stan-inventory:
 
 ## make policy-tables          Validate synced optimal-policy outputs and render tables.
 policy-tables:
-	bash run_optim_tables.sh
+	bash archive/code/policy-v1/run_optim_tables.sh
 
 ## make policy-fast-predict    Predict sparse feasible-edge demand from compact cluster-weighted parameters.
 policy-fast-predict:
@@ -163,10 +163,11 @@ optimal-policy: policy-fast-summarize
 
 ## make optimal-policy-legacy Run the older dense posterior workflow (smoke test by default).
 optimal-policy-legacy:
-	SMOKETEST=$(POLICY_SMOKETEST) bash slurm_run_optim.sh
+	SMOKETEST=$(POLICY_SMOKETEST) bash archive/code/policy-v1/slurm_run_optim.sh
 
 ## make check                  Run build and manuscript dependency checks.
 check: audit paper-assets
+	Rscript --no-save --no-restore scripts/checks/check-repository-layout.R
 	Rscript --no-save --no-restore scripts/checks/test-distance-spec.R
 	Rscript --no-save --no-restore scripts/checks/audit-paper-pipeline-coverage.R
 	Rscript --no-save --no-restore scripts/checks/build-stan-artifact-inventory.R

@@ -30,6 +30,11 @@ commonrmd.yaml
 *_cache/
 *.pdf
 *.log
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.out
 
 # Packrat
 packrat/
@@ -61,6 +66,14 @@ stan_models/takeup_struct
 takeup_assigned_distance_files/
 
 temp/
+temp-plots/
+rosm.cache/
+optim/data/
+optim/plots/
+.claude/
+.codex
+nohup.out
+*.tar.gz
 
 *.aux
 

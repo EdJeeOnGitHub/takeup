@@ -125,7 +125,7 @@ This file summarizes each non-AK ToDo, where the change landed, and the table, f
 
 \todosection{6}{\texorpdfstring{\(\sigma_u\)}{sigma-u} Identification}
 \commitline{Analysis: \code{fe9c8d8}, refined in \code{7705024}. Overleaf master: \code{68712c0}; terminology cleanup: \code{30215bd}.}
-\changed{Added \code{scratch/sigma-u-prior-posterior-plot.R}, which reads only the \(\sigma_u\) Stan variable, writes a prior/posterior comparison plot, and writes a summary CSV. The paper now explains that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells and the normal-sum signal-extraction restriction.}
+\changed{Added \code{scripts/appendix/sigma-u-prior-posterior-plot.R}, which reads only the \(\sigma_u\) Stan variable, writes a prior/posterior comparison plot, and writes a summary CSV. The paper now explains that \(\sigma_u\) is disciplined by curvature in arm-by-distance take-up cells and the normal-sum signal-extraction restriction.}
 \artifact{The new appendix figure compares the prior and posterior distributions for \(\sigma_u\).}
 
 \begin{figure}[p]
@@ -157,7 +157,7 @@ Posterior & 0.302 & 0.278 & 0.127 & 0.583\\
 
 \todosection{11}{HMC Diagnostics}
 \commitline{Analysis: \code{e7e2ac1}. Overleaf master: \code{9126723}, \code{4d1722e}.}
-\changed{Added \code{scratch/stan-hmc-diagnostics.R}, a reusable diagnostics script that can load only selected Stan variables. The paper now reports max split \(\hat R\), minimum bulk/tail ESS, and divergence counts for the main structural fit and the appendix structural robustness fits.}
+\changed{Added \code{archive/code/scratch/stan-hmc-diagnostics.R}, a reusable diagnostics script that can load only selected Stan variables. The paper now reports max split \(\hat R\), minimum bulk/tail ESS, and divergence counts for the main structural fit and the appendix structural robustness fits.}
 \artifact{Diagnostic values added to paper table notes are summarized below.}
 
 \begin{longtable}{p{0.24\linewidth}p{0.58\linewidth}p{0.12\linewidth}}

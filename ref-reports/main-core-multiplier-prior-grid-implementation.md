@@ -28,7 +28,7 @@ There are 13 specifications:
 
 The exact numerical settings and seeds are written before estimation to
 `prior-grid-manifest.csv` by
-`scratch/generate-main-core-prior-grid-manifest.R`.
+`scripts/appendix/generate-main-core-prior-grid-manifest.R`.
 
 ## Estimation and audit
 
@@ -39,14 +39,14 @@ numerically stable initial point; independent HMC seeds determine their
 trajectories. Compact generated quantities retain the three finite spans
 0--2.5 km, 0--1.5 km, and 1.5--2.5 km without saving ancillary latent arrays.
 
-`scratch/summarize-main-core-prior-grid.R` requires all four fit and GQ files,
+`scripts/appendix/summarize-main-core-prior-grid.R` requires all four fit and GQ files,
 saves parameter and estimand R-hat/ESS diagnostics, divergences, and treedepth
 hits, and writes `prior-grid-needs-rerun.csv`. A specification is flagged for
 an 800/800 rerun if R-hat exceeds 1.01, bulk or tail ESS is below 400, or any
 divergence or treedepth hit occurs.
 
 After the initial summary completes,
-`submit_main_core_prior_grid_reruns.sh` reads that audit and submits only the
+`hpc/structural/submit_main_core_prior_grid_reruns.sh` reads that audit and submits only the
 flagged specifications at 800/800. Rerun fits and GQs are isolated under
 `fits-rerun/` and `gq-rerun/`; the final summary automatically prefers a
 complete rerun pair and records the source used for every row.

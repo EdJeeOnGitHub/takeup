@@ -50,6 +50,6 @@ Name-matched individuals have `dewormed = NA` (since `dewormed` is only set for 
 
 2. **Name matching compensates.** The 991 gap individuals (and others) are recovered via fuzzy name matching. 4,150 name-matched individuals were identified as dewormed through this process.
 
-3. **Name-matched individuals are excluded from the structural model.** `run_takeup.R` filters to `mon_status == "monitored"` (i.e., `true.monitored == TRUE`) and passes `dewormed` (not `dewormed.any`) to Stan. So the 25,190 name-matched individuals are not used in estimation. Their `dewormed.any` status is available in the analysis data but is not currently used.
+3. **Name-matched individuals are excluded from the structural model.** `scripts/structural/run-model.R` filters to `mon_status == "monitored"` (i.e., `true.monitored == TRUE`) and passes `dewormed` (not `dewormed.any`) to Stan. So the 25,190 name-matched individuals are not used in estimation. Their `dewormed.any` status is available in the analysis data but is not currently used.
 
 4. **147 orphan survey entries remain.** These are valid PoT survey rows with no dict match. They may represent walk-ins, roster errors, or data entry mistakes in `person_key`. The name matching may have recovered some of these, but we cannot confirm a 1-to-1 correspondence without further investigation.

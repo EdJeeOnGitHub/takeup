@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 ## Target-equivalence tests
 
-Test script: `scratch/validate-main-core-target.R`
+Test script: `scripts/appendix/validate-main-core-target.R`
 
 Midway validation job: `48723593`
 

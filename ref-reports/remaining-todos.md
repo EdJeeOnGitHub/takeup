@@ -14,7 +14,7 @@ workflow.
 ## Exponential cluster-weight production follow-up
 
 - [x] Run
-  `submit_main_core_cluster_bootstrap_999.sh`. It now defaults to 999
+  `hpc/structural/submit_main_core_cluster_bootstrap_999.sh`. It now defaults to 999
   county-stratified exponential/Dirichlet cluster-weighted refits. Confirm the
   attempted, successful, included, and unique-weight counts before replacing
   the current 200-refit appendix artifacts. All 999 attempted refits completed,
@@ -23,7 +23,7 @@ workflow.
   the finite 500--2500m No-Signal minus Any-Signal multiplier contrast. The
   older 200-refit artifacts contain the three point multipliers but did not
   save this finite-change quantity.
-- [x] Run `submit_policy_cluster_bootstrap.sh` against the completed
+- [x] Run `hpc/policy/submit_policy_cluster_bootstrap.sh` against the completed
   exponential-weight modes. The pipeline now defaults to exponential weights
   and all 999 refits. The production allocation and summary completed for all
   five policy scenarios.
