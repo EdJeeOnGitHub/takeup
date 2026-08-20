@@ -12,6 +12,8 @@ Options:
   --monitored-attrition
   --sms
   --main
+  --distance-definition=<spec>  Close/Far definition: assigned or realized [default: assigned]
+  --ri-draws=<n>  Randomization-inference draws [default: 500]
 
 "),
   args = if (interactive()) "
@@ -19,6 +21,9 @@ Options:
     --sms
     " else commandArgs(trailingOnly = TRUE)
 )
+
+Sys.setenv(TAKEUP_DISTANCE_SPEC = script_options$distance_definition)
+ri_draws <- as.integer(script_options$ri_draws)
 
 
 run_all <- !any(
@@ -934,7 +939,7 @@ if (script_options$fit_ri) {
     
   plan(multisession, workers = 12)
   perm_fit_df = future_map_dfr(
-    1:500, 
+    seq_len(ri_draws),
     ri_fun, 
     .progress = TRUE,
     .options = furrr_options(
@@ -1086,7 +1091,7 @@ all_endline_data = all_endline_data %>%
 
 nrow(endline_data)
 nrow(all_endline_data)
-nrow(all_endline_data_frame)
+nrow(all_endline_data)
 
 # First attrition table: does treatment predict attrition from the know table?
 # (1) Pooled treatment effect on attrition
@@ -1634,8 +1639,6 @@ list(
 # SMS Balance Analysis
 # ============================================================================
 if (run_all || script_options$sms) {
-
-stop()
 
 census_data %>%
   count(cluster.id)

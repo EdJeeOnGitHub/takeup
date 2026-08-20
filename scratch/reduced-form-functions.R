@@ -512,10 +512,13 @@ make_lee_trim_f = function(f, base_data, direction = c("upper", "lower"), B_draw
   }
 }
 
-create_regression_output = function(data, f,  B_draws = 500,
+create_regression_output = function(
+                                    data, f,
+                                    B_draws = getOption("takeup.bootstrap_draws", 500L),
                                     stat = params$stat,
                                     caption = "Average Treatment Effects: Reduced Form",
                                     dependent_var = "Dependent variable: Take-up",
+                                    model_label = "Reduced Form",
                                     type = "APE",
                                     stars = TRUE,
                                     drop_H0s = FALSE,
@@ -617,7 +620,8 @@ create_regression_output = function(data, f,  B_draws = 500,
     filter(assigned_treatment != "$|Calendar| - |Bracelet|$") %>%
     nice_kbl_table(
       cap = caption,
-      outcome_var = dependent_var
+      outcome_var = dependent_var,
+      model_label = model_label
       )
 
 
@@ -640,7 +644,8 @@ create_regression_output = function(data, f,  B_draws = 500,
       arrange(assigned_treatment) %>%
     nice_kbl_table(
       cap = caption,
-      outcome_var = dependent_var
+      outcome_var = dependent_var,
+      model_label = model_label
     )
 
   return(list(
@@ -759,7 +764,8 @@ prep_tbl = function(tes, stat = "ci", stars = FALSE) {
     return(tbl)
 }
 
-nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up", stat = params$stat) {
+nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up",
+                          stat = params$stat, model_label = "Reduced Form") {
   linesep_str = if_else(stat == "ci", "\\addlinespace", "")
 
   nice_kbl = tbl %>%
@@ -792,7 +798,7 @@ nice_kbl_table = function(tbl, cap, outcome_var = "Dependent variable: Take-up",
   add_header_above(
     c(
       " " = 1,
-      "Reduced Form" = 4
+      setNames(4, model_label)
       )
   ) %>%
   row_spec(c(3), hline_after = TRUE) 
@@ -835,13 +841,15 @@ custom_save_latex_table = function(table, table_name, table_output_path = params
 
 wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, table_options = list(), stat = params$stat,
                             flip_calendar_sign = FALSE,
-                            lee_direction = NULL, lee_base_data = NULL, B_draws = 500) {
+                            lee_direction = NULL, lee_base_data = NULL,
+                            B_draws = getOption("takeup.bootstrap_draws", 500L)) {
   default_table_options = list(
     caption = "Average Treatment Effects: Reduced Form",
     dependent_var = "Dependent variable: Take-up",
     type = "APE",
     stars = TRUE,
-    drop_H0s = FALSE
+    drop_H0s = FALSE,
+    model_label = "Reduced Form"
   )
   table_options = modifyList(default_table_options, table_options)
   output = create_regression_output(
@@ -849,6 +857,7 @@ wrapper_function = function(data, regression_spec, tidy_summ_path, table_name, t
     f = regression_spec,
     caption = table_options$caption,
     dependent_var = table_options$dependent_var,
+    model_label = table_options$model_label,
     type = table_options$type,
     stars = table_options$stars,
     drop_H0s = table_options$drop_H0s,

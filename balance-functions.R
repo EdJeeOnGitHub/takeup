@@ -64,9 +64,24 @@ raw_treat_dist_means = function(data, lhs_var, control_only = FALSE, close_only 
 create_balance_comparisons = function(fit, data = NULL) {
   lhs_var = all.vars(fit$fml)[1]
 
-  comp_df = avg_comparisons(
+  # In these additive balance models, every treat_dist contrast is constant
+  # across observations: county effects cancel from the contrast. Evaluating
+  # the contrast on the full estimation sample is therefore redundant (and
+  # very expensive for individual-level outcomes). A one-row reference grid
+  # gives the same point estimates and clustered delta-method standard errors.
+  fit_formula_text = paste(deparse(fit$fml), collapse = " ")
+  if (grepl("treat_dist[^+~]*:|:[^+~]*treat_dist", fit_formula_text)) {
+    stop(
+      "Fast balance comparisons require treat_dist to enter additively; ",
+      "use avg_comparisons() explicitly for an interacted specification."
+    )
+  }
+
+  comparison_grid = marginaleffects::datagrid(model = fit)
+  comp_df = marginaleffects::comparisons(
     fit,
-    variables = list("treat_dist" = "all")
+    variables = list("treat_dist" = "all"),
+    newdata = comparison_grid
   ) %>%
   as_tibble()
 

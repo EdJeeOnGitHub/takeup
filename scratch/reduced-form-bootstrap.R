@@ -13,11 +13,13 @@ Options:
   --plots              Run NP fit plots section
   --externality        Run externality knowledge section
   --takeup             Run takeup regressions + levels section
-  --itt                Run original-distance-assignment take-up ITT robustness
+  --itt                Run original-distance-assignment take-up ITT and IV robustness
   --beliefs            Run beliefs (FOB/SOB) regressions + levels section
   --endline            Run endline/incentive/preference/travel section
   --sms                Run SMS heterogeneity section
   --heterogeneity      Run heterogeneity + WTP section
+  --distance-definition=<spec>  Close/Far definition: assigned or realized [default: assigned]
+  --bootstrap-draws=<n>  Bayesian bootstrap draws [default: 500]
   --table-output-path=<path>  Table output path [default: presentations/rf-tables/main-specs]
   --stat=<stat>        Statistic to show [default: std.error]
 ",
@@ -25,6 +27,9 @@ Options:
    --endline 
   " else commandArgs(trailingOnly = TRUE)
 )
+
+Sys.setenv(TAKEUP_DISTANCE_SPEC = script_options$distance_definition)
+options(takeup.bootstrap_draws = as.integer(script_options$bootstrap_draws))
 # TODO: Fix --sms and --heterogeneity
 
 run_all <- !any(script_options$plots, script_options$externality, script_options$takeup,
@@ -187,7 +192,7 @@ original_distance_itt_data <- cov_analysis_data %>%
   mutate(
     analysis_cluster_id_raw = as.character(cluster.id.x),
     original_cluster_id = clean_cluster_id(cluster.id.x, "analysis cluster.id.x"),
-    final_dist_group = factor(dist.pot.group, levels = c("close", "far")),
+    final_dist_group = factor(realized_dist_group, levels = c("close", "far")),
     cluster_id_rank = dense_rank(cluster_id)
   ) %>%
   left_join(
@@ -236,7 +241,7 @@ monitored_check <- original_distance_itt_data %>%
     KEY.individ,
     original_cluster_id,
     assigned.treatment,
-    dist.pot.group,
+    realized_dist_group_check = realized_dist_group,
     dist.to.pot,
     cluster.dist.to.pot
   ) %>%
@@ -245,12 +250,12 @@ monitored_check <- original_distance_itt_data %>%
 assert_true(!any(is.na(monitored_check$source_cluster_id)), "Some analysis rows did not match monitored source data.")
 assert_true(all(monitored_check$original_cluster_id == monitored_check$source_cluster_id), "Original cluster IDs differ from monitored source cluster IDs.")
 assert_true(all(as.character(monitored_check$assigned.treatment) == monitored_check$source_treatment), "Treatment assignments differ from monitored source data.")
-assert_true(all(as.character(monitored_check$dist.pot.group) == monitored_check$source_dist_group), "Current distance groups differ from monitored source data.")
+assert_true(all(as.character(monitored_check$realized_dist_group_check) == monitored_check$source_dist_group), "Current distance groups differ from monitored source data.")
 assert_true(max(abs(monitored_check$dist.to.pot - monitored_check$source_dist_to_pot), na.rm = TRUE) < 1e-8, "Individual PoT distances differ from monitored source data.")
 assert_true(max(abs(monitored_check$cluster.dist.to.pot - monitored_check$source_cluster_dist_to_pot), na.rm = TRUE) < 1e-8, "Cluster PoT distances differ from monitored source data.")
 
 processed_check <- original_distance_itt_data %>%
-  distinct(original_cluster_id, assigned.treatment, dist.pot.group) %>%
+  distinct(original_cluster_id, assigned.treatment, realized_dist_group) %>%
   left_join(
     read_rds("data/takeup_processed_cluster_strat.rds") %>%
       transmute(
@@ -266,7 +271,7 @@ processed_check <- original_distance_itt_data %>%
 
 assert_true(!any(is.na(processed_check$processed_treatment)), "Some clusters did not match processed randomization data.")
 assert_true(all(as.character(processed_check$assigned.treatment) == processed_check$processed_treatment), "Treatment assignments differ from processed randomization data.")
-assert_true(all(as.character(processed_check$dist.pot.group) == processed_check$processed_dist_group), "Current distance groups differ from processed randomization data.")
+assert_true(all(as.character(processed_check$realized_dist_group) == processed_check$processed_dist_group), "Current distance groups differ from processed randomization data.")
 
 cluster_audit <- original_distance_itt_data %>%
   distinct(
@@ -330,11 +335,11 @@ merge_checks <- tibble(
     sum(is.na(original_distance_itt_data$assigned_dist_group)),
     sum(is.na(original_distance_itt_data$mu_d)),
     sum(as.character(monitored_check$assigned.treatment) != monitored_check$source_treatment),
-    sum(as.character(monitored_check$dist.pot.group) != monitored_check$source_dist_group),
+    sum(as.character(monitored_check$realized_dist_group_check) != monitored_check$source_dist_group),
     max(abs(monitored_check$dist.to.pot - monitored_check$source_dist_to_pot), na.rm = TRUE),
     max(abs(monitored_check$cluster.dist.to.pot - monitored_check$source_cluster_dist_to_pot), na.rm = TRUE),
     sum(as.character(processed_check$assigned.treatment) != processed_check$processed_treatment),
-    sum(as.character(processed_check$dist.pot.group) != processed_check$processed_dist_group)
+    sum(as.character(processed_check$realized_dist_group) != processed_check$processed_dist_group)
   )
 )
 
@@ -408,6 +413,55 @@ original_distance_itt_output$tidy_summary %>%
   filter(assigned_dist_group == "far - close") %>%
   print(n = Inf)
 
+#### Realized Distance IV ------------------------------------------------------
+
+# Instrument the realized close/far group (and its treatment interactions) with
+# the corresponding terms formed from the original randomized assignment.  Keep
+# assigned_dist_group equal to the realized group so the standard prediction and
+# contrast code reports the same estimands as the main reduced-form table.
+original_distance_iv_data <- original_distance_itt_data %>%
+  mutate(
+    original_assigned_dist_group = assigned_dist_group,
+    assigned_dist_group = final_dist_group
+  )
+
+assert_true(
+  all(original_distance_iv_data$assigned_dist_group == original_distance_iv_data$final_dist_group),
+  "The IV outcome-side distance group does not match the realized distance group."
+)
+assert_true(
+  all(original_distance_iv_data$original_assigned_dist_group == original_distance_iv_data$original_dist_group),
+  "The IV instrument does not match the original randomized distance assignment."
+)
+
+original_distance_iv_regression <- function(data, weights) {
+  feols(
+    dewormed ~ 0 + assigned_treatment + .[l_cov_vars] + mu_d | county |
+      I(assigned_dist_group == "far") +
+        i(assigned_treatment, I(assigned_dist_group == "far"), ref = "control") ~
+      I(original_assigned_dist_group == "far") +
+        i(assigned_treatment, I(original_assigned_dist_group == "far"), ref = "control"),
+    data = data,
+    nthreads = 1,
+    weights = ~wt
+  )
+}
+
+original_distance_iv_output <- wrapper_function(
+  data = original_distance_iv_data,
+  regression_spec = original_distance_iv_regression,
+  tidy_summ_path = "temp-data/tidy-rf-tes/original-distance-iv-tidy-tes.csv",
+  table_name = "rf_original_distance_iv_tbl",
+  table_options = list(
+    caption = "Average Treatment Effects: Original Distance Assignment IV",
+    model_label = "Instrumental Variables"
+  )
+)
+
+original_distance_iv_output$tidy_summary %>%
+  filter(assigned_dist_group == "far - close") %>%
+  print(n = Inf)
+
 summ_know_A_itt_df <- summ_endline_know_table %>%
   filter(fct_match(know.table.type, "table.A"))
 
@@ -420,7 +474,7 @@ endline_know_A_itt_data <- endline_data %>%
   mutate(
     observability_cluster_id_raw = as.character(cluster.id),
     original_cluster_id = clean_cluster_id(cluster.id, "endline_data$cluster.id"),
-    final_dist_group = factor(dist.pot.group, levels = c("close", "far")),
+    final_dist_group = factor(realized_dist_group, levels = c("close", "far")),
     cluster_id_rank = dense_rank(original_cluster_id),
     prop_know_fob = knows_other_dewormed / obs_know_person,
     prop_know_sob = thinks_other_knows / obs_know_person
@@ -450,7 +504,7 @@ observability_source_check <- endline_know_A_itt_data %>%
     KEY.individ,
     original_cluster_id,
     assigned.treatment,
-    dist.pot.group,
+    realized_dist_group_check = realized_dist_group,
     dist.to.pot,
     standard_cluster.dist.to.pot
   ) %>%
@@ -472,7 +526,7 @@ observability_source_check <- endline_know_A_itt_data %>%
 assert_true(!any(is.na(observability_source_check$source_cluster_id)), "Some observability rows did not match endline source data.")
 assert_true(all(observability_source_check$original_cluster_id == observability_source_check$source_cluster_id), "Observability cluster IDs differ from endline source data.")
 assert_true(all(as.character(observability_source_check$assigned.treatment) == observability_source_check$source_treatment), "Observability treatment assignments differ from endline source data.")
-assert_true(all(as.character(observability_source_check$dist.pot.group) == observability_source_check$source_dist_group), "Observability current distance groups differ from endline source data.")
+assert_true(all(as.character(observability_source_check$realized_dist_group_check) == observability_source_check$source_dist_group), "Observability current distance groups differ from endline source data.")
 assert_true(max(abs(observability_source_check$dist.to.pot - observability_source_check$source_dist_to_pot), na.rm = TRUE) < 1e-8, "Observability individual PoT distances differ from endline source data.")
 assert_true(max(abs(observability_source_check$standard_cluster.dist.to.pot - observability_source_check$source_standard_cluster_dist_to_pot), na.rm = TRUE) < 1e-8, "Observability standardized cluster PoT distances differ from endline source data.")
 
@@ -493,7 +547,7 @@ observability_merge_checks <- tibble(
     sum(is.na(endline_know_A_itt_data$assigned_dist_group)),
     sum(is.na(endline_know_A_itt_data$mu_d)),
     sum(as.character(observability_source_check$assigned.treatment) != observability_source_check$source_treatment),
-    sum(as.character(observability_source_check$dist.pot.group) != observability_source_check$source_dist_group),
+    sum(as.character(observability_source_check$realized_dist_group_check) != observability_source_check$source_dist_group),
     max(abs(observability_source_check$dist.to.pot - observability_source_check$source_dist_to_pot), na.rm = TRUE),
     max(abs(observability_source_check$standard_cluster.dist.to.pot - observability_source_check$source_standard_cluster_dist_to_pot), na.rm = TRUE)
   )
@@ -659,6 +713,7 @@ full_externality_knowledge_df = full_analysis_data %>%
     female = gender == "female",
     cluster_id = dense_rank(cluster.id)
     ) %>%
+  select(-any_of("assigned_dist_group")) %>%
   select(
     cluster_id,
     cluster.id,
@@ -1513,7 +1568,7 @@ if (run_all || script_options$takeup) run_section("Takeup Levels", {
 
 # For plotting
 dist_cts_spec_bs_draws = map_dfr(
-  1:500,
+  seq_len(getOption("takeup.bootstrap_draws", 500L)),
   ~bayes_bs_f(
     seed = .x,
     f = dist_cts_regression,
@@ -1550,7 +1605,7 @@ tidy_dist_cts_spec_levels %>%
 
 #### Takeup LEVELS Discrete Distance + LASSO Covs + Expected Distance
 discrete_distance_covs_bs_draws = map_dfr(
-  1:500,
+  seq_len(getOption("takeup.bootstrap_draws", 500L)),
   ~bayes_bs_f(
     seed = .x,
     f = discrete_distance_regression,
@@ -1593,7 +1648,7 @@ tidy_discrete_distance_cov_levels %>%
 if (run_all || script_options$beliefs) run_section("Beliefs Levels", {
 
 fob_bs_draws = map_dfr(
-  1:500,
+  seq_len(getOption("takeup.bootstrap_draws", 500L)),
   ~bayes_bs_f(
     seed = .x,
     f = discrete_f_know,
@@ -2541,8 +2596,6 @@ endline_data %>%
 #### SMS -----------------------------------------------------------------------
 
 if (run_all || script_options$sms) run_section("SMS Heterogeneity", {
-  stop()
-
 pval_only_terms = c("bracelet - calendar", "signal")
 
 sms_analysis_data %>%
@@ -2673,7 +2726,7 @@ f_sms = function(data, weights) {
 
 
 sms_bs_draws = map_dfr(
-    1:500,
+    seq_len(getOption("takeup.bootstrap_draws", 500L)),
     ~bayes_bs_f(
         seed = .x, 
         f = f_sms, 

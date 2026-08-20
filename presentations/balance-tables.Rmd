@@ -420,7 +420,7 @@ create_balance_input = function(tidy_df,
 ```
 
 ```{r}
-#| baseline-covariate-naming
+#| label: baseline-covariate-naming
 lhs_translation_df = tribble(
   ~lhs, ~clean_name, ~sample,
 
@@ -497,7 +497,7 @@ lhs_translation_df = tribble(
 
 
 ```{r}
-#| balance-reading
+#| label: balance-reading
 
 comp_balance_tidy_df = read_csv(
   file.path("temp-data", "comp_balance_tidy_df.csv")
@@ -522,7 +522,7 @@ clean_census_data = balance_data$clean_census_data
 
 
 ```{r}
-#| joint-tests
+#| label: joint-tests
 
 boot_fits = read_rds(
   file.path("temp-data",
@@ -577,7 +577,9 @@ N_baseline_worm_obs  = baseline_worm_data  %>%
 
 
 ```{r}
-#| balance-creation, dependson="balance-setup", eval=FALSE
+#| label: balance-creation
+#| dependson: balance-setup
+#| eval: false
 
 
 
@@ -613,8 +615,8 @@ comp_wide_indiv_bal_df = create_balance_input(
 ## Balance
 
 ```{r, results="asis"}
-#| comp-balance-table,
-#| dependson=c("balance-setup", "balance-creation")
+#| label: comp-balance-table
+#| dependson: [balance-setup, balance-creation]
 
 main_lhs_df = lhs_translation_df %>%
   filter(!sample %in% c("endline_belief_sample", "social_image_concerns"))
@@ -645,8 +647,8 @@ render_comp_balance_table(
 
 
 ```{r, results="asis"}
-#| pretreat-baseline-balance-table
-#| dependson=c("balance-setup", "balance-creation")
+#| label: pretreat-baseline-balance-table
+#| dependson: [balance-setup, balance-creation]
 
 pretreat_baseline_lhs_df = lhs_translation_df %>%
   filter(sample %in% c("pretreat", "baseline_worm", "social_image_concerns"))
@@ -673,8 +675,8 @@ render_comp_balance_table(
 ```
 
 ```{r, results="asis"}
-#| implementation-balance-table
-#| dependson=c("balance-setup", "balance-creation")
+#| label: implementation-balance-table
+#| dependson: [balance-setup, balance-creation]
 
 impl_lhs_df = lhs_translation_df %>%
   filter(sample == "implementation")
@@ -696,8 +698,8 @@ render_comp_balance_table(
 ```
 
 ```{r, results="asis"}
-#| implementation-dist-balance-table
-#| dependson=c("balance-setup", "balance-creation")
+#| label: implementation-dist-balance-table
+#| dependson: [balance-setup, balance-creation]
 
 impl_dist_wide = build_dist_comp_wide(comp_balance_tidy_df, impl_lhs_df)
 
@@ -716,7 +718,7 @@ render_dist_comp_table(
 ```
 
 ```{r, results="asis"}
-#| dist-comp-balance-table
+#| label: dist-comp-balance-table
 
 dist_comp_wide = build_dist_comp_wide(comp_balance_tidy_df, main_lhs_df)
 
@@ -732,7 +734,7 @@ render_dist_comp_table(
 
 
 ```{r, results="asis"}
-#| endline-beliefs-table
+#| label: endline-beliefs-table
 
 belief_lhs_df = lhs_translation_df %>%
   filter(sample == "endline_belief_sample")
@@ -764,7 +766,8 @@ render_dist_comp_table(
 
 
 ```{r}
-#| endline-table, eval=FALSE
+#| label: endline-table
+#| eval: false
 
 
 endline_balance_df = create_balance_input(
@@ -815,7 +818,8 @@ endline_bal_table %>%
 
 
 ```{r}
-#| cts-distance-pval-table, eval=FALSE
+#| label: cts-distance-pval-table
+#| eval: false
 1+1
 
 
@@ -860,7 +864,8 @@ rename_lhs = function(data, name_var = term) {
 
 
 ```{r}
-#| baseline-perception-balance, eval=FALSE
+#| label: baseline-perception-balance
+#| eval: false
 
 baseline_perception_data = read_rds(
   "temp-data/praise_stigma_baseline.rds"
@@ -1024,7 +1029,7 @@ baseline_perception_tbl %>%
 
 
 ```{r}
-#| main-sample-balance
+#| label: main-sample-balance
 main_balance_samples = read_rds(
   file.path(
     "temp-data",
@@ -1205,7 +1210,7 @@ stacked_sample_tbl %>%
 ```
 
 ```{r, results="asis"}
-#| stacked-sample-dist-balance
+#| label: stacked-sample-dist-balance
 
 takeup_lhs_df = lhs_translation_df %>%
   filter(lhs %in% unique(takeup_bal_comp_df$lhs))
@@ -1247,7 +1252,7 @@ stacked_dist_tbl %>%
 ```
 
 ```{r}
-#| attrition-treat-balance
+#| label: attrition-treat-balance
 
 attrition_treat_comp_df = read_csv(
   file.path("temp-data", "attrition_treat_comp_df.csv")
@@ -1306,6 +1311,7 @@ att_treat_panel_df = lhs_translation_df %>%
     sample,
     levels = c("takeup_sample", "pretreat", "baseline_worm", "social_image_concerns", "census", "implementation")
   )) %>%
+  filter(!is.na(sample)) %>%
   arrange(sample) %>%
   data.table::data.table()
 
@@ -1351,7 +1357,7 @@ attrition_treat_bal_table %>%
 
 
 ```{r}
-#| non-attrition-treat-balance
+#| label: non-attrition-treat-balance
 
 non_attrition_treat_comp_df = read_csv(
   file.path("temp-data", "non_attrition_treat_comp_df.csv")
@@ -1409,6 +1415,7 @@ non_att_treat_panel_df = lhs_translation_df %>%
     sample,
     levels = c("takeup_sample", "pretreat", "baseline_worm", "social_image_concerns", "census", "implementation")
   )) %>%
+  filter(!is.na(sample)) %>%
   arrange(sample) %>%
   data.table::data.table()
 
@@ -1454,7 +1461,7 @@ non_attrition_treat_bal_table %>%
 
 
 ```{r}
-#| monitoring-attrition-treat-balance
+#| label: monitoring-attrition-treat-balance
 
 mon_attrition_comp_df = read_csv(
   file.path("temp-data", "monitoring_attrition_comp_df.csv")
@@ -1546,7 +1553,7 @@ mon_attrition_bal_table %>%
 
 
 ```{r}
-#| mon-non-attrition-treat-balance
+#| label: mon-non-attrition-treat-balance
 
 mon_non_attrition_comp_df = read_csv(
   file.path("temp-data", "mon_non_attrition_comp_df.csv")
@@ -1629,7 +1636,7 @@ mon_non_attrition_bal_table %>%
 
 
 ```{r, results="asis"}
-#| sms-balance-table
+#| label: sms-balance-table
 
 sms_balance      <- read_rds(file.path("temp-data", "sms_balance.rds"))
 sms_comp_rmd     <- sms_balance$sms_comp_df
@@ -1718,7 +1725,7 @@ sms_bal_tbl %>%
 
 
 ```{r, results="asis"}
-#| sms-enrollment-balance-table
+#| label: sms-enrollment-balance-table
 
 sms_enrollment_balance <- read_rds(file.path("temp-data", "sms_enrollment_balance.rds"))
 comp_sms_enrollment    <- sms_enrollment_balance$enrollment_balance_comp

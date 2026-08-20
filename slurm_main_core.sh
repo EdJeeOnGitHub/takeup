@@ -47,6 +47,8 @@ CORE_RECOGNITION_STRUCTURE=${CORE_RECOGNITION_STRUCTURE:-0}
 CORE_REPORT_STRUCTURE=${CORE_REPORT_STRUCTURE:-0}
 CORE_REPORT_ARM_DIST_HIERARCHICAL=${CORE_REPORT_ARM_DIST_HIERARCHICAL:-0}
 CORE_REPORT_ARM_DIST_PRIOR_SCALE=${CORE_REPORT_ARM_DIST_PRIOR_SCALE:-0.25}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-realized}
+WORKSPACE=${WORKSPACE:-}
 
 mkdir -p temp/log "${OUTPUT_PATH}"
 module load gcc/10.2.0
@@ -82,7 +84,11 @@ args=(
   "--core-report-structure=${CORE_REPORT_STRUCTURE}"
   "--core-report-arm-dist-hierarchical=${CORE_REPORT_ARM_DIST_HIERARCHICAL}"
   "--core-report-arm-dist-prior-scale=${CORE_REPORT_ARM_DIST_PRIOR_SCALE}"
+  "--distance-definition=${DISTANCE_DEFINITION}"
 )
+if [[ -n "${WORKSPACE}" ]]; then
+  args+=("--workspace=${WORKSPACE}")
+fi
 if [[ -n "${INIT_FILE}" ]]; then
   if [[ ! -f "${INIT_FILE}" ]]; then
     echo "Initial-value file not found: ${INIT_FILE}" >&2

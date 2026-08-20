@@ -14,7 +14,7 @@ suppressPackageStartupMessages({
 })
 
 workspace_path <- option_value(
-  "--workspace", "data/stan_analysis_data/dist_fit105.RData"
+  "--workspace", "data/stan_analysis_data/dist_fit104.RData"
 )
 data_json <- option_value("--data-json")
 model_name <- option_value(
@@ -67,8 +67,41 @@ report_arm_dist_hierarchical <- as.integer(
 report_arm_dist_prior_scale <- as.numeric(
   option_value("--core-report-arm-dist-prior-scale", "0.25")
 )
+visibility_prior_multiplier <- as.numeric(
+  option_value("--core-visibility-prior-multiplier", "1")
+)
+wtp_mu_prior_sd <- as.numeric(option_value("--core-wtp-mu-prior-sd", "2"))
+optional_numeric <- function(name) {
+  value <- option_value(name)
+  if (is.null(value)) NULL else as.numeric(value)
+}
+prior_overrides <- list(
+  mu_rep_sd = optional_numeric("--mu-rep-sd"),
+  dist_beta_v_sd = optional_numeric("--dist-beta-v-sd"),
+  raw_u_sd_alpha = optional_numeric("--raw-u-sd-alpha"),
+  raw_u_sd_beta = optional_numeric("--raw-u-sd-beta"),
+  beta_intercept_sd = optional_numeric("--beta-intercept-sd"),
+  beta_ink_effect_sd = optional_numeric("--beta-ink-effect-sd"),
+  beta_calendar_effect_sd = optional_numeric("--beta-calendar-effect-sd"),
+  beta_bracelet_effect_sd = optional_numeric("--beta-bracelet-effect-sd"),
+  wtp_value_utility_mean = optional_numeric("--wtp-value-utility-mean"),
+  wtp_value_utility_sd = optional_numeric("--wtp-value-utility-sd"),
+  lnorm_wtp_value_utility_prior = optional_numeric(
+    "--lnorm-wtp-value-utility-prior"
+  )
+)
 peer_audit_path <- option_value("--peer-audit-path")
 cluster_weight_file <- option_value("--cluster-weight-file")
+distance_definition <- option_value(
+  "--distance-definition", Sys.getenv("TAKEUP_DISTANCE_SPEC", "realized")
+)
+distance_definition <- takeup_distance_spec(distance_definition)
+if (!is.null(data_json) && distance_definition != "realized") {
+  stop(
+    "Assigned Close/Far requires rebuilding structural data from --workspace; ",
+    "an existing --data-json cannot be relabeled safely.", call. = FALSE
+  )
+}
 threads <- as.integer(option_value("--threads", "2"))
 parallel_chains <- as.integer(option_value("--parallel-chains", "4"))
 cmdstan_path_option <- option_value(
@@ -103,7 +136,13 @@ data <- if (!is.null(data_json)) {
       core_lambda_log_ratio_sd_prior = lambda_prior,
       core_profile_group_lambda = profile_group_lambda,
       core_profile_group_log_ratio = profile_group_log_ratio,
-      core_gq_override_lambda = 0L
+      core_gq_override_lambda = 0L,
+      core_visibility_prior_multiplier = visibility_prior_multiplier,
+      core_wtp_mu_prior_sd = wtp_mu_prior_sd,
+      unlist(
+        prior_overrides[!vapply(prior_overrides, is.null, logical(1))],
+        use.names = TRUE
+      )
     )
   )
 } else {
@@ -125,6 +164,21 @@ data <- if (!is.null(data_json)) {
     report_structure = report_structure,
     report_arm_dist_hierarchical = report_arm_dist_hierarchical,
     report_arm_dist_prior_scale = report_arm_dist_prior_scale,
+    visibility_prior_multiplier = visibility_prior_multiplier,
+    wtp_mu_prior_sd = wtp_mu_prior_sd,
+    mu_rep_sd = prior_overrides$mu_rep_sd,
+    dist_beta_v_sd = prior_overrides$dist_beta_v_sd,
+    raw_u_sd_alpha = prior_overrides$raw_u_sd_alpha,
+    raw_u_sd_beta = prior_overrides$raw_u_sd_beta,
+    beta_intercept_sd = prior_overrides$beta_intercept_sd,
+    beta_ink_effect_sd = prior_overrides$beta_ink_effect_sd,
+    beta_calendar_effect_sd = prior_overrides$beta_calendar_effect_sd,
+    beta_bracelet_effect_sd = prior_overrides$beta_bracelet_effect_sd,
+    wtp_value_utility_mean = prior_overrides$wtp_value_utility_mean,
+    wtp_value_utility_sd = prior_overrides$wtp_value_utility_sd,
+    lnorm_wtp_value_utility_prior =
+      prior_overrides$lnorm_wtp_value_utility_prior,
+    distance_definition = distance_definition,
     peer_audit_path = peer_audit_path
   )
 }

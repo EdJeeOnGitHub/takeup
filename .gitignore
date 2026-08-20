@@ -17,6 +17,8 @@ slurm-*.out
 stan_models/*.rds
 
 temp-data/
+build/
+_targets/
 
 # RStudio files
 .Rproj.user
@@ -65,6 +67,16 @@ temp/
 stan_models/u_sd_prior_tune
 
 stan_models/u_sd_prior_tune.hpp
+
+# Generated CmdStan translation units and executables. Stan source files remain
+# tracked explicitly; these products are reproducible from those sources.
+stan_models/*.hpp
+stan_models/takeup_struct_main_core
+stan_models/takeup_struct_main_core_compact_gq
+stan_models/takeup_struct_indiv_fp_slim
+stan_models/takeup_struct_indiv_fp_reduce_sum
+stan_models/takeup_struct_indiv_fp_reduce_sum_newton
+stan_models/wtp_model
 
 takeup.Rproj
 

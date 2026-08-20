@@ -2,6 +2,49 @@
 # generated quantities. Callers must load dplyr, purrr, and rlang first.
 
 source("scratch/main-core-asymmetric-observability-data.R")
+source("R/distance-spec.R")
+
+main_core_apply_distance_definition <- function(sample_data,
+                                                distance_definition = "realized",
+                                                project_root = ".") {
+  distance_definition <- takeup_distance_spec(distance_definition)
+  analysis_data <- sample_data$analysis_data
+  if (is.null(analysis_data) ||
+      !all(c("cluster.id", "cluster_id") %in% names(analysis_data))) {
+    stop(
+      "The saved structural workspace lacks the cluster mapping needed to ",
+      "change the distance definition.", call. = FALSE
+    )
+  }
+  crosswalk <- takeup_distance_crosswalk(
+    file.path(project_root, "data", "rct_targetable_schools_2.0.rds"),
+    file.path(project_root, "data", "takeup_processed_cluster_strat.rds"),
+    file.path(project_root, "data", "clean-data",
+              "monitored-nosms-takeup-data.rds")
+  )
+  analysis_data <- takeup_apply_distance_spec(
+    analysis_data, crosswalk, distance_definition
+  )
+  cluster_groups <- analysis_data |>
+    dplyr::distinct(.data$cluster_id, .data$analysis_dist_group) |>
+    dplyr::arrange(.data$cluster_id)
+  if (nrow(cluster_groups) != sample_data$num_clusters ||
+      !identical(cluster_groups$cluster_id, seq_len(sample_data$num_clusters))) {
+    stop("Structural cluster IDs are incomplete or out of order.", call. = FALSE)
+  }
+  group_id <- as.integer(cluster_groups$analysis_dist_group)
+  treatment_id <- as.integer(sample_data$cluster_assigned_treatment)
+  if (length(treatment_id) != sample_data$num_clusters ||
+      any(!treatment_id %in% 1:4)) {
+    stop("Unexpected structural treatment encoding.", call. = FALSE)
+  }
+  sample_data$cluster_assigned_dist_group <- group_id
+  sample_data$cluster_assigned_dist_group_treatment <-
+    (group_id - 1L) * 4L + treatment_id
+  sample_data$analysis_data <- analysis_data
+  sample_data$distance_definition <- distance_definition
+  sample_data
+}
 
 main_core_option_value <- function(args, name, default = NULL) {
   prefix <- paste0(name, "=")
@@ -69,6 +112,25 @@ main_core_student_t_mixture <- function(df = 5, components = 12L) {
   )
 }
 
+# Gaussian and estimated finite-mixture fits do not evaluate the Student-t
+# quadrature. Supply valid inert data for that unused branch and avoid calling
+# the platform BLAS/LAPACK eigensolver on every ordinary core-model launch.
+main_core_type_mixture_data <- function(type_distribution, df = 5,
+                                        components = 12L) {
+  type_distribution <- as.integer(type_distribution)
+  components <- as.integer(components)
+  if (type_distribution == 1L) {
+    return(main_core_student_t_mixture(df, components))
+  }
+  list(
+    df = df,
+    components = components,
+    scale_sq = (df - 2) / df,
+    precision = rep(1, components),
+    weight = rep(1 / components, components)
+  )
+}
+
 read_main_core_weights <- function(path, num_clusters) {
   if (is.null(path)) return(rep(1, num_clusters))
   if (!file.exists(path)) stop("Weight file not found: ", path, call. = FALSE)
@@ -107,6 +169,20 @@ prepare_main_core_data <- function(
     report_structure = 0L,
     report_arm_dist_hierarchical = 0L,
     report_arm_dist_prior_scale = 0.25,
+    visibility_prior_multiplier = 1,
+    wtp_mu_prior_sd = 2,
+    mu_rep_sd = NULL,
+    dist_beta_v_sd = NULL,
+    raw_u_sd_alpha = NULL,
+    raw_u_sd_beta = NULL,
+    beta_intercept_sd = NULL,
+    beta_ink_effect_sd = NULL,
+    beta_calendar_effect_sd = NULL,
+    beta_bracelet_effect_sd = NULL,
+    wtp_value_utility_mean = NULL,
+    wtp_value_utility_sd = NULL,
+    lnorm_wtp_value_utility_prior = NULL,
+    distance_definition = "realized",
     project_root = ".",
     peer_audit_path = NULL) {
   if (!file.exists(workspace_path)) {
@@ -131,6 +207,9 @@ prepare_main_core_data <- function(
     list_modify(!!!model_info) |>
     map_if(is.factor, as.integer)
   sample_data$num_dist_group_mix <- 1L
+  sample_data <- main_core_apply_distance_definition(
+    sample_data, distance_definition, project_root
+  )
   sample_data$use_belief_row_cluster_mu_rep <-
     sample_data$use_belief_row_cluster_mu_rep %||% 0L
   if (length(sample_data$num_belief_rows_by_cluster) != sample_data$num_clusters) {
@@ -151,6 +230,45 @@ prepare_main_core_data <- function(
     weight_file,
     sample_data$num_clusters
   )
+  if (!is.finite(visibility_prior_multiplier) ||
+      visibility_prior_multiplier <= 0 || !is.finite(wtp_mu_prior_sd) ||
+      wtp_mu_prior_sd <= 0) {
+    stop("Core visibility and WTP prior scales must be positive.",
+         call. = FALSE)
+  }
+  sample_data$core_visibility_prior_multiplier <-
+    visibility_prior_multiplier
+  sample_data$core_wtp_mu_prior_sd <- wtp_mu_prior_sd
+  prior_overrides <- list(
+    mu_rep_sd = mu_rep_sd,
+    dist_beta_v_sd = dist_beta_v_sd,
+    raw_u_sd_alpha = raw_u_sd_alpha,
+    raw_u_sd_beta = raw_u_sd_beta,
+    beta_intercept_sd = beta_intercept_sd,
+    beta_ink_effect_sd = beta_ink_effect_sd,
+    beta_calendar_effect_sd = beta_calendar_effect_sd,
+    beta_bracelet_effect_sd = beta_bracelet_effect_sd,
+    wtp_value_utility_mean = wtp_value_utility_mean,
+    wtp_value_utility_sd = wtp_value_utility_sd,
+    lnorm_wtp_value_utility_prior = lnorm_wtp_value_utility_prior
+  )
+  for (prior_name in names(prior_overrides)) {
+    value <- prior_overrides[[prior_name]]
+    if (is.null(value)) next
+    if (length(value) != 1L || !is.finite(value)) {
+      stop("Invalid prior override: ", prior_name, call. = FALSE)
+    }
+    if (prior_name == "lnorm_wtp_value_utility_prior") {
+      value <- as.integer(value)
+      if (!value %in% 0:1) {
+        stop("lnorm_wtp_value_utility_prior must be 0 or 1.", call. = FALSE)
+      }
+    } else if (prior_name != "wtp_value_utility_mean" && value <= 0) {
+      stop("Prior scale/shape must be positive: ", prior_name,
+           call. = FALSE)
+    }
+    sample_data[[prior_name]] <- value
+  }
   sample_data$use_core_cluster_shock <- as.integer(use_cluster_shock)
   sample_data$core_cluster_shock_sd_prior <- cluster_shock_sd_prior
   sample_data$core_lambda_structure <- as.integer(lambda_structure)
@@ -168,8 +286,8 @@ prepare_main_core_data <- function(
     stop("type_distribution must be 0 (Gaussian), 1 (Student-t), or 2 (finite mixture).",
          call. = FALSE)
   }
-  type_mixture <- main_core_student_t_mixture(
-    student_t_df, student_t_components
+  type_mixture <- main_core_type_mixture_data(
+    type_distribution, student_t_df, student_t_components
   )
   sample_data$core_type_distribution <- type_distribution
   sample_data$core_student_t_df <- type_mixture$df

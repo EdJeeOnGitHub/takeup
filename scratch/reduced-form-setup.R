@@ -42,6 +42,10 @@ if (exists("params")) {
 source(file.path("rct-design-fieldwork", "takeup_rct_assign_clusters.R"))
 source(file.path("analysis_util.R"))
 source(file.path("scratch", "reduced-form-functions.R"))
+source(file.path("R", "distance-spec.R"))
+
+distance_specification <- takeup_distance_spec()
+distance_crosswalk <- takeup_distance_crosswalk()
 
 
 # wtp data
@@ -52,7 +56,8 @@ kenya.proj4 <- "+proj=utm +zone=36 +south +ellps=clrk80 +units=m +no_defs"
 ## Loading Data - these are all intermediate cleaned data files
 rct.schools.data <- read_rds(file.path("data", "takeup_rct_schools.rds"))
 rct.cluster.selection <- read_rds(file.path("data", "rct_cluster_selection_2.0.rds"))
-cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))
+cluster.strat.data <- read_rds(file.path("data", "takeup_processed_cluster_strat.rds")) %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification)
 load(file.path("data", "takeup_village_pot_dist.RData"))
 # load(file.path("data", "analysis.RData"))
 library(here)
@@ -62,10 +67,14 @@ standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
 
 # Load datasets
-baseline_data = read_rds("data/clean-data/clean-baseline-data.rds")
-endline_data = read_rds("data/clean-data/clean-endline-data.rds")
-summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds")
-endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds")
+baseline_data = read_rds("data/clean-data/clean-baseline-data.rds") %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification)
+endline_data = read_rds("data/clean-data/clean-endline-data.rds") %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification)
+summ_endline_know_table = read_rds("data/clean-data/clean-endline-know-table-data.rds") %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification)
+endline_know_table_data = read_rds("data/clean-data/clean-endline-know-table-data-long.rds") %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification)
 
 # HHs in endline, not in know table
 in_endline_not_know_table = endline_data %>% 
@@ -75,8 +84,10 @@ in_endline_not_know_table = endline_data %>%
   unique()
 
 analysis_data = read_rds("data/clean-data/monitored-nosms-takeup-data.rds")  %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification) %>%
   mutate(cluster_id_rank = dense_rank(cluster.id))
 full_analysis_data = read_rds("data/clean-data/full-takeup-data.rds") %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification) %>%
   mutate(cluster_id_rank = dense_rank(cluster.id))
 
 # Subset to main analysis sample
@@ -161,7 +172,9 @@ with_env = function(f, e = parent.frame()) {
 }
 load_census_function = function(){
   load(file.path("data", "takeup_census.RData"))
-  return(census.data)
+  return(takeup_apply_distance_spec(
+    census.data, distance_crosswalk, distance_specification
+  ))
 }
 census_data = with_env(load_census_function, census_data_env)() %>%
   rename(census.consent = consent) # Rename this to reduce chance of error
@@ -345,6 +358,7 @@ analysis_data = analysis_data %>%
 
 ## Getting cluster treatment assignment
 cluster_treat_df = read_rds(file.path("data", "takeup_processed_cluster_strat.rds"))  %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification) %>%
   mutate(
       treat_dist = paste0(
       "treat: ", 
@@ -653,9 +667,11 @@ no_outlier_analysis_data = outlier_analysis_data %>%
 ## Generating another version of analysis data with covariate data which we used to use 
 # stata briefly
 cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>%
+  takeup_apply_distance_spec(distance_crosswalk, distance_specification) %>%
   mutate(assigned_dist_group = dist.pot.group) %>%
   mutate(
-    cluster.id = cluster_id
+    cluster.id = cluster_id,
+    cluster_id_rank = dense_rank(cluster_id)
   ) %>%
   mutate(assigned.treatment = factor(assigned.treatment, levels = c("control", "ink", "calendar", "bracelet"))) %>%
   mutate(assigned_treatment = assigned.treatment)  %>%

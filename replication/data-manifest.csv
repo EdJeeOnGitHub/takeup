@@ -1,0 +1,15 @@
+path,role,access,generated_by,deposit
+data/rct_targetable_schools_2.0.rds,original randomized Close/Far assignment,review before release,rct-design-fieldwork,required
+data/takeup_processed_cluster_strat.rds,realized treatment and distance assignment,review before release,rct-design-fieldwork,required
+data/clean-data/monitored-nosms-takeup-data.rds,main reduced-form analysis data,restricted,clean-data.sh,restricted substitute
+data/clean-data/full-takeup-data.rds,full take-up and SMS analysis data,restricted,clean-data.sh,restricted substitute
+data/clean-data/clean-baseline-data.rds,baseline survey analysis data,restricted,clean-data.sh,restricted substitute
+data/clean-data/clean-endline-data.rds,endline survey analysis data,restricted,clean-data.sh,restricted substitute
+data/stan_analysis_data/dist_fit104.RData,canonical workspace used to construct slim main-core data,derived,run_takeup.R,required until workspace builder is refactored
+replication/structural-draws/assigned,assigned-definition slim posterior draws,derived,make structural-fit,required
+replication/structural-draws/realized,realized-definition slim posterior draws,derived,make structural-fit,robustness
+data/stan_analysis_data/param_posterior_draws_dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv,posterior parameter input for policy demand,derived,optim/predict-takeup-for-optim.R,required for policy workflow
+optim/data/full-many-pots-experiment.rds,candidate PoT and distance input for policy optimization,derived,optim/create-distance-data.R,required for policy workflow
+Gurobi license and R package,mixed-integer policy solver,external,Gurobi,externally required
+temp-data,disposable intermediates,generated,various,exclude
+build,dependency-tracked build products,generated,Makefile and targets,exclude

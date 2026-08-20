@@ -21,6 +21,7 @@ input_path <- option_value(
   "--input-path",
   "/project/akaring/takeup-data/data/stan_analysis_data"
 )
+workspace_option <- option_value("--workspace")
 output_path <- option_value(
   "--output-path",
   "/project/akaring/takeup-data/data/stan_analysis_data"
@@ -55,6 +56,16 @@ fit_dist_override <- option_value("--fit-dist-model")
 fit_beliefs_override <- option_value("--fit-beliefs-model")
 fit_wtp_override <- option_value("--fit-wtp-model")
 cluster_weight_file <- option_value("--cluster-weight-file")
+distance_definition <- option_value(
+  "--distance-definition", Sys.getenv("TAKEUP_DISTANCE_SPEC", "realized")
+)
+distance_definition <- takeup_distance_spec(distance_definition)
+if (!is.null(data_json) && distance_definition != "realized") {
+  stop(
+    "Assigned Close/Far requires rebuilding structural data from --workspace; ",
+    "an existing --data-json cannot be relabeled safely.", call. = FALSE
+  )
+}
 use_core_cluster_shock <- as.integer(
   option_value("--use-core-cluster-shock", "0")
 )
@@ -94,6 +105,31 @@ core_report_arm_dist_hierarchical <- as.integer(
 )
 core_report_arm_dist_prior_scale <- as.numeric(
   option_value("--core-report-arm-dist-prior-scale", "0.25")
+)
+core_visibility_prior_multiplier <- as.numeric(
+  option_value("--core-visibility-prior-multiplier", "1")
+)
+core_wtp_mu_prior_sd <- as.numeric(
+  option_value("--core-wtp-mu-prior-sd", "2")
+)
+optional_numeric <- function(name) {
+  value <- option_value(name)
+  if (is.null(value)) NULL else as.numeric(value)
+}
+prior_overrides <- list(
+  mu_rep_sd = optional_numeric("--mu-rep-sd"),
+  dist_beta_v_sd = optional_numeric("--dist-beta-v-sd"),
+  raw_u_sd_alpha = optional_numeric("--raw-u-sd-alpha"),
+  raw_u_sd_beta = optional_numeric("--raw-u-sd-beta"),
+  beta_intercept_sd = optional_numeric("--beta-intercept-sd"),
+  beta_ink_effect_sd = optional_numeric("--beta-ink-effect-sd"),
+  beta_calendar_effect_sd = optional_numeric("--beta-calendar-effect-sd"),
+  beta_bracelet_effect_sd = optional_numeric("--beta-bracelet-effect-sd"),
+  wtp_value_utility_mean = optional_numeric("--wtp-value-utility-mean"),
+  wtp_value_utility_sd = optional_numeric("--wtp-value-utility-sd"),
+  lnorm_wtp_value_utility_prior = optional_numeric(
+    "--lnorm-wtp-value-utility-prior"
+  )
 )
 
 stopifnot(
@@ -150,6 +186,12 @@ if (!core_report_arm_dist_hierarchical %in% 0:2 ||
     !is.finite(core_report_arm_dist_prior_scale) ||
     core_report_arm_dist_prior_scale <= 0) {
   stop("Invalid report arm-distance hierarchy controls.", call. = FALSE)
+}
+if (!is.finite(core_visibility_prior_multiplier) ||
+    core_visibility_prior_multiplier <= 0 ||
+    !is.finite(core_wtp_mu_prior_sd) || core_wtp_mu_prior_sd <= 0) {
+  stop("Core visibility and WTP prior scales must be positive.",
+       call. = FALSE)
 }
 if (core_report_arm_dist_hierarchical > 0L &&
     (core_observation_model == 0L || core_report_structure != 0L)) {
@@ -224,7 +266,11 @@ if (nzchar(cmdstan_path_option)) {
   set_cmdstan_path(cmdstan_path_option)
 }
 
-workspace_path <- file.path(input_path, "dist_fit105.RData")
+workspace_path <- if (is.null(workspace_option)) {
+  file.path(input_path, "dist_fit105.RData")
+} else {
+  workspace_option
+}
 if (!file.exists(workspace_path)) {
   stop("Saved fit workspace not found: ", workspace_path, call. = FALSE)
 }
@@ -252,6 +298,10 @@ sample_data <- stan_data_preprocess(fit_env$stan_data) |>
   list_modify(!!!model_info) |>
   map_if(is.factor, as.integer)
 
+sample_data <- main_core_apply_distance_definition(
+  sample_data, distance_definition, project_root = "."
+)
+
 # Match the original fit-105 invocation.
 sample_data$num_dist_group_mix <- 1L
 sample_data$use_belief_row_cluster_mu_rep <-
@@ -273,6 +323,23 @@ if (sample_data$num_optim_distances == 1L) {
 # cluster mapping; that is harmless for an unweighted fit but must be rejected
 # for cluster-weighted refits.
 sample_data$core_cluster_weight <- rep(1, sample_data$num_clusters)
+sample_data$core_visibility_prior_multiplier <-
+  core_visibility_prior_multiplier
+sample_data$core_wtp_mu_prior_sd <- core_wtp_mu_prior_sd
+for (prior_name in names(prior_overrides)) {
+  value <- prior_overrides[[prior_name]]
+  if (is.null(value)) next
+  if (length(value) != 1L || !is.finite(value)) {
+    stop("Invalid prior override: ", prior_name, call. = FALSE)
+  }
+  if (prior_name == "lnorm_wtp_value_utility_prior") {
+    value <- as.integer(value)
+    if (!value %in% 0:1) stop(prior_name, " must be 0 or 1.", call. = FALSE)
+  } else if (prior_name != "wtp_value_utility_mean" && value <= 0) {
+    stop("Prior scale/shape must be positive: ", prior_name, call. = FALSE)
+  }
+  sample_data[[prior_name]] <- value
+}
 sample_data$use_core_cluster_shock <- use_core_cluster_shock
 sample_data$core_cluster_shock_sd_prior <- core_cluster_shock_sd_prior
 sample_data$core_lambda_structure <- core_lambda_structure
@@ -282,8 +349,8 @@ sample_data$core_profile_group_lambda <- core_profile_group_lambda
 sample_data$core_profile_group_log_ratio <- core_profile_group_log_ratio
 sample_data$core_gq_override_lambda <- 0L
 sample_data$core_gq_lambda_override <- rep(0, sample_data$num_treatments)
-type_mixture <- main_core_student_t_mixture(
-  core_student_t_df, core_student_t_components
+type_mixture <- main_core_type_mixture_data(
+  core_type_distribution, core_student_t_df, core_student_t_components
 )
 sample_data$core_type_distribution <- core_type_distribution
 sample_data$core_student_t_df <- type_mixture$df
@@ -361,6 +428,10 @@ if (!is.null(data_json)) {
   if (!file.exists(data_json)) stop("Data JSON not found: ", data_json, call. = FALSE)
   patched_data_json <- tempfile(fileext = ".json")
   on.exit(unlink(patched_data_json), add = TRUE)
+  json_prior_overrides <- unlist(
+    prior_overrides[!vapply(prior_overrides, is.null, logical(1))],
+    use.names = TRUE
+  )
   sample_data <- main_core_patch_stan_json_scalars(
     data_json,
     patched_data_json,
@@ -378,7 +449,10 @@ if (!is.null(data_json)) {
       core_recognition_structure = core_recognition_structure,
       core_report_structure = core_report_structure,
       core_report_arm_dist_hierarchical = core_report_arm_dist_hierarchical,
-      core_report_arm_dist_prior_scale = core_report_arm_dist_prior_scale
+      core_report_arm_dist_prior_scale = core_report_arm_dist_prior_scale,
+      core_visibility_prior_multiplier = core_visibility_prior_multiplier,
+      core_wtp_mu_prior_sd = core_wtp_mu_prior_sd,
+      json_prior_overrides
     )
   )
 }

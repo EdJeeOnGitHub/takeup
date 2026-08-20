@@ -67,13 +67,29 @@ PDF_DIR="presentations/misc-figures"
 OPTIM_FIG_DIR="presentations/optim-figures"
 
 # ── Environment ───────────────────────────────────────────────────────────────
-cd ~/projects/takeup
-module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
-export GUROBI_HOME="${HOME}/gurobi952/linux64"
-export PATH="${GUROBI_HOME}/bin:${PATH}"
-export LD_LIBRARY_PATH="${GUROBI_HOME}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-# Use cluster token server license (works on compute nodes; not login node)
-export GRB_LICENSE_FILE=/software/gurobi-9.2-el7-x86_64/gurobi.lic
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_ROOT=${TAKEUP_PROJECT_ROOT:-${SCRIPT_DIR}}
+cd "${PROJECT_ROOT}"
+
+# Midway supplies these through environment modules. Container/local runs may
+# instead provide the libraries directly and therefore skip module loading.
+if command -v module >/dev/null 2>&1; then
+    module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
+fi
+
+export GUROBI_HOME="${GUROBI_HOME:-${HOME}/gurobi952/linux64}"
+if [[ -d "${GUROBI_HOME}/bin" ]]; then
+    export PATH="${GUROBI_HOME}/bin:${PATH}"
+fi
+if [[ -d "${GUROBI_HOME}/lib" ]]; then
+    export LD_LIBRARY_PATH="${GUROBI_HOME}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
+# Use the cluster token-server license by default when it exists; local runs
+# can provide GRB_LICENSE_FILE explicitly.
+MIDWAY_GUROBI_LICENSE=/software/gurobi-9.2-el7-x86_64/gurobi.lic
+if [[ -z "${GRB_LICENSE_FILE:-}" && -f "${MIDWAY_GUROBI_LICENSE}" ]]; then
+    export GRB_LICENSE_FILE="${MIDWAY_GUROBI_LICENSE}"
+fi
 # scratch-midway2 is also noexec at GPFS policy level; home is exec-allowed
 export TMPDIR="${TMPDIR:-~/tmp-rcpp}"
 mkdir -p "${TMPDIR}" "${DATA_DIR}" "${PLOT_DIR}" "${PDF_DIR}" "${OPTIM_FIG_DIR}" temp/log
