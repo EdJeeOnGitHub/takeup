@@ -6,10 +6,20 @@
 source("R/policy/bootstrap.R")
 source("R/policy/cost-sensitivity.R")
 
-compact_path <- "temp-data/policy-cost-sensitivity/fit105-compact.csv"
-distance_path <- "optim/data/full-many-pots-experiment.rds"
-csv_path <- "ref-reports/policy-cost-sensitivity/policy-distance-cap-diagnostics.csv"
-table_path <- "appendix/structural-robustness/tables/policy-distance-cap-feasibility.tex"
+args <- commandArgs(trailingOnly = TRUE)
+compact_path <- policy_option_value(
+  args, "--parameter-csv", "temp-data/policy-cost-sensitivity/fit105-compact.csv"
+)
+parameter_type <- policy_option_value(args, "--parameter-type", "raw")
+distance_path <- policy_option_value(
+  args, "--distance-data", "optim/data/full-many-pots-experiment.rds"
+)
+csv_path <- policy_option_value(
+  args, "--csv-path", "ref-reports/policy-cost-sensitivity/policy-distance-cap-diagnostics.csv"
+)
+table_path <- policy_option_value(
+  args, "--table-path", "appendix/structural-robustness/tables/policy-distance-cap-feasibility.tex"
+)
 caps <- c(2500, 2750, 3000, 3250, 3500)
 
 if (!file.exists(compact_path)) {
@@ -17,13 +27,21 @@ if (!file.exists(compact_path)) {
 }
 
 draws <- read.csv(compact_path, check.names = FALSE, stringsAsFactors = FALSE)
-parameter_columns <- setdiff(names(draws), c("chain", "iteration", "source_csv"))
+parameter_columns <- names(draws)[vapply(draws, is.numeric, logical(1))]
+parameter_columns <- setdiff(
+  parameter_columns,
+  c("chain", "iteration", "draw", "replicate")
+)
 median_draw <- as.data.frame(as.list(vapply(
   draws[parameter_columns], median, numeric(1), na.rm = TRUE
 )), check.names = FALSE)
-parameter <- as.list(canonical_policy_parameters(
-  median_draw, replicate = 1L, mode_csv = compact_path
-))
+parameter <- if (parameter_type == "canonical") {
+  as.list(median_draw)
+} else if (parameter_type == "raw") {
+  as.list(canonical_policy_parameters(
+    median_draw, replicate = 1L, mode_csv = compact_path
+  ))
+} else stop("--parameter-type must be raw or canonical.", call. = FALSE)
 parameter$model_family <- "gaussian"
 
 distance_object <- readRDS(distance_path)
@@ -102,6 +120,8 @@ rows <- lapply(caps, function(cap) {
 })
 results <- do.call(rbind, rows)
 
+dir.create(dirname(csv_path), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(table_path), recursive = TRUE, showWarnings = FALSE)
 dir.create(dirname(csv_path), recursive = TRUE, showWarnings = FALSE)
 dir.create(dirname(table_path), recursive = TRUE, showWarnings = FALSE)
 write.csv(results, csv_path, row.names = FALSE)

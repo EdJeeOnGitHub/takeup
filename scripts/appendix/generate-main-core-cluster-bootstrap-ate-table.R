@@ -16,6 +16,9 @@ summary_path <- main_core_option_value(
   "temp-data/main-core-cluster-robustness/exponential-cluster-weight-structural-results.csv"
 )
 method <- main_core_option_value(args, "--method", "exponential")
+distance_definition <- takeup_distance_spec(main_core_option_value(
+  args, "--distance-definition", Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
+))
 specification <- switch(
   method,
   exponential = "Exponential cluster weights",
@@ -130,6 +133,11 @@ summary <- summary[order(summary$row, summary$column), ]
 dir.create(dirname(summary_path), recursive = TRUE, showWarnings = FALSE)
 dir.create(dirname(table_path), recursive = TRUE, showWarnings = FALSE)
 write.csv(summary, summary_path, row.names = FALSE)
+write.csv(
+  data.frame(distance_definition = distance_definition, method = method,
+             replications = length(unique(cells$replicate))),
+  sub("[.]csv$", "-manifest.csv", summary_path), row.names = FALSE
+)
 
 cell_tex <- function(row, column) {
   value <- summary[summary$row == row & summary$column == column, ]

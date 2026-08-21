@@ -38,6 +38,7 @@ Options:
   --write-robustness      Also write appendix robustness tables
   --write-beliefs-robustness  Also write belief/observability robustness table
   --only-beliefs-robustness   Only write belief/observability robustness table
+  --tables-only          Write tables and skip social-multiplier figures
   "),
   args = if (interactive()) "--fit-version=105 --write-robustness" else commandArgs(trailingOnly = TRUE)
 )
@@ -610,6 +611,11 @@ if (isTRUE(script_options$write_robustness)) {
 
 if (isTRUE(script_options$write_beliefs_robustness)) {
   write_beliefs_robustness_table()
+}
+
+if (isTRUE(script_options$tables_only)) {
+  cat("Tables-only render complete.\n")
+  quit(save = "no", status = 0)
 }
 
 # ---------------------------------------------------------------------------

@@ -33,6 +33,9 @@ figure_path <- option_value(
   "--figure-path",
   "presentations/misc-figures/main-core-cluster-robustness.pdf"
 )
+distance_definition <- takeup_distance_spec(option_value(
+  "--distance-definition", Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
+))
 
 split_csvs <- function(x) {
   if (is.null(x) || !nzchar(x)) return(character())
@@ -147,6 +150,7 @@ if (length(status_files) > 0L) {
     filter(
       status == "complete",
       method %in% c("multinomial", "exponential"),
+      distance_definition == .env$distance_definition,
       file.exists(gq_csv)
     ) |>
     group_by(method) |>
@@ -242,6 +246,10 @@ if (length(status_files) > 0L) {
   status_detail <- map_dfr(
     status_files, read.csv, stringsAsFactors = FALSE
   )
+  if (!"distance_definition" %in% names(status_detail) ||
+      any(status_detail$distance_definition != distance_definition)) {
+    stop("Weighted-fit status files do not consistently match --distance-definition.")
+  }
   valid_weight <- !is.na(status_detail$weight_file) &
     file.exists(status_detail$weight_file)
   status_detail$weight_hash <- NA_character_

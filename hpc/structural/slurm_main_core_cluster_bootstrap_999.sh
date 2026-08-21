@@ -25,6 +25,11 @@ PAPER_OUTPUT=${PAPER_OUTPUT:-${ANALYSIS_ROOT}/main-core-exponential-cluster-weig
 MANIFEST=${MANIFEST:-${WEIGHTS_PATH}/weight-manifest.csv}
 BASELINE_INIT=${BASELINE_INIT:-${OUTPUT_PATH}/unweighted/mode-init.json}
 STAN_PATH=${STAN_PATH:-stan_models}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
+if [[ "${DISTANCE_DEFINITION}" != "assigned" && "${DISTANCE_DEFINITION}" != "realized" ]]; then
+  echo "DISTANCE_DEFINITION must be assigned or realized" >&2
+  exit 2
+fi
 if [[ -z "${CMDSTAN_PATH:-}" ]]; then
   if [[ -d /home/edjee/.cmdstan/cmdstan-2.35.0 ]]; then
     CMDSTAN_PATH=/home/edjee/.cmdstan/cmdstan-2.35.0
@@ -69,6 +74,7 @@ case "${STAGE}" in
       scripts/appendix/fit-main-core-weighted-mode.R \
       "--workspace=${WORKSPACE}" "--output-path=${OUTPUT_PATH}" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
       --threads=8
     ;;
   bootstrap)
@@ -78,7 +84,8 @@ case "${STAGE}" in
       "--workspace=${WORKSPACE}" "--manifest=${MANIFEST}" \
       "--task-id=${SLURM_ARRAY_TASK_ID}" "--init-json=${BASELINE_INIT}" \
       "--output-path=${OUTPUT_PATH}" "--stan-path=${STAN_PATH}" \
-      "--cmdstan-path=${CMDSTAN_PATH}" --threads=8
+      "--cmdstan-path=${CMDSTAN_PATH}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" --threads=8
     ;;
   launch)
     : "${NEXT_START:?launch stage requires NEXT_START}"
@@ -112,6 +119,7 @@ case "${STAGE}" in
     Rscript --no-save --no-restore --no-init-file \
       scripts/appendix/summarize-main-core-cluster-robustness.R \
       "--weighted-path=${OUTPUT_PATH}" "--output-path=${PAPER_OUTPUT}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
       "--table-path=${PAPER_OUTPUT}/main-core-exponential-cluster-weight-multipliers.tex" \
       "--figure-path=${PAPER_OUTPUT}/main-core-exponential-cluster-weight-multipliers.pdf"
     Rscript --no-save --no-restore --no-init-file \
@@ -119,7 +127,7 @@ case "${STAGE}" in
       "--draws=${PAPER_OUTPUT}/estimand-draws.csv" \
       "--table-path=${PAPER_OUTPUT}/main-core-exponential-cluster-weight-overall-te-table.tex" \
       "--summary-path=${PAPER_OUTPUT}/exponential-cluster-weight-structural-results.csv" \
-      "--method=${WEIGHT_METHOD}"
+      "--method=${WEIGHT_METHOD}" "--distance-definition=${DISTANCE_DEFINITION}"
     ;;
   *) echo "Unknown STAGE=${STAGE}" >&2; exit 2 ;;
 esac

@@ -16,6 +16,7 @@ SPECIFICATION=${SPECIFICATION:?Set an observability specification}
 FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-observability-ladder}
 INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-asym-input}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 
 case "${SPECIFICATION}" in
   f1) observation=1; recognition=0; report=1; hierarchical=0; prior_scale=0.25 ;;
@@ -50,6 +51,7 @@ Rscript --no-save --no-restore --no-init-file \
   "--core-report-structure=${report}" \
   "--core-report-arm-dist-hierarchical=${hierarchical}" \
   "--core-report-arm-dist-prior-scale=${prior_scale}" \
+  "--distance-definition=${DISTANCE_DEFINITION}" \
   "--force-recompile=${FORCE_RECOMPILE:-0}" \
   --threads=4 --parallel-chains=1 \
   "--cmdstan-path=${CMDSTAN_PATH}"

@@ -22,7 +22,7 @@ Rscript --no-save --no-restore --no-init-file \
   --output-path="$output_dir" \
   --stan-path=stan_models \
   --stan-file=takeup_struct_main_core.stan \
-  --output-basename="main-core-${specification}" \
+  --output-basename="dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP" \
   --distance-definition="$specification" \
   --chains=4 \
   --parallel-chains=4 \

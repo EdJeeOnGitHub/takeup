@@ -23,6 +23,7 @@ STAN_PATH=${STAN_PATH:-stan_models}
 MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP}
 ITER_WARMUP=${ITER_WARMUP:-800}
 ITER_SAMPLING=${ITER_SAMPLING:-800}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 
 mkdir -p temp/log "${OUTPUT_PATH}"
 module load -f R/4.2.0
@@ -91,7 +92,8 @@ case "${STAGE}" in
       --adapt-delta=0.999 --max-treedepth=12 --metric=diag_e \
       "--seed=$((20261020 + chain))" \
       "--init-files=${MODE_INIT}" \
-      --core-type-distribution=2
+      --core-type-distribution=2 \
+      "--distance-definition=${DISTANCE_DEFINITION}"
     ;;
   gq)
     fit_csvs=$(find "${OUTPUT_PATH}/fits/finite-mixture" -maxdepth 1 -type f \
@@ -107,6 +109,7 @@ case "${STAGE}" in
       "--output-path=${OUTPUT_PATH}/gq/finite-mixture" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
       --core-type-distribution=2 --force-recompile=0 \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
       --threads=2 --parallel-chains=4
     ;;
   summarize)

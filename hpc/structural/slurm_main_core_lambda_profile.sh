@@ -17,7 +17,7 @@ OUTPUT_PATH=${OUTPUT_PATH:-${ROOT_OUTPUT}/profile}
 MANIFEST=${MANIFEST:-${OUTPUT_PATH}/lambda-profile-manifest.csv}
 WORKSPACE=${WORKSPACE:-${ANALYSIS_ROOT}/main-core-bootstrap-input/dist_fit105.RData}
 MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP}
-STAN_PATH=${STAN_PATH:-stan_models_fit105}
+STAN_PATH=${STAN_PATH:-stan_models}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 INIT_JSON=${INIT_JSON:-${ROOT_OUTPUT}/modes/grouped-sd0p25/mode-init.json}
 

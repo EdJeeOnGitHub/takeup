@@ -124,8 +124,16 @@ takeup_run_reduced_form <- function(specification, output_dir, context_files,
       stderr = log_path
     ))
   if (status != 0L) stop("Reduced-form build failed; see ", log_path, call. = FALSE)
+  generated <- list.files(table_dir, pattern = "[.]tex$", full.names = TRUE)
+  if (!length(generated) || any(file.info(generated)$size == 0L)) {
+    stop("Reduced-form build produced no valid tables.", call. = FALSE)
+  }
   marker <- file.path(output_dir, "reduced-form.complete")
-  writeLines(format(Sys.time(), tz = "UTC", usetz = TRUE), marker)
+  utils::write.csv(data.frame(
+    distance_definition = specification, bootstrap_draws = bootstrap_draws,
+    generated_tables = length(generated),
+    completed_utc = format(Sys.time(), tz = "UTC", usetz = TRUE)
+  ), marker, row.names = FALSE)
   marker
 }
 
@@ -187,13 +195,31 @@ takeup_run_balance_section <- function(specification, output_dir, section,
     stop("Balance section '", section, "' failed; see ", log_path,
          call. = FALSE)
   }
+  expected <- c(
+    main = "main-balance-samples.rds",
+    orig = "cluster_balance_fits.rds",
+    `fit-ri` = "balance-ri-fe.rds",
+    attrition = "attrition_treat_comp_df.csv",
+    `monitored-attrition` = "monitoring_attrition_comp_df.csv",
+    sms = "sms_enrollment_balance.rds"
+  )[[section]]
+  expected_path <- file.path(balance_dir, expected)
+  if (!file.exists(expected_path) || file.info(expected_path)$size == 0L) {
+    stop("Balance section '", section, "' did not produce ", expected,
+         ".", call. = FALSE)
+  }
   generated_balance_files <- list.files(balance_dir, full.names = TRUE)
   if (length(generated_balance_files)) {
     file.copy(generated_balance_files, file.path(run_dir, "temp-data"),
               overwrite = TRUE)
   }
   marker <- file.path(output_dir, paste0("balance-", section, ".complete"))
-  writeLines(format(Sys.time(), tz = "UTC", usetz = TRUE), marker)
+  utils::write.csv(data.frame(
+    distance_definition = specification, section = section,
+    ri_draws = ri_draws, required_output = expected,
+    required_output_sha256 = unname(tools::md5sum(expected_path)),
+    completed_utc = format(Sys.time(), tz = "UTC", usetz = TRUE)
+  ), marker, row.names = FALSE)
   marker
 }
 
@@ -237,7 +263,10 @@ takeup_saved_draws <- function(specification) {
   )
   generated_root <- file.path("build", "structural-fit", specification)
   root <- if (dir.exists(deposited_root)) deposited_root else generated_root
-  files <- Sys.glob(file.path(root, "*.csv"))
+  files <- list.files(
+    root, full.names = TRUE,
+    pattern = "^dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-[1-4][.]csv$"
+  )
   if (length(files) != 4L) {
     stop(
       "Expected four saved slim-chain CSVs in ", root,

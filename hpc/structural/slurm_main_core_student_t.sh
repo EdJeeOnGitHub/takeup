@@ -16,13 +16,14 @@ WORKSPACE=${WORKSPACE:-${ANALYSIS_ROOT}/main-core-bootstrap-input/dist_fit105.RD
 OUTPUT_PATH=${OUTPUT_PATH:-${ANALYSIS_ROOT}/main-core-student-t-robustness}
 MODE_PATH=${MODE_PATH:-${OUTPUT_PATH}/mode/student-t5}
 BASELINE_GQ_DIR=${BASELINE_GQ_DIR:-${ANALYSIS_ROOT}/main-core-lambda-identification/gq/common}
-STAN_PATH=${STAN_PATH:-stan_models_fit105}
+STAN_PATH=${STAN_PATH:-stan_models}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP}
 DF=${DF:-5}
 COMPONENTS=${COMPONENTS:-12}
 ITER_WARMUP=${ITER_WARMUP:-400}
 ITER_SAMPLING=${ITER_SAMPLING:-400}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 
 mkdir -p temp/log "${OUTPUT_PATH}"
 module load -f R/4.2.0
@@ -38,6 +39,7 @@ case "${STAGE}" in
       "--output-path=${OUTPUT_PATH}/mode" --label=student-t5 \
       --core-type-distribution=1 "--core-student-t-df=${DF}" \
       "--core-student-t-components=${COMPONENTS}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
       --threads=8 --seed=20260831
     ;;
@@ -58,7 +60,8 @@ case "${STAGE}" in
       "--seed=$((20260900 + chain))" \
       "--init-files=${MODE_PATH}/mode-init.json" \
       --core-type-distribution=1 "--core-student-t-df=${DF}" \
-      "--core-student-t-components=${COMPONENTS}"
+      "--core-student-t-components=${COMPONENTS}" \
+      "--distance-definition=${DISTANCE_DEFINITION}"
     ;;
   gq)
     fit_csvs=$(find "${OUTPUT_PATH}/fits/student-t5" -maxdepth 1 -type f \
@@ -69,7 +72,9 @@ case "${STAGE}" in
       "--fit-csvs=${fit_csvs}" "--output-path=${OUTPUT_PATH}/gq/student-t5" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
       --core-type-distribution=1 "--core-student-t-df=${DF}" \
-      "--core-student-t-components=${COMPONENTS}" --threads=2 --parallel-chains=4
+      "--core-student-t-components=${COMPONENTS}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
+      --threads=2 --parallel-chains=4
     ;;
   summarize)
     Rscript --no-save --no-restore --no-init-file \

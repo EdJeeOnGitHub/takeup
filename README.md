@@ -24,6 +24,28 @@ Use `make help` for the individual reduced-form, balance, structural, policy,
 and audit targets. See `replication/README.md` for the complete reproduction
 contract and restricted-input requirements.
 
+## Assigned-distance candidate paper
+
+The non-promoting candidate workflow refits the slim structural model with the
+randomized assigned Close/Far definition and stages both the manuscript and the
+structural-robustness appendix under `build/paper-candidate/assigned/`:
+
+```sh
+make candidate-local DISTANCE_SPEC=assigned
+make candidate-hpc-export DISTANCE_SPEC=assigned
+# Run the exported jobs externally and construct the checksummed result bundle.
+make candidate-hpc-import DISTANCE_SPEC=assigned \
+  CANDIDATE_HPC_BUNDLE=/path/to/completed-bundle
+make candidate-policy DISTANCE_SPEC=assigned POLICY_REPLICATES=999
+make paper-candidate DISTANCE_SPEC=assigned
+make candidate-check DISTANCE_SPEC=assigned
+```
+
+Make never submits the external jobs. Candidate staging rejects old frozen
+artifacts for every distance-sensitive or posterior-derived dependency. It also
+writes `NUMERIC-TODOS.md`, listing hard-coded statistical claims that require
+author review; it does not edit the source manuscript or approved artifacts.
+
 ## Repository layout
 
 - `R/`: reusable analysis functions, with no command-line entry points.

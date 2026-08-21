@@ -5,6 +5,7 @@
 # historical package library.
 
 args <- commandArgs(trailingOnly = TRUE)
+source("R/distance/spec.R")
 arg_value <- function(flag, default) {
   hit <- grep(paste0("^", flag, "="), args, value = TRUE)
   if (!length(hit)) return(default)
@@ -39,7 +40,6 @@ takeup <- data.frame(
   cluster_id = clean_id(takeup$cluster.id.x),
   county = factor(takeup$county),
   arm = factor(takeup$assigned.treatment, levels = arms),
-  final_far = as.integer(takeup$dist.pot.group == "far"),
   distance_km = takeup$cluster.dist.to.pot / 1000,
   y = as.numeric(as.logical(takeup$dewormed)),
   female = as.numeric(takeup$female),
@@ -47,11 +47,15 @@ takeup <- data.frame(
   mu_d = takeup$mu_d
 )
 
-original <- unique(data.frame(
-  cluster_id = clean_id(readRDS("data/rct_targetable_schools_2.0.rds")$pot.cluster.id),
-  original_far = as.integer(readRDS("data/rct_targetable_schools_2.0.rds")$assigned.dist.cat == "far")
-))
-takeup <- merge(takeup, original, by = "cluster_id", all.x = TRUE, sort = FALSE)
+distance_groups <- takeup_distance_crosswalk() |>
+  dplyr::filter(.data$in_main_analysis) |>
+  dplyr::transmute(
+    cluster_id = .data$cluster.id,
+    original_far = as.integer(.data$assigned_dist_group == "far"),
+    final_far = as.integer(.data$realized_dist_group == "far")
+  ) |>
+  as.data.frame()
+takeup <- merge(takeup, distance_groups, by = "cluster_id", all.x = TRUE, sort = FALSE)
 
 endline <- readRDS("data/clean-data/clean-endline-data.rds")
 knowledge <- readRDS("data/clean-data/clean-endline-know-table-data.rds")
@@ -72,10 +76,9 @@ obs$female <- obs$female_cov
 obs$age <- obs$age_cov
 obs$cluster_id <- clean_id(obs$cluster.id)
 obs <- merge(obs, cluster_cov, by = "cluster_id", all.x = TRUE, sort = FALSE)
-obs <- merge(obs, original, by = "cluster_id", all.x = TRUE, sort = FALSE)
+obs <- merge(obs, distance_groups, by = "cluster_id", all.x = TRUE, sort = FALSE)
 obs$county <- factor(obs$county)
 obs$arm <- factor(obs$assigned.treatment, levels = arms)
-obs$final_far <- as.integer(obs$dist.pot.group == "far")
 obs$definite <- obs$knows_other_dewormed / obs$obs_know_person
 obs$correct <- obs$pct_correct_classification_yesnodk
 obs$own_observed <- obs$thinks_other_knows / obs$obs_know_person
@@ -90,7 +93,7 @@ assert(!anyNA(takeup), "Take-up analysis fields contain missing values")
 
 cluster_frame <- unique(takeup[c("cluster_id", "county", "arm", "final_far", "original_far", "distance_km")])
 cluster_frame <- cluster_frame[order(cluster_frame$cluster_id), ]
-cluster_frame$stratum <- interaction(cluster_frame$county, cluster_frame$final_far, drop = TRUE)
+cluster_frame$stratum <- interaction(cluster_frame$county, cluster_frame$original_far, drop = TRUE)
 assert(nrow(cluster_frame) == 144L, "Cluster fields are not constant within community")
 
 stratum_counts <- as.data.frame.matrix(table(cluster_frame$stratum, cluster_frame$arm))
@@ -300,6 +303,7 @@ write.csv(sample_audit, file.path(out_dir, "data", "sample-audit.csv"), row.name
 permutation_audit <- data.frame(
   permutations = B, seed = seed, cores = cores, communities = nrow(cluster_frame),
   strata = nlevels(cluster_frame$stratum), switches = 26,
+  stratum_definition = "county_x_original_assigned_close_far",
   generated_at = format(Sys.time(), tz = "UTC", usetz = TRUE)
 )
 write.csv(permutation_audit, file.path(out_dir, "data", "permutation-audit.csv"), row.names = FALSE)

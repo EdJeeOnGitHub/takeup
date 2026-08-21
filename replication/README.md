@@ -118,6 +118,31 @@ This uses the stripped main-core Stan model, runs four chains across at most
 eight CPU threads, and writes outputs to `build/structural-fit/assigned/`.
 It is intentionally separate from ordinary paper reproduction.
 
+## Complete assigned-distance candidate
+
+`make candidate-local` runs the local production components without writing to
+paper-facing directories. The production defaults are 500 reduced-form
+bootstrap draws, 500 balance RI draws, 1,000 appendix cluster-weight draws, and
+99,999 conditional randomization-inference permutations. Completion files are
+CSV manifests containing the specification and draw count, rather than
+unverifiable timestamp markers.
+
+`make candidate-hpc-export` writes a commit- and input-hashed request below
+`build/candidate-hpc/assigned/export/`. Run the listed jobs from that commit,
+place paper-relative products under `artifacts/`, and provide an
+`artifact-manifest.csv` with `path`, `sha256`, `workflow_id`, and
+`distance_definition`. `make candidate-hpc-import` rejects missing workflows,
+mixed definitions, stale paths, and checksum mismatches. It does not submit or
+monitor Slurm.
+
+After importing the structural robustness bundle and running the 999-replicate
+sparse policy workflow, `make paper-candidate` compiles the manuscript and the
+standalone structural-robustness appendix. `make candidate-check` requires
+assigned provenance for every sensitive artifact, four production structural
+chains, complete external workflows, and an empty missing-artifact list. Open
+numeric prose TODOs are allowed at this review stage but prevent treating the
+candidate as promotion-ready.
+
 ## Outputs and data
 
 All generated outputs live below `build/`; existing results are not overwritten.

@@ -541,4 +541,19 @@ fit <- model$sample(
 
 message("Output files:")
 message(paste(fit$output_files(), collapse = "\n"))
-print(fit$diagnostic_summary())
+diagnostics <- fit$diagnostic_summary()
+print(diagnostics)
+write.csv(diagnostics, file.path(
+  output_path, paste0(output_basename, "-diagnostics.csv")
+), row.names = FALSE)
+write.csv(data.frame(
+  distance_definition = distance_definition,
+  model = model_name,
+  stan_file = stan_file_name,
+  chains = chains,
+  iter_warmup = iter_warmup,
+  iter_sampling = iter_sampling,
+  seed = seed,
+  git_commit = system2("git", c("rev-parse", "HEAD"), stdout = TRUE)[[1L]],
+  completed_utc = format(Sys.time(), tz = "UTC", usetz = TRUE)
+), file.path(output_path, paste0(output_basename, "-manifest.csv")), row.names = FALSE)

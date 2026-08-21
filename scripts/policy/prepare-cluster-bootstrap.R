@@ -13,6 +13,12 @@ output_path <- policy_option_value(
 )
 num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"))
 method <- policy_option_value(args, "--method", "exponential")
+distance_definition <- policy_option_value(
+  args, "--distance-definition", Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
+)
+if (!distance_definition %in% c("assigned", "realized")) {
+  stop("--distance-definition must be assigned or realized.", call. = FALSE)
+}
 if (!method %in% c("exponential", "multinomial")) {
   stop("--method must be exponential or multinomial.", call. = FALSE)
 }
@@ -20,8 +26,12 @@ if (!method %in% c("exponential", "multinomial")) {
 status_files <- Sys.glob(file.path(weighted_path, "*", "status.csv"))
 if (length(status_files) == 0L) stop("No bootstrap status files found.", call. = FALSE)
 statuses <- do.call(rbind, lapply(status_files, read.csv, stringsAsFactors = FALSE))
+if (!"distance_definition" %in% names(statuses)) {
+  stop("Weighted status files predate explicit distance provenance.", call. = FALSE)
+}
 statuses <- statuses[
   statuses$method == method & statuses$status == "complete" &
+    statuses$distance_definition == distance_definition &
     file.exists(statuses$mode_csv),
 ]
 statuses <- statuses[order(statuses$replicate), ]
@@ -68,5 +78,10 @@ write.csv(
   ), names(statuses)), drop = FALSE],
   file.path(output_path, "policy-bootstrap-draw-map.csv"), row.names = FALSE
 )
+write.csv(data.frame(
+  distance_definition = distance_definition, method = method,
+  replications = nrow(parameters),
+  generated_utc = format(Sys.time(), tz = "UTC", usetz = TRUE)
+), file.path(output_path, "policy-bootstrap-manifest.csv"), row.names = FALSE)
 message("Prepared ", nrow(parameters), " ", method,
         " cluster-weighted policy modes.")

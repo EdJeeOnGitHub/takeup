@@ -31,9 +31,9 @@ Midway analysis directory.
 
 The randomization-inference section is regenerated with
 `Rscript scripts/appendix/randomization-inference.R --permutations=99999`. It preserves
-the exact four-arm counts within county by finalized-distance randomization
-strata and reports original-assignment results separately from realized-distance
-sensitivity analyses. Stable outputs are written first to
+the exact four-arm counts within the original county-by-assigned-distance
+randomization strata and reports original-assignment results separately from
+realized-distance sensitivity analyses. Stable outputs are written first to
 `ref-reports/randomization-inference/` and then copied into this bundle.
 
 The reduced-form relative-distance-multiplier section is regenerated with

@@ -54,6 +54,15 @@ student_t_df <- as.numeric(option_value("--core-student-t-df", "5"))
 student_t_components <- as.integer(
   option_value("--core-student-t-components", "12")
 )
+distance_definition <- takeup_distance_spec(option_value(
+  "--distance-definition", Sys.getenv("TAKEUP_DISTANCE_SPEC", "assigned")
+))
+if (!is.null(data_json) && distance_definition != "realized") {
+  stop(
+    "Assigned Close/Far requires rebuilding from --workspace; an existing ",
+    "--data-json cannot be relabeled safely.", call. = FALSE
+  )
+}
 
 method <- "unweighted"
 replicate_id <- 0L
@@ -117,7 +126,8 @@ data <- if (!is.null(data_json)) {
     profile_group_log_ratio = profile_group_log_ratio,
     type_distribution = type_distribution,
     student_t_df = student_t_df,
-    student_t_components = student_t_components
+    student_t_components = student_t_components,
+    distance_definition = distance_definition
   )
 }
 model <- cmdstan_model(
@@ -221,6 +231,7 @@ status_data <- data.frame(
   type_distribution = type_distribution,
   student_t_df = student_t_df,
   student_t_components = student_t_components,
+  distance_definition = distance_definition,
   replicate = replicate_id,
   seed = seed,
   status = status,

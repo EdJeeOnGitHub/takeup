@@ -9,6 +9,7 @@ Options:
   --output-path=<path>  Path to find results [default: temp-data/struct-postprocess]
   --data-path=<path>  Path to analysis data [default: data]
   --model=<model>  Which model to postprocess
+  --distance-definition=<definition>  Close/Far definition [default: assigned]
   --prior  Postprocess the prior predictive
 
   "),

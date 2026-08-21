@@ -16,12 +16,13 @@ ANALYSIS_ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_d
 WORKSPACE=${WORKSPACE:-${ANALYSIS_ROOT}/main-core-bootstrap-input/dist_fit105.RData}
 OUTPUT_PATH=${OUTPUT_PATH:-${ANALYSIS_ROOT}/main-core-lambda-identification}
 MANIFEST=${MANIFEST:-${OUTPUT_PATH}/lambda-specification-manifest.csv}
-STAN_PATH=${STAN_PATH:-stan_models_fit105}
+STAN_PATH=${STAN_PATH:-stan_models}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 MODEL=${MODEL:-STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP}
 ITER_WARMUP=${ITER_WARMUP:-400}
 ITER_SAMPLING=${ITER_SAMPLING:-400}
 BASELINE_CSV_DIR=${BASELINE_CSV_DIR:-${ANALYSIS_ROOT}/main-core-baseline-production}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 
 mkdir -p temp/log "${OUTPUT_PATH}"
 module load -f R/4.2.0
@@ -70,7 +71,7 @@ case "${STAGE}" in
       "--core-lambda-structure=${structure}" \
       "--core-lambda-log-ratio-sd-prior=${prior}" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
-      "--seed=${seed}" --threads=8
+      "--seed=${seed}" "--distance-definition=${DISTANCE_DEFINITION}" --threads=8
     ;;
   sample)
     : "${SLURM_ARRAY_TASK_ID:?sample requires --array=1-36}"
@@ -97,7 +98,8 @@ case "${STAGE}" in
       --adapt-delta=0.999 --max-treedepth=12 --metric=diag_e \
       "--seed=$((seed + chain))" "--init-files=${init_file}" \
       "--core-lambda-structure=${structure}" \
-      "--core-lambda-log-ratio-sd-prior=${prior}"
+      "--core-lambda-log-ratio-sd-prior=${prior}" \
+      "--distance-definition=${DISTANCE_DEFINITION}"
     ;;
   gq)
     : "${SLURM_ARRAY_TASK_ID:?gq requires --array=1-9}"
@@ -114,7 +116,8 @@ case "${STAGE}" in
       "--output-path=${OUTPUT_PATH}/gq/${label}" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
       "--core-lambda-structure=${structure}" \
-      "--core-lambda-log-ratio-sd-prior=${prior}"
+      "--core-lambda-log-ratio-sd-prior=${prior}" \
+      "--distance-definition=${DISTANCE_DEFINITION}"
     ;;
   summarize)
     Rscript --no-save --no-restore --no-init-file \

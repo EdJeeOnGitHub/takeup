@@ -27,6 +27,7 @@ ITER_SAMPLING=${ITER_SAMPLING:-400}
 MAX_TREEDEPTH=${MAX_TREEDEPTH:-12}
 RERUN_FIT_ROOT=${RERUN_FIT_ROOT:-fits-rerun}
 RERUN_GQ_ROOT=${RERUN_GQ_ROOT:-gq-rerun}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 
 mkdir -p temp/log "${OUTPUT_PATH}"
 module load -f R/4.2.0
@@ -110,6 +111,7 @@ case "${STAGE}" in
       "--iter-sampling=${ITER_SAMPLING}" \
       --adapt-delta=0.999 "--max-treedepth=${MAX_TREEDEPTH}" --metric=diag_e \
       "--seed=$((seed + chain))" "--init-files=${MODE_INIT}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
       "${priors[@]}"
     ;;
   gq|gq-rerun)
@@ -138,6 +140,7 @@ case "${STAGE}" in
       "--output-path=${OUTPUT_PATH}/${gq_root}/${label}" \
       "--output-basename=${label}-compact" \
       "--stan-path=${STAN_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
+      "--distance-definition=${DISTANCE_DEFINITION}" \
       "${priors[@]}"
     ;;
   summarize)
