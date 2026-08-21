@@ -88,18 +88,13 @@ structural-render:
 		--output=build/structural-paper/$(DISTANCE_SPEC)/fit$(STRUCTURAL_RENDER_FIT)/comparison.csv
 
 ## make structural-candidate-render Postprocess and render the assigned slim baseline fit.
-structural-candidate-render: structural-fit
+structural-candidate-render: structural-postprocess
 	mkdir -p "$(CANDIDATE_COMPONENT_ROOT)/structural-data"
-	Rscript --no-save --no-restore scripts/structural/postprocess-ate.R 105 \
-		--input-path=build/structural-fit/$(DISTANCE_SPEC) \
+	Rscript --no-save --no-restore scripts/structural/postprocess-main-core-compact.R \
+		--compact-gq-path=build/$(DISTANCE_SPEC)/structural/compact-gq \
+		--fit-path=build/structural-fit/$(DISTANCE_SPEC) \
 		--output-path="$(CANDIDATE_COMPONENT_ROOT)/structural-data" \
-		--model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
-		--distance-definition=$(DISTANCE_SPEC) 1 2 3 4
-	Rscript --no-save --no-restore scripts/structural/postprocess-submodel.R 105 \
-		--input-path=build/structural-fit/$(DISTANCE_SPEC) \
-		--output-path="$(CANDIDATE_COMPONENT_ROOT)/structural-data" \
-		--model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
-		--distance-definition=$(DISTANCE_SPEC) 1 2 3 4
+		--fit-version=105 --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 	Rscript --no-save --no-restore scripts/structural/render-paper.R \
 		--fit-version=105 --input-path="$(CANDIDATE_COMPONENT_ROOT)/structural-data" \
 		--output-path="$(CANDIDATE_COMPONENT_ROOT)/structural-data" \

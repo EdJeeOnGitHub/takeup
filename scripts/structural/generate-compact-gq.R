@@ -105,7 +105,7 @@ if (!is.null(data_json) && distance_definition != "realized") {
 threads <- as.integer(option_value("--threads", "2"))
 parallel_chains <- as.integer(option_value("--parallel-chains", "4"))
 cmdstan_path_option <- option_value(
-  "--cmdstan-path", Sys.getenv("CMDSTAN", unset = "")
+  "--cmdstan-path", Sys.getenv("CMDSTAN_PATH", unset = "")
 )
 force_recompile <- as.integer(option_value("--force-recompile", "0")) == 1L
 
@@ -114,7 +114,6 @@ if (length(fit_csvs) < 1L || any(!nzchar(fit_csvs)) ||
   stop("--fit-csvs must list existing fitted-parameter CSVs.", call. = FALSE)
 }
 if (nzchar(cmdstan_path_option)) {
-  Sys.setenv(CMDSTAN = cmdstan_path_option)
   set_cmdstan_path(cmdstan_path_option)
 }
 Sys.setenv(CMDSTANR_NO_VER_CHECK = "TRUE")

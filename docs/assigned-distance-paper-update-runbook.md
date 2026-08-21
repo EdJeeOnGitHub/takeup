@@ -10,9 +10,9 @@ The existing command `make paper DISTANCE_SPEC=assigned` is not, by itself, a co
 |---|---|---|
 | Distance crosswalk and audit | Complete | Validate again during the final candidate build |
 | Main reduced form, including Tables 1 and 2 | Complete | The 500-draw assigned and realized bootstrap runs are available |
-| Balance tables | Pending | Run the assigned specification with the full randomization-inference draws |
-| Reduced-form appendix results | Pending audit/run | Rebuild every output that reports a Close/Far split |
-| Baseline structural ATEs | Mostly complete | The assigned reaggregation exists; render candidate tables and figures |
+| Balance tables | Complete locally | Six validated sections and candidate tables use 500 RI draws |
+| Reduced-form appendix results | Complete locally | Campaign-day and multiplier use 1,000 bootstrap draws; RI uses 99,999 reallocations |
+| Baseline structural ATEs | Complete locally | Four-chain slim fit, compact GQ, and candidate tables are available |
 | Other structural specifications | Pending | Reaggregate saved generated quantities using assigned groups |
 | Cluster structural inference | Pending | Reprocess the 999 weighted fits and cluster-random-shock model |
 | Continuous-distance multiplier and policy results | Expected to be invariant | Verify rather than re-estimate when possible |
@@ -44,9 +44,9 @@ The target:
 
 This isolation is necessary because some existing appendix scripts copy their results directly into `appendix/structural-robustness/` or other stable paper-facing locations.
 
-## 2. Complete the assigned balance results
+## 2. Assigned balance results
 
-The main expensive local job still outstanding is:
+The full assigned balance build completed successfully. To reproduce it, run:
 
 ```bash
 make balance \
@@ -70,7 +70,9 @@ make balance DISTANCE_SPEC=assigned BALANCE_SECTIONS=fit-ri RI_DRAWS=500 TAKEUP_
 make balance-tables DISTANCE_SPEC=assigned
 ```
 
-Render the tables only after all required sections have completed.
+Render the tables only after all required sections have completed. Completed
+sections are cached and validated independently, so a repeat invocation skips
+them.
 
 ## 3. Reduced-form results
 
@@ -87,7 +89,8 @@ make reduced-form \
 
 The targets pipeline should recognize and skip completed work.
 
-The remaining audit must cover auxiliary reduced-form outputs outside the main target, especially:
+The local candidate workflow now covers the auxiliary reduced-form outputs
+outside the main target, including:
 
 - campaign-day results;
 - randomization inference;
@@ -96,27 +99,34 @@ The remaining audit must cover auxiliary reduced-form outputs outside the main t
 - `sms-TE-by-dist-incentive.pdf`;
 - `dist-ri-plot.pdf`.
 
-The campaign-day analysis labelled “original assignment” may already use the desired definition. Validate it against the canonical assigned variable rather than assuming it needs numerical changes.
+The production local settings are 1,000 bootstrap draws for campaign-day and
+the reduced-form distance multiplier, and 99,999 conditional arm reallocations
+for randomization inference.
 
 ## 4. Baseline and alternative structural results
 
-The baseline structural model does not need to be refitted solely because of the binary-distance change. It uses continuous distance; Close/Far is primarily used when aggregating treatment effects.
+The baseline structural model does not need to be refitted solely because of
+the binary-distance change. For the candidate audit, however, a fresh
+four-chain fit of the latest slim main-core model was completed and retained
+under `build/structural-fit/assigned/`.
 
-The assigned baseline aggregation and its comparison with realized status are available under:
+Compact generated quantities and modern renderer inputs are available under:
 
 ```text
-build/structural-distance/assigned/
-build/structural-distance/assigned-vs-realized.csv
+build/assigned/structural/compact-gq/
+build/candidate-components/assigned/structural-data/
+build/candidate-components/assigned/tables/
 ```
 
-Render that aggregation into candidate paper artifacts with:
+Regenerate and render them with:
 
 ```bash
-make structural-render \
-  DISTANCE_SPEC=assigned \
-  STRUCTURAL_RENDER_FIT=105 \
-  STRUCTURAL_RENDER_INPUT=build/structural-distance/assigned
+make structural-postprocess DISTANCE_SPEC=assigned
+make structural-candidate-render DISTANCE_SPEC=assigned
 ```
+
+The fit wrapper reuses the completed fit only after checking the manifest and
+diagnostics. Set `FORCE_STRUCTURAL_FIT=1` when a deliberate refit is required.
 
 Apply the same assigned-group reaggregation to every robustness output with Combined, Close, Far, or Far-minus-Close columns, including:
 
@@ -197,15 +207,12 @@ For every changed artifact, the comparison should record:
 
 ## Recommended execution order
 
-1. Run the implemented isolated `paper-candidate` workflow and non-promoting appendix options.
-2. Finish the 500-draw assigned balance workflow.
-3. Audit and regenerate all reduced-form appendix outputs with binary Close/Far content.
-4. Render the already-computed assigned baseline structural aggregation.
-5. Reaggregate the remaining structural robustness specifications.
-6. Recover and reprocess the 999 cluster-weighted fits and cluster-random-shock output.
-7. Validate continuous-distance multiplier, policy, and design artifacts for identity.
-8. Stage and compile the candidate paper.
-9. Audit hard-coded manuscript numbers and create the old-versus-new comparison bundle.
-10. Review the bundle before separately authorizing any promotion into the paper or Overleaf.
+1. Export and run the Midway bundle for the remaining structural robustness jobs.
+2. Reprocess the 999 cluster-weighted fits and cluster-random-shock output.
+3. Generate and validate policy outputs from the canonical compact parameters.
+4. Import the checksummed Midway result bundle.
+5. Stage and compile the candidate paper.
+6. Audit hard-coded manuscript numbers and create the old-versus-new comparison bundle.
+7. Review the bundle before separately authorizing any promotion into the paper or Overleaf.
 
 The critical path is therefore the isolated candidate target, full balance run, and complete structural Close/Far reaggregation—especially cluster inference. No approved result should be replaced until the candidate PDF and comparison manifest have been reviewed.

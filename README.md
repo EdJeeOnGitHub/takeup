@@ -79,7 +79,13 @@ The current structural workflow uses:
 - `stan_models/takeup_struct_main_core_compact_gq.stan` for compact generated
   quantities;
 - `scripts/workflow/run-structural-fit.sh` for a local four-chain refit;
+- `scripts/structural/postprocess-main-core-compact.R` for the aggregate
+  overall, signal/private, belief, and WTP renderer contracts;
 - `scripts/structural/render-paper.R` for focused paper tables and figures.
+
+The structural wrapper reuses an existing four-chain fit only after validating
+its manifest and diagnostics (zero divergences, zero maximum-treedepth hits,
+and E-BFMI above 0.3). Set `FORCE_STRUCTURAL_FIT=1` to require a fresh refit.
 
 The current optimal-policy workflow is `make optimal-policy`. It uses compact
 cluster-weighted parameters and sparse feasible-edge predictions, and requires

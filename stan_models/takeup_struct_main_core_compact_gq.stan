@@ -707,6 +707,17 @@ generated quantities {
   // Rows: Combined, Close, Far. Columns follow the canonical Stan treatment
   // order and are reordered only by paper postprocessing.
   matrix[3, num_treatments] core_compact_takeup_level;
+  // Rows are Combined, Close, Far. Matrix rows index the private-incentive
+  // treatment and columns index the signal treatment. Keeping only these
+  // weighted aggregates is enough to reproduce the paper's overall,
+  // private, and signal decompositions without the legacy cluster arrays.
+  array[3] matrix[num_treatments, num_treatments]
+    core_compact_takeup_cf_level;
+  matrix[num_discrete_dist, num_treatments]
+    core_compact_belief_prob_1ord;
+  matrix[num_discrete_dist, num_treatments]
+    core_compact_belief_prob_2ord;
+  vector[num_preference_value_diff] core_compact_prob_prefer_calendar;
   // Rows: 500m, 1500m, 2500m.
   matrix[3, num_treatments] core_compact_sm;
   matrix[3, num_treatments] core_compact_sm_rescaled;
@@ -757,9 +768,13 @@ generated quantities {
       beliefs_treatment_map_design_matrix * hyper_beta_1ord';
     vector[num_treatments] rep_dist_slope =
       beliefs_treatment_map_design_matrix * hyper_dist_beta_1ord';
+    vector[num_treatments] rep_intercept_2ord =
+      beliefs_treatment_map_design_matrix * hyper_beta_2ord';
+    vector[num_treatments] rep_dist_slope_2ord =
+      beliefs_treatment_map_design_matrix * hyper_dist_beta_2ord';
     vector[num_clusters] cluster_shock = rep_vector(0, num_clusters);
-    vector[num_treatments] combined_numerator =
-      rep_vector(0, num_treatments);
+    matrix[num_treatments, num_treatments] combined_numerator_cf =
+      rep_matrix(0, num_treatments, num_treatments);
     real total_weight = 0;
     real u_sd = raw_u_sd[1];
     real total_error_sd = sqrt(1 + square(u_sd));
@@ -1038,17 +1053,33 @@ generated quantities {
     }
 
     for (dist_group_index in 1:num_discrete_dist) {
+      vector[num_beliefs_obs] belief_distance =
+        all_cluster_dist[beliefs_cluster_index, dist_group_index];
+      for (treatment_index in 1:num_treatments) {
+        core_compact_belief_prob_1ord[dist_group_index, treatment_index] =
+          mean(inv_logit(
+            rep_intercept[treatment_index] +
+            rep_dist_slope[treatment_index] * belief_distance
+          ));
+        core_compact_belief_prob_2ord[dist_group_index, treatment_index] =
+          mean(inv_logit(
+            rep_intercept_2ord[treatment_index] +
+            rep_dist_slope_2ord[treatment_index] * belief_distance
+          ));
+      }
+    }
+    for (value_index in 1:num_preference_value_diff) {
+      core_compact_prob_prefer_calendar[value_index] = 1 - normal_cdf(
+        scaled_preference_value_diff[value_index] | hyper_wtp_mu, wtp_sigma
+      );
+    }
+
+    for (dist_group_index in 1:num_discrete_dist) {
       vector[num_clusters] counterfactual_dist =
         all_cluster_dist[, dist_group_index];
       for (treatment_index in 1:num_treatments) {
         int cell_index = 0;
-        vector[num_clusters] mu_rep;
         vector[num_clusters] benefit_cost;
-        vector[num_clusters] cutoff;
-        vector[num_clusters] probability;
-        matrix[num_clusters, 4] noisy_q_taker = rep_matrix(0, num_clusters, 4);
-        matrix[num_clusters, 4] noisy_q_nontaker = rep_matrix(0, num_clusters, 4);
-        real group_numerator = 0;
 
         for (candidate_index in 1:num_dist_group_treatments) {
           if (cluster_treatment_map[candidate_index, 1] == treatment_index &&
@@ -1060,18 +1091,28 @@ generated quantities {
           reject("No treatment-by-distance cell found in compact core GQ.");
         }
 
-        mu_rep = core_compact_signal_lambda[treatment_index] * inv_logit(
-          rep_intercept[treatment_index] +
-          rep_dist_slope[treatment_index] * counterfactual_dist
-        );
         benefit_cost =
           rep_vector(structural_treatment_effect[cell_index], num_clusters) -
           dist_beta_v[1] * counterfactual_dist + cluster_shock;
-        if (core_observation_model > 0) {
-          for (cluster_index in 1:num_clusters) {
-            for (truth in 1:2) {
+        for (mu_treatment_index in 1:num_treatments) {
+          vector[num_clusters] mu_rep =
+            core_compact_signal_lambda[mu_treatment_index] * inv_logit(
+              rep_intercept[mu_treatment_index] +
+              rep_dist_slope[mu_treatment_index] * counterfactual_dist
+            );
+          vector[num_clusters] cutoff;
+          vector[num_clusters] probability;
+          matrix[num_clusters, 4] noisy_q_taker =
+            rep_matrix(0, num_clusters, 4);
+          matrix[num_clusters, 4] noisy_q_nontaker =
+            rep_matrix(0, num_clusters, 4);
+          real group_numerator = 0;
+
+          if (core_observation_model > 0) {
+            for (cluster_index in 1:num_clusters) {
+              for (truth in 1:2) {
               vector[2] recognition = core_gq_recognition_channel(
-                counterfactual_dist[cluster_index], truth, treatment_index,
+                counterfactual_dist[cluster_index], truth, mu_treatment_index,
                 core_recognition_structure, core_recognition_intercept,
                 core_recognition_dist_slope,
                 core_recognition_arm_intercept_raw,
@@ -1079,8 +1120,9 @@ generated quantities {
                 core_signal_lambda_contrast_basis
               );
               vector[6] report = core_gq_report_channel(
-                counterfactual_dist[cluster_index], truth, treatment_index,
-                core_report_structure, core_is_public_signal[treatment_index],
+                counterfactual_dist[cluster_index], truth, mu_treatment_index,
+                core_report_structure,
+                core_is_public_signal[mu_treatment_index],
                 core_report_intercept, core_report_dist_slope,
                 core_report_arm_intercept_raw, core_report_arm_dist_raw,
                 core_report_arm_dist_hierarchical, core_report_arm_dist_sd,
@@ -1103,77 +1145,87 @@ generated quantities {
                   core_observation_model
                 )';
               }
+              }
             }
           }
-        }
-        for (cluster_index in 1:num_clusters) {
-          if (core_observation_model > 0) {
-            cutoff[cluster_index] = core_gq_find_fixedpoint_noisy_safe(
-              benefit_cost[cluster_index], base_mu_rep, total_error_sd, u_sd,
-              noisy_q_taker[cluster_index]', noisy_q_nontaker[cluster_index]',
-              core_observation_model == 1 ? 3 : 4,
-              use_u_in_delta
-            );
-          } else if (core_type_distribution == 1) {
-            cutoff[cluster_index] = core_gq_find_fixedpoint_student_t_safe(
-              benefit_cost[cluster_index], mu_rep[cluster_index], u_sd,
-              use_u_in_delta, core_type_scale_sq,
-              core_type_mixture_precision, core_type_mixture_weight
-            );
-          } else if (core_type_distribution == 2) {
-            cutoff[cluster_index] =
-              core_gq_find_fixedpoint_finite_mixture_safe(
+          for (cluster_index in 1:num_clusters) {
+            if (core_observation_model > 0) {
+              cutoff[cluster_index] = core_gq_find_fixedpoint_noisy_safe(
+                benefit_cost[cluster_index], base_mu_rep, total_error_sd, u_sd,
+                noisy_q_taker[cluster_index]', noisy_q_nontaker[cluster_index]',
+                core_observation_model == 1 ? 3 : 4,
+                use_u_in_delta
+              );
+            } else if (core_type_distribution == 1) {
+              cutoff[cluster_index] = core_gq_find_fixedpoint_student_t_safe(
+                benefit_cost[cluster_index], mu_rep[cluster_index], u_sd,
+                use_u_in_delta, core_type_scale_sq,
+                core_type_mixture_precision, core_type_mixture_weight
+              );
+            } else if (core_type_distribution == 2) {
+              cutoff[cluster_index] =
+                core_gq_find_fixedpoint_finite_mixture_safe(
                 benefit_cost[cluster_index], mu_rep[cluster_index], u_sd,
                 use_u_in_delta, finite_component_mean,
                 finite_component_variance, finite_component_weight
               );
-          } else {
-            cutoff[cluster_index] = core_gq_find_fixedpoint_safe(
-              benefit_cost[cluster_index],
-              mu_rep[cluster_index],
-              total_error_sd,
-              u_sd,
-              use_u_in_delta,
-              alg_sol_rel_tol,
-              alg_sol_f_tol,
-              alg_sol_max_steps
-            );
+            } else {
+              cutoff[cluster_index] = core_gq_find_fixedpoint_safe(
+                benefit_cost[cluster_index],
+                mu_rep[cluster_index],
+                total_error_sd,
+                u_sd,
+                use_u_in_delta,
+                alg_sol_rel_tol,
+                alg_sol_f_tol,
+                alg_sol_max_steps
+              );
+            }
           }
-        }
-        if (core_type_distribution == 1) {
-          for (cluster_index in 1:num_clusters) {
-            probability[cluster_index] = 1 - core_student_t_moments(
-              cutoff[cluster_index], u_sd, use_u_in_delta,
-              core_type_scale_sq, core_type_mixture_precision,
-              core_type_mixture_weight
-            )[1];
-          }
-        } else if (core_type_distribution == 2) {
-          for (cluster_index in 1:num_clusters) {
-            probability[cluster_index] = 1 -
-              core_finite_mixture_moments(
+          if (core_type_distribution == 1) {
+            for (cluster_index in 1:num_clusters) {
+              probability[cluster_index] = 1 - core_student_t_moments(
+                cutoff[cluster_index], u_sd, use_u_in_delta,
+                core_type_scale_sq, core_type_mixture_precision,
+                core_type_mixture_weight
+              )[1];
+            }
+          } else if (core_type_distribution == 2) {
+            for (cluster_index in 1:num_clusters) {
+              probability[cluster_index] = 1 -
+                core_finite_mixture_moments(
                 cutoff[cluster_index], u_sd, use_u_in_delta,
                 finite_component_mean, finite_component_variance,
                 finite_component_weight
               )[1];
+            }
+          } else {
+            probability = Phi_approx(-cutoff / total_error_sd);
           }
-        } else {
-          probability = Phi_approx(-cutoff / total_error_sd);
-        }
 
-        for (cluster_index in 1:num_clusters) {
-          real size_weight = sum(cluster_size[cluster_index]);
-          group_numerator += size_weight * probability[cluster_index];
-          if (cluster_dist_treatment_id[cluster_index] == dist_group_index) {
-            combined_numerator[treatment_index] +=
-              size_weight * probability[cluster_index];
+          for (cluster_index in 1:num_clusters) {
+            real size_weight = sum(cluster_size[cluster_index]);
+            group_numerator += size_weight * probability[cluster_index];
+            if (cluster_dist_treatment_id[cluster_index] == dist_group_index) {
+              combined_numerator_cf[treatment_index, mu_treatment_index] +=
+                size_weight * probability[cluster_index];
+            }
           }
+          core_compact_takeup_cf_level[
+            dist_group_index + 1, treatment_index, mu_treatment_index
+          ] = group_numerator / total_weight;
         }
-        core_compact_takeup_level[dist_group_index + 1, treatment_index] =
-          group_numerator / total_weight;
       }
     }
-    core_compact_takeup_level[1] = combined_numerator' / total_weight;
+    core_compact_takeup_cf_level[1] = combined_numerator_cf / total_weight;
+    for (dist_level_index in 1:3) {
+      for (treatment_index in 1:num_treatments) {
+        core_compact_takeup_level[dist_level_index, treatment_index] =
+          core_compact_takeup_cf_level[
+            dist_level_index, treatment_index, treatment_index
+          ];
+      }
+    }
 
     if (num_roc_distances < compact_sm_roc_index[3]) {
       reject("Compact core GQ requires ROC distances through 2500m.");
