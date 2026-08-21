@@ -41,14 +41,13 @@ utils::write.csv(input_manifest, file.path(output_root, "input-manifest.csv"),
 
 workflows <- data.frame(
   workflow_id = c(
-    "baseline", "cluster-shock", "cluster-weight-999", "prior-grid",
+    "cluster-shock", "cluster-weight-999", "prior-grid",
     "student-t", "finite-mixture", "lambda", "observability-reporting",
     "individual-distance", "no-outliers", "policy-parameters",
     "policy-model-inputs"
   ),
   required = TRUE,
   command = c(
-    "make structural-fit DISTANCE_SPEC=assigned",
     "DISTANCE_DEFINITION=assigned USE_CORE_CLUSTER_SHOCK=1 sbatch --array=1-4 hpc/structural/slurm_main_core.sh",
     "DISTANCE_DEFINITION=assigned bash hpc/structural/submit_main_core_cluster_bootstrap_999.sh",
     "DISTANCE_DEFINITION=assigned bash hpc/structural/submit_main_core_prior_grid.sh",
@@ -59,12 +58,11 @@ workflows <- data.frame(
     "DISTANCE_DEFINITION=assigned MODEL=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP sbatch --array=1-4 hpc/structural/slurm_main_core.sh",
     "DISTANCE_DEFINITION=assigned MODEL=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS sbatch --array=1-4 hpc/structural/slurm_main_core.sh",
     "Rscript scripts/policy/prepare-cluster-bootstrap.R --distance-definition=assigned --num-replicates=999",
-    "Rscript scripts/policy/prepare-model-robustness.R and predict-model-robustness.R for every maintained alternative"
+    "bash hpc/policy/submit_policy_model_robustness.sh"
   ),
   stringsAsFactors = FALSE
 )
 expected <- c(
-  baseline = "tables/struct-overall-te-table.tex;tables/private-signal-te-table.tex;tables/fob-beliefs-table.tex;tables/wtp-summ-table.tex",
   `cluster-shock` = "appendix/structural-robustness/tables/main-core-cluster-robustness.tex",
   `cluster-weight-999` = paste(c(
     "appendix/structural-robustness/tables/main-core-exponential-cluster-weight-overall-te-table.tex",
@@ -91,7 +89,9 @@ manifest <- data.frame(
 utils::write.csv(manifest, file.path(output_root, "candidate-hpc-manifest.csv"), row.names = FALSE)
 writeLines(c(
   "# Candidate HPC bundle", "",
-  "Run every command in `job-manifest.csv` from the recorded Git commit.",
+  "Run every required command in `job-manifest.csv` from the recorded Git commit.",
+  "The baseline tables are generated and validated locally, so they are not",
+  "part of this external-compute request.",
   "The completed bundle must contain an unchanged candidate-hpc-manifest.csv,",
   "an artifact-manifest.csv with columns path,sha256,workflow_id,distance_definition,",
   "and an artifacts/ directory containing those relative paths."
