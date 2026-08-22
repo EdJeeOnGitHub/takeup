@@ -15,6 +15,7 @@ STAGE=${STAGE:?Set STAGE to prepare, predict, optimize, summarize, or population
 PROJECT_ROOT=${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}
 NUM_REPLICATES=${NUM_REPLICATES:-999}
 WEIGHT_METHOD=${WEIGHT_METHOD:-exponential}
+DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 NUM_CORES=${NUM_CORES:-12}
 MODEL=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 OUTPUT_PATH=${OUTPUT_PATH:-optim/data/${MODEL}/agg-full-many-pots-exponential-cluster-weights}
@@ -55,7 +56,8 @@ case "${STAGE}" in
   prepare)
     Rscript --no-save --no-restore scripts/policy/prepare-cluster-bootstrap.R \
       "--weighted-path=${WEIGHTED_PATH}" "--output-path=${OUTPUT_PATH}" \
-      "--num-replicates=${NUM_REPLICATES}" "--method=${WEIGHT_METHOD}"
+      "--num-replicates=${NUM_REPLICATES}" "--method=${WEIGHT_METHOD}" \
+      "--distance-definition=${DISTANCE_DEFINITION}"
     ;;
   predict)
     Rscript --no-save --no-restore scripts/policy/predict-cluster-bootstrap.R \
