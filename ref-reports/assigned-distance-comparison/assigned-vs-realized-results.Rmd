@@ -4,7 +4,6 @@ output:
     latex_engine: pdflatex
     keep_tex: true
 classoption: landscape
-fontfamily: mathpazo
 geometry: margin=0.55in
 params:
   paper_tex: "/home/agent/projects/overleaf/overleaf-takeup/ECM ReStud.tex"
@@ -13,7 +12,6 @@ header-includes:
   - \usepackage{booktabs}
   - \usepackage{graphicx}
   - \usepackage{xcolor}
-  - \usepackage{float}
   - \usepackage{caption}
   - \usepackage{amsmath}
   - '\providecommand{\makecell}[2][]{\begin{tabular}{c}#2\end{tabular}}'
@@ -38,14 +36,18 @@ realized_roots <- c(
   "build/distance-comparison/realized",
   "build/realized",
   "build/candidate-components/realized",
-  "build/structural-paper/realized/fit105"
+  "build/structural-paper/realized/fit105",
+  "build/structural-paper/invariant",
+  "build/policy/posterior"
 )
 assigned_roots <- c(
   "build/distance-comparison/assigned",
   "build/assigned",
   "build/candidate-components/assigned",
   "build/candidate-hpc/assigned/imported/artifacts",
-  "build/structural-paper/assigned/fit105"
+  "build/structural-paper/assigned/fit105",
+  "build/structural-paper/invariant",
+  "build/policy/posterior"
 )
 
 manifest <- build_comparison_manifest(
@@ -96,11 +98,13 @@ draw_manifest <- if (file.exists(draw_manifest_path)) {
 
 This report compares outputs using the same current analysis code. Realized-distance
 results are always shown on the left and assigned-distance results on the right.
-It does not replace or promote any approved paper artifact. Identical pairs are
-recorded below and in the manifest but omitted from the detailed pages.
+It does not replace or promote any approved paper artifact. Identical
+distance-sensitive pairs are recorded below and in the manifest but omitted
+from the detailed pages. Generated invariant paper figures are included once
+on each side so the visual audit retains the paper's full opening sequence.
 
 ```{r audit-summary, results='asis'}
-cat("\\begin{table}[H]\\centering\n")
+cat("\\begin{table}[h!]\\centering\n")
 cat("\\begin{tabular}{lr}\\toprule\nStatus & Number of distance-sensitive artifacts \\\\\ \\midrule\n")
 for (name in names(status_counts)) {
   safe_name <- paste(strsplit(name, "_", fixed = TRUE)[[1L]], collapse = "\\_")
@@ -129,7 +133,7 @@ The machine-readable audit is
 
 ```{r comparison-pages, results='asis'}
 if (!nrow(details)) {
-  cat("\\clearpage\\begin{center}No changed or pending distance-sensitive artifacts found.\\end{center}\n")
+  cat("\\clearpage\\begin{center}No changed, pending, or generated invariant artifacts found.\\end{center}\n")
 } else {
   for (index in seq_len(nrow(details))) {
     cat("\\clearpage\n")
