@@ -10,8 +10,8 @@ table_path <- policy_option_value(
 )
 num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"))
 method <- policy_option_value(args, "--method", "exponential")
-if (!method %in% c("exponential", "multinomial")) {
-  stop("--method must be exponential or multinomial.", call. = FALSE)
+if (!method %in% c("exponential", "multinomial", "posterior")) {
+  stop("--method must be exponential, multinomial, or posterior.", call. = FALSE)
 }
 if (is.null(input_path)) stop("--input-path is required.", call. = FALSE)
 
@@ -21,15 +21,11 @@ scenario_results <- do.call(rbind, lapply(seq_len(nrow(policy_scenarios)), funct
   )
   if (!file.exists(path)) stop("Missing scenario status: ", path, call. = FALSE)
   value <- read.csv(path, stringsAsFactors = FALSE)
-  allowed_status <- if (policy_scenarios$suppress_reputation[index]) {
-    c("complete", "target_infeasible")
-  } else {
-    "complete"
-  }
+  allowed_status <- c("complete", "target_infeasible")
   value <- value[value$status %in% allowed_status, ]
   value <- value[order(value$draw), ]
   if (nrow(value) != num_replicates || anyDuplicated(value$draw)) {
-    stop("Expected exactly ", num_replicates, " completed draws in ", path, call. = FALSE)
+    stop("Expected exactly ", num_replicates, " resolved draws in ", path, call. = FALSE)
   }
   value
 }))
@@ -81,9 +77,16 @@ summary_rows <- do.call(rbind, lapply(split(all_results, all_results$scenario_id
 }))
 summary_rows <- summary_rows[order(summary_rows$scenario_id), ]
 write.csv(summary_rows, file.path(input_path, "policy-cluster-bootstrap-summary.csv"), row.names = FALSE)
-no_image_infeasible <- sum(
-  all_results$scenario == "suppress-reputation" &
-    all_results$status == "target_infeasible"
+infeasible_counts <- aggregate(
+  as.integer(status == "target_infeasible") ~ scenario_label,
+  data = scenario_results,
+  FUN = sum
+)
+names(infeasible_counts)[[2L]] <- "count"
+infeasible_counts <- infeasible_counts[infeasible_counts$count > 0L, ]
+infeasible_note <- paste(
+  paste0(infeasible_counts$scenario_label, ": ", infeasible_counts$count),
+  collapse = "; "
 )
 
 format_cell <- function(estimate, lower, upper, digits, integer = FALSE) {
@@ -123,21 +126,26 @@ lines <- c(
   "\\end{tabular}}",
   "\\begin{minipage}{0.98\\linewidth}",
   "\\footnotesize \\textit{Notes:} Entries are medians across",
-  if (method == "exponential") {
+  if (method == "posterior") {
+    paste0(num_replicates, " balanced posterior draws;")
+  } else if (method == "exponential") {
     paste0(num_replicates, " exponential cluster-weighted mode refits;")
   } else {
     paste0(num_replicates, " county-stratified cluster-bootstrap mode refits;")
   },
   "parentheses are 2.5th and 97.5th percentiles. The welfare target is fixed",
-  "at the baseline experimental-allocation target. The no-social-image target",
-  paste0("is infeasible in ", no_image_infeasible, " of ", num_replicates,
-         " refits; in those refits that row reports the best/closest-site"),
-  paste0("benchmark. The mode approximation passed ",
-         if (method == "exponential") "96.7" else "93.4",
-         " percent of its prespecified"),
-  "short-MCMC audit cells.",
+  "at the baseline experimental-allocation target. Target-infeasible refits",
+  paste0("are ", infeasible_note, " (out of ", num_replicates,
+         " per scenario); those rows report the best/closest-site"),
+  if (method == "posterior") {
+    "benchmark. Draws are selected evenly within each of four chains."
+  } else {
+    paste0("benchmark. The mode approximation passed ",
+           if (method == "exponential") "96.7" else "93.4",
+           " percent of its prespecified short-MCMC audit cells.")
+  },
   "\\end{minipage}"
 )
 dir.create(dirname(table_path), recursive = TRUE, showWarnings = FALSE)
 writeLines(lines, table_path)
-message("Wrote ", method, " cluster-weighted policy table: ", table_path)
+message("Wrote ", method, " policy table: ", table_path)
