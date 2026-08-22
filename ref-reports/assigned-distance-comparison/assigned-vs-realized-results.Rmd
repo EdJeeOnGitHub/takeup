@@ -1,0 +1,139 @@
+---
+output:
+  pdf_document:
+    latex_engine: pdflatex
+    keep_tex: true
+classoption: landscape
+fontfamily: mathpazo
+geometry: margin=0.55in
+params:
+  paper_tex: "/home/agent/projects/overleaf/overleaf-takeup/ECM ReStud.tex"
+  output_root: "build/reports"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{graphicx}
+  - \usepackage{xcolor}
+  - \usepackage{float}
+  - \usepackage{caption}
+  - \usepackage{amsmath}
+  - '\providecommand{\makecell}[2][]{\begin{tabular}{c}#2\end{tabular}}'
+  - '\providecommand{\floatfoot}[1]{\par\vspace{0.3em}{\scriptsize #1}}'
+  - '\providecommand{\sym}[1]{\ifmmode^{#1}\else\(^{#1}\)\fi}'
+  - \setlength{\parindent}{0pt}
+  - \setlength{\parskip}{0.35em}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+source("R/reports/distance-comparison.R")
+
+paper_tex <- params$paper_tex
+if (!file.exists(paper_tex)) {
+  fallback <- "ref-reports/ECM ReStud.tex"
+  if (!file.exists(fallback)) stop("Paper source not found: ", paper_tex)
+  paper_tex <- fallback
+}
+
+realized_roots <- c(
+  "build/distance-comparison/realized",
+  "build/realized",
+  "build/candidate-components/realized",
+  "build/structural-paper/realized/fit105"
+)
+assigned_roots <- c(
+  "build/distance-comparison/assigned",
+  "build/assigned",
+  "build/candidate-components/assigned",
+  "build/candidate-hpc/assigned/imported/artifacts",
+  "build/structural-paper/assigned/fit105"
+)
+
+manifest <- build_comparison_manifest(
+  paper_tex = paper_tex,
+  realized_roots = realized_roots,
+  assigned_roots = assigned_roots,
+  contract_path = "replication/paper-artifact-contract.csv"
+)
+paper_aux <- file.path(
+  dirname(paper_tex), "build",
+  paste0(tools::file_path_sans_ext(basename(paper_tex)), ".aux")
+)
+overleaf_labels <- read_overleaf_labels(paper_aux)
+label_lookup <- stats::setNames(overleaf_labels$overleaf_number,
+                                overleaf_labels$label)
+manifest$overleaf_number <- unname(label_lookup[manifest$label])
+source_labels <- infer_paper_numbers(paper_tex)
+source_lookup <- stats::setNames(source_labels$overleaf_number,
+                                 source_labels$label)
+missing_number <- is.na(manifest$overleaf_number)
+manifest$overleaf_number[missing_number] <- unname(
+  source_lookup[manifest$label[missing_number]]
+)
+dir.create(params$output_root, recursive = TRUE, showWarnings = FALSE)
+utils::write.csv(
+  manifest,
+  file.path(params$output_root, "assigned-vs-realized-results-manifest.csv"),
+  row.names = FALSE
+)
+
+repo_commit <- system2("git", c("rev-parse", "HEAD"), stdout = TRUE)[1L]
+paper_hash <- sha256_file(paper_tex)
+status_counts <- table(factor(
+  manifest$status[manifest$distance_sensitive],
+  levels = c("changed", "identical", "realized missing", "assigned missing", "both missing")
+))
+details <- manifest[manifest$detail_page, , drop = FALSE]
+draw_manifest_path <- "build/distance-comparison/structural-draw-manifest.csv"
+draw_manifest <- if (file.exists(draw_manifest_path)) {
+  utils::read.csv(draw_manifest_path, stringsAsFactors = FALSE)
+} else NULL
+```
+
+\begin{center}
+{\Large\textbf{Assigned versus Realized Distance: Paper Results Audit}}\\[0.5em]
+{\large Comparison in active manuscript order}
+\end{center}
+
+This report compares outputs using the same current analysis code. Realized-distance
+results are always shown on the left and assigned-distance results on the right.
+It does not replace or promote any approved paper artifact. Identical pairs are
+recorded below and in the manifest but omitted from the detailed pages.
+
+```{r audit-summary, results='asis'}
+cat("\\begin{table}[H]\\centering\n")
+cat("\\begin{tabular}{lr}\\toprule\nStatus & Number of distance-sensitive artifacts \\\\\ \\midrule\n")
+for (name in names(status_counts)) {
+  safe_name <- paste(strsplit(name, "_", fixed = TRUE)[[1L]], collapse = "\\_")
+  cat(safe_name, " & ", status_counts[[name]], " \\\\\n", sep = "")
+}
+cat("\\bottomrule\\end{tabular}\\end{table}\n")
+cat("\\textbf{Paper source:} \\texttt{\\detokenize{", normalizePath(paper_tex), "}}\\par\n", sep = "")
+cat("\\textbf{Paper SHA-256:} \\texttt{", paper_hash, "}\\par\n", sep = "")
+cat("\\textbf{Overleaf label map:} \\texttt{\\detokenize{", paper_aux, "}}\\par\n", sep = "")
+cat("\\textbf{Analysis commit:} \\texttt{", repo_commit, "}\\par\n", sep = "")
+cat("\\textbf{Generated UTC:} ", format(Sys.time(), tz = "UTC", usetz = TRUE), "\\par\n", sep = "")
+cat("\\textbf{Detailed comparison pages:} ", nrow(details), "\\par\n", sep = "")
+if (!is.null(draw_manifest)) {
+  stopifnot(nrow(draw_manifest) == 4L, !anyDuplicated(draw_manifest$chain))
+  cat("\\textbf{Shared structural draws:} four chains; hashes recorded in ",
+      "\\texttt{\\detokenize{", draw_manifest_path, "}}.\\par\n", sep = "")
+}
+```
+
+\vfill
+
+Pending panels are intentional: they identify outputs that still require the
+corresponding reduced-form, balance, structural, or optimal-policy workflow.
+The machine-readable audit is
+`build/reports/assigned-vs-realized-results-manifest.csv`.
+
+```{r comparison-pages, results='asis'}
+if (!nrow(details)) {
+  cat("\\clearpage\\begin{center}No changed or pending distance-sensitive artifacts found.\\end{center}\n")
+} else {
+  for (index in seq_len(nrow(details))) {
+    cat("\\clearpage\n")
+    emit_comparison_page(details[index, , drop = FALSE])
+  }
+}
+```

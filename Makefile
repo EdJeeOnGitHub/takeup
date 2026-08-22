@@ -17,6 +17,7 @@ CANDIDATE_ROOT ?= build/paper-candidate/$(DISTANCE_SPEC)
 CANDIDATE_COMPONENT_ROOT ?= build/candidate-components/$(DISTANCE_SPEC)
 CANDIDATE_HPC_ROOT ?= build/candidate-hpc/$(DISTANCE_SPEC)
 CANDIDATE_HPC_BUNDLE ?=
+PAPER_TEX ?= /home/agent/projects/overleaf/overleaf-takeup/ECM ReStud.tex
 STRUCTURAL_RENDER_FIT ?= 105
 STRUCTURAL_RENDER_INPUT ?= temp-data/struct-postprocess
 export TAKEUP_DISTANCE_SPEC := $(DISTANCE_SPEC)
@@ -32,7 +33,8 @@ export TAKEUP_THREADS
 	replication-package paper-audit stan-inventory optimal-policy optimal-policy-legacy \
 	policy-fast-predict policy-fast-optimize policy-fast-summarize policy-tables clean-cache \
 	candidate-local candidate-appendix candidate-hpc-export candidate-hpc-import \
-	candidate-auxiliary-rf candidate-policy paper-candidate candidate-check
+	candidate-auxiliary-rf candidate-policy paper-candidate candidate-check \
+	distance-comparison-inputs distance-comparison-report distance-comparison
 
 help:
 	@sed -n 's/^## //p' Makefile
@@ -193,6 +195,23 @@ candidate-check:
 ## make compare-distance       Build both definitions and compare artifacts.
 compare-distance:
 	TAKEUP_BUILD_SPECS=both Rscript --no-save --no-restore -e 'targets::tar_make_future(names = tidyselect::all_of("distance_comparison"), workers = as.integer(Sys.getenv("TAKEUP_THREADS", "1")), callr_function = NULL)'
+
+## make distance-comparison-inputs Build modern realized/assigned review inputs without promotion.
+distance-comparison-inputs: compare-distance
+	Rscript --no-save --no-restore scripts/reduced-form/render-candidate-auxiliary.R \
+		--spec=realized --output-root=build/candidate-components/realized
+	Rscript --no-save --no-restore scripts/reduced-form/render-candidate-auxiliary.R \
+		--spec=assigned --output-root=build/candidate-components/assigned
+	Rscript --no-save --no-restore scripts/reports/build-structural-distance-comparison.R \
+		--fit-root=build/structural-fit/assigned --output-root=build/distance-comparison
+
+## make distance-comparison-report Render the paper-order side-by-side audit PDF.
+distance-comparison-report:
+	Rscript --no-save --no-restore scripts/reports/render-distance-comparison.R \
+		--paper-tex="$(PAPER_TEX)" --output-root=build/reports
+
+## make distance-comparison      Build inputs and render the side-by-side audit PDF.
+distance-comparison: distance-comparison-inputs distance-comparison-report
 
 ## make paper-assets           Validate frozen approved outputs and static assets.
 paper-assets:

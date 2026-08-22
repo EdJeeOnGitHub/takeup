@@ -168,7 +168,7 @@ list(
       file.path(takeup_build_root(), "assigned"),
       file.path(takeup_build_root(), "realized"),
       file.path(takeup_build_root(), "comparison"),
-      dependencies = c(reduced_form, balance)
+      dependencies = c(reduced_form, balance, balance_tables)
     ),
     format = "file"
   )
