@@ -71,15 +71,23 @@ read_spec <- function(table_id, spec_id, directory, schema) {
     select(table_id, spec_id, treatment, draw, distance_m, multiplier)
 }
 
-result <- pmap_dfr(catalog, read_spec) |>
+result_unfiltered <- pmap_dfr(catalog, read_spec)
+invalid_joint_draws <- result_unfiltered |>
+  group_by(table_id, spec_id, draw) |>
+  summarise(valid = all(is.finite(multiplier)), .groups = "drop") |>
+  filter(!valid)
+if (nrow(invalid_joint_draws)) {
+  message("Dropping ", nrow(invalid_joint_draws), " joint draw(s) with a nonfinite arm multiplier.")
+}
+
+result <- result_unfiltered |>
+  group_by(table_id, spec_id, draw) |>
+  filter(all(is.finite(multiplier))) |>
+  ungroup() |>
   mutate(treatment = factor(treatment, levels = c("Control", "Calendar", "Ink", "Bracelet"))) |>
   arrange(table_id, spec_id, treatment, draw) |>
   mutate(treatment = as.character(treatment))
 
-expected_rows <- 23L * 4L * length(unique(result$draw[result$table_id == "main" & result$spec_id == "baseline"]))
-if (nrow(result) != expected_rows) {
-  warning("Draw counts vary across specifications; retained all available draws.")
-}
 dir.create(dirname(output_csv), recursive = TRUE, showWarnings = FALSE)
 readr::write_csv(result, output_csv)
 message("Wrote ", nrow(result), " rows to ", output_csv)
