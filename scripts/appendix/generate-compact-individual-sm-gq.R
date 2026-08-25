@@ -188,8 +188,18 @@ if (!all(file.exists(fit_csv))) {
 dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 stan_file <- file.path(stan_path, spec$stan_file)
 message("Compiling compact GQ model: ", stan_file)
+# Different legacy schemas deliberately reuse compact Stan source with different
+# original model names. Compile an isolated copy so concurrent array tasks cannot
+# overwrite one another's executable.
+compiled_stan_file <- file.path(
+  output_path,
+  paste0(tools::file_path_sans_ext(spec$stan_file), "-", model_key, ".stan")
+)
+if (!file.copy(stan_file, compiled_stan_file, overwrite = TRUE)) {
+  stop("Could not stage isolated compact Stan source: ", compiled_stan_file)
+}
 gq_model <- cmdstan_model(
-  stan_file,
+  compiled_stan_file,
   include_paths = stan_path,
   cpp_options = list(stan_threads = TRUE),
   stanc_options = list("name" = spec$stan_model_name),
