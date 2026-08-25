@@ -50,6 +50,27 @@ multiplier relative to zero observability.
 The alternative-observability multiplier table is regenerated with
 `Rscript scripts/appendix/summarize-struct-observability-multipliers.R`.
 
+The two compact 1.25 km multiplier tables are rendered from a common
+draw-level file with:
+
+```bash
+Rscript scripts/appendix/render-multiplier-robustness-1250.R
+```
+
+The input
+`temp-data/assigned-distance-comparison/multiplier-draws-1250.csv` contains
+exact posterior multiplier draws at the experiment's Close--Far threshold. The
+renderer validates the complete specification-by-arm grid, calculates the
+posterior median, 95 percent interval, and probability of mitigation, and
+writes custom-save-style LaTeX fragments without floats, captions, labels, or
+notes. The fragments are
+`tables/main-core-multiplier-robustness-1250m.tex` and
+`tables/main-core-multiplier-prior-sensitivity-1250m.tex`. Within every table
+cell, the three lines are the posterior median, 95 percent interval, and
+`Pr(M < 1)`, respectively. If every retained draw is on the same side of one,
+the renderer reports the finite-draw resolution as `<1/N` or `>1-1/N`, where
+`N` is the number of retained draws for that specification.
+
 The multiplier prior-sensitivity section uses the isolated 13-specification
 workflow `hpc/structural/submit_main_core_prior_grid.sh`. It varies the social-image weight,
 distance cost, idiosyncratic heterogeneity, first-order visibility schedule,
