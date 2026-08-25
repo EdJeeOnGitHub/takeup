@@ -68,14 +68,16 @@ model_manifest <- list(
     workspace_fit = 1251L,
     source_model = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_CORRECT_OBS",
     stan_file = "takeup_struct_indiv_fp_sm_compact.stan",
-    stan_model_name = "takeup_struct_model"
+    stan_model_name = "takeup_struct_model",
+    workspace_already_preprocessed = TRUE
   ),
   second_order_observability = list(
     model = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB",
     workspace_fit = 1252L,
     source_model = "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB",
     stan_file = "takeup_struct_indiv_fp_sm_compact.stan",
-    stan_model_name = "takeup_struct_model"
+    stan_model_name = "takeup_struct_model",
+    workspace_already_preprocessed = TRUE
   )
 )
 
@@ -116,7 +118,11 @@ if (!spec$source_model %in% names(fit_env$models)) {
 }
 
 model_info <- fit_env$models[[spec$source_model]]
-stan_data_preprocess <- model_info$stan_data_preprocess %||% identity
+stan_data_preprocess <- if (isTRUE(spec$workspace_already_preprocessed)) {
+  identity
+} else {
+  model_info$stan_data_preprocess %||% identity
+}
 model_info$stan_data_preprocess <- NULL
 model_info$model_file <- spec$stan_file
 
