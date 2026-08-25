@@ -40,6 +40,7 @@ cd "${PROJECT_ROOT}"
 module load -f R/4.2.0
 export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/R/x86_64-pc-linux-gnu-library/4.2}
 export DISTANCE_DEFINITION=assigned
+export TAKEUP_ANALYSIS_RDATA=${TAKEUP_ANALYSIS_RDATA:-/home/edjee/scratch-midway3/takeup-sm-robustness/analysis-data/analysis.RData}
 mkdir -p temp/log "${OUTPUT_ROOT}/workspaces"
 Rscript --no-save --no-restore scripts/structural/run-model.R takeup fit \
   --cmdstanr --data-only --models="${model}" --num-mix-groups=1 \

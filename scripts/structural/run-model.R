@@ -108,7 +108,11 @@ source("R/reduced-form/context.R")
 
 # Data --------------------------------------------------------------------
 
-load(file.path("data", "analysis.RData"))
+analysis_data_path <- Sys.getenv(
+  "TAKEUP_ANALYSIS_RDATA",
+  unset = file.path("data", "analysis.RData")
+)
+load(analysis_data_path)
 
 standardize <- as_mapper(~ (.) / sd(.))
 unstandardize <- function(standardized, original) standardized * sd(original)
