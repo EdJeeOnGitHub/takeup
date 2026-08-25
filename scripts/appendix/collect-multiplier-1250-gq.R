@@ -53,7 +53,11 @@ read_spec <- function(table_id, spec_id, directory, schema) {
   if (length(files) != 4L) stop("Expected four GQ CSVs in ", directory, "; found ", length(files))
   prefix <- if (schema == "core") "core_compact_sm_rescaled" else "compact_sm_rescaled"
   variables <- sprintf("%s[1,%d]", prefix, 1:4)
-  draws <- cmdstanr::as_cmdstan_fit(sort(files))$draws(variables, format = "draws_df")
+  draws <- cmdstanr::read_cmdstan_csv(
+    sort(files),
+    variables = variables
+  )$generated_quantities |>
+    posterior::as_draws_df()
   as.data.frame(draws) |>
     transmute(draw = .draw, across(all_of(variables))) |>
     pivot_longer(-draw, names_to = "variable", values_to = "raw_multiplier") |>
