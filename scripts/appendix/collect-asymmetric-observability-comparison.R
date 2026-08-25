@@ -144,12 +144,16 @@ for (i in seq_len(nrow(specifications))) {
   }
 }
 
-multiplier_draws <- bind_rows(multiplier_draw_rows)
-multiplier_summary <- multiplier_draws |>
+multiplier_draws_raw <- bind_rows(multiplier_draw_rows)
+multiplier_summary <- multiplier_draws_raw |>
   group_by(specification, treatment) |>
   summarise(stats = list(summarize_finite(multiplier)), .groups = "drop") |>
   unnest_wider(stats) |>
   rename(`Pr(M<1)` = probability_below_one, `Pr(M>1)` = probability_above_one)
+multiplier_draws <- multiplier_draws_raw |>
+  group_by(specification, draw) |>
+  filter(all(is.finite(multiplier))) |>
+  ungroup()
 response_summary <- bind_rows(response_rows)
 diagnostics <- bind_rows(diagnostic_rows)
 curve <- bind_rows(multiplier_curve_rows)
