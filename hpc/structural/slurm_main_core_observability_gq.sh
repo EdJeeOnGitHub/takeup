@@ -15,7 +15,7 @@ CHAIN_ID=${CHAIN_ID:-${SLURM_ARRAY_TASK_ID:-}}
 SPECIFICATION=${SPECIFICATION:?Set an observability specification}
 FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-observability-ladder}
 INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-asym-input}
-CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
+CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
 DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 SM_EVALUATION_DISTANCE_M=${SM_EVALUATION_DISTANCE_M:-}
 

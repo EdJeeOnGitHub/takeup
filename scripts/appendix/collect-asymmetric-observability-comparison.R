@@ -20,6 +20,7 @@ output_path <- option_value(
 )
 git_commit <- option_value("--git-commit", "unknown")
 gq_1250_root <- option_value("--gq-1250-root", "not-yet-submitted")
+gq_1250_status <- option_value("--gq-1250-status", "not yet submitted")
 
 suppressPackageStartupMessages({
   library(cmdstanr)
@@ -195,6 +196,7 @@ manifest <- c(
   "- Posterior sampling rerun: no",
   "- 1.5 km GQ rerun: no; existing compact GQs were used",
   paste0("- Pre-emptive exact-1.25 km GQ root: `", gq_1250_root, "`"),
+  paste0("- Pre-emptive exact-1.25 km GQ status: ", gq_1250_status),
   "",
   "## Specifications and source directories",
   ""
