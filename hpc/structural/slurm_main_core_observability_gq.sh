@@ -17,6 +17,7 @@ FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-c
 INPUT_PATH=${INPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-asym-input}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
+SM_EVALUATION_DISTANCE_M=${SM_EVALUATION_DISTANCE_M:-}
 
 case "${SPECIFICATION}" in
   f1) observation=1; recognition=0; report=1; hierarchical=0; prior_scale=0.25 ;;
@@ -38,6 +39,11 @@ export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2
 export CMDSTAN=${CMDSTAN_PATH}
 export CMDSTANR_NO_VER_CHECK=TRUE
 
+extra=()
+if [[ -n ${SM_EVALUATION_DISTANCE_M} ]]; then
+  extra+=("--sm-evaluation-distance-m=${SM_EVALUATION_DISTANCE_M}")
+fi
+
 Rscript --no-save --no-restore --no-init-file \
   scripts/structural/generate-compact-gq.R \
   "--workspace=${INPUT_PATH}/dist_fit105.RData" \
@@ -54,4 +60,5 @@ Rscript --no-save --no-restore --no-init-file \
   "--distance-definition=${DISTANCE_DEFINITION}" \
   "--force-recompile=${FORCE_RECOMPILE:-0}" \
   --threads=4 --parallel-chains=1 \
-  "--cmdstan-path=${CMDSTAN_PATH}"
+  "--cmdstan-path=${CMDSTAN_PATH}" \
+  "${extra[@]}"
