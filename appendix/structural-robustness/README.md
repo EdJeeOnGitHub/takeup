@@ -57,19 +57,26 @@ draw-level file with:
 Rscript scripts/appendix/render-multiplier-robustness-1250.R
 ```
 
-The input
+The primary input
 `temp-data/assigned-distance-comparison/multiplier-draws-1250.csv` contains
-exact posterior multiplier draws at the experiment's Close--Far threshold. The
-renderer validates the complete specification-by-arm grid, calculates the
-posterior median, 95 percent interval, and probability of mitigation, and
-writes custom-save-style LaTeX fragments without floats, captions, labels, or
-notes. The fragments are
+exact posterior multiplier draws at the experiment's Close--Far threshold.
+The renderer supplements it with the exact draws for the tight asymmetric
+multinomial reporting model from
+`temp-data/asymmetric-observability-comparison/multiplier-draws-1250.csv`.
+That correct-classification model uses the truth-linked multinomial
+Yes/No/Don't-know response channel and replaces the earlier binary
+correct/incorrect structural sensitivity; binary correct classification
+remains a reduced-form validation outcome. The renderer
+validates the complete specification-by-arm grid, calculates the posterior
+median, 95 percent interval, and probability of mitigation, and writes
+custom-save-style LaTeX fragments without floats, captions, labels, or notes.
+The fragments are
 `tables/main-core-multiplier-robustness-1250m.tex` and
 `tables/main-core-multiplier-prior-sensitivity-1250m.tex`. Within every table
 cell, the three lines are the posterior median, 95 percent interval, and
-`Pr(M < 1)`, respectively. If every retained draw is on the same side of one,
-the renderer reports the finite-draw resolution as `<1/N` or `>1-1/N`, where
-`N` is the number of retained draws for that specification.
+`Pr(M < 1)`, respectively. Posterior probabilities are reported to three
+decimal places, with values below 0.001 displayed as `<0.001` and values above
+0.999 displayed as `>0.999`, matching the paper's p-value precision.
 
 The multiplier prior-sensitivity section uses the isolated 13-specification
 workflow `hpc/structural/submit_main_core_prior_grid.sh`. It varies the social-image weight,

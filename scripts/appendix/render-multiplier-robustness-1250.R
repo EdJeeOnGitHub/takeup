@@ -2,8 +2,8 @@
 
 # Render the two paper-facing 1.25 km social-multiplier robustness tables.
 #
-# Input is a draw-level CSV with one row per specification, treatment, and
-# posterior draw. Required columns:
+# The main input is a draw-level CSV with one row per specification, treatment,
+# and posterior draw. Required columns:
 #
 #   table_id       "main" or "prior"
 #   spec_id        stable identifier listed in specification_catalog below
@@ -11,6 +11,12 @@
 #   draw            posterior draw identifier
 #   distance_m      must equal 1250
 #   multiplier      reported social multiplier (one = no feedback)
+#
+# The tight asymmetric-multinomial reporting model is read from the separate
+# server-returned exact-1.25 km draw file. It replaces the earlier structural
+# binary correct/incorrect sensitivity row; the full model instead treats
+# Yes, No, and Don't know as separate reports conditional on administrative
+# take-up.
 #
 # The output is deliberately a custom_save_latex_table-style fragment: it has
 # no table float, caption, label, or notes. The paper controls those around an
@@ -33,6 +39,10 @@ option_value <- function(name, default = NULL) {
 input_path <- option_value(
   "--input",
   "temp-data/assigned-distance-comparison/multiplier-draws-1250.csv"
+)
+asymmetric_input_path <- option_value(
+  "--asymmetric-input",
+  "temp-data/asymmetric-observability-comparison/multiplier-draws-1250.csv"
 )
 output_dir <- option_value(
   "--output-dir", "appendix/structural-robustness/tables"
@@ -60,9 +70,9 @@ specification_catalog <- tibble::tribble(
     "Full information",
   "main", "Distance, information, and sample", "exclude-dispersed",
     "Excluding spatially dispersed clusters",
-  "main", "Observability measure", "correct-classification",
-    "Correct classification",
-  "main", "Observability measure", "second-order-observability",
+  "main", "Observability model", "tight-multinomial-reporting",
+    "Correct classification (multinomial)",
+  "main", "Observability model", "second-order-observability",
     "Perceived second-order observability",
   "main", "Social-image weight", "grouped-lambda",
     "Signal-group-specific $\\lambda$",
@@ -110,7 +120,46 @@ draws <- draws |>
     treatment = as.character(treatment),
     distance_m = as.numeric(distance_m),
     multiplier = as.numeric(multiplier)
+  ) |>
+  filter(.data$spec_id != "correct-classification")
+
+asymmetric_required_columns <- c(
+  "specification", "treatment", "draw", "multiplier"
+)
+if (!file.exists(asymmetric_input_path)) {
+  stop(
+    "Missing exact-1.25 km asymmetric-reporting draws: ",
+    asymmetric_input_path
   )
+}
+asymmetric_draws <- read.csv(
+  asymmetric_input_path,
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+missing_asymmetric_columns <- setdiff(
+  asymmetric_required_columns, names(asymmetric_draws)
+)
+if (length(missing_asymmetric_columns)) {
+  stop(
+    "Asymmetric-reporting input is missing columns: ",
+    paste(missing_asymmetric_columns, collapse = ", ")
+  )
+}
+asymmetric_draws <- asymmetric_draws |>
+  filter(.data$specification == "Tight multinomial") |>
+  transmute(
+    table_id = "main",
+    spec_id = "tight-multinomial-reporting",
+    treatment = as.character(.data$treatment),
+    draw = .data$draw,
+    distance_m = reference_distance_m,
+    multiplier = as.numeric(.data$multiplier)
+  )
+if (!nrow(asymmetric_draws)) {
+  stop("No Tight multinomial draws found in ", asymmetric_input_path)
+}
+draws <- bind_rows(draws, asymmetric_draws)
 
 if (any(!is.finite(draws$distance_m)) ||
     any(draws$distance_m != reference_distance_m)) {
@@ -210,16 +259,9 @@ summary <- draws |>
 
 format_number <- function(x) sprintf("%.2f", x)
 format_probability <- function(x, n_draws) {
-  output <- sprintf("%.4f", x)
-  resolution_scale <- 1e5
-  zero_resolution <- ceiling(
-    resolution_scale / n_draws[x == 0]
-  ) / resolution_scale
-  one_resolution <- floor(
-    (1 - 1 / n_draws[x == 1]) * resolution_scale
-  ) / resolution_scale
-  output[x == 0] <- sprintf("$<%.5f$", zero_resolution)
-  output[x == 1] <- sprintf("$>%.5f$", one_resolution)
+  output <- sprintf("%.3f", x)
+  output[x < 0.001] <- "$<0.001$"
+  output[x > 0.999] <- "$>0.999$"
   output
 }
 format_cell <- function(median, lower, upper, probability, n_draws) {
