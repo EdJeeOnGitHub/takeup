@@ -97,7 +97,12 @@ output_file_name <- file.path(script_options$output_path, str_c(output_name, ".R
 thin_by <- as.integer(script_options$thin)
 
 source("R/common/analysis.R")
-source(file.path("multilvlr", "multilvlr_util.R"))
+multilvlr_util <- file.path("multilvlr", "multilvlr_util.R")
+if (file.exists(multilvlr_util)) {
+  source(multilvlr_util)
+} else if (!isTRUE(script_options$data_only)) {
+  stop("Missing required multilvlr utility: ", multilvlr_util)
+}
 source("R/structural/legacy-utils.R")
 source("R/reduced-form/context.R")
 
