@@ -184,7 +184,11 @@ if (str_detect(script_options$models, "NO_OUTLIERS")) {
 
 # Belief data loading
 load_belief_data = function(context, outcome = "fob", missing = "drop") {
-  takeup_context_into_environment(context, environment())
+  if (!is.null(context$data)) {
+    takeup_context_into_environment(context, environment())
+  } else {
+    list2env(context, envir = environment())
+  }
   summ_know_A_df = summ_endline_know_table %>%
     filter(fct_match(know.table.type, "table.A"))
   summ_know_B_df = summ_endline_know_table %>%
@@ -312,7 +316,26 @@ prepare_belief_stan_inputs = function(belief_df, variant_label) {
   )
 }
 
-belief_analysis_context <- takeup_get_analysis_context()
+belief_analysis_context <- if (nzchar(Sys.getenv("TAKEUP_ANALYSIS_RDATA", ""))) {
+  # Legacy saved analysis workspaces already contain the three inputs needed by
+  # load_belief_data(). Avoid rebuilding the full reduced-form context, which
+  # requires unrelated private intermediate files.
+  legacy_summ_endline_know_table <- endline.know.table.data %>%
+    group_by(KEY.individ, know.table.type) %>%
+    summarise(
+      obs_know_person = sum(num.recognized, na.rm = TRUE),
+      knows_other_dewormed = sum(dewormed %in% c("yes", "no"), na.rm = TRUE),
+      thinks_other_knows = sum(second.order %in% c("yes", "no"), na.rm = TRUE),
+      .groups = "drop"
+    )
+  list(
+    summ_endline_know_table = legacy_summ_endline_know_table,
+    endline_know_table_data = endline.know.table.data,
+    endline_data = endline.data
+  )
+} else {
+  takeup_get_analysis_context()
+}
 belief_variant_data <- lst(
   fob_drop = load_belief_data(belief_analysis_context, "fob", "drop"),
   sob_drop = load_belief_data(belief_analysis_context, "sob", "drop"),
