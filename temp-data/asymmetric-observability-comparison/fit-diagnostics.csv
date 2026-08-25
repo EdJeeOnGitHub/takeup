@@ -1,0 +1,4 @@
+specification,max_rhat,min_bulk_ess,min_tail_ess,divergences,maximum_treedepth_transitions,retained_draws
+Tight multinomial,1.014393189266587,582.8836346485803,460.535032980953,0,0,1600
+F3 two-stage conditional,1.019542507036788,275.83932705298866,228.16042416644072,0,0,1600
+U3 two-stage unconditional,1.0081500490562736,530.0598928973388,583.7000807790465,0,0,1600
