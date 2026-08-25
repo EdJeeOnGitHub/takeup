@@ -26,6 +26,9 @@ stan_path <- option_value("--stan-path", "stan_models")
 parallel_chains <- as.integer(option_value("--parallel-chains", "4"))
 threads_per_chain <- as.integer(option_value("--threads-per-chain", "1"))
 schema_debug <- has_flag("--schema-debug")
+sm_evaluation_distance_m <- as.numeric(
+  option_value("--sm-evaluation-distance-m", "500")
+)
 fit_csv_option <- option_value("--fit-csvs")
 chains <- as.integer(strsplit(option_value("--chains", "1,2,3,4"), ",", fixed = TRUE)[[1L]])
 if (
@@ -132,6 +135,11 @@ gq_data <- discard(
 if (length(gq_data$roc_distances) < 26L) {
   stop("Stan data does not contain the 2500m ROC grid point.", call. = FALSE)
 }
+if (!is.finite(sm_evaluation_distance_m) || sm_evaluation_distance_m < 0) {
+  stop("--sm-evaluation-distance-m must be a finite nonnegative distance.")
+}
+gq_data$roc_distances[[6L]] <-
+  gq_data$roc_distances[[6L]] * sm_evaluation_distance_m / 500
 
 fit_csv <- if (is.null(fit_csv_option)) {
   file.path(

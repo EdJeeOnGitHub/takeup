@@ -108,6 +108,7 @@ cmdstan_path_option <- option_value(
   "--cmdstan-path", Sys.getenv("CMDSTAN_PATH", unset = "")
 )
 force_recompile <- as.integer(option_value("--force-recompile", "0")) == 1L
+sm_evaluation_distance_m <- optional_numeric("--sm-evaluation-distance-m")
 
 if (length(fit_csvs) < 1L || any(!nzchar(fit_csvs)) ||
     any(!file.exists(fit_csvs))) {
@@ -180,6 +181,21 @@ data <- if (!is.null(data_json)) {
     distance_definition = distance_definition,
     peer_audit_path = peer_audit_path
   )
+}
+if (!is.null(sm_evaluation_distance_m)) {
+  if (!is.finite(sm_evaluation_distance_m) || sm_evaluation_distance_m < 0) {
+    stop("--sm-evaluation-distance-m must be a finite nonnegative distance.")
+  }
+  reference_index <- 6L
+  reference_distance_m <- 500
+  if (length(data$roc_distances) < reference_index ||
+      !is.finite(data$roc_distances[[reference_index]]) ||
+      data$roc_distances[[reference_index]] <= 0) {
+    stop("Stan data lacks the reference 500m ROC grid point.")
+  }
+  data$roc_distances[[reference_index]] <-
+    data$roc_distances[[reference_index]] *
+    sm_evaluation_distance_m / reference_distance_m
 }
 dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 model <- cmdstan_model(
