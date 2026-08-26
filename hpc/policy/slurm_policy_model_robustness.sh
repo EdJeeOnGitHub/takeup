@@ -164,7 +164,7 @@ case "${STAGE}" in
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
       --distance-cap=3500 \
       "--num-cores=${NUM_CORES}" "--max-draws=${MAX_DRAWS}" \
-      "${PREDICT_OPTIONS[@]}"
+      ${PREDICT_OPTIONS[@]+"${PREDICT_OPTIONS[@]}"}
     ;;
   optimize)
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
