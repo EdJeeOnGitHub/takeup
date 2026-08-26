@@ -142,6 +142,26 @@ generates the structural treatment-effect table; and
 finite 0--2.5 km, 0--1.5 km, and 1.5--2.5 km multiplier table. Conventional multinomial
 resampling outputs remain archived as an internal sensitivity check but are
 not part of this paper-facing appendix.
+
+The community-random-shock multiplier has two distinct aggregations. The
+existing `core_compact_sm_rescaled` object is an equal-weighted average over
+the fitted shocks of the experimental communities. The current compact GQ also
+reports that sample average explicitly, its amplification/mitigation shares,
+and the corresponding population objects obtained by integrating a new
+community shock over the fitted Gaussian random-effect distribution. The
+population integral uses 64 deterministic equal-probability normal bins, so it
+adds no simulation noise within posterior draws. Exact 1.25 km objects require
+only a GQ rerun, not a structural refit:
+
+```bash
+sbatch hpc/structural/slurm_main_core_cluster_shock_gq_1250.sh
+```
+
+The job runs `scripts/appendix/summarize-main-core-cluster-shock-population.R`
+and writes draw-level, summary, and custom-save-style LaTeX outputs beneath its
+configured output directory. Posterior mitigation probabilities attached to
+the two average multipliers refer to the average estimand; the reported shares
+instead describe heterogeneity across fitted or new communities.
 `hpc/structural/submit_main_core_cluster_bootstrap_999.sh` is the portable Midway2/Midway3
 entry point for this run. All 999 attempted refits completed with distinct
 weight vectors; the stable paper tables and local summaries use those refits.

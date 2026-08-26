@@ -721,6 +721,24 @@ generated quantities {
   // Rows: 500m, 1500m, 2500m.
   matrix[3, num_treatments] core_compact_sm;
   matrix[3, num_treatments] core_compact_sm_rescaled;
+  // Random-shock multiplier summaries in the paper's positive-multiplier
+  // convention.  The sample objects average over the fitted shocks for the
+  // experimental communities.  The population objects integrate over a new
+  // shock drawn from N(0, core_cluster_shock_sd^2), using a deterministic
+  // midpoint-normal grid so that generated quantities add no Monte Carlo
+  // noise.  Shares are computed within each posterior draw.
+  matrix[3, num_treatments] core_compact_sm_sample_average =
+    rep_matrix(0, 3, num_treatments);
+  matrix[3, num_treatments] core_compact_sm_population_average =
+    rep_matrix(0, 3, num_treatments);
+  matrix[3, num_treatments] core_compact_sm_sample_share_amplification =
+    rep_matrix(0, 3, num_treatments);
+  matrix[3, num_treatments] core_compact_sm_sample_share_mitigation =
+    rep_matrix(0, 3, num_treatments);
+  matrix[3, num_treatments] core_compact_sm_population_share_amplification =
+    rep_matrix(0, 3, num_treatments);
+  matrix[3, num_treatments] core_compact_sm_population_share_mitigation =
+    rep_matrix(0, 3, num_treatments);
   // Secant multiplier from 500m to 2500m, normalized by the direct distance
   // cost change. This is reported beside the local derivative multiplier.
   vector[num_treatments] core_compact_sm_finite;
@@ -773,11 +791,21 @@ generated quantities {
     vector[num_treatments] rep_dist_slope_2ord =
       beliefs_treatment_map_design_matrix * hyper_dist_beta_2ord';
     vector[num_clusters] cluster_shock = rep_vector(0, num_clusters);
+    // Midpoints of 64 equal-probability bins under a standard normal.  This
+    // integrates the population distribution of a new community shock while
+    // remaining deterministic within a posterior draw.
+    vector[64] population_shock_standard_nodes;
     matrix[num_treatments, num_treatments] combined_numerator_cf =
       rep_matrix(0, num_treatments, num_treatments);
     real total_weight = 0;
     real u_sd = raw_u_sd[1];
     real total_error_sd = sqrt(1 + square(u_sd));
+
+    for (node_index in 1:64) {
+      population_shock_standard_nodes[node_index] = inv_Phi(
+        (node_index - 0.5) / 64.0
+      );
+    }
     vector[2] finite_component_mean = rep_vector(0, 2);
     vector[2] finite_component_variance = rep_vector(1, 2);
     vector[2] finite_component_weight = rep_vector(0.5, 2);
@@ -1269,6 +1297,11 @@ generated quantities {
         real noisy_information_sum = 0;
         real cutoff_sum = 0;
         real image_return_sum = 0;
+        real sample_amplification_count = 0;
+        real sample_mitigation_count = 0;
+        real population_multiplier_sum = 0;
+        real population_amplification_count = 0;
+        real population_mitigation_count = 0;
 
         for (candidate_index in 1:num_dist_group_treatments) {
           if (cluster_treatment_map[candidate_index, 1] == treatment_index) {
@@ -1431,12 +1464,93 @@ generated quantities {
             image_return_sum +=
               curr_mu[cluster_index] * roc_results[cluster_index, 8];
           }
+          {
+            real sample_multiplier =
+              -roc_results[cluster_index, 7] / dist_beta_v[1];
+            if (sample_multiplier > 1) {
+              sample_amplification_count += 1;
+            } else if (sample_multiplier < 1) {
+              sample_mitigation_count += 1;
+            }
+          }
         }
         core_compact_sm[compact_dist_index, treatment_index] =
           mean(roc_results[, 7]);
         core_compact_sm_rescaled[compact_dist_index, treatment_index] =
           core_compact_sm[compact_dist_index, treatment_index] /
           dist_beta_v[1];
+        core_compact_sm_sample_average[
+          compact_dist_index, treatment_index
+        ] = -core_compact_sm_rescaled[compact_dist_index, treatment_index];
+        core_compact_sm_sample_share_amplification[
+          compact_dist_index, treatment_index
+        ] = sample_amplification_count / num_clusters;
+        core_compact_sm_sample_share_mitigation[
+          compact_dist_index, treatment_index
+        ] = sample_mitigation_count / num_clusters;
+
+        for (node_index in 1:64) {
+          real population_shock = use_core_cluster_shock
+            ? core_compact_cluster_shock_sd *
+                population_shock_standard_nodes[node_index]
+            : 0;
+          real population_benefit =
+            structural_treatment_effect[treatment_cell] -
+            dist_beta_v[1] * roc_distance + population_shock;
+          real population_control_benefit =
+            structural_treatment_effect[control_cell] -
+            dist_beta_v[1] * roc_distance + population_shock;
+          real population_sm_raw;
+          real population_multiplier;
+
+          if (core_observation_model > 0) {
+            population_sm_raw = core_gq_calculate_noisy_sm(
+              population_benefit, base_mu_rep, total_error_sd, u_sd,
+              dist_beta_v[1], noisy_q_taker, noisy_q_nontaker,
+              noisy_q_taker_dist, noisy_q_nontaker_dist,
+              core_observation_model == 1 ? 3 : 4,
+              use_u_in_delta, alg_sol_rel_tol, alg_sol_f_tol,
+              alg_sol_max_steps
+            );
+          } else if (core_type_distribution == 1) {
+            population_sm_raw = core_gq_calculate_roc_student_t(
+              population_benefit, population_control_benefit, u_sd,
+              dist_beta_v[1], curr_mu[1], control_mu[1],
+              curr_mu_deriv[1], use_u_in_delta, core_type_scale_sq,
+              core_type_mixture_precision, core_type_mixture_weight
+            )[7];
+          } else if (core_type_distribution == 2) {
+            population_sm_raw = core_gq_calculate_roc_finite_mixture(
+              population_benefit, population_control_benefit, u_sd,
+              dist_beta_v[1], curr_mu[1], control_mu[1],
+              curr_mu_deriv[1], use_u_in_delta, finite_component_mean,
+              finite_component_variance, finite_component_weight
+            )[7];
+          } else {
+            population_sm_raw = core_gq_calculate_roc(
+              population_benefit, population_control_benefit,
+              total_error_sd, u_sd, dist_beta_v[1], curr_mu[1],
+              control_mu[1], curr_mu_deriv[1], use_u_in_delta,
+              alg_sol_rel_tol, alg_sol_f_tol, alg_sol_max_steps
+            )[7];
+          }
+          population_multiplier = -population_sm_raw / dist_beta_v[1];
+          population_multiplier_sum += population_multiplier;
+          if (population_multiplier > 1) {
+            population_amplification_count += 1;
+          } else if (population_multiplier < 1) {
+            population_mitigation_count += 1;
+          }
+        }
+        core_compact_sm_population_average[
+          compact_dist_index, treatment_index
+        ] = population_multiplier_sum / 64.0;
+        core_compact_sm_population_share_amplification[
+          compact_dist_index, treatment_index
+        ] = population_amplification_count / 64.0;
+        core_compact_sm_population_share_mitigation[
+          compact_dist_index, treatment_index
+        ] = population_mitigation_count / 64.0;
         if (core_observation_model > 0) {
           core_compact_information_factor[compact_dist_index, treatment_index] =
             noisy_information_sum / num_clusters;
