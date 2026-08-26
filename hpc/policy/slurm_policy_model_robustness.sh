@@ -14,8 +14,9 @@ set -euo pipefail
 STAGE=${STAGE:?Set STAGE to prepare, predict, optimize, or summarize}
 MODEL_ID=${MODEL_ID:?Set MODEL_ID}
 NUM_CORES=${NUM_CORES:-12}
+MAX_DRAWS=${MAX_DRAWS:-0}
 ROOT=/project/akaring/takeup-data/data/stan_analysis_data
-OUTPUT_PATH=${OUTPUT_PATH:-optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/policy-model-robustness/${MODEL_ID}}
+OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/policy-model-robustness/${MODEL_ID}}
 COMPACT_CSV=${OUTPUT_PATH}/compact-policy-draws.csv
 TARGET_CSV=${TARGET_CSV:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
 DISTANCE_DATA=${DISTANCE_DATA:-/project/akaring/takeup-data/optim/data/full-many-pots-experiment.rds}
@@ -162,7 +163,8 @@ case "${STAGE}" in
       "--parameter-rds=${OUTPUT_PATH}/policy-model-parameters.rds" \
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
       --distance-cap=3500 \
-      "--num-cores=${NUM_CORES}" "${PREDICT_OPTIONS[@]}"
+      "--num-cores=${NUM_CORES}" "--max-draws=${MAX_DRAWS}" \
+      "${PREDICT_OPTIONS[@]}"
     ;;
   optimize)
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
