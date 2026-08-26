@@ -92,8 +92,9 @@ if (household_family) {
   curves <- NULL
 } else if (is.null(cluster_shock)) {
   curves <- do.call(rbind, draw_predictions)
-  if (any(!is.finite(curves$demand)) || any(curves$demand < 0 | curves$demand > 1)) {
-    stop("Non-finite or invalid predicted demand.", call. = FALSE)
+  finite_curve_demand <- curves$demand[is.finite(curves$demand)]
+  if (any(finite_curve_demand < 0 | finite_curve_demand > 1)) {
+    stop("Invalid finite predicted demand.", call. = FALSE)
   }
   edge_demand <- NULL
 } else {
@@ -177,7 +178,9 @@ write.csv(data.frame(
   scenarios = nrow(policy_scenarios), feasible_edges = nrow(edges),
   edge_specific = !is.null(cluster_shock) || household_family,
   prediction_values = if (is.null(edge_demand)) nrow(curves) else length(edge_demand),
-  undefined_prediction_values = if (is.null(edge_demand)) 0L else sum(!is.finite(edge_demand)),
+  undefined_prediction_values = if (is.null(edge_demand)) {
+    sum(!is.finite(curves$demand))
+  } else sum(!is.finite(edge_demand)),
   storage_mb = if (is.null(edge_demand)) as.numeric(object.size(curves)) / 1024^2 else
     as.numeric(object.size(edge_demand)) / 1024^2,
   elapsed_seconds = as.numeric(difftime(Sys.time(), started, units = "secs"))
