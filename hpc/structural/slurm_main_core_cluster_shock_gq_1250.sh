@@ -4,7 +4,7 @@
 #SBATCH --job-name=cluster-shock-gq-1250
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=02:00:00
 #SBATCH --output=temp/log/cluster-shock-gq-1250-%j.log
@@ -19,6 +19,7 @@ FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-c
 WORKSPACE=${WORKSPACE:-/project/akaring/takeup-data/data/stan_analysis_data/dist_fit104.RData}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-cluster-shock-population-gq-1250}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
+THREADS=${THREADS:-1}
 
 cd "${REPO_ROOT}"
 mkdir -p temp/log "${OUTPUT_PATH}"
@@ -54,7 +55,7 @@ Rscript --no-save --no-restore --no-init-file \
   --distance-definition=assigned \
   --sm-evaluation-distance-m=1250 \
   --parallel-chains=4 \
-  --threads=2
+  "--threads=${THREADS}"
 
 gq_files=("${OUTPUT_PATH}"/main-core-cluster-shock-population-1250-*.csv)
 if [[ ${#gq_files[@]} -ne 4 ]]; then
