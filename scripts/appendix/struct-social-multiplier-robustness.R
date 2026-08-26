@@ -80,7 +80,7 @@ models <- data.frame(
   specification = c(
     "Baseline Specification",
     "Private Distance Costs and Community Social Image Returns",
-    "Full Information",
+    "Individual Distance Observed by Peers",
     "Excluding Spatially Dispersed Clusters",
     "Corrected observability",
     "SOB observability"
