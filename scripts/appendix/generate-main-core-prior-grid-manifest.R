@@ -99,8 +99,13 @@ specifications <- list(
             vary(baseline, tight, private_fields)),
   make_spec(11, "private-diffuse", "Private utility", "Diffuse",
             vary(baseline, diffuse, private_fields)),
-  make_spec(12, "joint-tight", "Joint stress test", "Tight", tight),
-  make_spec(13, "joint-diffuse", "Joint stress test", "Diffuse", diffuse)
+  make_spec(
+    12, "joint-tight", "All priors varied together", "Tighter priors", tight
+  ),
+  make_spec(
+    13, "joint-diffuse", "All priors varied together",
+    "More diffuse priors", diffuse
+  )
 )
 manifest <- do.call(rbind, specifications)
 
