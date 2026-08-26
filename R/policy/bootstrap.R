@@ -150,6 +150,11 @@ canonical_policy_draw <- function(
   } else if (lambda_structure != "common") {
     stop("Unknown lambda structure: ", lambda_structure, call. = FALSE)
   }
+  if (identical(model_family, "finite_mixture")) {
+    value$mixture_weight <- mode_scalar(draw, "core_finite_mixture_weight")
+    value$mixture_between_share <-
+      mode_scalar(draw, "core_finite_mixture_between_share")
+  }
   if (model_family %in% policy_asymmetric_families) {
     if (model_family %in% c("asymmetric_f3", "asymmetric_u3")) {
       measurement <- c(
@@ -509,6 +514,66 @@ policy_student_t_moments <- function(cutoff, u_sd, mixture) {
   list(probability_below = below, delta = delta, delta_derivative = delta_derivative)
 }
 
+policy_finite_mixture <- function(parameter) {
+  weight <- parameter$mixture_weight
+  between <- parameter$mixture_between_share
+  if (!is.finite(weight) || !is.finite(between) || weight <= 0 || weight >= 1 ||
+      between < 0 || between >= 1) {
+    stop("Invalid finite-mixture shape parameters.", call. = FALSE)
+  }
+  separation <- sqrt(between / (weight * (1 - weight)))
+  list(
+    mean = c(-(1 - weight) * separation, weight * separation),
+    variance = rep(1 - between, 2L),
+    weight = c(weight, 1 - weight)
+  )
+}
+
+policy_finite_mixture_moments <- function(cutoff, u_sd, mixture) {
+  index_variance <- mixture$variance + u_sd^2
+  index_sd <- sqrt(index_variance)
+  z <- outer(cutoff, mixture$mean, "-")
+  z <- sweep(z, 2L, index_sd, "/")
+  density <- dnorm(z)
+  component_below <- pnorm(z)
+  below <- as.vector(component_below %*% mixture$weight)
+  below <- pmin(1 - 1e-12, pmax(1e-12, below))
+  numerator <- as.vector((
+    sweep(density, 2L, mixture$variance / index_sd, "*") +
+      sweep(component_below, 2L, -mixture$mean, "*")
+  ) %*% mixture$weight)
+  delta <- numerator / (below * (1 - below))
+  list(probability_below = below, delta = delta)
+}
+
+solve_policy_finite_mixture_fixedpoint <- function(
+    benefit, mu_rep, u_sd, mixture, tolerance = 1e-9, iterations = 70L) {
+  residual <- function(cutoff) cutoff + benefit + mu_rep *
+    policy_finite_mixture_moments(cutoff, u_sd, mixture)$delta
+  lower <- rep(-12, length(benefit))
+  upper <- rep(12, length(benefit))
+  lower_value <- residual(lower)
+  upper_value <- residual(upper)
+  bracketed <- is.finite(lower_value) & is.finite(upper_value) &
+    lower_value * upper_value <= 0
+  for (step in seq_len(iterations)) {
+    midpoint <- 0.5 * (lower + upper)
+    midpoint_value <- residual(midpoint)
+    left <- bracketed & lower_value * midpoint_value <= 0
+    upper[left] <- midpoint[left]
+    right <- bracketed & !left
+    lower[right] <- midpoint[right]
+    lower_value[right] <- midpoint_value[right]
+  }
+  solution <- 0.5 * (lower + upper)
+  bad <- !bracketed | !is.finite(residual(solution)) |
+    abs(residual(solution)) > tolerance
+  solution[bad] <- NA_real_
+  attr(solution, "fallback_count") <- sum(!bracketed)
+  attr(solution, "undefined_count") <- sum(bad)
+  solution
+}
+
 solve_policy_student_t_fixedpoint <- function(benefit, mu_rep, u_sd, mixture) {
   cutoff <- pmin(8, pmax(-8, -benefit))
   for (step in seq_len(8L)) {
@@ -553,6 +618,10 @@ predict_policy_draw <- function(
       solve_policy_student_t_fixedpoint(
         benefit, mu, parameter$u_sd, policy_student_t_mixture()
       )
+    } else if (identical(model_family, "finite_mixture")) {
+      solve_policy_finite_mixture_fixedpoint(
+        benefit, mu, parameter$u_sd, policy_finite_mixture(parameter)
+      )
     } else {
       solve_policy_fixedpoint(benefit, mu, parameter$u_sd)
     }
@@ -586,6 +655,14 @@ predict_policy_draw <- function(
         benefit_500, mu_500, parameter$u_sd, mixture
       )
       signal <- mu_500 * policy_student_t_moments(
+        cutoff_500, parameter$u_sd, mixture
+      )$delta
+    } else if (identical(model_family, "finite_mixture")) {
+      mixture <- policy_finite_mixture(parameter)
+      cutoff_500 <- solve_policy_finite_mixture_fixedpoint(
+        benefit_500, mu_500, parameter$u_sd, mixture
+      )
+      signal <- mu_500 * policy_finite_mixture_moments(
         cutoff_500, parameter$u_sd, mixture
       )$delta
     } else {
@@ -627,6 +704,10 @@ predict_policy_draw <- function(
         1 - policy_student_t_moments(
           cutoff, parameter$u_sd, policy_student_t_mixture()
         )$probability_below
+      } else if (identical(model_family, "finite_mixture")) {
+        1 - policy_finite_mixture_moments(
+          cutoff, parameter$u_sd, policy_finite_mixture(parameter)
+        )$probability_below
       } else {
         1 - pnorm(cutoff / parameter$total_error_sd)
       },
@@ -636,6 +717,126 @@ predict_policy_draw <- function(
     )
   })
   do.call(rbind, pieces)
+}
+
+policy_haversine_m <- function(lon1, lat1, lon2, lat2) {
+  radians <- pi / 180
+  lon1 <- lon1 * radians
+  lat1 <- lat1 * radians
+  lon2 <- lon2 * radians
+  lat2 <- lat2 * radians
+  delta_lon <- lon2 - lon1
+  delta_lat <- lat2 - lat1
+  value <- sin(delta_lat / 2)^2 +
+    cos(lat1) * cos(lat2) * sin(delta_lon / 2)^2
+  2 * 6371008.8 * asin(pmin(1, sqrt(value)))
+}
+
+prepare_policy_household_edges <- function(distance_object, workspace, edges) {
+  if (!file.exists(workspace)) stop("Household workspace not found: ", workspace)
+  fit_environment <- new.env(parent = emptyenv())
+  suppressWarnings(load(workspace, envir = fit_environment))
+  analysis <- fit_environment$stan_data$analysis_data
+  required <- c("cluster.id", "lon", "lat")
+  if (!all(required %in% names(analysis))) {
+    stop("Household workspace lacks cluster.id/lon/lat.", call. = FALSE)
+  }
+  household <- data.frame(
+    household_i = seq_len(nrow(analysis)),
+    cluster.id = analysis$cluster.id,
+    lon = as.numeric(analysis$lon), lat = as.numeric(analysis$lat),
+    observed_distance = as.numeric(analysis$dist.to.pot)
+  )
+  if (any(!is.finite(household$lon) | !is.finite(household$lat))) {
+    stop("Household coordinate frame contains missing coordinates.", call. = FALSE)
+  }
+  household$village_i <- match(
+    household$cluster.id, distance_object$village_df$cluster.id
+  )
+  if (anyNA(household$village_i)) {
+    stop("Household-to-policy-community mapping is incomplete.", call. = FALSE)
+  }
+  counts <- tabulate(household$village_i, nbins = nrow(distance_object$village_df))
+  if (any(counts == 0L)) stop("At least one policy community has no households.")
+  edge_households <- merge(
+    transform(edges, edge_i = seq_len(nrow(edges))),
+    household, by = "village_i", sort = FALSE
+  )
+  site_row <- match(edge_households$pot_j, distance_object$pot_df$id)
+  if (anyNA(site_row)) stop("Candidate-site mapping is incomplete.", call. = FALSE)
+  edge_households$household_distance <- policy_haversine_m(
+    edge_households$lon, edge_households$lat,
+    distance_object$pot_df$lon[site_row], distance_object$pot_df$lat[site_row]
+  )
+  edge_households <- edge_households[order(edge_households$edge_i), ]
+  list(
+    data = edge_households,
+    status = data.frame(
+      coordinate_source = normalizePath(workspace),
+      observations = nrow(household), communities = length(unique(household$village_i)),
+      candidate_sites = nrow(distance_object$pot_df), feasible_edges = nrow(edges),
+      household_edge_rows = nrow(edge_households),
+      missing_coordinates = 0L,
+      distance_method = "great-circle haversine; radius 6371008.8m",
+      cap_interpretation = "3.5km cap on community-centroid assignment; all mapped households retained",
+      memory_mb = as.numeric(object.size(edge_households)) / 1024^2,
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+predict_policy_household_draw <- function(parameter, edges, household_edges) {
+  family <- parameter$model_family
+  if (!family %in% c("private_distance_community_image", "full_information")) {
+    stop("Unsupported household-distance policy family: ", family)
+  }
+  hh <- household_edges
+  if (identical(family, "full_information")) {
+    raw <- predict_policy_draw(parameter, hh$household_distance)
+    pieces <- lapply(seq_len(nrow(policy_scenarios)), function(index) {
+      rows <- ((index - 1L) * nrow(hh) + 1L):(index * nrow(hh))
+      sums <- rowsum(raw$demand[rows], hh$edge_i, reorder = FALSE)
+      counts <- rowsum(rep(1, nrow(hh)), hh$edge_i, reorder = FALSE)
+      as.numeric(sums / counts)
+    })
+    return(matrix(unlist(pieces, use.names = FALSE), nrow = 1L))
+  }
+
+  centroid_distance_sd <- edges$distance / parameter$sd_of_dist
+  household_distance_sd <- hh$household_distance / parameter$sd_of_dist
+  centroid_benefit <- parameter$beta_control -
+    parameter$dist_beta * centroid_distance_sd
+  household_benefit <- parameter$beta_control -
+    parameter$dist_beta * household_distance_sd
+  values <- vector("list", nrow(policy_scenarios))
+  for (scenario_index in seq_len(nrow(policy_scenarios))) {
+    scenario <- policy_scenarios[scenario_index, ]
+    if (scenario$suppress_reputation) {
+      household_cutoff <- -household_benefit
+    } else if (scenario$static_signal) {
+      distance_500_sd <- 500 / parameter$sd_of_dist
+      benefit_500 <- parameter$beta_control - parameter$dist_beta * distance_500_sd
+      mu_500 <- policy_mu_rep(distance_500_sd, parameter, scenario$visibility)
+      cutoff_500 <- solve_policy_fixedpoint(benefit_500, mu_500, parameter$u_sd)
+      signal_500 <- mu_500 * policy_delta(cutoff_500, parameter$u_sd)
+      household_cutoff <- -(household_benefit + signal_500)
+    } else {
+      mu <- policy_mu_rep(centroid_distance_sd, parameter, scenario$visibility)
+      community_cutoff <- solve_policy_fixedpoint(
+        centroid_benefit, mu, parameter$u_sd
+      )
+      # This is algebraically identical to the fitted private-info model:
+      # -community cutoff - household cost + community-centroid cost.
+      household_cutoff <- community_cutoff[hh$edge_i] +
+        parameter$dist_beta *
+          (household_distance_sd - centroid_distance_sd[hh$edge_i])
+    }
+    demand <- 1 - pnorm(household_cutoff / parameter$total_error_sd)
+    sums <- rowsum(demand, hh$edge_i, reorder = FALSE)
+    counts <- rowsum(rep(1, length(demand)), hh$edge_i, reorder = FALSE)
+    values[[scenario_index]] <- as.numeric(sums / counts)
+  }
+  matrix(unlist(values, use.names = FALSE), nrow = 1L)
 }
 
 `%||%` <- function(left, right) if (is.null(left)) right else left

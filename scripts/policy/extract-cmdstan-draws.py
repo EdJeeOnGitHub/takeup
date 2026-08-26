@@ -36,6 +36,8 @@ def main():
                         help="Number of cluster shock elements to retain")
     parser.add_argument("--include-asymmetric", action="store_true",
                         help="Retain the 48 asymmetric-observability parameters")
+    parser.add_argument("--include-finite-mixture", action="store_true",
+                        help="Retain the fitted two-component type-mixture shape")
     parser.add_argument(
         "--asymmetric-structure",
         choices=["none", "full", "f1", "f2", "f3", "u3"],
@@ -53,6 +55,9 @@ def main():
     if args.include_cluster_shock:
         wanted += ["core_cluster_shock_sd.1"]
         wanted += [f"core_cluster_shock_raw.{i}" for i in range(1, args.include_cluster_shock + 1)]
+    if args.include_finite_mixture:
+        wanted += ["core_finite_mixture_weight.1",
+                   "core_finite_mixture_between_share.1"]
     if args.include_asymmetric and args.asymmetric_structure != "none":
         parser.error("Use either --include-asymmetric or --asymmetric-structure")
     asymmetric_structure = (

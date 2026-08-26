@@ -9,6 +9,7 @@ output_path <- policy_option_value(args, "--output-path")
 distance_cap <- as.numeric(policy_option_value(args, "--distance-cap", "3500"))
 num_cores <- as.integer(policy_option_value(args, "--num-cores", "1"))
 max_draws <- as.integer(policy_option_value(args, "--max-draws", "0"))
+household_workspace <- policy_option_value(args, "--household-workspace")
 if (is.null(parameter_rds) || is.null(output_path)) {
   stop("--parameter-rds and --output-path are required.", call. = FALSE)
 }
@@ -43,18 +44,29 @@ edges <- edges[edges$dist <= distance_cap, c("index_i", "index_j", "dist", "dist
 names(edges) <- c("village_i", "pot_j", "distance", "distance_km")
 edges <- edges[order(edges$village_i, edges$pot_j), ]
 parameters$sd_of_dist <- distance_object$sd_of_dist
+household_family <- parameters$model_family[1] %in% c(
+  "private_distance_community_image", "full_information"
+)
+household_object <- if (household_family) {
+  if (is.null(household_workspace)) {
+    stop("Household-distance models require --household-workspace.", call. = FALSE)
+  }
+  prepare_policy_household_edges(distance_object, household_workspace, edges)
+} else NULL
 
 started <- Sys.time()
 draw_predictions <- parallel::mclapply(seq_len(nrow(parameters)), function(index) {
   tryCatch({
     parameter <- as.list(parameters[index, ])
-    prediction <- if (!is.null(cluster_shock)) {
+    prediction <- if (household_family) {
+      predict_policy_household_draw(parameter, edges, household_object$data)
+    } else if (!is.null(cluster_shock)) {
       parameter$cluster_shock <- cluster_shock[index, ]
       predict_policy_draw(parameter, edges$distance, village_ids = edges$village_i)
     } else {
       predict_policy_draw(parameter, sort(unique(edges$distance)))
     }
-    if (is.null(cluster_shock)) prediction else prediction$demand
+    if (household_family) prediction else if (is.null(cluster_shock)) prediction else prediction$demand
   }, error = function(error) structure(
     list(index = index, message = conditionMessage(error)),
     class = "policy_prediction_error"
@@ -69,7 +81,16 @@ if (any(prediction_errors)) {
   }, character(1))
   stop("Policy prediction failed: ", paste(details, collapse = "; "), call. = FALSE)
 }
-if (is.null(cluster_shock)) {
+if (household_family) {
+  edge_demand <- do.call(rbind, draw_predictions)
+  expected_columns <- nrow(edges) * nrow(policy_scenarios)
+  finite_edge_demand <- edge_demand[is.finite(edge_demand)]
+  if (ncol(edge_demand) != expected_columns ||
+      any(finite_edge_demand < 0 | finite_edge_demand > 1)) {
+    stop("Invalid household-aggregated edge-demand matrix.", call. = FALSE)
+  }
+  curves <- NULL
+} else if (is.null(cluster_shock)) {
   curves <- do.call(rbind, draw_predictions)
   if (any(!is.finite(curves$demand)) || any(curves$demand < 0 | curves$demand > 1)) {
     stop("Non-finite or invalid predicted demand.", call. = FALSE)
@@ -90,11 +111,36 @@ experimental_distances <- distance_object$village_df$dist.to.pot
 experimental <- do.call(rbind, parallel::mclapply(seq_len(nrow(parameters)), function(index) {
   parameter <- as.list(parameters[index, ])
   if (!is.null(cluster_shock)) parameter$cluster_shock <- cluster_shock[index, ]
-  prediction <- predict_policy_draw(
-    parameter, experimental_distances,
-    policy_scenarios[policy_scenarios$scenario == "control", ],
-    village_ids = if (is.null(cluster_shock)) NULL else distance_object$village_df$id
-  )
+  prediction <- if (household_family) {
+    experimental_edges <- data.frame(
+      village_i = distance_object$village_df$id,
+      pot_j = NA_integer_, distance = experimental_distances,
+      distance_km = experimental_distances / 1000
+    )
+    experimental_households <- household_object$data[
+      !duplicated(household_object$data$household_i),
+      c("household_i", "village_i", "observed_distance"), drop = FALSE
+    ]
+    experimental_households$edge_i <- experimental_households$village_i
+    experimental_households$household_distance <-
+      experimental_households$observed_distance
+    demand <- predict_policy_household_draw(
+      parameter, experimental_edges, experimental_households
+    )[1L, seq_len(nrow(experimental_edges))]
+    data.frame(
+      draw = parameter$draw, replicate = parameter$replicate,
+      scenario_id = 1L, scenario = "control", scenario_label = "Control",
+      visibility = "control", village_i = distance_object$village_df$id,
+      distance = experimental_distances, distance_km = experimental_distances / 1000,
+      demand = demand, fixedpoint_fallbacks = 0L, fixedpoint_undefined = 0L
+    )
+  } else {
+    predict_policy_draw(
+      parameter, experimental_distances,
+      policy_scenarios[policy_scenarios$scenario == "control", ],
+      village_ids = if (is.null(cluster_shock)) NULL else distance_object$village_df$id
+    )
+  }
   prediction$village_i <- distance_object$village_df$id
   prediction
 }, mc.cores = num_cores, mc.preschedule = TRUE))
@@ -104,6 +150,12 @@ if (!is.null(cluster_crosswalk)) {
   write.csv(
     cluster_crosswalk, file.path(output_path, "policy-cluster-crosswalk.csv"),
     row.names = FALSE
+  )
+}
+if (household_family) {
+  write.csv(
+    household_object$status,
+    file.path(output_path, "policy-household-geometry-status.csv"), row.names = FALSE
   )
 }
 saveRDS(edges, file.path(output_path, "policy-feasible-edges.rds"), compress = FALSE)
@@ -123,7 +175,7 @@ saveRDS(experimental, file.path(output_path, "policy-experimental-demand.rds"), 
 write.csv(data.frame(
   model_id = parameters$model_id[1], draws = nrow(parameters),
   scenarios = nrow(policy_scenarios), feasible_edges = nrow(edges),
-  edge_specific = !is.null(cluster_shock),
+  edge_specific = !is.null(cluster_shock) || household_family,
   prediction_values = if (is.null(edge_demand)) nrow(curves) else length(edge_demand),
   undefined_prediction_values = if (is.null(edge_demand)) 0L else sum(!is.finite(edge_demand)),
   storage_mb = if (is.null(edge_demand)) as.numeric(object.size(curves)) / 1024^2 else

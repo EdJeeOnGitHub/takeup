@@ -22,6 +22,48 @@ DISTANCE_DATA=${DISTANCE_DATA:-/project/akaring/takeup-data/optim/data/full-many
 REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 
 case "${MODEL_ID}" in
+  benchmark)
+    MODEL_LABEL="Benchmark"
+    MODEL_FAMILY=gaussian
+    LAMBDA_STRUCTURE=common
+    FITS=()
+    EXTRACT_OPTIONS=()
+    ;;
+  private-distance-community-image)
+    MODEL_LABEL="Individual travel costs"
+    MODEL_FAMILY=private_distance_community_image
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS-{1,2,3,4}.csv)
+    EXTRACT_OPTIONS=()
+    ;;
+  full-information)
+    MODEL_LABEL="Individual distance observed by peers"
+    MODEL_FAMILY=full_information
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP-{1,2,3,4}.csv)
+    EXTRACT_OPTIONS=()
+    ;;
+  exclude-dispersed)
+    MODEL_LABEL="Excluding geographically dispersed communities"
+    MODEL_FAMILY=gaussian
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS-{1,2,3,4}.csv)
+    EXTRACT_OPTIONS=()
+    ;;
+  tight-multinomial)
+    MODEL_LABEL="Correct classification of take-up"
+    MODEL_FAMILY=asymmetric_conditional
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/main-core-report-distance-priors/tight/dist_fit106_MAIN_CORE_chain{1,2,3,4}-1.csv)
+    EXTRACT_OPTIONS=(--include-asymmetric)
+    ;;
+  finite-mixture)
+    MODEL_LABEL="Mixture v distribution"
+    MODEL_FAMILY=finite_mixture
+    LAMBDA_STRUCTURE=common
+    FITS=("${ROOT}"/main-core-finite-mixture-robustness-800/fits/finite-mixture/finite-mixture-chain{1,2,3,4}-1.csv)
+    EXTRACT_OPTIONS=(--include-finite-mixture)
+    ;;
   correct-observability)
     MODEL_LABEL="Correct classification"
     MODEL_FAMILY=gaussian
@@ -112,11 +154,15 @@ case "${STAGE}" in
       "--model-family=${MODEL_FAMILY}" "--lambda-structure=${LAMBDA_STRUCTURE}"
     ;;
   predict)
+    PREDICT_OPTIONS=()
+    if [[ "${MODEL_ID}" == "private-distance-community-image" || "${MODEL_ID}" == "full-information" ]]; then
+      PREDICT_OPTIONS+=(--household-workspace="${ROOT}/dist_fit104.RData")
+    fi
     Rscript --no-save --no-restore scripts/policy/predict-model-robustness.R \
       "--parameter-rds=${OUTPUT_PATH}/policy-model-parameters.rds" \
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
       --distance-cap=3500 \
-      "--num-cores=${NUM_CORES}"
+      "--num-cores=${NUM_CORES}" "${PREDICT_OPTIONS[@]}"
     ;;
   optimize)
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
@@ -127,6 +173,17 @@ case "${STAGE}" in
   summarize)
     Rscript --no-save --no-restore scripts/policy/summarize-model-results.R \
       "--input-path=${OUTPUT_PATH}"
+    {
+      echo "model_id=${MODEL_ID}"
+      echo "model_label=${MODEL_LABEL}"
+      echo "distance_definition=assigned"
+      echo "git_commit=$(git rev-parse HEAD)"
+      echo "source_fit_directory=$(dirname "${FITS[0]:-prepared-balanced-assigned-distance-slim-chains}")"
+      echo "structural_refit_performed=no"
+      echo "candidate_sites=1451"
+      echo "distance_cap_m=3500"
+      echo "generated_utc=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+    } > "${OUTPUT_PATH}/provenance.txt"
     ;;
   *)
     echo "Unknown STAGE=${STAGE}" >&2
