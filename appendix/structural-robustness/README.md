@@ -63,6 +63,11 @@ exact posterior multiplier draws at the experiment's Close--Far threshold.
 The renderer supplements it with the exact draws for the tight asymmetric
 multinomial reporting model from
 `temp-data/asymmetric-observability-comparison/multiplier-draws-1250.csv`.
+It also adds the population-average community-random-shock multiplier from
+`temp-data/main-core-cluster-shock-population-gq-1250/summary/draws.csv`.
+The fuller sample-average, population-average, and community-share results are
+retained in
+`tables/main-core-cluster-shock-population-1250m.tex`.
 That correct-classification model uses the truth-linked multinomial
 Yes/No/Don't-know response channel and replaces the earlier binary
 correct/incorrect structural sensitivity; binary correct classification

@@ -44,6 +44,13 @@ asymmetric_input_path <- option_value(
   "--asymmetric-input",
   "temp-data/asymmetric-observability-comparison/multiplier-draws-1250.csv"
 )
+cluster_shock_input_path <- option_value(
+  "--cluster-shock-input",
+  paste0(
+    "temp-data/main-core-cluster-shock-population-gq-1250/",
+    "summary/draws.csv"
+  )
+)
 output_dir <- option_value(
   "--output-dir", "appendix/structural-robustness/tables"
 )
@@ -70,6 +77,8 @@ specification_catalog <- tibble::tribble(
     "Full information",
   "main", "Distance, information, and sample", "exclude-dispersed",
     "Excluding spatially dispersed clusters",
+  "main", "Community dependence", "cluster-random-shock-population",
+    "Community random shock (population average)",
   "main", "Observability model", "tight-multinomial-reporting",
     "Correct classification (multinomial)",
   "main", "Observability model", "second-order-observability",
@@ -160,6 +169,47 @@ if (!nrow(asymmetric_draws)) {
   stop("No Tight multinomial draws found in ", asymmetric_input_path)
 }
 draws <- bind_rows(draws, asymmetric_draws)
+
+cluster_shock_required_columns <- c(
+  "draw", "distance_m", "estimand", "treatment", "value"
+)
+if (!file.exists(cluster_shock_input_path)) {
+  stop(
+    "Missing exact-1.25 km cluster-random-shock draws: ",
+    cluster_shock_input_path
+  )
+}
+cluster_shock_draws <- read.csv(
+  cluster_shock_input_path,
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+missing_cluster_shock_columns <- setdiff(
+  cluster_shock_required_columns, names(cluster_shock_draws)
+)
+if (length(missing_cluster_shock_columns)) {
+  stop(
+    "Cluster-random-shock input is missing columns: ",
+    paste(missing_cluster_shock_columns, collapse = ", ")
+  )
+}
+cluster_shock_draws <- cluster_shock_draws |>
+  filter(.data$estimand == "Population-average multiplier") |>
+  transmute(
+    table_id = "main",
+    spec_id = "cluster-random-shock-population",
+    treatment = as.character(.data$treatment),
+    draw = .data$draw,
+    distance_m = as.numeric(.data$distance_m),
+    multiplier = as.numeric(.data$value)
+  )
+if (!nrow(cluster_shock_draws)) {
+  stop(
+    "No population-average multiplier draws found in ",
+    cluster_shock_input_path
+  )
+}
+draws <- bind_rows(draws, cluster_shock_draws)
 
 if (any(!is.finite(draws$distance_m)) ||
     any(draws$distance_m != reference_distance_m)) {
