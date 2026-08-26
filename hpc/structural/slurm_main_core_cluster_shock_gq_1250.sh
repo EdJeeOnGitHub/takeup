@@ -20,6 +20,7 @@ WORKSPACE=${WORKSPACE:-/project/akaring/takeup-data/data/stan_analysis_data/dist
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-cluster-shock-population-gq-1250}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
 THREADS=${THREADS:-1}
+PARALLEL_CHAINS=${PARALLEL_CHAINS:-4}
 
 cd "${REPO_ROOT}"
 mkdir -p temp/log "${OUTPUT_PATH}"
@@ -54,7 +55,7 @@ Rscript --no-save --no-restore --no-init-file \
   --core-cluster-shock-sd-prior=0.1 \
   --distance-definition=assigned \
   --sm-evaluation-distance-m=1250 \
-  --parallel-chains=4 \
+  "--parallel-chains=${PARALLEL_CHAINS}" \
   "--threads=${THREADS}"
 
 gq_files=("${OUTPUT_PATH}"/main-core-cluster-shock-population-1250-*.csv)
