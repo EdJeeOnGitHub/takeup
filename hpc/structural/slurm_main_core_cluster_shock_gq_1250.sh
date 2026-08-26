@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-#SBATCH --partition=broadwl
+#SBATCH --partition=caslake
+#SBATCH --account=pi-akaring
 #SBATCH --job-name=cluster-shock-gq-1250
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -17,7 +18,7 @@ REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-cluster-shock-production}
 WORKSPACE=${WORKSPACE:-/project/akaring/takeup-data/data/stan_analysis_data/dist_fit104.RData}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-cluster-shock-population-gq-1250}
-CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
+CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
 
 cd "${REPO_ROOT}"
 mkdir -p temp/log "${OUTPUT_PATH}"
@@ -37,7 +38,7 @@ done
 
 module load gcc/10.2.0
 module load -f R/4.2.0
-export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2/x86_64-pc-linux-gnu}
+export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/R/x86_64-pc-linux-gnu-library/4.2}
 export CMDSTAN=${CMDSTAN_PATH}
 export CMDSTANR_NO_VER_CHECK=TRUE
 
