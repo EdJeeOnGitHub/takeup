@@ -84,7 +84,10 @@ for (index in seq_len(nrow(catalog))) {
       "distance and fixed point; five communities transported out of fit105 estimation sample."
     ),
     "exclude-dispersed" = "Alternative fit transported to the common 144-community policy geography.",
-    "cluster-shock" = "Reused validated cluster-shock-mapped production output.",
+    "cluster-shock" = paste(
+      "Reused validated 4000-draw cluster-shock parameters; prediction and",
+      "optimization rerun on the common 1451-site geography."
+    ),
     "benchmark" = "Exactly 200 balanced posterior draws; not the 210-refit bootstrap.",
     ""
   )
