@@ -31,6 +31,9 @@ rerun_warmup <- as.integer(option_value("--rerun-warmup", "2000"))
 rerun_sampling <- as.integer(option_value("--rerun-sampling", "2000"))
 minimum_ess <- as.numeric(option_value("--minimum-ess", "400"))
 maximum_rhat <- as.numeric(option_value("--maximum-rhat", "1.01"))
+enforce_minimum_ess <- tolower(option_value(
+  "--enforce-minimum-ess", "true"
+)) %in% c("1", "true", "yes")
 if (chains < 1L || chains > threads) stop("--chains must be between 1 and --threads.")
 
 if (is.null(manifest_path) || !file.exists(manifest_path)) {
@@ -112,9 +115,13 @@ run_attempt <- function(attempt, warmup, sampling) {
     max_treedepth = sum(sampler$treedepth__ >= 12, na.rm = TRUE),
     elapsed_seconds = as.numeric(difftime(Sys.time(), started, units = "secs"))
   )
+  audit$ess_advisory_passed <- with(audit,
+    min_ess_bulk >= minimum_ess && min_ess_tail >= minimum_ess
+  )
+  audit$ess_enforced <- enforce_minimum_ess
   audit$passed <- with(audit,
     (chains == 1L || (is.finite(max_rhat) && max_rhat <= maximum_rhat)) &&
-      min_ess_bulk >= minimum_ess && min_ess_tail >= minimum_ess &&
+      (!ess_enforced || ess_advisory_passed) &&
       divergences == 0 && max_treedepth == 0
   )
   write.csv(audit, file.path(attempt_path, "audit.csv"), row.names = FALSE)

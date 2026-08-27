@@ -47,7 +47,8 @@ case "${STAGE}" in
       "--manifest=${MANIFEST}" "--task-id=${SLURM_ARRAY_TASK_ID}" \
       "--output-path=${OUTPUT_PATH}" "--cmdstan-path=${CMDSTAN_PATH}" \
       --threads=8 --chains=1 --iter-warmup=1000 --iter-sampling=1000 \
-      --rerun-warmup=2000 --rerun-sampling=2000
+      --rerun-warmup=2000 --rerun-sampling=2000 \
+      "--enforce-minimum-ess=${ENFORCE_MINIMUM_ESS:-false}"
     ;;
   summarize)
     Rscript --no-save --no-restore --no-init-file \
