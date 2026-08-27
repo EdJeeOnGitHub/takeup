@@ -12,7 +12,7 @@ declare -A source=(
   [private-distance-community-image]=private-distance-community-image
   [full-information]=full-information
   [exclude-dispersed]=exclude-dispersed
-  [cluster-shock]=cluster-shock-mapped
+  [cluster-shock]=cluster-shock
   [tight-multinomial]=tight-multinomial
   [second-order-observability]=second-order-observability
   [grouped-lambda]=grouped-lambda
@@ -29,6 +29,9 @@ models=(
 mkdir -p "${OUTPUT_PATH}/audit"
 for model in "${models[@]}"; do
   from=${SOURCE_ROOT}/${source[$model]}
+  if [[ "${model}" == "cluster-shock" && ! -d "${from}" ]]; then
+    from=${SOURCE_ROOT}/cluster-shock-mapped
+  fi
   [[ -d "${from}" ]] || { echo "Missing source directory: ${from}" >&2; exit 1; }
   cp -al "${from}" "${OUTPUT_PATH}/${model}"
 done
