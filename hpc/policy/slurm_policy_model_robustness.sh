@@ -16,11 +16,20 @@ MODEL_ID=${MODEL_ID:?Set MODEL_ID}
 NUM_CORES=${NUM_CORES:-12}
 MAX_DRAWS=${MAX_DRAWS:-0}
 ROOT=/project/akaring/takeup-data/data/stan_analysis_data
+STREAMLINED_ROOT=${STREAMLINED_ROOT:-${ROOT}/streamlined-active-robustness}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/policy-model-robustness/${MODEL_ID}}
 COMPACT_CSV=${OUTPUT_PATH}/compact-policy-draws.csv
 TARGET_CSV=${TARGET_CSV:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
 DISTANCE_DATA=${DISTANCE_DATA:-/project/akaring/takeup-data/optim/data/full-many-pots-experiment.rds}
 REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
+
+use_streamlined_fits() {
+  local spec_id=$1
+  FITS=()
+  for chain in 1 2 3 4; do
+    FITS+=("${STREAMLINED_ROOT}/${spec_id}/fits/${spec_id}-slim-chain${chain}-1.csv")
+  done
+}
 
 case "${MODEL_ID}" in
   benchmark)
@@ -34,21 +43,21 @@ case "${MODEL_ID}" in
     MODEL_LABEL="Individual travel costs"
     MODEL_FAMILY=private_distance_community_image
     LAMBDA_STRUCTURE=common
-    FITS=("${ROOT}"/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_COMMUNITY_FP_INDIV_VIS-{1,2,3,4}.csv)
+    use_streamlined_fits private-distance-community-image
     EXTRACT_OPTIONS=()
     ;;
   full-information)
     MODEL_LABEL="Individual distance observed by peers"
     MODEL_FAMILY=full_information
     LAMBDA_STRUCTURE=common
-    FITS=("${ROOT}"/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_INDIV_DIST_INDIV_FP-{1,2,3,4}.csv)
+    use_streamlined_fits full-information
     EXTRACT_OPTIONS=()
     ;;
   exclude-dispersed)
     MODEL_LABEL="Excluding geographically dispersed communities"
     MODEL_FAMILY=gaussian
     LAMBDA_STRUCTURE=common
-    FITS=("${ROOT}"/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS-{1,2,3,4}.csv)
+    use_streamlined_fits exclude-dispersed
     EXTRACT_OPTIONS=()
     ;;
   tight-multinomial)
@@ -76,7 +85,7 @@ case "${MODEL_ID}" in
     MODEL_LABEL="Perceived observability (second order)"
     MODEL_FAMILY=gaussian
     LAMBDA_STRUCTURE=common
-    FITS=("${ROOT}"/dist_fit106_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB-{1,2,3,4}.csv)
+    use_streamlined_fits second-order-observability
     EXTRACT_OPTIONS=(--beliefs-order 2)
     ;;
   grouped-lambda)
