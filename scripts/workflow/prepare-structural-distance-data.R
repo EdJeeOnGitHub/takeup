@@ -18,10 +18,7 @@ model_name <- Sys.getenv(
 )
 workspace <- Sys.getenv("TAKEUP_STRUCTURAL_WORKSPACE", "")
 if (!nzchar(workspace)) {
-  candidates <- c(
-    "data/stan_analysis_data/dist_fit105.RData",
-    "data/stan_analysis_data/dist_fit104.RData"
-  )
+  candidates <- "build/structural-workspace/main-core-input.RData"
   workspace <- candidates[vapply(candidates, function(path) {
     if (!file.exists(path)) return(FALSE)
     env <- new.env(parent = emptyenv())

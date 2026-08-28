@@ -17,7 +17,7 @@ PROJECT_ROOT=${PROJECT_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/candidate-hpc-cd5f295-assigned/work}
 OUTPUT_ROOT=${OUTPUT_ROOT:?Set OUTPUT_ROOT to an isolated candidate directory}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
-WORKSPACE=${WORKSPACE:-${PROJECT_ROOT}/data/stan_analysis_data/dist_fit104.RData}
+WORKSPACE=${WORKSPACE:-${PROJECT_ROOT}/build/structural-workspace/main-core-input.RData}
 task=${SLURM_ARRAY_TASK_ID:?This launcher requires an array task from 1 to 17}
 
 prior_labels=(

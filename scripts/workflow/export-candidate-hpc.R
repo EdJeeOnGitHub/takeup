@@ -30,7 +30,7 @@ sha256 <- function(path) {
 inputs <- c(
   "data/rct_targetable_schools_2.0.rds",
   "data/takeup_processed_cluster_strat.rds",
-  "data/stan_analysis_data/dist_fit104.RData",
+  "build/structural-workspace/main-core-input.RData",
   "stan_models/takeup_struct_main_core.stan",
   "stan_models/takeup_struct_main_core_compact_gq.stan"
 )

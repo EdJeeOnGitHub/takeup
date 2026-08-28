@@ -4,7 +4,7 @@ args <- commandArgs(trailingOnly = TRUE)
 source("R/structural/main-core-data.R")
 
 workspace_path <- main_core_option_value(
-  args, "--workspace", "data/stan_analysis_data/dist_fit105.RData"
+  args, "--workspace", "build/structural-workspace/main-core-input.RData"
 )
 output_path <- main_core_option_value(
   args, "--output-path", "temp-data/main-core-cluster-weights"

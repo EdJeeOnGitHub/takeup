@@ -23,13 +23,9 @@ required_tables <- c(
   "struct-overall-te-table.tex", "private-signal-te-table.tex",
   "fob-beliefs-table.tex", "wtp-summ-table.tex"
 )
-required_figures <- "sm-decomp-annotated.pdf"
 manifest_path <- file.path(output_root, "structural-draw-manifest.csv")
 expected <- unlist(lapply(c("realized", "assigned"), function(specification) {
-  c(
-    file.path(output_root, specification, "tables", required_tables),
-    file.path(output_root, specification, "figures", required_figures)
-  )
+  file.path(output_root, specification, "tables", required_tables)
 }))
 
 if (file.exists(manifest_path) && all(file.exists(expected))) {
@@ -64,7 +60,7 @@ for (specification in c("realized", "assigned")) {
   run(
     "scripts/structural/generate-compact-gq.R",
     c(
-      "--workspace=data/stan_analysis_data/dist_fit104.RData",
+      "--workspace=build/structural-workspace/main-core-input.RData",
       paste0("--fit-csvs=", paste(chains, collapse = ",")),
       paste0("--output-path=", compact),
       paste0("--distance-definition=", specification)
@@ -90,14 +86,12 @@ for (specification in c("realized", "assigned")) {
       paste0("--input-path=", data),
       paste0("--output-path=", data),
       paste0("--table-output=", tables),
-      paste0("--figure-output=", figures)
+      paste0("--figure-output=", figures),
+      "--tables-only"
     ),
     file.path(root, "structural-render.log")
   )
-  missing <- c(
-    file.path(tables, required_tables),
-    file.path(figures, required_figures)
-  )
+  missing <- file.path(tables, required_tables)
   missing <- missing[!file.exists(missing)]
   if (length(missing)) stop("Missing structural comparison tables: ",
                             paste(missing, collapse = ", "), call. = FALSE)

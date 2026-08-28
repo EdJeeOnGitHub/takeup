@@ -16,7 +16,7 @@ set -euo pipefail
 
 REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 FIT_ROOT=${FIT_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-cluster-shock-production}
-WORKSPACE=${WORKSPACE:-/project/akaring/takeup-data/data/stan_analysis_data/dist_fit104.RData}
+WORKSPACE=${WORKSPACE:-${PROJECT_ROOT}/build/structural-workspace/main-core-input.RData}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/data/stan_analysis_data/main-core-cluster-shock-population-gq-1250}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
 THREADS=${THREADS:-1}

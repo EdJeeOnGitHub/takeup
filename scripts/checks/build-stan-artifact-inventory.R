@@ -84,7 +84,7 @@ canonical_chains <- paste0(
   "data/stan_analysis_data/",
   "dist_fit104_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-", 1:4, ".csv"
 )
-canonical_workspace <- "data/stan_analysis_data/dist_fit104.RData"
+canonical_workspace <- "build/structural-workspace/main-core-input.RData"
 
 extension <- tools::file_ext(files)
 kind <- ifelse(

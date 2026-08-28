@@ -18,7 +18,7 @@ suppressPackageStartupMessages({
 })
 
 workspace <- option_value(
-  "--workspace", "data/stan_analysis_data/dist_fit104.RData"
+  "--workspace", "build/structural-workspace/main-core-input.RData"
 )
 fit_csvs <- strsplit(option_value("--fit-csvs", ""), ",", fixed = TRUE)[[1L]]
 output_path <- option_value(

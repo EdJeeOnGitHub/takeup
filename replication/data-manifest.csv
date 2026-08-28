@@ -5,14 +5,16 @@ data/clean-data/monitored-nosms-takeup-data.rds,main reduced-form analysis data,
 data/clean-data/full-takeup-data.rds,full take-up and SMS analysis data,restricted,scripts/design/clean-data.sh,restricted substitute
 data/clean-data/clean-baseline-data.rds,baseline survey analysis data,restricted,scripts/design/clean-data.sh,restricted substitute
 data/clean-data/clean-endline-data.rds,endline survey analysis data,restricted,scripts/design/clean-data.sh,restricted substitute
-data/stan_analysis_data/dist_fit104.RData,canonical workspace used to construct slim main-core data,derived,scripts/structural/run-model.R,required until workspace builder is refactored
+build/structural-workspace/main-core-input.RData,minimal loader-built workspace used to construct slim main-core data,derived,make structural-workspace,generated locally
 replication/structural-draws/assigned,assigned-definition slim posterior draws,derived,make structural-fit,required
 replication/structural-draws/realized,realized-definition slim posterior draws,derived,make structural-fit,robustness
-data/stan_analysis_data/param_posterior_draws_dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP.csv,posterior parameter input for policy demand,derived,optim/predict-takeup-for-optim.R,required for policy workflow
+build/structural-fit/assigned,parameter-only posterior draws used by compact GQ and main policy demand,derived,make structural-fit,required for current policy workflow
 replication/inputs/policy/policy-bootstrap-parameters.csv,compact cluster-weighted parameter input for low-memory policy demand,derived,scripts/policy/prepare-cluster-bootstrap.R,required for current policy workflow
 optim/data/full-many-pots-experiment.rds,candidate PoT and distance input for policy optimization,derived,scripts/policy/create-distance-data.R,required for policy workflow
 optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv,fixed experimental welfare target for policy optimization,derived,optim/create-experiment-target.R,required for policy workflow
 temp-data/struct-postprocess/rvar_processed_dist_fit105_*.rds,focused fit-105 structural summaries,derived,quick postprocess scripts,required for structural renderer until compact-GQ adapter is complete
+temp-data/tidy_processed_dist_prior95_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_FOB_1-4.rds,fit-95 prior-predictive multiplier curves retained by the paper,derived,legacy prior predictive postprocessing,required for Figure 4
+temp-data/delta-vstar-endog-mu.csv,theoretical declining-observability simulation grid,derived,legacy theory simulation,required for Figure 3 panel b pending compact-input promotion
 data/rct_cluster_selection_2.0.rds,design selection history,restricted,rct-design-fieldwork,required for design workflow
 data/rct_target_villages_2.0.rds,design target villages,restricted,rct-design-fieldwork,required for design workflow
 data/takeup_cluster_survey.rds,design cluster survey,restricted,rct-design-fieldwork,required for design workflow

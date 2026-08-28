@@ -272,7 +272,7 @@ if (nzchar(cmdstan_path_option)) {
 }
 
 workspace_path <- if (is.null(workspace_option)) {
-  file.path(input_path, "dist_fit105.RData")
+  "build/structural-workspace/main-core-input.RData"
 } else {
   workspace_option
 }
@@ -563,6 +563,10 @@ write.csv(data.frame(
   iter_warmup = iter_warmup,
   iter_sampling = iter_sampling,
   seed = seed,
+  workspace_sha256 = strsplit(
+    system2("sha256sum", workspace_path, stdout = TRUE),
+    "[[:space:]]+"
+  )[[1L]][[1L]],
   git_commit = system2("git", c("rev-parse", "HEAD"), stdout = TRUE)[[1L]],
   completed_utc = format(Sys.time(), tz = "UTC", usetz = TRUE)
 ), file.path(output_path, paste0(output_basename, "-manifest.csv")), row.names = FALSE)

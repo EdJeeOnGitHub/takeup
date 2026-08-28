@@ -101,7 +101,9 @@ takeup_run_reduced_form <- function(specification, output_dir, context_files,
                                     bootstrap_draws,
                                     dependencies = NULL) {
   table_dir <- file.path(output_dir, "presentations", "rf-tables", "main-specs")
+  figure_dir <- file.path(output_dir, "figures")
   dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
   log_path <- file.path(output_dir, "reduced-form.log")
   env <- c(
     paste0("TAKEUP_DISTANCE_SPEC=", specification),
@@ -118,7 +120,8 @@ takeup_run_reduced_form <- function(specification, output_dir, context_files,
         paste0("--distance-definition=", specification),
         paste0("--bootstrap-draws=", bootstrap_draws),
         paste0("--context-path=", context_path),
-        paste0("--table-output-path=", table_dir)),
+        paste0("--table-output-path=", table_dir),
+        paste0("--figure-output-path=", figure_dir)),
       env = env,
       stdout = log_path,
       stderr = log_path
@@ -285,7 +288,7 @@ takeup_run_compact_gq <- function(specification, output_dir, draws) {
     "--no-save", "--no-restore", "scripts/structural/generate-compact-gq.R",
     paste0("--workspace=", Sys.getenv(
       "TAKEUP_STRUCTURAL_WORKSPACE",
-      "data/stan_analysis_data/dist_fit104.RData"
+      "build/structural-workspace/main-core-input.RData"
     )),
     paste0("--fit-csvs=", paste(draws, collapse = ",")),
     paste0("--output-path=", gq_dir),

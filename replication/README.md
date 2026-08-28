@@ -20,7 +20,8 @@ policy optimization.
 The canonical sampling model is `stan_models/takeup_struct_main_core.stan`,
 its compact-GQ companion is
 `stan_models/takeup_struct_main_core_compact_gq.stan`, and the default input
-workspace is `data/stan_analysis_data/dist_fit104.RData`. These defaults are
+workspace is `build/structural-workspace/main-core-input.RData`, rebuilt from
+the current loaders by `make structural-workspace`. These defaults are
 shared by the Make pipeline and direct helper scripts.
 
 To build and compare both Close/Far definitions:
@@ -75,6 +76,13 @@ coverage separately from full-regeneration coverage. The latter continues to
 identify the focused structural-render and isolated legacy-output work that
 remains for a public replication package.
 
+Run `make paper-figures-quick` for the supported local figure DAG. It rebuilds
+14 active manuscript figures and validates the seven intervention-material
+assets. The two design figures and four distributional-robustness figures stay
+explicitly checksum-frozen pending their focused renderer extractions. The
+policy panels are rendered from an imported completed allocation bundle, so
+this target does not invoke a solver.
+
 `make structural-render` runs the focused fit-105 table/figure renderer into
 `build/structural-paper/fit105/` and writes `comparison.csv` against the frozen
 paper artifacts. It reads the small postprocessed RDS summaries in
@@ -83,19 +91,21 @@ object. `make structural-postprocess` remains the separate compact-GQ step from
 the four saved Stan chains. New results are never promoted over approved paper
 outputs automatically.
 
-`make paper-full` refreshes compact structural GQ, focused structural renders,
-and the fast sparse policy workflow before staging. The policy default is a
-five-refit smoke test; use `POLICY_REPLICATES=999` for the complete exponential
-cluster-weighted exercise. `make design-paper-full` runs the historical design
+`make paper-full` refreshes compact structural GQ, invariant theory and the
+focused slim-chain social-multiplier figure, and the 200-draw sparse posterior policy workflow
+before staging. The separate `make optimal-policy` target remains the
+cluster-weighted exercise: use `POLICY_REPLICATES=999` for its production run.
+`make design-paper-full` runs the historical design
 simulation and PAP map source; both require the restricted design inputs.
 
-Production policy optimization is not silently run by `make paper`. The
-current `make optimal-policy` entrypoint is the low-memory cluster-weighted
+Production policy optimization is not silently run by `make paper`.
+`make optimal-policy-main` is the low-memory main-paper posterior workflow;
+`make optimal-policy` is the low-memory cluster-weighted robustness
 workflow: it reads the compact `policy-bootstrap-parameters.csv`, predicts only
 the 1,252 feasible village--PoT edges, optimizes five scenarios, and writes
 everything below `build/policy/cluster-weighted/`. It needs either `glpsol`
 (Ubuntu package `glpk-utils`) or `gurobi_cl`. Five refits are used by default;
-set `POLICY_REPLICATES=999` for production. The older fit-105 dense posterior
+set `POLICY_REPLICATES=999` for the robustness production run. The older fit-105 dense posterior
 workflow is retained as `make optimal-policy-legacy` and still supports
 `POLICY_SMOKETEST=1`.
 

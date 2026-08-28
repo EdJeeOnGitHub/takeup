@@ -24,6 +24,12 @@ Use `make help` for the individual reduced-form, balance, structural, policy,
 and audit targets. See `replication/README.md` for the complete reproduction
 contract and restricted-input requirements.
 
+Structural sampling no longer depends on a saved legacy fit workspace. Run
+`make structural-workspace` to rebuild the minimal `models` and `stan_data`
+objects from the current take-up, observability, WTP, and distance loaders. The
+result is written below `build/` and its hash is recorded in new slim-fit
+manifests, preventing reuse of posterior draws from a different data snapshot.
+
 ## Assigned-distance candidate paper
 
 The non-promoting candidate workflow refits the slim structural model with the
@@ -87,17 +93,36 @@ The structural wrapper reuses an existing four-chain fit only after validating
 its manifest and diagnostics (zero divergences, zero maximum-treedepth hits,
 and E-BFMI above 0.3). Set `FORCE_STRUCTURAL_FIT=1` to require a fresh refit.
 
-The current optimal-policy workflow is `make optimal-policy`. It uses compact
-cluster-weighted parameters and sparse feasible-edge predictions, and requires
-either GLPK (`glpsol`) or Gurobi. The older dense workflow is retained only as
-the explicitly named `make optimal-policy-legacy` target under
-`archive/code/policy-v1/`.
+The main-paper policy workflow is `make optimal-policy-main`. It selects 200
+balanced posterior draws from the four slim chains, uses sparse feasible-edge
+prediction and optimization, and renders the main table plus demand and
+allocation-distance figures. `make optimal-policy` retains the cluster-weighted
+mode robustness workflow. Both require GLPK (`glpsol`) or Gurobi for allocation.
+The older dense workflow is retained only as `make optimal-policy-legacy`.
+
+`make structural-theory-figures` regenerates the invariant Figure 3 panels.
+`make structural-multiplier-figure` rebuilds Figure 4's smooth decomposition
+analytically from 200 balanced draws in the slim chains. `make paper-full`
+includes these targets and the
+main posterior policy workflow; ordinary `make paper` continues to stage
+approved artifacts without silently promoting regenerated candidates.
+
+`make paper-figures-quick` regenerates all currently supported local paper
+figures, including the baseline descriptives, GPT reasons, reduced-form plots,
+the derivative diagnostic, the sigma-u prior/posterior comparison, theory, and
+the imported 999-draw policy figures. It does not run policy optimization or
+the historical design simulation. `make check-paper-figures` verifies that
+every active `\includegraphics` entry is classified and resolves to a readable
+generated, static, or checksum-frozen file.
 
 Restricted inputs and large saved fits are not committed. Their expected paths,
 owners, and replication disposition are listed in
 `replication/data-manifest.csv`. On a compute server, keep those inputs and
 generated results outside the Git checkout and pass the relevant input/output
 flags to the supported scripts.
+
+The few structural specifications that still depend on retained legacy fits
+are listed in `docs/legacy-structural-fit-exceptions.md`.
 
 ## Output policy
 

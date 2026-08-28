@@ -15,7 +15,19 @@ basename <- value(
 warmup <- as.integer(value("--iter-warmup", "1000"))
 sampling <- as.integer(value("--iter-sampling", "1000"))
 seed <- as.integer(value("--seed", "20260820"))
+workspace <- value(
+  "--workspace",
+  Sys.getenv(
+    "TAKEUP_STRUCTURAL_WORKSPACE",
+    "build/structural-workspace/main-core-input.RData"
+  )
+)
 if (is.null(specification) || is.null(output_dir)) quit(status = 1L)
+if (!file.exists(workspace)) quit(status = 1L)
+workspace_sha256 <- strsplit(
+  system2("sha256sum", workspace, stdout = TRUE),
+  "[[:space:]]+"
+)[[1L]][[1L]]
 
 chains <- file.path(output_dir, sprintf("%s-%d.csv", basename, 1:4))
 manifest_path <- file.path(output_dir, paste0(basename, "-manifest.csv"))
@@ -35,7 +47,9 @@ valid_manifest <- identical(manifest$distance_definition[[1L]], specification) &
   manifest$chains[[1L]] == 4L &&
   manifest$iter_warmup[[1L]] == warmup &&
   manifest$iter_sampling[[1L]] == sampling &&
-  manifest$seed[[1L]] == seed
+  manifest$seed[[1L]] == seed &&
+  "workspace_sha256" %in% names(manifest) &&
+  identical(manifest$workspace_sha256[[1L]], workspace_sha256)
 valid_diagnostics <-
   all(diagnostics$num_divergent == 0L) &&
   all(diagnostics$num_max_treedepth == 0L) &&

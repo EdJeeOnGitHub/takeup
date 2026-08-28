@@ -13,6 +13,11 @@ POLICY_REPLICATES ?= 5
 POLICY_SOLVER ?= auto
 POLICY_FAST_SOURCE ?= replication/inputs/policy
 POLICY_FAST_BUILD ?= build/policy/cluster-weighted
+POLICY_MAIN_BUILD ?= build/policy/posterior
+POLICY_MODEL_PACKAGE ?= temp-data/policy-model-robustness-complete-20260827-002500
+PAPER_FIGURE_BUILD ?= build/paper-figures/$(DISTANCE_SPEC)
+POLICY_PAPER_RETURN ?= build/midway-returns/assigned-distance-midway-20260822-160039/policy
+POLICY_PAPER_DRAW ?= 337
 CANDIDATE_ROOT ?= build/paper-candidate/$(DISTANCE_SPEC)
 CANDIDATE_COMPONENT_ROOT ?= build/candidate-components/$(DISTANCE_SPEC)
 CANDIDATE_HPC_ROOT ?= build/candidate-hpc/$(DISTANCE_SPEC)
@@ -20,21 +25,52 @@ CANDIDATE_HPC_BUNDLE ?=
 PAPER_TEX ?= /home/agent/projects/overleaf/overleaf-takeup/ECM ReStud.tex
 STRUCTURAL_RENDER_FIT ?= 105
 STRUCTURAL_RENDER_INPUT ?= temp-data/struct-postprocess
+STRUCTURAL_WORKSPACE ?= build/structural-workspace/main-core-input.RData
 export TAKEUP_DISTANCE_SPEC := $(DISTANCE_SPEC)
 export TAKEUP_BUILD_SPECS := $(DISTANCE_SPEC)
 export TAKEUP_BALANCE_SECTIONS := $(BALANCE_SECTIONS)
 export TAKEUP_RI_DRAWS := $(RI_DRAWS)
 export TAKEUP_BOOTSTRAP_DRAWS := $(BOOTSTRAP_DRAWS)
 export TAKEUP_THREADS
+export TAKEUP_STRUCTURAL_WORKSPACE := $(STRUCTURAL_WORKSPACE)
 
-.PHONY: help setup audit analysis-context reduced-form balance balance-tables structural-data structural-fit \
+.PHONY: help setup audit analysis-context reduced-form balance balance-tables structural-workspace structural-data structural-fit \
 	structural-postprocess compare-distance paper paper-generated paper-full paper-assets \
 	structural-render structural-candidate-render structural-paper policy-paper design-paper design-paper-full auxiliary-paper check \
 	replication-package paper-audit stan-inventory optimal-policy optimal-policy-legacy \
 	policy-fast-predict policy-fast-optimize policy-fast-summarize policy-tables clean-cache \
+	structural-theory-figures structural-multiplier-figure policy-main-prepare \
+	policy-main-predict policy-main-optimize policy-main-summarize policy-main-render optimal-policy-main \
+	balance-ri figures-baseline figures-reduced-form figures-policy-diagnostics \
+	figures-structural-diagnostics policy-paper-figures paper-figures-quick check-paper-figures \
+	policy-model-table structural-benchmark-recovery-prepare structural-benchmark-recovery-summarize \
 	candidate-local candidate-appendix candidate-hpc-export candidate-hpc-import \
 	candidate-auxiliary-rf candidate-policy paper-candidate candidate-check \
 	distance-comparison-inputs distance-comparison-report distance-comparison
+
+## make policy-model-table    Render the eleven-model optimal-policy robustness table.
+policy-model-table:
+	Rscript --no-save --no-restore scripts/policy/render-model-scenario-table.R \
+		--input-root="$(POLICY_MODEL_PACKAGE)" \
+		--output=appendix/structural-robustness/tables/optim-policy-model-scenarios.tex
+
+BENCHMARK_RECOVERY_PATH ?= temp-data/main-core-benchmark-recovery
+BENCHMARK_RECOVERY_FITS ?= $(shell find build/structural-fit/assigned -maxdepth 1 -type f -name 'dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-[1-4].csv' 2>/dev/null | sort | paste -sd, -)
+
+## make structural-benchmark-recovery-prepare Generate 50 assigned-design benchmark simulations and the HPC manifest.
+structural-benchmark-recovery-prepare:
+	Rscript --no-save --no-restore scripts/appendix/generate-main-core-benchmark-recovery.R \
+		--workspace=$(STRUCTURAL_WORKSPACE) \
+		--fit-csvs="$(BENCHMARK_RECOVERY_FITS)" \
+		--output-path="$(BENCHMARK_RECOVERY_PATH)" \
+		--replicates=50 --grid-points=21 --seed=20260827
+
+## make structural-benchmark-recovery-summarize Validate all 50 HMC fits and render appendix artifacts.
+structural-benchmark-recovery-summarize:
+	Rscript --no-save --no-restore scripts/appendix/summarize-main-core-benchmark-recovery.R \
+		--input-path="$(BENCHMARK_RECOVERY_PATH)" --expected-replicates=50 \
+		--table-path=appendix/structural-robustness/tables/main-core-benchmark-recovery.tex \
+		--figure-path=appendix/structural-robustness/figures/main-core-benchmark-likelihood.pdf
 
 help:
 	@sed -n 's/^## //p' Makefile
@@ -63,8 +99,22 @@ balance:
 balance-tables:
 	Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of("balance_tables"), callr_function = NULL)'
 
+## make balance-ri             Build only the balance randomization-inference section.
+balance-ri:
+	TAKEUP_BALANCE_SECTIONS=fit-ri Rscript --no-save --no-restore -e 'targets::tar_make_future(names = tidyselect::all_of(c("distance_audit", "build_manifest", "balance")), workers = as.integer(Sys.getenv("TAKEUP_THREADS", "1")), callr_function = NULL)'
+
+## make structural-workspace   Rebuild minimal structural inputs from current loaders.
+structural-workspace: audit
+	mkdir -p "$(dir $(STRUCTURAL_WORKSPACE))"
+	TAKEUP_DISTANCE_SPEC=realized Rscript --no-save --no-restore \
+		scripts/structural/run-model.R takeup fit --data-only \
+		--models=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
+		--outputname=$(basename $(notdir $(STRUCTURAL_WORKSPACE))) \
+		--output-path=$(patsubst %/,%,$(dir $(STRUCTURAL_WORKSPACE))) \
+		--num-mix-groups=1 --cmdstanr
+
 ## make structural-data        Validate structural inputs for DISTANCE_SPEC.
-structural-data: audit
+structural-data: audit structural-workspace
 	Rscript --no-save --no-restore scripts/workflow/prepare-structural-distance-data.R --spec=$(DISTANCE_SPEC)
 
 ## make structural-fit         Run four latest slim structural chains locally.
@@ -72,7 +122,7 @@ structural-fit: structural-data
 	bash scripts/workflow/run-structural-fit.sh $(DISTANCE_SPEC)
 
 ## make structural-postprocess Rebuild compact GQ from four saved chains.
-structural-postprocess:
+structural-postprocess: structural-workspace
 	Rscript --no-save --no-restore -e 'targets::tar_make(names = tidyselect::all_of("compact_gq"), callr_function = NULL)'
 
 ## make structural-render      Render current fit-105 tables/figures from focused summaries for review.
@@ -88,6 +138,24 @@ structural-render:
 		--owner=structural_postprocess \
 		--generated-root=build/structural-paper/$(DISTANCE_SPEC)/fit$(STRUCTURAL_RENDER_FIT) \
 		--output=build/structural-paper/$(DISTANCE_SPEC)/fit$(STRUCTURAL_RENDER_FIT)/comparison.csv
+
+## make structural-theory-figures Regenerate invariant theoretical Figure 3 panels.
+structural-theory-figures:
+	Rscript --no-save --no-restore scripts/structural/render-theory-figures.R \
+		--output-path=build/structural-paper/invariant/figures
+
+## make structural-multiplier-figure Rebuild and render the focused smooth Figure 4 decomposition.
+structural-multiplier-figure: policy-main-prepare
+	Rscript --no-save --no-restore scripts/structural/postprocess-sm-curve.R \
+		--parameter-csv="$(POLICY_MAIN_BUILD)/policy-posterior-parameters.csv" \
+		--output-path=build/structural-paper/invariant/fit105/data/rvar_processed_dist_fit105_sm_summ_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_1-4.rds
+	Rscript --no-save --no-restore scripts/structural/render-paper.R \
+		--fit-version=105 --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
+		--input-path="$(STRUCTURAL_RENDER_INPUT)" \
+		--sm-input=build/structural-paper/invariant/fit105/data/rvar_processed_dist_fit105_sm_summ_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_1-4.rds \
+		--output-path=build/structural-paper/invariant/fit105/data \
+		--table-output=build/structural-paper/invariant/fit105/tables \
+		--figure-output=build/structural-paper/invariant/fit105/figures
 
 ## make structural-candidate-render Postprocess and render the assigned slim baseline fit.
 structural-candidate-render: structural-postprocess
@@ -130,6 +198,55 @@ candidate-appendix: analysis-context
 candidate-auxiliary-rf: paper-generated
 	Rscript --no-save --no-restore scripts/reduced-form/render-candidate-auxiliary.R \
 		--spec=$(DISTANCE_SPEC) --output-root="$(CANDIDATE_COMPONENT_ROOT)"
+
+## make figures-baseline       Render Appendix Figures A1-A2 from the analysis context.
+figures-baseline: analysis-context
+	Rscript --no-save --no-restore scripts/figures/render-baseline-descriptives.R \
+		--context-path=build/$(DISTANCE_SPEC)/context/analysis-context.rds \
+		--output-path="$(PAPER_FIGURE_BUILD)/baseline"
+
+## make figures-reduced-form   Render/stage Appendix Figures A8-A10 and E2.
+figures-reduced-form: reduced-form balance-ri
+	Rscript --no-save --no-restore create-figures/create-gpt-reason-plot.R \
+		--output-dir="$(PAPER_FIGURE_BUILD)/reduced-form/figures" \
+		--output-basename=gpt-reason-plot --formats=pdf
+	Rscript --no-save --no-restore scripts/reduced-form/render-candidate-auxiliary.R \
+		--spec=$(DISTANCE_SPEC) --output-root="$(PAPER_FIGURE_BUILD)/reduced-form"
+
+## make figures-policy-diagnostics Render Appendix Figure A11 without optimization.
+figures-policy-diagnostics: policy-main-prepare
+	Rscript --no-save --no-restore scripts/policy/render-derivative-diagnostic.R \
+		--parameter-csv="$(POLICY_MAIN_BUILD)/policy-posterior-parameters.csv" \
+		--output-path="$(PAPER_FIGURE_BUILD)/policy" --num-draws=100
+
+## make figures-structural-diagnostics Render Appendix Figure K1 from fit-105 chains.
+figures-structural-diagnostics:
+	@for chain in 1 2 3 4; do test -f "build/structural-fit/$(DISTANCE_SPEC)/dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP-$$chain.csv" || { echo "Missing fit-105 chain $$chain; run make structural-fit DISTANCE_SPEC=$(DISTANCE_SPEC)." >&2; exit 1; }; done
+	Rscript --no-save --no-restore scripts/appendix/sigma-u-prior-posterior-plot.R \
+		--input-path=build/structural-fit/$(DISTANCE_SPEC) \
+		--output-path="$(PAPER_FIGURE_BUILD)/structural"
+
+## make policy-paper-figures   Re-render Figures 5, 6 and A12 from imported 999-draw results.
+policy-paper-figures:
+	test -f "$(POLICY_PAPER_RETURN)/policy-bootstrap-parameters.csv"
+	test -f "$(POLICY_PAPER_RETURN)/allocations/control/replicate-$(shell printf '%04d' $(POLICY_PAPER_DRAW)).rds"
+	test -f "$(POLICY_PAPER_RETURN)/allocations/bracelet/replicate-$(shell printf '%04d' $(POLICY_PAPER_DRAW)).rds"
+	Rscript --no-save --no-restore scripts/policy/render-paper-figures.R \
+		--parameter-csv="$(POLICY_PAPER_RETURN)/policy-bootstrap-parameters.csv" \
+		--parameter-draw=median --allocation-draw=$(POLICY_PAPER_DRAW) \
+		--policy-path="$(POLICY_PAPER_RETURN)" \
+		--output-path=build/policy/cluster-weighted/figures
+
+## make paper-figures-quick    Render all supported quick/local paper figures.
+paper-figures-quick: figures-baseline figures-reduced-form figures-policy-diagnostics \
+	figures-structural-diagnostics structural-theory-figures structural-multiplier-figure \
+	policy-paper-figures
+	$(MAKE) check-paper-figures
+
+## make check-paper-figures    Audit manuscript figure classification and generated PDFs.
+check-paper-figures:
+	Rscript --no-save --no-restore scripts/checks/check-paper-figures.R \
+		--paper-tex="$(PAPER_TEX)" --contract=replication/paper-artifact-contract.csv
 
 ## make candidate-local          Run all local assigned candidate components.
 candidate-local: audit paper-generated structural-fit structural-postprocess structural-candidate-render candidate-appendix candidate-auxiliary-rf
@@ -181,6 +298,9 @@ candidate-policy:
 		--output-csv="$(CANDIDATE_COMPONENT_ROOT)/policy/policy-model-robustness-summary.csv" \
 		--table-path="$(CANDIDATE_COMPONENT_ROOT)/appendix/structural-robustness/tables/optim-policy-model-robustness.tex" \
 		--contrast-table-path="$(CANDIDATE_COMPONENT_ROOT)/appendix/structural-robustness/tables/optim-policy-model-robustness-contrasts.tex"
+	Rscript --no-save --no-restore scripts/policy/render-model-scenario-table.R \
+		--input-root="$(POLICY_MODEL_PACKAGE)" \
+		--output="$(CANDIDATE_COMPONENT_ROOT)/appendix/structural-robustness/tables/optim-policy-model-scenarios.tex"
 
 ## make paper-candidate          Strictly stage and compile manuscript plus robustness appendix.
 paper-candidate:
@@ -198,6 +318,18 @@ compare-distance:
 
 ## make distance-comparison-inputs Build modern realized/assigned review inputs without promotion.
 distance-comparison-inputs: compare-distance
+	Rscript --no-save --no-restore scripts/figures/render-baseline-descriptives.R \
+		--context-path=build/realized/context/analysis-context.rds \
+		--output-path=build/paper-figures/realized/baseline
+	Rscript --no-save --no-restore scripts/figures/render-baseline-descriptives.R \
+		--context-path=build/assigned/context/analysis-context.rds \
+		--output-path=build/paper-figures/assigned/baseline
+	Rscript --no-save --no-restore create-figures/create-gpt-reason-plot.R \
+		--output-dir=build/paper-figures/realized/reduced-form/figures \
+		--output-basename=gpt-reason-plot --formats=pdf
+	Rscript --no-save --no-restore create-figures/create-gpt-reason-plot.R \
+		--output-dir=build/paper-figures/assigned/reduced-form/figures \
+		--output-basename=gpt-reason-plot --formats=pdf
 	Rscript --no-save --no-restore scripts/reduced-form/render-candidate-auxiliary.R \
 		--spec=realized --output-root=build/candidate-components/realized
 	Rscript --no-save --no-restore scripts/reduced-form/render-candidate-auxiliary.R \
@@ -244,9 +376,9 @@ paper-generated:
 paper: paper-generated paper-assets structural-paper policy-paper design-paper auxiliary-paper
 	Rscript --no-save --no-restore scripts/workflow/stage-paper.R --spec=$(DISTANCE_SPEC) --strict
 
-## make paper-full             Refresh structural renders and fast policy intermediates, then stage for review.
-paper-full: paper-generated structural-postprocess structural-render optimal-policy paper-assets
-	Rscript --no-save --no-restore scripts/workflow/stage-paper.R --spec=$(DISTANCE_SPEC) --strict
+## make paper-full             Refresh supported structural and main-policy artifacts, then stage for review.
+paper-full: paper-generated structural-postprocess structural-render structural-theory-figures structural-multiplier-figure optimal-policy-main paper-assets
+	Rscript --no-save --no-restore scripts/workflow/stage-paper.R --spec=$(DISTANCE_SPEC) --strict --full
 
 ## make paper-audit            Report which active paper artifacts are reproducible.
 paper-audit:
@@ -291,6 +423,55 @@ policy-fast-summarize: policy-fast-optimize
 		--input-path="$(POLICY_FAST_BUILD)" \
 		--table-path="$(POLICY_FAST_BUILD)/optim-summ-exponential-cluster-weights.tex" \
 		--num-replicates=$(POLICY_REPLICATES) --method=exponential
+
+## make policy-main-prepare    Select 200 balanced posterior draws and a median parameter row.
+policy-main-prepare:
+	Rscript --no-save --no-restore scripts/policy/prepare-baseline-posterior.R \
+		--fit-path=build/structural-fit/$(DISTANCE_SPEC) --output-path="$(POLICY_MAIN_BUILD)"
+
+## make policy-main-predict    Predict sparse demand for posterior draws and median parameters.
+policy-main-predict: policy-main-prepare
+	Rscript --no-save --no-restore scripts/policy/predict-cluster-bootstrap.R \
+		--parameter-csv="$(POLICY_MAIN_BUILD)/policy-posterior-parameters.csv" \
+		--distance-data=optim/data/full-many-pots-experiment.rds \
+		--output-path="$(POLICY_MAIN_BUILD)" --distance-cap=3500 \
+		--num-cores=$(TAKEUP_THREADS) --num-replicates=200
+	mkdir -p "$(POLICY_MAIN_BUILD)/median"
+	Rscript --no-save --no-restore scripts/policy/predict-cluster-bootstrap.R \
+		--parameter-csv="$(POLICY_MAIN_BUILD)/policy-posterior-median-parameters.csv" \
+		--distance-data=optim/data/full-many-pots-experiment.rds \
+		--output-path="$(POLICY_MAIN_BUILD)/median" --distance-cap=3500 \
+		--num-cores=1 --num-replicates=1
+
+## make policy-main-optimize   Optimize five scenarios for posterior draws and median parameters.
+policy-main-optimize: policy-main-predict
+	set -e; for scenario in 1 2 3 4 5; do \
+		Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
+			--input-path="$(POLICY_MAIN_BUILD)" \
+			--target-csv=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv \
+			--scenario-id=$$scenario --num-replicates=200 --solver=$(POLICY_SOLVER); \
+		Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
+			--input-path="$(POLICY_MAIN_BUILD)/median" \
+			--target-csv=optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv \
+			--scenario-id=$$scenario --num-replicates=1 --solver=$(POLICY_SOLVER); \
+	done
+
+## make policy-main-summarize Render the main posterior policy table.
+policy-main-summarize: policy-main-optimize
+	Rscript --no-save --no-restore scripts/policy/summarize-cluster-bootstrap.R \
+		--input-path="$(POLICY_MAIN_BUILD)" \
+		--table-path="$(POLICY_MAIN_BUILD)/optim-summ-table.tex" \
+		--num-replicates=200 --method=posterior
+
+## make policy-main-render     Render main-paper demand and allocation-distance figures.
+policy-main-render: policy-main-summarize
+	Rscript --no-save --no-restore scripts/policy/render-paper-figures.R \
+		--median-parameter-csv="$(POLICY_MAIN_BUILD)/policy-posterior-median-parameters.csv" \
+		--policy-path="$(POLICY_MAIN_BUILD)/median" \
+		--output-path="$(POLICY_MAIN_BUILD)/figures"
+
+## make optimal-policy-main    Run the sparse 200-posterior-draw main-paper policy workflow.
+optimal-policy-main: policy-main-render
 
 ## make optimal-policy         Run the low-memory sparse policy workflow (5 refits by default).
 optimal-policy: policy-fast-summarize

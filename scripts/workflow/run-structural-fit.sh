@@ -19,6 +19,7 @@ if [[ "${FORCE_STRUCTURAL_FIT:-0}" != "1" ]] &&
     scripts/checks/validate-structural-fit-cache.R \
     --spec="$specification" \
     --output-dir="$output_dir" \
+    --workspace="${TAKEUP_STRUCTURAL_WORKSPACE:-build/structural-workspace/main-core-input.RData}" \
     --iter-warmup="${ITER_WARMUP:-1000}" \
     --iter-sampling="${ITER_SAMPLING:-1000}" \
     --seed="${SEED:-20260820}"; then
@@ -32,7 +33,7 @@ Rscript --no-save --no-restore \
   scripts/structural/sample-main-core.R \
   --model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP \
   --input-path=data/stan_analysis_data \
-  --workspace="${TAKEUP_STRUCTURAL_WORKSPACE:-data/stan_analysis_data/dist_fit104.RData}" \
+  --workspace="${TAKEUP_STRUCTURAL_WORKSPACE:-build/structural-workspace/main-core-input.RData}" \
   --output-path="$output_dir" \
   --stan-path=stan_models \
   --stan-file=takeup_struct_main_core.stan \

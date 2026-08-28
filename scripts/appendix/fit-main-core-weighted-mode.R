@@ -16,7 +16,7 @@ suppressPackageStartupMessages({
 })
 
 workspace_path <- option_value(
-  "--workspace", "data/stan_analysis_data/dist_fit105.RData"
+  "--workspace", "build/structural-workspace/main-core-input.RData"
 )
 data_json <- option_value("--data-json")
 model_name <- option_value(
