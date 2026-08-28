@@ -97,6 +97,14 @@ legacy <- readr::read_csv(legacy_draws, show_col_types = FALSE) |>
   filter(.data$table_id == "main", .data$spec_id %in% catalog$spec_id) |>
   select(.data$spec_id, .data$treatment, .data$draw, .data$multiplier)
 new <- purrr::pmap_dfr(catalog, read_new_gq)
+updated_draws <- readr::read_csv(legacy_draws, show_col_types = FALSE) |>
+  filter(!(.data$table_id == "main" & .data$spec_id %in% catalog$spec_id)) |>
+  bind_rows(new |>
+    transmute(
+      table_id = "main", .data$spec_id, .data$treatment, .data$draw,
+      distance_m = 1250, .data$multiplier
+    )) |>
+  arrange(.data$table_id, .data$spec_id, .data$treatment, .data$draw)
 
 comparison <- summarize_draws(legacy, "legacy") |>
   inner_join(summarize_draws(new, "new"), by = c("spec_id", "treatment")) |>
@@ -170,6 +178,7 @@ deletion_manifest <- purrr::pmap_dfr(catalog, function(spec_id, schema, legacy_s
 
 dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 readr::write_csv(new, file.path(output_path, "streamlined-multiplier-draws-1250.csv"))
+readr::write_csv(updated_draws, file.path(output_path, "updated-multiplier-draws-1250.csv"))
 readr::write_csv(comparison, file.path(output_path, "legacy-streamlined-comparison.csv"))
 readr::write_csv(diagnostics, file.path(output_path, "streamlined-fit-diagnostics.csv"))
 readr::write_csv(deletion_manifest, file.path(output_path, "legacy-deletion-manifest.csv"))
