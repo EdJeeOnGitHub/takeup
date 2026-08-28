@@ -27,6 +27,8 @@ output_path <- option_value(
   "/project/akaring/takeup-data/data/stan_analysis_data"
 )
 data_json <- option_value("--data-json")
+workspace_already_preprocessed <-
+  as.integer(option_value("--workspace-already-preprocessed", "0"))
 stan_path <- option_value("--stan-path", "stan_models")
 stan_file_name <- option_value(
   "--stan-file",
@@ -146,6 +148,9 @@ stopifnot(
 )
 if (!use_core_cluster_shock %in% 0:1) {
   stop("--use-core-cluster-shock must be 0 or 1.", call. = FALSE)
+}
+if (!workspace_already_preprocessed %in% 0:1) {
+  stop("--workspace-already-preprocessed must be 0 or 1.", call. = FALSE)
 }
 if (!is.finite(core_cluster_shock_sd_prior) ||
     core_cluster_shock_sd_prior <= 0) {
@@ -285,7 +290,11 @@ if (!model_name %in% names(fit_env$models)) {
 }
 
 model_info <- fit_env$models[[model_name]]
-stan_data_preprocess <- model_info$stan_data_preprocess %||% identity
+stan_data_preprocess <- if (workspace_already_preprocessed == 1L) {
+  identity
+} else {
+  model_info$stan_data_preprocess %||% identity
+}
 model_info$stan_data_preprocess <- NULL
 model_info$model_file <- stan_file_name
 
