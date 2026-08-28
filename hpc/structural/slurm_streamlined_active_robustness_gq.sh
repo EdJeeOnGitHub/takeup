@@ -16,6 +16,7 @@ PROJECT_ROOT=${PROJECT_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
 ANALYSIS_ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data}
 PREPARED_ROOT=${PREPARED_ROOT:-/project/akaring/takeup-data/candidate-multiplier-1250-20260825/workspaces}
 OUTPUT_ROOT=${OUTPUT_ROOT:-${ANALYSIS_ROOT}/streamlined-active-robustness}
+FIT_SOURCE=${FIT_SOURCE:-streamlined}
 task=${SLURM_ARRAY_TASK_ID:?Submit as an array from 1 to 4}
 
 case ${task} in
@@ -35,6 +36,7 @@ case ${task} in
     input_root=${PREPARED_ROOT}
     model_name=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS
     workspace=${PREPARED_ROOT}/dist_fit1250.RData
+    legacy_fit_stem=dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS
     ;;
   4)
     spec_id=second-order-observability
@@ -42,13 +44,25 @@ case ${task} in
     input_root=${PREPARED_ROOT}
     model_name=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB
     workspace=${PREPARED_ROOT}/dist_fit1252.RData
+    legacy_fit_stem=dist_fit106_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB
     ;;
   *) exit 2 ;;
 esac
 
 fit_csvs=()
 for chain in 1 2 3 4; do
-  fit_csvs+=("${OUTPUT_ROOT}/${spec_id}/fits/${spec_id}-slim-chain${chain}-1.csv")
+  if [[ ${FIT_SOURCE} == legacy ]]; then
+    if [[ -z ${legacy_fit_stem:-} ]]; then
+      echo "FIT_SOURCE=legacy is supported only for main-core tasks 3 and 4." >&2
+      exit 2
+    fi
+    fit_csvs+=("${ANALYSIS_ROOT}/${legacy_fit_stem}-${chain}.csv")
+  elif [[ ${FIT_SOURCE} == streamlined ]]; then
+    fit_csvs+=("${OUTPUT_ROOT}/${spec_id}/fits/${spec_id}-slim-chain${chain}-1.csv")
+  else
+    echo "FIT_SOURCE must be streamlined or legacy; got ${FIT_SOURCE}." >&2
+    exit 2
+  fi
 done
 fit_csv_arg=$(IFS=,; echo "${fit_csvs[*]}")
 gq_path=${OUTPUT_ROOT}/${spec_id}/gq-1250
