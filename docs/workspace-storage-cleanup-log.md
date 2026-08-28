@@ -131,6 +131,14 @@ deletion manifest, pre-deletion SHA-256 hashes, deletion timestamps, and
 post-deletion existence checks. Older fit generations and archive files were
 not included and remain untouched.
 
+The downstream policy check used all 4,000 posterior draws for both new
+main-core fits and solved all five policy scenarios. Slurm job families
+`48878594`--`48878597` and `48878598`--`48878601` completed successfully; the
+provenance-only summary refreshes were `48879246` and `48879247`. The promoted
+policy bundles passed `scripts/policy/audit-streamlined-policy-replacements.R`.
+The previous policy directories were retained in the dated superseded-policy
+archive rather than deleted.
+
 ## Tranche 4: superseded backups, transfer archives, and debug intermediates
 
 Removed **5 files and 3 directories**, totaling **1,619,928,183 bytes

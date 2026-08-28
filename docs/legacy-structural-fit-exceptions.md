@@ -41,6 +41,17 @@ manifest-gated cleanup removed the 16 superseded active fit CSVs listed in
 (11,094,305,455 bytes). Each file was SHA-256 hashed before deletion; the
 per-file receipt is `legacy-deletion-receipt.csv` in the same audit directory.
 
+The policy downstream was then regenerated with all 4,000 draws for
+`exclude-dispersed` and `second-order-observability`. The latter was necessary
+because its superseded policy bundle had also extracted first-order rather than
+second-order belief coefficients. Both replacements passed the policy migration
+audit: five scenarios and 4,000 allocations per scenario, no prediction errors,
+and explicit assigned-distance/fit-path provenance. Correcting SOB changes the
+median endogenous Control-versus-Bracelet saving from 21 to 23 PoTs (95% interval
+11--33), leaving the qualitative policy conclusion intact. The canonical server
+policy directories now contain the streamlined versions; the old policy bundles
+were moved, not deleted, to `policy-model-robustness-superseded-20260828/`.
+
 The following older archives and fit generations remain exceptions and were
 not part of that deletion manifest:
 
