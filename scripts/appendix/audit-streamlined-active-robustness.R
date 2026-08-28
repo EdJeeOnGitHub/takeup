@@ -24,6 +24,10 @@ legacy_fit_root <- value(
   "--legacy-fit-root",
   "/project/akaring/takeup-data/data/stan_analysis_data"
 )
+corrected_legacy_root <- value(
+  "--corrected-legacy-root",
+  paste0(legacy_fit_root, "/streamlined-active-robustness-corrected-legacy")
+)
 output_path <- value("--output-path", file.path(new_root, "audit"))
 median_tolerance <- as.numeric(value("--median-tolerance", "0.04"))
 quantile_tolerance <- as.numeric(value("--quantile-tolerance", "0.07"))
@@ -51,8 +55,8 @@ catalog <- tibble::tribble(
 )
 treatments <- c("Control", "Ink", "Calendar", "Bracelet")
 
-read_new_gq <- function(spec_id, schema, legacy_stem) {
-  directory <- file.path(new_root, spec_id, "gq-1250")
+read_gq <- function(spec_id, schema, legacy_stem, root = new_root) {
+  directory <- file.path(root, spec_id, "gq-1250")
   files <- list.files(directory, pattern = "[.]csv$", full.names = TRUE)
   files <- files[!grepl("diagnostics|manifest|audit", basename(files))]
   if (length(files) != 4L) {
@@ -96,7 +100,21 @@ if (!file.exists(legacy_draws)) stop("Missing legacy draw file: ", legacy_draws)
 legacy <- readr::read_csv(legacy_draws, show_col_types = FALSE) |>
   filter(.data$table_id == "main", .data$spec_id %in% catalog$spec_id) |>
   select(.data$spec_id, .data$treatment, .data$draw, .data$multiplier)
-new <- purrr::pmap_dfr(catalog, read_new_gq)
+new <- purrr::pmap_dfr(catalog, read_gq)
+
+# The historical compact GQ hard-coded first-order belief coefficients in its
+# multiplier block, including for the SOB model.  Compare the streamlined SOB
+# result with the same old posterior evaluated by the corrected main-core GQ;
+# otherwise this gate would test a known postprocessing bug rather than fit
+# equivalence.
+corrected_sob <- read_gq(
+  "second-order-observability", "core",
+  "dist_fit106_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB",
+  root = corrected_legacy_root
+)
+legacy <- legacy |>
+  filter(.data$spec_id != "second-order-observability") |>
+  bind_rows(corrected_sob)
 updated_draws <- readr::read_csv(legacy_draws, show_col_types = FALSE) |>
   filter(!(.data$table_id == "main" & .data$spec_id %in% catalog$spec_id)) |>
   bind_rows(new |>
@@ -128,6 +146,14 @@ comparison <- summarize_draws(legacy, "legacy") |>
       abs(.data$q975_difference) <= quantile_tolerance &
       abs(.data$pr_lt_1_difference) <= probability_tolerance &
       .data$interval_overlap >= 0.75
+  ) |>
+  mutate(
+    reference_kind = if_else(
+      .data$spec_id == "second-order-observability",
+      "legacy_posterior_corrected_second_order_gq",
+      "historical_compact_gq"
+    ),
+    .after = .data$treatment
   )
 
 diagnose_spec <- function(spec_id, schema, legacy_stem) {
