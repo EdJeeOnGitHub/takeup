@@ -77,7 +77,7 @@ case "${MODEL_ID}" in
     MODEL_FAMILY=gaussian
     LAMBDA_STRUCTURE=common
     FITS=("${ROOT}"/dist_fit106_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB-{1,2,3,4}.csv)
-    EXTRACT_OPTIONS=()
+    EXTRACT_OPTIONS=(--beliefs-order 2)
     ;;
   grouped-lambda)
     MODEL_LABEL="Any-signal/no-signal social image weight"

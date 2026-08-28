@@ -39,6 +39,11 @@ def main():
     parser.add_argument("--include-finite-mixture", action="store_true",
                         help="Retain the fitted two-component type-mixture shape")
     parser.add_argument(
+        "--beliefs-order", type=int, choices=[1, 2], default=1,
+        help=("Belief coefficients used by the social-return equation. "
+              "Order-2 inputs are written under canonical order-1 column names."),
+    )
+    parser.add_argument(
         "--asymmetric-structure",
         choices=["none", "full", "f1", "f2", "f3", "u3"],
         default="none",
@@ -91,6 +96,14 @@ def main():
         wanted += [f"core_accuracy_arm_intercept_raw.{i}.{j}"
                    for j in range(1, 4) for i in range(1, 3)]
 
+    source_wanted = list(wanted)
+    if args.beliefs_order == 2:
+        source_wanted = [
+            column.replace("hyper_beta_1ord", "hyper_beta_2ord")
+            .replace("hyper_dist_beta_1ord", "hyper_dist_beta_2ord")
+            for column in source_wanted
+        ]
+
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as output_handle:
@@ -100,10 +113,10 @@ def main():
             path = Path(name)
             handle, header, rows = header_and_rows(path)
             try:
-                missing = sorted(set(wanted) - set(header))
+                missing = sorted(set(source_wanted) - set(header))
                 if missing:
                     raise ValueError(f"Missing columns in {path}: {', '.join(missing)}")
-                indices = [header.index(column) for column in wanted]
+                indices = [header.index(column) for column in source_wanted]
                 for iteration, row in enumerate(rows, 1):
                     writer.writerow([chain, iteration, str(path), *[row[i] for i in indices]])
             finally:
