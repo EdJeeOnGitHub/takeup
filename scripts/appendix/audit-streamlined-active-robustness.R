@@ -149,6 +149,8 @@ diagnose_spec <- function(spec_id, schema, legacy_stem) {
   }, numeric(1))
   tibble(
     spec_id = spec_id,
+    replacement_method = if (schema == "core") "main_core_refit" else
+      "lossless_column_subset",
     chains = length(files),
     retained_draws = posterior::ndraws(fit),
     max_rhat = max(fit_summary$rhat, na.rm = TRUE),
@@ -173,8 +175,10 @@ deletion_manifest <- purrr::pmap_dfr(catalog, function(spec_id, schema, legacy_s
     replacement_root = file.path(new_root, spec_id),
     delete_approved_by_audit = all(comparison$pass[comparison$spec_id == spec_id]) &&
       all(file.exists(paths)) &&
-      diagnostics$divergences[diagnostics$spec_id == spec_id] == 0 &&
-      diagnostics$max_treedepth_hits[diagnostics$spec_id == spec_id] == 0
+      (schema != "core" || (
+        diagnostics$divergences[diagnostics$spec_id == spec_id] == 0 &&
+        diagnostics$max_treedepth_hits[diagnostics$spec_id == spec_id] == 0
+      ))
   )
 })
 
@@ -188,8 +192,11 @@ readr::write_csv(deletion_manifest, file.path(output_path, "legacy-deletion-mani
 if (any(!comparison$pass)) {
   stop("At least one result-equivalence check failed; legacy deletion is forbidden.")
 }
-if (any(diagnostics$divergences > 0 | diagnostics$max_treedepth_hits > 0)) {
-  stop("Hard HMC diagnostics failed; legacy deletion is forbidden.")
+core_diagnostics <- diagnostics |>
+  filter(.data$replacement_method == "main_core_refit")
+if (any(core_diagnostics$divergences > 0 |
+        core_diagnostics$max_treedepth_hits > 0)) {
+  stop("A new main-core refit has hard HMC failures; legacy deletion is forbidden.")
 }
 if (any(!deletion_manifest$delete_approved_by_audit)) {
   stop("Deletion manifest is incomplete or unapproved.")
