@@ -18,6 +18,10 @@ ANALYSIS_ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_d
 PREPARED_ROOT=${PREPARED_ROOT:-/project/akaring/takeup-data/candidate-multiplier-1250-20260825/workspaces}
 OUTPUT_ROOT=${OUTPUT_ROOT:-${ANALYSIS_ROOT}/streamlined-active-robustness}
 CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
+ITER_WARMUP=${ITER_WARMUP:-1000}
+ITER_SAMPLING=${ITER_SAMPLING:-1000}
+ADAPT_DELTA=${ADAPT_DELTA:-0.999}
+MAX_TREEDEPTH=${MAX_TREEDEPTH:-12}
 task=${SLURM_ARRAY_TASK_ID:?Submit as an array from 1 to 16}
 spec_index=$(( (task - 1) / 4 + 1 ))
 chain_id=$(( (task - 1) % 4 + 1 ))
@@ -76,8 +80,8 @@ Rscript --no-save --no-restore --no-init-file \
   --stan-file="${stan_file}" \
   --cmdstan-path="${CMDSTAN_PATH}" \
   --chains=1 --parallel-chains=1 --threads-per-chain=4 \
-  --iter-warmup=1000 --iter-sampling=1000 \
-  --adapt-delta=0.999 --max-treedepth=12 --metric=diag_e \
+  --iter-warmup="${ITER_WARMUP}" --iter-sampling="${ITER_SAMPLING}" \
+  --adapt-delta="${ADAPT_DELTA}" --max-treedepth="${MAX_TREEDEPTH}" --metric=diag_e \
   --seed="$((20260828 + chain_id + 100 * spec_index))" \
   --distance-definition=assigned \
   --refresh=25
