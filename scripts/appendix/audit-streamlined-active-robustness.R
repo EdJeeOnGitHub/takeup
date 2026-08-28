@@ -138,7 +138,9 @@ diagnose_spec <- function(spec_id, schema, legacy_stem) {
   if (length(files) != 4L) stop("Expected four fit chains for ", spec_id)
   fit <- cmdstanr::read_cmdstan_csv(sort(files))$post_warmup_draws
   fit_summary <- posterior::summarise_draws(fit)
-  diagnostics <- cmdstanr::read_cmdstan_csv(sort(files))$sampler_diagnostics
+  diagnostics <- cmdstanr::read_cmdstan_csv(
+    sort(files)
+  )$post_warmup_sampler_diagnostics
   diagnostic_df <- posterior::as_draws_df(diagnostics)
   energy <- posterior::as_draws_array(diagnostics[, , "energy__"])
   ebfmi <- vapply(seq_len(dim(energy)[2]), function(chain) {
