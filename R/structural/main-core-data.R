@@ -28,19 +28,29 @@ main_core_apply_distance_definition <- function(sample_data,
   if (individual_fixed_point) {
     # The full-information robustness model treats each household as a Stan
     # cluster. Assigned Close/Far remains a community-level randomized label,
-    # so join through the retained original community identifiers and then
-    # restore the household identifiers used by the fitted likelihood.
-    household_cluster_dot <- analysis_data$cluster.id
-    household_cluster_id <- analysis_data$cluster_id
-    analysis_data$cluster.id <- analysis_data$old.cluster.id
-    analysis_data$cluster_id <- analysis_data$old_cluster_id
-  }
-  analysis_data <- takeup_apply_distance_spec(
-    analysis_data, crosswalk, distance_definition
-  )
-  if (individual_fixed_point) {
-    analysis_data$cluster.id <- household_cluster_dot
-    analysis_data$cluster_id <- household_cluster_id
+    # so join through the retained sequential community ID. That ID was
+    # created from the 144 main-analysis communities in raw cluster-id order.
+    community_groups <- crosswalk |>
+      dplyr::filter(.data$in_main_analysis) |>
+      dplyr::arrange(.data$cluster.id) |>
+      dplyr::mutate(old_cluster_id = dplyr::row_number()) |>
+      dplyr::select(.data$old_cluster_id, .data$assigned_dist_group,
+                    .data$realized_dist_group)
+    if (nrow(community_groups) != 144L ||
+        anyDuplicated(community_groups$old_cluster_id)) {
+      stop("Unexpected main-analysis community distance crosswalk.",
+           call. = FALSE)
+    }
+    group_column <- paste0(distance_definition, "_dist_group")
+    analysis_data <- analysis_data |>
+      dplyr::select(-dplyr::any_of("analysis_dist_group")) |>
+      dplyr::left_join(community_groups, by = "old_cluster_id") |>
+      dplyr::mutate(analysis_dist_group = .data[[group_column]]) |>
+      dplyr::select(-.data$assigned_dist_group, -.data$realized_dist_group)
+  } else {
+    analysis_data <- takeup_apply_distance_spec(
+      analysis_data, crosswalk, distance_definition
+    )
   }
   cluster_groups <- analysis_data |>
     dplyr::distinct(.data$cluster_id, .data$analysis_dist_group) |>
