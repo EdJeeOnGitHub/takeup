@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --partition=caslake
-#SBATCH --account=pi-akaring
+#SBATCH --partition=broadwl
 #SBATCH --job-name=slim-active-gq
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
