@@ -43,7 +43,9 @@ main_core_apply_distance_definition <- function(sample_data,
     }
     group_column <- paste0(distance_definition, "_dist_group")
     analysis_data <- analysis_data |>
-      dplyr::select(-dplyr::any_of("analysis_dist_group")) |>
+      dplyr::select(-dplyr::any_of(c(
+        "analysis_dist_group", "assigned_dist_group", "realized_dist_group"
+      ))) |>
       dplyr::left_join(community_groups, by = "old_cluster_id") |>
       dplyr::mutate(analysis_dist_group = .data[[group_column]]) |>
       dplyr::select(-.data$assigned_dist_group, -.data$realized_dist_group)
