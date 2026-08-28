@@ -44,14 +44,14 @@ case ${spec_index} in
     spec_id=exclude-dispersed
     model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS
     workspace=${PREPARED_ROOT}/dist_fit1250.RData
-    stan_file=takeup_struct_indiv_fp_slim.stan
+    stan_file=takeup_struct_main_core.stan
     preprocessed=1
     ;;
   4)
     spec_id=second-order-observability
     model=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB
     workspace=${PREPARED_ROOT}/dist_fit1252.RData
-    stan_file=takeup_struct_indiv_fp_slim.stan
+    stan_file=takeup_struct_main_core.stan
     preprocessed=1
     ;;
   *) exit 2 ;;

@@ -17,6 +17,8 @@ workspace_path <- option_value(
   "--workspace", "data/stan_analysis_data/dist_fit104.RData"
 )
 data_json <- option_value("--data-json")
+workspace_already_preprocessed <-
+  as.integer(option_value("--workspace-already-preprocessed", "0"))
 model_name <- option_value(
   "--model", "STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP"
 )
@@ -114,6 +116,9 @@ if (length(fit_csvs) < 1L || any(!nzchar(fit_csvs)) ||
     any(!file.exists(fit_csvs))) {
   stop("--fit-csvs must list existing fitted-parameter CSVs.", call. = FALSE)
 }
+if (!workspace_already_preprocessed %in% 0:1) {
+  stop("--workspace-already-preprocessed must be 0 or 1.", call. = FALSE)
+}
 if (nzchar(cmdstan_path_option)) {
   set_cmdstan_path(cmdstan_path_option)
 }
@@ -179,7 +184,8 @@ data <- if (!is.null(data_json)) {
     lnorm_wtp_value_utility_prior =
       prior_overrides$lnorm_wtp_value_utility_prior,
     distance_definition = distance_definition,
-    peer_audit_path = peer_audit_path
+    peer_audit_path = peer_audit_path,
+    workspace_already_preprocessed = workspace_already_preprocessed == 1L
   )
 }
 if (!is.null(sm_evaluation_distance_m)) {

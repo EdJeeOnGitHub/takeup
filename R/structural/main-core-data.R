@@ -201,7 +201,8 @@ prepare_main_core_data <- function(
     lnorm_wtp_value_utility_prior = NULL,
     distance_definition = "realized",
     project_root = ".",
-    peer_audit_path = NULL) {
+    peer_audit_path = NULL,
+    workspace_already_preprocessed = FALSE) {
   if (!file.exists(workspace_path)) {
     stop("Workspace not found: ", workspace_path, call. = FALSE)
   }
@@ -212,7 +213,11 @@ prepare_main_core_data <- function(
     stop("Workspace lacks the requested model: ", model_name, call. = FALSE)
   }
   model_info <- fit_env$models[[model_name]]
-  stan_data_preprocess <- model_info$stan_data_preprocess %||% identity
+  stan_data_preprocess <- if (isTRUE(workspace_already_preprocessed)) {
+    identity
+  } else {
+    model_info$stan_data_preprocess %||% identity
+  }
   model_info$stan_data_preprocess <- NULL
   model_info$model_file <- NULL
 

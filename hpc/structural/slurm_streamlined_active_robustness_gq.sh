@@ -33,11 +33,15 @@ case ${task} in
     spec_id=exclude-dispersed
     model_key=no_outliers
     input_root=${PREPARED_ROOT}
+    model_name=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS
+    workspace=${PREPARED_ROOT}/dist_fit1250.RData
     ;;
   4)
     spec_id=second-order-observability
     model_key=second_order_observability
     input_root=${PREPARED_ROOT}
+    model_name=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB
+    workspace=${PREPARED_ROOT}/dist_fit1252.RData
     ;;
   *) exit 2 ;;
 esac
@@ -57,11 +61,26 @@ export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2
 export CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 export CMDSTANR_NO_VER_CHECK=TRUE
 
-Rscript --no-save --no-restore --no-init-file \
-  scripts/appendix/generate-compact-individual-sm-gq.R \
-  --model="${model_key}" \
-  --input-path="${input_root}" \
-  --output-path="${gq_path}" \
-  --fit-csvs="${fit_csv_arg}" \
-  --parallel-chains=4 --threads-per-chain=1 \
-  --sm-evaluation-distance-m=1250
+if (( task <= 2 )); then
+  Rscript --no-save --no-restore --no-init-file \
+    scripts/appendix/generate-compact-individual-sm-gq.R \
+    --model="${model_key}" \
+    --input-path="${input_root}" \
+    --output-path="${gq_path}" \
+    --fit-csvs="${fit_csv_arg}" \
+    --parallel-chains=4 --threads-per-chain=1 \
+    --sm-evaluation-distance-m=1250
+else
+  Rscript --no-save --no-restore --no-init-file \
+    scripts/structural/generate-compact-gq.R \
+    --model="${model_name}" \
+    --workspace="${workspace}" \
+    --workspace-already-preprocessed=1 \
+    --fit-csvs="${fit_csv_arg}" \
+    --output-path="${gq_path}" \
+    --output-basename="${spec_id}-1250" \
+    --distance-definition=assigned \
+    --sm-evaluation-distance-m=1250 \
+    --cmdstan-path="${CMDSTAN_PATH}" \
+    --parallel-chains=4 --threads=4
+fi
