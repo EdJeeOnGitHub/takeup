@@ -190,6 +190,13 @@ case "${STAGE}" in
       echo "distance_definition=assigned"
       echo "git_commit=$(git rev-parse HEAD)"
       echo "source_fit_directory=$(dirname "${FITS[0]:-prepared-balanced-assigned-distance-slim-chains}")"
+      echo "source_fit_files=$(IFS=,; echo "${FITS[*]:-prepared-balanced-assigned-distance-slim-chains}")"
+      echo "extract_options=${EXTRACT_OPTIONS[*]:-}"
+      if [[ ${FITS[0]:-} == "${STREAMLINED_ROOT}"/* ]]; then
+        echo "streamlined_active_robustness=true"
+      else
+        echo "streamlined_active_robustness=false"
+      fi
       echo "structural_refit_performed=no"
       echo "candidate_sites=1451"
       echo "distance_cap_m=3500"
