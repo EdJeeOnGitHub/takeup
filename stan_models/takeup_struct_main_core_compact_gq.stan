@@ -782,14 +782,18 @@ generated quantities {
     vector[num_dist_group_treatments] beta =
       rep_vector(0, num_dist_group_treatments);
     vector[num_dist_group_treatments] structural_treatment_effect;
-    vector[num_treatments] rep_intercept =
+    vector[num_treatments] rep_intercept_1ord =
       beliefs_treatment_map_design_matrix * hyper_beta_1ord';
-    vector[num_treatments] rep_dist_slope =
+    vector[num_treatments] rep_dist_slope_1ord =
       beliefs_treatment_map_design_matrix * hyper_dist_beta_1ord';
     vector[num_treatments] rep_intercept_2ord =
       beliefs_treatment_map_design_matrix * hyper_beta_2ord';
     vector[num_treatments] rep_dist_slope_2ord =
       beliefs_treatment_map_design_matrix * hyper_dist_beta_2ord';
+    vector[num_treatments] rep_intercept = BELIEFS_ORDER == 1 ?
+      rep_intercept_1ord : rep_intercept_2ord;
+    vector[num_treatments] rep_dist_slope = BELIEFS_ORDER == 1 ?
+      rep_dist_slope_1ord : rep_dist_slope_2ord;
     vector[num_clusters] cluster_shock = rep_vector(0, num_clusters);
     // Midpoints of 64 equal-probability bins under a standard normal.  This
     // integrates the population distribution of a new community shock while
@@ -1086,8 +1090,8 @@ generated quantities {
       for (treatment_index in 1:num_treatments) {
         core_compact_belief_prob_1ord[dist_group_index, treatment_index] =
           mean(inv_logit(
-            rep_intercept[treatment_index] +
-            rep_dist_slope[treatment_index] * belief_distance
+            rep_intercept_1ord[treatment_index] +
+            rep_dist_slope_1ord[treatment_index] * belief_distance
           ));
         core_compact_belief_prob_2ord[dist_group_index, treatment_index] =
           mean(inv_logit(

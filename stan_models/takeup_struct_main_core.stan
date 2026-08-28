@@ -120,7 +120,6 @@ transformed data {
       !use_wtp_model ||
       suppress_reputation ||
       mu_rep_type != 4 ||
-      BELIEFS_ORDER != 1 ||
       !lognormal_dist_model ||
       num_dist_group_mix != 1) {
     reject("Data are incompatible with the fit-105 main-model specialization.");
@@ -237,10 +236,8 @@ model {
     num_dist_group_treatments
   );
   vector[num_dist_group_treatments] structural_treatment_effect;
-  vector[num_treatments] rep_intercept =
-    beliefs_treatment_map_design_matrix * hyper_beta_1ord';
-  vector[num_treatments] rep_dist_slope =
-    beliefs_treatment_map_design_matrix * hyper_dist_beta_1ord';
+  vector[num_treatments] rep_intercept;
+  vector[num_treatments] rep_dist_slope;
   vector[num_clusters] cluster_mu_rep;
   vector[num_treatments] signal_lambda =
     rep_vector(base_mu_rep, num_treatments);
@@ -258,6 +255,16 @@ model {
   vector[2] finite_component_mean = rep_vector(0, 2);
   vector[2] finite_component_variance = rep_vector(1, 2);
   vector[2] finite_component_weight = rep_vector(0.5, 2);
+
+  if (BELIEFS_ORDER == 1) {
+    rep_intercept = beliefs_treatment_map_design_matrix * hyper_beta_1ord';
+    rep_dist_slope =
+      beliefs_treatment_map_design_matrix * hyper_dist_beta_1ord';
+  } else {
+    rep_intercept = beliefs_treatment_map_design_matrix * hyper_beta_2ord';
+    rep_dist_slope =
+      beliefs_treatment_map_design_matrix * hyper_dist_beta_2ord';
+  }
 
   if (core_type_distribution == 2) {
     real mixture_weight = core_finite_mixture_weight[1];
