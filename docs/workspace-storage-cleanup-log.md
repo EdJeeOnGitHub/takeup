@@ -104,6 +104,33 @@ Rebuildable presentation caches:
   result-bundle manifests, and generate a dry-run list. Do not use broad globs
   without inspecting the resolved targets.
 
+## Midway2 active-robustness migration
+
+On 2026-08-28, four active robustness specifications were removed from the
+legacy-fit exception list after a separate server-side migration:
+
+- Individual travel costs: lossless parameter-only subset, 800 draws.
+- Individual distance observed by peers: lossless parameter-only subset, 800
+  draws.
+- Excluding geographically dispersed communities: latest main-core refit,
+  4,000 draws.
+- Perceived community observability: latest main-core refit, 4,000 draws.
+
+All four have four compact GQ chains and fit diagnostics under
+`data/stan_analysis_data/streamlined-active-robustness/`. The main-core refits
+had zero divergences and zero maximum-treedepth transitions. Multiplier checks
+passed against the legacy draws, except that the historical SOB compact GQ was
+diagnosed as incorrectly hard-coding first-order belief coefficients. The SOB
+gate instead used the legacy posterior with a corrected second-order GQ and
+then passed.
+
+After downstream policy fit paths were changed to the replacements, the
+manifest-gated deletion removed exactly 16 active legacy CmdStan CSVs totaling
+**11,094,305,455 bytes (10.33 GiB)**. The server audit directory contains the
+deletion manifest, pre-deletion SHA-256 hashes, deletion timestamps, and
+post-deletion existence checks. Older fit generations and archive files were
+not included and remain untouched.
+
 ## Tranche 4: superseded backups, transfer archives, and debug intermediates
 
 Removed **5 files and 3 directories**, totaling **1,619,928,183 bytes

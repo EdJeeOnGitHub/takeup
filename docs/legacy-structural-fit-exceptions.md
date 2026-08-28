@@ -13,27 +13,42 @@ objects directly from the current loaders into
 the workspace hash, so posterior draws produced from an older data snapshot
 cannot be silently reused.
 
-Four active robustness specifications have not yet been refitted in the new
-streamlined format. Their legacy sources remain under
-`data/stan_analysis_data/`:
+The four formerly active exceptions were migrated on Midway2 on 2026-08-28:
 
 1. **Individual travel costs** (`INDIV_DIST_COMMUNITY_FP_INDIV_VIS`)
 2. **Individual distance observed by peers** (`INDIV_DIST_INDIV_FP`)
 3. **Excluding geographically dispersed communities** (`NO_OUTLIERS`)
 4. **Perceived community observability** (`SOB`)
 
-The retained legacy artifacts are:
+Their canonical server fits now live beneath
+`data/stan_analysis_data/streamlined-active-robustness/<specification>/fits/`.
+The two individual-distance fits are lossless parameter-column subsets of the
+validated legacy posterior draws (800 draws each). `NO_OUTLIERS` and `SOB` were
+refitted with the latest main-core model (4,000 draws each), with zero
+divergences and zero maximum-treedepth transitions. Compact 1.25 km GQs and the
+full audit are stored alongside the fits.
+
+All multiplier equivalence gates passed. The historical compact SOB GQ was
+found to hard-code first-order belief coefficients even for the second-order
+model. The deletion audit therefore compares the new SOB fit against the old
+posterior evaluated with the corrected second-order main-core GQ. Those
+reader-facing medians differ by at most 0.009 across arms. The original and
+streamlined posterior parameter summaries also agree closely.
+
+The active policy launcher now reads these streamlined paths. On Midway2, the
+manifest-gated cleanup removed the 16 superseded active fit CSVs listed in
+`streamlined-active-robustness/audit/legacy-deletion-manifest.csv`: 10.33 GiB
+(11,094,305,455 bytes). Each file was SHA-256 hashed before deletion; the
+per-file receipt is `legacy-deletion-receipt.csv` in the same audit directory.
+
+The following older archives and fit generations remain exceptions and were
+not part of that deletion manifest:
 
 - `dist_fit102.RData` and `dist_fit102.zip`
 - `dist_fit103.RData` and `dist_fit103.zip`
-- `dist_fit105_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_NO_OUTLIERS-[1-4].csv`
-- `dist_fit106_STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP_SOB.rds`
+- older fit-95/98/102/103/104 posterior generations and transfer archives
 - the four small `rvar_processed_*_SOB_1-4.rds` summaries
 
-The fit-102/103 archives are retained conservatively because they contain the
-legacy individual-distance variants; the server-returned policy provenance and
-focused multiplier-draw bundles are the authoritative paper-facing records.
-
-Remove these exceptions only after the four specifications are refitted with
-the parameter-only model and compact GQ, and their multiplier and policy
-summaries have been checked against the current paper artifacts.
+These are retained conservatively as historical/archive material rather than
+active paper inputs. Do not remove them with a family-name glob: audit and
+manifest any later archive cleanup separately.
