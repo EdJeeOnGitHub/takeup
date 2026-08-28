@@ -22,9 +22,26 @@ main_core_apply_distance_definition <- function(sample_data,
     file.path(project_root, "data", "clean-data",
               "monitored-nosms-takeup-data.rds")
   )
+  individual_fixed_point <-
+    dplyr::n_distinct(analysis_data$cluster_id) == nrow(analysis_data) &&
+    all(c("old.cluster.id", "old_cluster_id") %in% names(analysis_data))
+  if (individual_fixed_point) {
+    # The full-information robustness model treats each household as a Stan
+    # cluster. Assigned Close/Far remains a community-level randomized label,
+    # so join through the retained original community identifiers and then
+    # restore the household identifiers used by the fitted likelihood.
+    household_cluster_dot <- analysis_data$cluster.id
+    household_cluster_id <- analysis_data$cluster_id
+    analysis_data$cluster.id <- analysis_data$old.cluster.id
+    analysis_data$cluster_id <- analysis_data$old_cluster_id
+  }
   analysis_data <- takeup_apply_distance_spec(
     analysis_data, crosswalk, distance_definition
   )
+  if (individual_fixed_point) {
+    analysis_data$cluster.id <- household_cluster_dot
+    analysis_data$cluster_id <- household_cluster_id
+  }
   cluster_groups <- analysis_data |>
     dplyr::distinct(.data$cluster_id, .data$analysis_dist_group) |>
     dplyr::arrange(.data$cluster_id)
