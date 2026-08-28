@@ -54,7 +54,7 @@ mkdir -p temp/log "${gq_path}"
 module load gcc/10.2.0
 module load -f R/4.2.0
 export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2/x86_64-pc-linux-gnu}
-export CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.35.0}
+export CMDSTAN_PATH=${CMDSTAN_PATH:-/home/edjee/.cmdstan/cmdstan-2.33.1}
 export CMDSTANR_NO_VER_CHECK=TRUE
 
 Rscript --no-save --no-restore --no-init-file \
