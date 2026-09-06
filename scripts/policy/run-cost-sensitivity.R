@@ -37,20 +37,9 @@ parameter$sd_of_dist <- distance_object$sd_of_dist
 villages <- distance_object$village_df
 
 # Census adult populations.
-census_environment <- new.env(parent = emptyenv())
-load("data/takeup_census.RData", envir = census_environment)
-census <- census_environment$census.data
-population_by_cluster <- aggregate(
-  census$num.individuals,
-  by = list(cluster.id = census$cluster.id), sum, na.rm = TRUE
-)
-names(population_by_cluster)[2L] <- "population"
-population <- population_by_cluster$population[
-  match(villages$cluster.id, population_by_cluster$cluster.id)
-]
-if (anyNA(population) || any(population <= 0)) {
-  stop("Census populations do not cover all policy villages.", call. = FALSE)
-}
+population_table <- policy_adult_population(distance_object)
+population <- population_table$population
+
 
 base_edges <- distance_object$long_distance_mat[, c("index_i", "index_j", "dist", "dist_km")]
 names(base_edges) <- c("village_i", "pot_j", "distance", "distance_km")

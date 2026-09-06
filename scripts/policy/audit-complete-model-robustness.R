@@ -22,7 +22,7 @@ catalog <- data.frame(
     "Mixture v distribution"
   ),
   source_fit_directory = c(
-    "200 balanced draws from assigned-distance slim chains",
+    "Canonical balanced draws from assigned-distance slim chains",
     "/project/akaring/takeup-data/data/stan_analysis_data/streamlined-active-robustness/private-distance-community-image/fits",
     "/project/akaring/takeup-data/data/stan_analysis_data/streamlined-active-robustness/full-information/fits",
     "/project/akaring/takeup-data/data/stan_analysis_data/streamlined-active-robustness/exclude-dispersed/fits",
@@ -52,12 +52,17 @@ for (index in seq_len(nrow(catalog))) {
     stop(item$model_id, " missing: ", paste(missing, collapse = ", "))
   }
   parameter <- read.csv(file.path(directory, "policy-model-parameter-status.csv"))
+  parameters <- read.csv(file.path(directory, "policy-model-parameters.csv"))
+  if (nrow(parameters) != parameter$draws[1] || anyDuplicated(parameters$draw)) stop("Invalid parameter inventory: ", item$model_id)
   prediction <- read.csv(file.path(directory, "policy-prediction-status.csv"))
   summary <- read.csv(file.path(directory, "policy-model-summary.csv"))
   statuses <- do.call(rbind, lapply(policy_scenarios$scenario, function(scenario) {
     path <- file.path(directory, "allocations", scenario, "status.csv")
     if (!file.exists(path)) stop("Missing status file: ", path)
     value <- read.csv(path, stringsAsFactors = FALSE)
+    if (anyDuplicated(value$draw) || !setequal(value$draw, parameters$draw) ||
+        any(value$scenario != scenario) ||
+        any(!value$status %in% c("complete", "target_infeasible", "equilibrium_undefined"))) stop("Incomplete scenario: ", path)
     value$model_id <- item$model_id
     value
   }))
@@ -88,7 +93,7 @@ for (index in seq_len(nrow(catalog))) {
       "Reused validated 4000-draw cluster-shock parameters; prediction and",
       "optimization rerun on the common 1451-site geography."
     ),
-    "benchmark" = "Exactly 200 balanced posterior draws; not the 210-refit bootstrap.",
+    "benchmark" = paste(parameter$draws[1], "balanced assigned-distance posterior draws; original 200-draw subset retained in canonical inventory."),
     ""
   )
   model_rows[[index]] <- data.frame(
@@ -124,7 +129,7 @@ write.csv(do.call(rbind, scenario_rows), file.path(audit_path, "scenario-status.
 writeLines(c(
   "distance_definition=assigned", "structural_refits_performed=none",
   "candidate_sites=1451", "distance_cap_m=3500",
-  paste0("git_commit=", system("git rev-parse HEAD", intern = TRUE)),
+  paste0("git_commit=", Sys.getenv("POLICY_CODE_REVISION", unset = "unrecorded")),
   paste0("generated_utc=", format(Sys.time(), tz = "UTC", usetz = TRUE))
 ), file.path(audit_path, "provenance.txt"))
 message("Audited all eleven policy models in ", package_path)

@@ -15,6 +15,9 @@ missing <- required[!file.exists(file.path(input_path, required))]
 if (length(missing)) stop("Missing baseline files: ", paste(missing, collapse = ", "))
 dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
 file.copy(file.path(input_path, required[-1L]), output_path, overwrite = TRUE)
+optional <- c("policy-population.csv", "policy-experimental-targets.csv", "policy-cache-manifest.rds")
+present <- optional[file.exists(file.path(input_path, optional))]
+if (length(present)) stopifnot(all(file.copy(file.path(input_path, present), output_path, overwrite = TRUE)))
 parameters <- read.csv(file.path(input_path, required[1L]), stringsAsFactors = FALSE)
 parameters$model_id <- "benchmark"
 parameters$model_label <- "Benchmark"

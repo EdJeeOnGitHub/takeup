@@ -21,6 +21,31 @@ table_path <- policy_option_value(
   args, "--table-path", "appendix/structural-robustness/tables/policy-distance-cap-feasibility.tex"
 )
 caps <- c(2500, 2750, 3000, 3250, 3500)
+allocation_path <- policy_option_value(args, "--allocation-path", file.path(dirname(csv_path), "median-allocations"))
+canonical_policy_path <- policy_option_value(args, "--policy-path")
+solver <- policy_option_value(args, "--solver", "gurobi")
+dir.create(allocation_path, recursive = TRUE, showWarnings = FALSE)
+solve_checked <- function(edges, demand, population, target_rate, label) {
+  if (any(!is.finite(demand)) || !is.finite(target_rate)) stop("Undefined median demand: ", label)
+  maximum <- sum(vapply(split(demand, edges$village_i), max, numeric(1)) * population)
+  if (maximum + 1e-5 < target_rate * sum(population)) {
+    saveRDS(list(status = "target_infeasible", maximum = maximum, target = target_rate * sum(population)),
+            file.path(allocation_path, paste0(label, ".rds")))
+    return(NA_real_)
+  }
+  fit <- policy_cost_solve(edges = edges, demand = demand, population = population,
+    target_rate = target_rate, site_cost = 1, solver = solver, solver_threads = 1L,
+    solver_seed = 0L, work_path = tempdir(),
+    log_file = file.path(allocation_path, paste0(label, ".log")))
+  if (!isTRUE(fit$diagnostics$optimal)) stop("Uncertified median solution: ", label)
+  saveRDS(fit, file.path(allocation_path, paste0(label, ".rds")))
+  if (!is.null(canonical_policy_path) && label %in% c("cap-3500-control", "cap-3500-bracelet")) {
+    directory <- file.path(canonical_policy_path, "median-allocations", sub("cap-3500-", "", label))
+    dir.create(directory, recursive = TRUE, showWarnings = FALSE)
+    saveRDS(fit, file.path(directory, "replicate-0001.rds"))
+  }
+  fit$summary$sites
+}
 
 if (!file.exists(compact_path)) {
   stop("Missing compact baseline draws: ", compact_path, call. = FALSE)
@@ -43,6 +68,8 @@ parameter <- if (parameter_type == "canonical") {
   ))
 } else stop("--parameter-type must be raw or canonical.", call. = FALSE)
 parameter$model_family <- "gaussian"
+parameter$draw <- 1L
+parameter$replicate <- 1L
 
 distance_object <- readRDS(distance_path)
 if (!identical(distance_object$candidate_site_mode, "all") ||
@@ -53,20 +80,9 @@ if (!identical(distance_object$candidate_site_mode, "all") ||
 parameter$sd_of_dist <- distance_object$sd_of_dist
 villages <- distance_object$village_df
 
-census_environment <- new.env(parent = emptyenv())
-load("data/takeup_census.RData", envir = census_environment)
-census <- census_environment$census.data
-population_by_cluster <- aggregate(
-  census$num.individuals,
-  by = list(cluster.id = census$cluster.id), sum, na.rm = TRUE
-)
-names(population_by_cluster)[2L] <- "population"
-population <- population_by_cluster$population[
-  match(villages$cluster.id, population_by_cluster$cluster.id)
-]
-if (anyNA(population) || any(population <= 0)) {
-  stop("Census populations do not cover all policy villages.", call. = FALSE)
-}
+population_table <- policy_adult_population(distance_object)
+population <- population_table$population
+
 
 experimental_demand <- predict_policy_draw(
   parameter, villages$dist.to.pot,
@@ -87,22 +103,21 @@ rows <- lapply(caps, function(cap) {
     edges$pot_j, levels = seq_len(nrow(distance_object$pot_df))
   ))
 
-  geographic_floor <- policy_cost_solve(
+  geographic_floor <- solve_checked(
     edges = edges, demand = rep(1, nrow(edges)),
     population = rep(1, nrow(villages)), target_rate = 0,
-    site_cost = 1, work_path = "temp-data/policy-cost-sensitivity"
-  )$summary$sites
+    label = paste0("cap-", cap, "-geographic-floor")
+  )
 
   sites <- vapply(c("control", "bracelet"), function(regime) {
     demand <- predict_policy_draw(
       parameter, edges$distance,
       policy_scenarios[policy_scenarios$scenario == regime, , drop = FALSE]
     )$demand
-    policy_cost_solve(
+    solve_checked(
       edges = edges, demand = demand, population = population,
-      target_rate = target_rate, site_cost = 1,
-      work_path = "temp-data/policy-cost-sensitivity"
-    )$summary$sites
+      target_rate = target_rate, label = paste0("cap-", cap, "-", regime)
+    )
   }, numeric(1))
 
   data.frame(
@@ -112,6 +127,10 @@ rows <- lapply(caps, function(cap) {
     villages_with_at_most_two_options = sum(village_degree <= 2),
     sites_feasible_for_multiple_villages = sum(site_degree >= 2),
     geographic_minimum_sites = geographic_floor,
+    population_total = sum(population),
+    target_expected_adults = target_rate * sum(population),
+    control_status = if (is.na(sites["control"])) "target_infeasible" else "complete",
+    bracelet_status = if (is.na(sites["bracelet"])) "target_infeasible" else "complete",
     control_sites = sites["control"],
     bracelet_sites = sites["bracelet"],
     sites_saved = sites["control"] - sites["bracelet"],

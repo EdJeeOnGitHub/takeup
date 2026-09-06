@@ -16,6 +16,11 @@ PROJECT_ROOT=${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}
 NUM_REPLICATES=${NUM_REPLICATES:-999}
 WEIGHT_METHOD=${WEIGHT_METHOD:-exponential}
 DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
+DISTANCE_CAP=${DISTANCE_CAP:-3500}
+POPULATION_WEIGHTING=${POPULATION_WEIGHTING:-equal-community}
+TARGET_MODE=${TARGET_MODE:-legacy-fixed}
+CENSUS_DATA=${CENSUS_DATA:-${POLICY_CENSUS:-${PROJECT_ROOT}/data/takeup_census.RData}}
+export POLICY_CENSUS="$CENSUS_DATA"
 NUM_CORES=${NUM_CORES:-12}
 optimizer_cpu_budget=${SLURM_CPUS_PER_TASK:-${NUM_CORES}}
 OPTIMIZE_CORES=${OPTIMIZE_CORES:-$(( optimizer_cpu_budget < 8 ? optimizer_cpu_budget : 8 ))}
@@ -38,13 +43,20 @@ if [[ -z "${WEIGHTED_PATH:-}" ]]; then
 fi
 DISTANCE_DATA=${DISTANCE_DATA:-optim/data/full-many-pots-experiment.rds}
 TARGET_CSV=${TARGET_CSV:-optim/data/${MODEL}/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
+if [[ "$TARGET_MODE" == draw-specific-experimental-control ]]; then
+  TARGET_CSV="$OUTPUT_PATH/policy-experimental-targets.csv"
+fi
 TABLE_PATH=${TABLE_PATH:-presentations/tables/fit105/optim-summ-exponential-cluster-weights.tex}
 POLICY_REVIEW_OUTPUT=${POLICY_REVIEW_OUTPUT:-ref-reports/policy-cost-sensitivity}
 POLICY_WORK_PATH=${POLICY_WORK_PATH:-temp-data/policy-cost-sensitivity}
 
 cd "${PROJECT_ROOT}"
 module load -f R/4.2.0
-if [[ -n "${GUROBI_MODULE:-}" ]]; then
+if [[ -n "${POLICY_GUROBI_ROOT:-}" ]]; then
+  export PATH="$POLICY_GUROBI_ROOT/bin:$PATH"
+  export LD_LIBRARY_PATH="$POLICY_GUROBI_ROOT/lib:${LD_LIBRARY_PATH:-}"
+  export GRB_LICENSE_FILE="$POLICY_GUROBI_ROOT/gurobi.lic"
+elif [[ -n "${GUROBI_MODULE:-}" ]]; then
   module load -f "${GUROBI_MODULE}"
 elif [[ "${SLURM_JOB_PARTITION:-}" == "caslake" ]]; then
   module load -f gurobi/11.0
@@ -72,13 +84,16 @@ case "${STAGE}" in
     Rscript --no-save --no-restore scripts/policy/predict-cluster-bootstrap.R \
       "--parameter-csv=${OUTPUT_PATH}/policy-bootstrap-parameters.csv" \
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
-      --distance-cap=3500 "--num-cores=${NUM_CORES}" \
+      "--distance-cap=${DISTANCE_CAP}" "--num-cores=${NUM_CORES}" \
+      "--population-weighting=${POPULATION_WEIGHTING}" "--census-data=${CENSUS_DATA}" \
       "--num-replicates=${NUM_REPLICATES}"
     ;;
   optimize)
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
     Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
       "--input-path=${OUTPUT_PATH}" "--target-csv=${TARGET_CSV}" \
+      "--population-weighting=${POPULATION_WEIGHTING}" "--target-mode=${TARGET_MODE}" \
+      "--distance-data=${DISTANCE_DATA}" "--census-data=${CENSUS_DATA}" \
       "--num-cores=${OPTIMIZE_CORES}" "--draw-batch-size=${DRAW_BATCH_SIZE}" \
       "--solver=${POLICY_SOLVER}" "--solver-threads=${SOLVER_THREADS}" \
       "--solver-seed=${SOLVER_SEED}" "--scratch-path=${POLICY_SCRATCH}" \
@@ -91,13 +106,17 @@ case "${STAGE}" in
       "--num-replicates=${NUM_REPLICATES}" "--method=${WEIGHT_METHOD}"
     ;;
   population)
+    REUSE_OPTIONS=()
+    if [[ "$POPULATION_WEIGHTING" == adult-census ]]; then REUSE_OPTIONS+=("--allocation-path=$OUTPUT_PATH"); fi
     Rscript --no-save --no-restore scripts/policy/run-population-cost.R \
       "--parameter-csv=${OUTPUT_PATH}/policy-bootstrap-parameters.csv" \
       --parameter-type=canonical --analysis-id=exponential-cluster-weights \
       "--distance-data=${DISTANCE_DATA}" \
       "--output-path=${POLICY_REVIEW_OUTPUT}" \
       "--work-path=${POLICY_WORK_PATH}" "--cores=${NUM_CORES}" \
-      "--max-draws=${NUM_REPLICATES}" --solver=auto
+      "--max-draws=${NUM_REPLICATES}" "--solver=${POLICY_SOLVER}" \
+      "--solver-threads=${SOLVER_THREADS}" "--solver-seed=${SOLVER_SEED}" \
+      ${REUSE_OPTIONS[@]+"${REUSE_OPTIONS[@]}"}
     ;;
   *)
     echo "Unknown STAGE=${STAGE}" >&2

@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-models=(
-  correct-observability second-order-observability grouped-lambda arm-lambda
-  student-t5 cluster-shock
-)
+models=(benchmark private-distance-community-image full-information exclude-dispersed
+  cluster-shock tight-multinomial second-order-observability grouped-lambda arm-lambda
+  student-t5 finite-mixture)
+
 script=${STAGE_SCRIPT:-hpc/policy/slurm_policy_model_robustness.sh}
 
 for model in "${models[@]}"; do

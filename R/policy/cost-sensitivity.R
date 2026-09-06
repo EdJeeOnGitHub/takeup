@@ -1,3 +1,5 @@
+source("R/policy/population.R")
+
 # Helpers for the local, review-only policy cost and pooling sensitivity.
 #
 # This module deliberately does not depend on ROI or an R Gurobi package.  It
@@ -246,6 +248,10 @@ policy_cost_solve <- function(
       args = c(
         paste0("ResultFile=", solution_path), paste0("LogFile=", log_path),
         "OutputFlag=1", paste0("TimeLimit=", time_limit),
+        # Adult-count constraints magnify tiny fractional binary residues when
+        # extracting one assignment per community. Keep those residues below
+        # the independent target-attainment tolerance.
+        "IntFeasTol=1e-9", "FeasibilityTol=1e-9",
         if (!is.null(solver_threads)) paste0("Threads=", solver_threads),
         if (!is.null(solver_seed)) paste0("Seed=", solver_seed), lp_path
       ),
@@ -287,36 +293,10 @@ policy_cost_solve <- function(
       allocation$pot_j, allocation$pot_j, FUN = length
     ) > 1L
   }
-  allocation$population <- population[allocation$village_i]
-  allocation$expected_takers <- allocation$population * allocation$demand
-  allocation$signal_cost <- allocation$expected_takers * signal_cost_per_taker
-  allocation$travel_cost <- allocation$expected_takers *
-    travel_cost_per_roundtrip_km * 2 * allocation$distance_km
-  total_population <- sum(population)
-  site_count <- length(unique(allocation$pot_j))
-  site_cost_total <- site_count * site_cost
-  result <- data.frame(
-    sites = site_count,
-    pooled_sites = length(unique(allocation$pot_j[allocation$pooled])),
-    pooled_population_share = sum(allocation$population[allocation$pooled]) / total_population,
-    unweighted_takeup = mean(allocation$demand),
-    population_weighted_takeup = sum(allocation$expected_takers) / total_population,
-    expected_takers = sum(allocation$expected_takers),
-    population_mean_distance_km = weighted.mean(
-      allocation$distance_km, allocation$population
-    ),
-    population_p90_distance_km = policy_cost_weighted_quantile(
-      allocation$distance_km, allocation$population, 0.9
-    ),
-    site_cost = site_cost_total,
-    signal_cost = sum(allocation$signal_cost),
-    travel_cost = sum(allocation$travel_cost),
-    total_cost = site_cost_total + sum(allocation$signal_cost) +
-      sum(allocation$travel_cost),
-    target_rate = target_rate,
-    target_slack_takers = sum(allocation$expected_takers) - target,
-    stringsAsFactors = FALSE
-  )
+  accounting <- policy_cost_account(allocation, population, target_rate, site_cost,
+                                    signal_cost_per_taker, travel_cost_per_roundtrip_km)
+  allocation <- accounting$allocation
+  result <- accounting$summary
   list(summary = result, allocation = allocation, solver_output = output,
        diagnostics = diagnostics,
        timing = c(model_write_seconds = write_seconds, solver_seconds = solve_seconds))
@@ -363,4 +343,42 @@ policy_cost_solver_diagnostics <- function(solver, log_path, solution_path) {
     }
   }
   result
+}
+
+# Pure accounting on an already selected assignment; never reoptimizes it.
+policy_cost_account <- function(allocation, population, target_rate, site_cost = 1,
+                                signal_cost_per_taker = 0, travel_cost_per_roundtrip_km = 0) {
+  if (!"pooled" %in% names(allocation)) allocation$pooled <- ave(allocation$pot_j, allocation$pot_j, FUN = length) > 1L
+  target <- target_rate * sum(population)
+  allocation$population <- population[allocation$village_i]
+  allocation$expected_takers <- allocation$population * allocation$demand
+  allocation$signal_cost <- allocation$expected_takers * signal_cost_per_taker
+  allocation$travel_cost <- allocation$expected_takers *
+    travel_cost_per_roundtrip_km * 2 * allocation$distance_km
+  total_population <- sum(population)
+  site_count <- length(unique(allocation$pot_j))
+  site_cost_total <- site_count * site_cost
+  result <- data.frame(
+    sites = site_count,
+    pooled_sites = length(unique(allocation$pot_j[allocation$pooled])),
+    pooled_population_share = sum(allocation$population[allocation$pooled]) / total_population,
+    unweighted_takeup = mean(allocation$demand),
+    population_weighted_takeup = sum(allocation$expected_takers) / total_population,
+    expected_takers = sum(allocation$expected_takers),
+    population_mean_distance_km = weighted.mean(
+      allocation$distance_km, allocation$population
+    ),
+    population_p90_distance_km = policy_cost_weighted_quantile(
+      allocation$distance_km, allocation$population, 0.9
+    ),
+    site_cost = site_cost_total,
+    signal_cost = sum(allocation$signal_cost),
+    travel_cost = sum(allocation$travel_cost),
+    total_cost = site_cost_total + sum(allocation$signal_cost) +
+      sum(allocation$travel_cost),
+    target_rate = target_rate,
+    target_slack_takers = sum(allocation$expected_takers) - target,
+    stringsAsFactors = FALSE
+  )
+  list(summary = result, allocation = allocation)
 }

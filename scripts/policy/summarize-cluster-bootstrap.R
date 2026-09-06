@@ -2,6 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 source("R/policy/bootstrap.R")
+source("R/policy/population.R")
 
 input_path <- policy_option_value(args, "--input-path")
 table_path <- policy_option_value(
@@ -21,7 +22,7 @@ scenario_results <- do.call(rbind, lapply(seq_len(nrow(policy_scenarios)), funct
   )
   if (!file.exists(path)) stop("Missing scenario status: ", path, call. = FALSE)
   value <- read.csv(path, stringsAsFactors = FALSE)
-  allowed_status <- c("complete", "target_infeasible")
+  allowed_status <- c("complete", "target_infeasible", "equilibrium_undefined")
   value <- value[value$status %in% allowed_status, ]
   value <- value[order(value$draw), ]
   if (nrow(value) != num_replicates || anyDuplicated(value$draw)) {
@@ -30,21 +31,7 @@ scenario_results <- do.call(rbind, lapply(seq_len(nrow(policy_scenarios)), funct
   value
 }))
 
-experimental_demand <- readRDS(file.path(input_path, "policy-experimental-demand.rds"))
-experimental <- aggregate(
-  cbind(mean_demand = experimental_demand$demand, mean_distance = experimental_demand$distance),
-  by = list(draw = experimental_demand$draw, replicate = experimental_demand$replicate),
-  FUN = mean
-)
-experimental$scenario_id <- 0L
-experimental$scenario <- "experimental"
-experimental$scenario_label <- "Control"
-experimental$status <- "complete"
-experimental$solver_status <- NA_integer_
-experimental$elapsed_seconds <- NA_real_
-experimental$n_pot <- 144L
-experimental$achieved_welfare <- experimental$mean_demand * 144
-experimental$target_welfare <- unique(scenario_results$target_welfare)[1L]
+experimental <- policy_experimental_summary(input_path, scenario_results)
 if (nrow(experimental) != num_replicates) {
   stop("Experimental allocation does not contain the expected draws.", call. = FALSE)
 }
@@ -72,6 +59,8 @@ summary_rows <- do.call(rbind, lapply(split(all_results, all_results$scenario_id
     distance_low = distance["conf_low"],
     distance_high = distance["conf_high"],
     replicates = nrow(value),
+    target_infeasible_share = mean(value$status == "target_infeasible"),
+    equilibrium_undefined_share = mean(value$status == "equilibrium_undefined"),
     stringsAsFactors = FALSE
   )
 }))
@@ -133,8 +122,8 @@ lines <- c(
   } else {
     paste0(num_replicates, " county-stratified cluster-bootstrap mode refits;")
   },
-  "parentheses are 2.5th and 97.5th percentiles. The welfare target is fixed",
-  "at the baseline experimental-allocation target. Target-infeasible refits",
+  "parentheses are 2.5th and 97.5th percentiles. Targets preserve each draw's experimental Control coverage",
+  "under the recorded population weighting; target-infeasible refits",
   paste0("are ", infeasible_note, " (out of ", num_replicates,
          " per scenario); those rows report the best/closest-site"),
   if (method == "posterior") {

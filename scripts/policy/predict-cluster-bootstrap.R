@@ -2,6 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 source("R/policy/bootstrap.R")
+source("R/policy/population.R")
 
 parameter_csv <- policy_option_value(args, "--parameter-csv")
 distance_data <- policy_option_value(args, "--distance-data", "optim/data/full-many-pots-experiment.rds")
@@ -80,6 +81,13 @@ write.csv(
   file.path(output_path, "policy-edge-demand-draw-map.csv"), row.names = FALSE
 )
 saveRDS(experimental, file.path(output_path, "policy-experimental-demand.rds"), compress = FALSE)
+if (policy_option_value(args, "--population-weighting", "equal-community") == "adult-census") {
+  population <- policy_adult_population(distance_object, policy_option_value(args, "--census-data", Sys.getenv("POLICY_CENSUS", "data/takeup_census.RData")))
+  policy_write_experimental_targets(experimental, population, output_path,
+    if ("model_id" %in% names(parameters)) parameters$model_id[1L] else "cluster-weighted",
+    policy_object_hash(parameters))
+}
+
 write.csv(data.frame(
   draws = nrow(parameters),
   scenarios = nrow(policy_scenarios),

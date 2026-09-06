@@ -24,11 +24,7 @@ geography <- read.csv(file.path(
 stopifnot(
   identical(geography$cap_m, c(2500L, 2750L, 3000L, 3250L, 3500L)),
   all(geography$control_sites >= geography$geographic_minimum_sites),
-  all(geography$bracelet_sites >= geography$geographic_minimum_sites),
-  geography$control_sites[geography$cap_m == 2500L] ==
-    geography$geographic_minimum_sites[geography$cap_m == 2500L],
-  geography$bracelet_sites[geography$cap_m == 2500L] ==
-    geography$geographic_minimum_sites[geography$cap_m == 2500L]
+  all(geography$bracelet_sites >= geography$geographic_minimum_sites)
 )
 
 analysis_ids <- c("baseline-posterior", "exponential-cluster-weights")

@@ -12,6 +12,17 @@ num_replicates <- as.integer(policy_option_value(args, "--num-replicates", "999"
 time_limit <- as.numeric(policy_option_value(args, "--time-limit", "10000"))
 target_tolerance <- as.numeric(policy_option_value(args, "--target-tolerance", "1e-5"))
 solver <- policy_option_value(args, "--solver", "auto")
+population_weighting <- policy_option_value(args, "--population-weighting", "equal-community")
+target_mode <- policy_option_value(args, "--target-mode", "legacy-fixed")
+distance_data <- policy_option_value(args, "--distance-data")
+census_data <- policy_option_value(args, "--census-data", Sys.getenv("POLICY_CENSUS", "data/takeup_census.RData"))
+allocation_root <- policy_option_value(args, "--allocation-root", input_path)
+draw_start <- as.integer(policy_option_value(args, "--draw-start", "1"))
+draw_end <- as.integer(policy_option_value(args, "--draw-end", as.character(num_replicates)))
+if (!population_weighting %in% c("adult-census", "equal-community") ||
+    !target_mode %in% c("legacy-fixed", "draw-specific-experimental-control")) stop("Unknown population/target convention.")
+if (population_weighting == "adult-census" && target_mode != "draw-specific-experimental-control") stop("Adult weighting requires explicit draw-specific experimental targets.")
+if (anyNA(c(draw_start, draw_end)) || draw_start < 1L || draw_end < draw_start) stop("Invalid draw shard.")
 allocated <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", as.character(parallel::detectCores())))
 if (is.na(allocated) || allocated < 1L) allocated <- 1L
 num_cores <- as.integer(policy_option_value(args, "--num-cores", as.character(min(8L, allocated))))
@@ -89,25 +100,38 @@ if (cache_format == "matrix") {
 }
 if (!length(draws) || anyNA(draws) || anyDuplicated(draws)) stop("Invalid draw inventory.")
 draws <- draws[seq_len(min(num_replicates, length(draws)))]
+if (draw_start > length(draws)) stop("Draw shard starts beyond input draws.")
+draws <- draws[seq.int(draw_start, min(draw_end, length(draws)))]
 
 target_data <- read.csv(target_csv, stringsAsFactors = FALSE)
-if (!"social_welfare" %in% names(target_data)) {
-  stop("Target CSV lacks social_welfare.", call. = FALSE)
-}
-# The legacy file repeats the draw-level target on every village row and has
-# one isolated missing cell. Recover one finite target per draw, then take the
-# same across-draw mean intended by the existing optimizer.
-if ("draw" %in% names(target_data)) {
-  target_by_draw <- vapply(split(target_data$social_welfare, target_data$draw), function(value) {
-    finite <- unique(value[is.finite(value)])
-    if (length(finite) != 1L) stop("Ambiguous target within a posterior draw.", call. = FALSE)
-    finite
-  }, numeric(1))
-  target <- mean(target_by_draw)
+population_table <- if (population_weighting == "adult-census") {
+  if (is.null(distance_data)) stop("Adult weighting requires --distance-data.")
+  policy_adult_population(readRDS(distance_data), census_data)
+} else NULL
+population <- if (is.null(population_table)) rep(1, length(unique(edges$village_i))) else population_table$population
+if (target_mode == "draw-specific-experimental-control") {
+  required <- c("draw", "replicate", "target_expected_adults", "target_community_welfare", "population_total", "target_mode", "population_checksum")
+  if (!all(required %in% names(target_data)) || anyDuplicated(target_data$draw) ||
+      any(!target_data$target_mode %in% target_mode)) stop("Invalid draw-specific target manifest.")
+  target_index <- match(draws, target_data$draw)
+  if (anyNA(target_index)) stop("Missing targets for selected draws.")
+  if (population_weighting == "adult-census" &&
+      (any(target_data$population_total != sum(population)) ||
+       any(target_data$population_checksum != policy_object_hash(population_table)))) stop("Target and census population disagree.")
+  targets <- target_data[[if (population_weighting == "adult-census") "target_expected_adults" else "target_community_welfare"]][target_index]
+  if (!is.null(edge_demand) && any(draw_map$replicate[match(draws, draw_map$draw)] != target_data$replicate[target_index])) stop("Target replicate IDs disagree with predictions.")
 } else {
-  target <- mean(target_data$social_welfare, na.rm = TRUE)
+  if (!"social_welfare" %in% names(target_data)) stop("Target CSV lacks social_welfare.")
+  target_by_draw <- if ("draw" %in% names(target_data)) vapply(split(target_data$social_welfare, target_data$draw), function(value) {
+    finite <- unique(value[is.finite(value)])
+    if (length(finite) != 1L) stop("Ambiguous target within a posterior draw.")
+    finite
+  }, numeric(1)) else target_data$social_welfare
+  target <- mean(target_by_draw, na.rm = TRUE)
+  if (!is.finite(target)) stop("Non-finite legacy target.")
+  targets <- rep(target, length(draws))
 }
-if (!is.finite(target)) stop("Non-finite policy target.", call. = FALSE)
+names(targets) <- as.character(draws)
 
 village_ids <- sort(unique(edges$village_i))
 num_villages <- length(village_ids)
@@ -120,16 +144,16 @@ input_files <- c(file.path(input_path, "policy-feasible-edges.rds"), target_csv,
 solver_version <- system2(solver_executable, "--version", stdout = TRUE, stderr = TRUE,
   env = if (solver == "gurobi") paste0("LD_LIBRARY_PATH=", file.path(dirname(dirname(solver_executable)), "lib")) else character())
 contract <- list(version = 1L, hashes = unname(tools::md5sum(input_files)),
-                 scenario_id = scenario_id, target = target, population = rep(1, num_villages),
+                 scenario_id = scenario_id, targets = targets, population = population, population_weighting = population_weighting, target_mode = target_mode,
                  solver = solver, solver_version = solver_version, solver_executable_hash = unname(tools::md5sum(solver_executable)),
                  threads = solver_threads, seed = solver_seed, time_limit = time_limit,
                  target_tolerance = target_tolerance,
-                 code_hashes = unname(tools::md5sum(c("scripts/policy/optimize-cluster-bootstrap.R", "R/policy/cost-sensitivity.R"))))
+                 code_hashes = unname(tools::md5sum(c("scripts/policy/optimize-cluster-bootstrap.R", "R/policy/cost-sensitivity.R", "R/policy/population.R"))))
 contract_file <- tempfile(); saveRDS(contract, contract_file)
 contract_hash <- unname(tools::md5sum(contract_file)); unlink(contract_file)
 load_seconds <- proc.time()[[3L]] - process_started
 
-scenario_dir <- file.path(input_path, "allocations", scenario$scenario)
+scenario_dir <- file.path(allocation_root, "allocations", scenario$scenario)
 dir.create(scenario_dir, recursive = TRUE, showWarnings = FALSE)
 status_path <- file.path(scenario_dir, "status.csv")
 run_manifest <- file.path(scenario_dir, "run-manifest.rds")
@@ -141,6 +165,7 @@ atomic_rds(list(contract = contract, contract_hash = contract_hash, R = R.versio
                 environment = Sys.getenv(c("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "SLURM_JOB_ID", "SLURM_CPUS_PER_TASK"))), run_manifest)
 
 solve_one_draw <- function(draw) {
+  target <- targets[as.character(draw)]
   output_file <- file.path(scenario_dir, sprintf("replicate-%04d.rds", draw))
   if (file.exists(output_file)) {
     saved <- readRDS(output_file)
@@ -170,7 +195,7 @@ solve_one_draw <- function(draw) {
     replicate_value <- prediction$replicate[1L]
   }
   lookup_seconds <- proc.time()[[3L]] - lookup_started
-  if (any(!is.finite(demand))) {
+  if (any(!is.finite(demand)) || !is.finite(target)) {
     status <- data.frame(
       draw = draw, replicate = replicate_value, scenario_id = scenario_id,
       scenario = scenario$scenario, scenario_label = scenario$label,
@@ -190,7 +215,7 @@ solve_one_draw <- function(draw) {
   best_edge <- unlist(lapply(prepared$village_edges, function(index) {
     index[which.max(demand[index])]
   }), use.names = FALSE)
-  maximum_achievable <- sum(demand[best_edge])
+  maximum_achievable <- sum(population[edges$village_i[best_edge]] * demand[best_edge])
   fit <- NULL
   if (maximum_achievable + target_tolerance < target) {
     # Retain the best feasible allocation and record target infeasibility. This
@@ -202,8 +227,8 @@ solve_one_draw <- function(draw) {
   } else {
     fit <- policy_cost_solve(
       edges = edges, demand = demand,
-      population = rep(1, num_villages),
-      target_rate = target / num_villages,
+      population = population,
+      target_rate = target / sum(population),
       site_cost = 1, solver = solver, time_limit = time_limit,
       work_path = file.path(scratch_path, paste0("policy-worker-", Sys.getpid())),
       prepared = prepared, solver_threads = solver_threads, solver_seed = solver_seed,
@@ -221,7 +246,9 @@ solve_one_draw <- function(draw) {
   if (nrow(allocation) != num_villages || anyDuplicated(allocation$village_i)) {
     stop("Invalid sparse allocation for draw ", draw, call. = FALSE)
   }
-  achieved <- sum(allocation$demand)
+  allocation$population <- population[allocation$village_i]
+  allocation$expected_takers <- allocation$population * allocation$demand
+  achieved <- sum(allocation$expected_takers)
   if (run_status == "complete" && achieved + target_tolerance < target) {
     stop(
       "Allocation missed fixed target by ", target - achieved, ".",
@@ -238,8 +265,8 @@ solve_one_draw <- function(draw) {
     solver_status = status_code,
     elapsed_seconds = elapsed,
     n_pot = length(unique(allocation$pot_j)),
-    mean_demand = mean(allocation$demand),
-    mean_distance = mean(allocation$distance),
+    mean_demand = weighted.mean(allocation$demand, allocation$population),
+    mean_distance = weighted.mean(allocation$distance, allocation$population),
     achieved_welfare = achieved,
     target_welfare = target,
     stringsAsFactors = FALSE
@@ -256,6 +283,7 @@ solve_one_draw <- function(draw) {
 }
 
 failed_draw <- function(draw, message) {
+  target <- targets[as.character(draw)]
   data.frame(draw = draw, replicate = NA_integer_, scenario_id = scenario_id,
              scenario = scenario$scenario, scenario_label = scenario$label,
              status = "failed", solver_status = NA_integer_, elapsed_seconds = NA_real_,
@@ -264,7 +292,11 @@ failed_draw <- function(draw, message) {
              error = message, stringsAsFactors = FALSE)
 }
 safe_draw <- function(draw) {
-  tryCatch(solve_one_draw(draw), error = function(e) failed_draw(draw, conditionMessage(e)))
+  value <- tryCatch(solve_one_draw(draw), error = function(e) failed_draw(draw, conditionMessage(e)))
+  value$population_weighting <- population_weighting
+  value$population_total <- sum(population)
+  value$target_mode <- target_mode
+  value
 }
 # Batch tasks bound process creation and keep large inputs read-only after fork.
 batches <- split(draws, ceiling(seq_along(draws) / batch_size))
@@ -275,8 +307,13 @@ for (first in seq.int(1L, length(batches), by = max(1L, num_cores * 4L))) {
                                 mc.cores = num_cores, mc.preschedule = FALSE, mc.set.seed = FALSE)
   for (i in seq_along(computed)) {
     if (inherits(computed[[i]], "try-error") || is.null(computed[[i]])) {
-      computed[[i]] <- lapply(wave[[i]], failed_draw,
-                             message = "Worker terminated unexpectedly; inspect saved assignments before resuming.")
+      computed[[i]] <- lapply(wave[[i]], function(draw) {
+        value <- failed_draw(draw, "Worker terminated unexpectedly; inspect saved assignments before resuming.")
+        value$population_weighting <- population_weighting
+        value$population_total <- sum(population)
+        value$target_mode <- target_mode
+        value
+      })
     }
   }
   results <- c(results, unlist(computed, recursive = FALSE))

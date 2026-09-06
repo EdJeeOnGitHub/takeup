@@ -26,6 +26,9 @@ work_path <- policy_option_value(
 cores <- as.integer(policy_option_value(args, "--cores", "8"))
 max_draws <- as.integer(policy_option_value(args, "--max-draws", "0"))
 solver <- policy_option_value(args, "--solver", "glpk")
+allocation_path <- policy_option_value(args, "--allocation-path")
+solver_threads <- as.integer(policy_option_value(args, "--solver-threads", "1"))
+solver_seed <- as.integer(policy_option_value(args, "--solver-seed", "0"))
 include_legacy <- policy_option_value(args, "--include-legacy", "true") == "true"
 pooling_rhos <- as.numeric(strsplit(
   policy_option_value(args, "--pooling-rhos", "0,0.5,1"), ",", fixed = TRUE
@@ -110,24 +113,14 @@ if (anyDuplicated(local_pot)) {
   stop("Experimental PoT-to-candidate matching is not one-to-one.")
 }
 
-census_environment <- new.env(parent = emptyenv())
-load("data/takeup_census.RData", envir = census_environment)
-census <- census_environment$census.data
-population_by_cluster <- aggregate(
-  census$num.individuals,
-  by = list(cluster.id = census$cluster.id), sum, na.rm = TRUE
-)
-names(population_by_cluster)[2L] <- "population"
-population <- population_by_cluster$population[
-  match(villages$cluster.id, population_by_cluster$cluster.id)
-]
-if (anyNA(population) || any(population <= 0)) {
-  stop("Census populations do not cover all policy villages.")
-}
+population_table <- policy_adult_population(distance_object)
+population <- population_table$population
+
 
 solve_one <- function(index) {
   tryCatch({
     parameter <- as.list(parameters[index, , drop = FALSE])
+    if (!is.null(parameter$model_family) && parameter$model_family != "gaussian") stop("Cost runner requires benchmark Gaussian parameters.")
     parameter$model_family <- "gaussian"
     parameter$sd_of_dist <- distance_object$sd_of_dist
     experimental_demand <- predict_policy_draw(
@@ -196,11 +189,29 @@ solve_one <- function(index) {
       if (exists(cache_key, envir = allocation_cache, inherits = FALSE)) {
         value <- get(cache_key, envir = allocation_cache, inherits = FALSE)
       } else {
-        fit <- policy_cost_solve(
-          edges = edges, demand = scenario_demand, population = weights,
-          target_rate = target, site_cost = 1, solver = solver,
-          work_path = work_path
-        )
+        if (!is.null(allocation_path) && population_estimand && effective_rho == 0) {
+          saved <- readRDS(file.path(allocation_path, "allocations", regime,
+                                    sprintf("replicate-%04d.rds", parameters$draw[index])))
+          if (saved$status$status != "complete" || !isTRUE(saved$solver$optimal) ||
+              abs(saved$status$target_welfare - target * sum(weights)) > 1e-5 ||
+              !identical(as.numeric(saved$allocation$population), as.numeric(weights[saved$allocation$village_i]))) {
+            stop("Canonical allocation is not certified at the same population/target.")
+          }
+          match_edge <- match(paste(saved$allocation$village_i, saved$allocation$pot_j), paste(edges$village_i, edges$pot_j))
+          if (anyNA(match_edge) || max(abs(saved$allocation$demand - scenario_demand[match_edge])) > 1e-10) stop("Canonical allocation predictions differ from cost inputs.")
+          fit <- policy_cost_account(saved$allocation, weights, target)
+        } else {
+          fit <- policy_cost_solve(
+            edges = edges, demand = scenario_demand, population = weights,
+            target_rate = target, site_cost = 1, solver = solver,
+            work_path = work_path, solver_threads = solver_threads, solver_seed = solver_seed,
+            log_file = file.path(output_path, "solver-logs", paste0(analysis_id, "-", parameters$draw[index], "-", cache_key, ".log"))
+          )
+          if (!isTRUE(fit$diagnostics$optimal)) stop("Cost sensitivity allocation not proven optimal.")
+          saved_path <- file.path(output_path, "sensitivity-allocations", analysis_id, cache_key)
+          dir.create(saved_path, recursive = TRUE, showWarnings = FALSE)
+          saveRDS(fit, file.path(saved_path, sprintf("replicate-%04d.rds", parameters$draw[index])), compress = FALSE)
+        }
         value <- fit$summary
         assigned_away <-
           fit$allocation$pot_j != local_pot[fit$allocation$village_i]
@@ -323,6 +334,9 @@ audit <- data.frame(
   villages = nrow(villages), candidate_sites = nrow(distance_object$pot_df),
   feasible_links_3500m = nrow(edges), census_adults = sum(population),
   max_experimental_distance_km = max(villages$dist.to.pot) / 1000,
+  population_checksum = policy_object_hash(population_table),
+  allocation_source = if (is.null(allocation_path)) "solved" else allocation_path,
+  target_mode = "draw-specific-experimental-control",
   signal_cost_per_taker = 0.20,
   pooling_rhos = paste(pooling_rhos, collapse = ";"),
   travel_cost_grid = paste(travel_values, collapse = ";"),
@@ -338,3 +352,5 @@ message(
   "Completed ", sum(statuses$status == "complete"), "/", nrow(statuses),
   " policy draws for ", analysis_id, "."
 )
+
+if (any(statuses$status != "complete")) stop("Incomplete cost accounting; inspect saved run audit.")

@@ -24,13 +24,21 @@ POLICY_SCRATCH=${POLICY_SCRATCH:-${SLURM_TMPDIR:-${TMPDIR:-/tmp}}}
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 
 MAX_DRAWS=${MAX_DRAWS:-0}
-ROOT=/project/akaring/takeup-data/data/stan_analysis_data
+ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data}
 STREAMLINED_ROOT=${STREAMLINED_ROOT:-${ROOT}/streamlined-active-robustness}
 OUTPUT_PATH=${OUTPUT_PATH:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/policy-model-robustness/${MODEL_ID}}
 COMPACT_CSV=${OUTPUT_PATH}/compact-policy-draws.csv
 TARGET_CSV=${TARGET_CSV:-/project/akaring/takeup-data/optim/data/STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP/agg-full-many-pots/summ-agg-identity-experiment-target-constraint.csv}
 DISTANCE_DATA=${DISTANCE_DATA:-/project/akaring/takeup-data/optim/data/full-many-pots-experiment.rds}
-REPO_ROOT=${REPO_ROOT:-/home/edjee/projects/takeup-ed-refine-todos}
+REPO_ROOT=${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}
+DISTANCE_CAP=${DISTANCE_CAP:-3500}
+POPULATION_WEIGHTING=${POPULATION_WEIGHTING:-equal-community}
+TARGET_MODE=${TARGET_MODE:-legacy-fixed}
+CENSUS_DATA=${CENSUS_DATA:-${POLICY_CENSUS:-${REPO_ROOT}/data/takeup_census.RData}}
+export POLICY_CENSUS="$CENSUS_DATA"
+if [[ "$TARGET_MODE" == draw-specific-experimental-control ]]; then
+  TARGET_CSV="${OUTPUT_PATH}/policy-experimental-targets.csv"
+fi
 
 use_streamlined_fits() {
   local spec_id=$1
@@ -41,6 +49,13 @@ use_streamlined_fits() {
 }
 
 case "${MODEL_ID}" in
+  cluster-weighted)
+    MODEL_LABEL="Exponential cluster-weighted modes"
+    MODEL_FAMILY=gaussian
+    LAMBDA_STRUCTURE=common
+    FITS=()
+    EXTRACT_OPTIONS=()
+    ;;
   benchmark)
     MODEL_LABEL="Benchmark"
     MODEL_FAMILY=gaussian
@@ -154,23 +169,47 @@ case "${MODEL_ID}" in
 esac
 
 cd "${REPO_ROOT}"
-module load -f gdal/2.4.1 udunits/2.2 proj/6.1 cmake R/4.2.0
-export R_LIBS_USER=${R_LIBS_USER:-/home/edjee/projects/takeup/renv/library/R-4.2/x86_64-pc-linux-gnu}
-export GUROBI_HOME="${HOME}/gurobi952/linux64"
+module load -f R/4.2.0
+if [[ -n "${POLICY_GUROBI_ROOT:-}" ]]; then
+  export GUROBI_HOME="$POLICY_GUROBI_ROOT"
+  export GRB_LICENSE_FILE="$POLICY_GUROBI_ROOT/gurobi.lic"
+else
+  export GUROBI_HOME="${HOME}/gurobi952/linux64"
+  if [[ "${SLURM_JOB_PARTITION:-}" == caslake ]]; then
+    module load -f gurobi/11.0
+    GUROBI_HOME=$(dirname "$(dirname "$(command -v gurobi_cl)")")
+  else
+    export GRB_LICENSE_FILE=/software/gurobi-9.2-el7-x86_64/gurobi.lic
+  fi
+fi
 export PATH="${GUROBI_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${GUROBI_HOME}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-export GRB_LICENSE_FILE=/software/gurobi-9.2-el7-x86_64/gurobi.lic
 mkdir -p temp/log "${OUTPUT_PATH}"
 
 case "${STAGE}" in
   prepare)
+    if [[ "$MODEL_ID" == benchmark ]]; then
+      Rscript --vanilla scripts/policy/prepare-baseline-posterior.R \
+        "--fit-path=${BENCHMARK_FIT_PATH:?Set BENCHMARK_FIT_PATH to assigned slim chains}" \
+        "--draws-per-chain=${BENCHMARK_DRAWS_PER_CHAIN:-400}" \
+        "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}"
+      exit 0
+    elif [[ "$MODEL_ID" == cluster-weighted ]]; then
+      Rscript --vanilla scripts/policy/prepare-cluster-bootstrap.R \
+        "--weighted-path=${WEIGHTED_PATH:?Set assigned-distance WEIGHTED_PATH}" \
+        "--output-path=${OUTPUT_PATH}" "--num-replicates=${NUM_REPLICATES:-999}" \
+        --method=exponential --distance-definition=assigned
+      Rscript --vanilla scripts/policy/standardize-weighted-modes.R "--input-path=${OUTPUT_PATH}"
+      exit 0
+    fi
     python3 scripts/policy/extract-cmdstan-draws.py \
       --output "${COMPACT_CSV}" \
       ${EXTRACT_OPTIONS[@]+"${EXTRACT_OPTIONS[@]}"} "${FITS[@]}"
     Rscript --no-save --no-restore scripts/policy/prepare-model-robustness.R \
       "--input-csv=${COMPACT_CSV}" "--output-path=${OUTPUT_PATH}" \
       "--model-id=${MODEL_ID}" "--model-label=${MODEL_LABEL}" \
-      "--model-family=${MODEL_FAMILY}" "--lambda-structure=${LAMBDA_STRUCTURE}"
+      "--model-family=${MODEL_FAMILY}" "--lambda-structure=${LAMBDA_STRUCTURE}" \
+      "--workspace=${CLUSTER_WORKSPACE:-${REPO_ROOT}/data/stan_analysis_data/dist_fit106.RData}"
     ;;
   predict)
     PREDICT_OPTIONS=()
@@ -180,7 +219,8 @@ case "${STAGE}" in
     Rscript --no-save --no-restore scripts/policy/predict-model-robustness.R \
       "--parameter-rds=${OUTPUT_PATH}/policy-model-parameters.rds" \
       "--distance-data=${DISTANCE_DATA}" "--output-path=${OUTPUT_PATH}" \
-      --distance-cap=3500 \
+      "--distance-cap=${DISTANCE_CAP}" \
+      "--population-weighting=${POPULATION_WEIGHTING}" "--census-data=${CENSUS_DATA}" \
       "--num-cores=${NUM_CORES}" "--max-draws=${MAX_DRAWS}" \
       ${PREDICT_OPTIONS[@]+"${PREDICT_OPTIONS[@]}"}
     ;;
@@ -188,10 +228,25 @@ case "${STAGE}" in
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
     Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
       "--input-path=${OUTPUT_PATH}" "--target-csv=${TARGET_CSV}" \
+      "--population-weighting=${POPULATION_WEIGHTING}" "--target-mode=${TARGET_MODE}" \
+      "--distance-data=${DISTANCE_DATA}" "--census-data=${CENSUS_DATA}" \
+      "--allocation-root=${ALLOCATION_ROOT:-${OUTPUT_PATH}}" \
+      "--draw-start=${DRAW_START:-1}" "--draw-end=${DRAW_END:-100000}" \
       "--num-cores=${OPTIMIZE_CORES}" "--draw-batch-size=${DRAW_BATCH_SIZE}" \
       "--solver=${POLICY_SOLVER}" "--solver-threads=${SOLVER_THREADS}" \
       "--solver-seed=${SOLVER_SEED}" "--scratch-path=${POLICY_SCRATCH}" \
+      "--time-limit=${SOLVER_TIME_LIMIT:-300}" \
       "--scenario-id=${SLURM_ARRAY_TASK_ID}" --num-replicates=100000
+    if [[ -n "${ALLOCATION_ROOT:-}" ]]; then
+      python3 scripts/policy/archive-policy-solver-logs.py \
+        "--run-root=${ALLOCATION_ROOT}" \
+        "--archive=${ALLOCATION_ROOT}/solver-logs-${SLURM_JOB_ID:-$$}.tar.gz"
+      touch "${ALLOCATION_ROOT}/_SUCCESS"
+    fi
+    ;;
+  collect)
+    Rscript --vanilla scripts/policy/collect-policy-shards.R \
+      "--input-path=${OUTPUT_PATH}" "--shard-root=${SHARD_ROOT:?Set SHARD_ROOT}"
     ;;
   summarize)
     Rscript --no-save --no-restore scripts/policy/summarize-model-results.R \
@@ -200,7 +255,7 @@ case "${STAGE}" in
       echo "model_id=${MODEL_ID}"
       echo "model_label=${MODEL_LABEL}"
       echo "distance_definition=assigned"
-      echo "git_commit=$(git rev-parse HEAD)"
+      echo "git_commit=${POLICY_CODE_REVISION:-$(git rev-parse HEAD)}"
       echo "source_fit_directory=$(dirname "${FITS[0]:-prepared-balanced-assigned-distance-slim-chains}")"
       echo "source_fit_files=$(IFS=,; echo "${FITS[*]:-prepared-balanced-assigned-distance-slim-chains}")"
       echo "extract_options=${EXTRACT_OPTIONS[*]:-}"
@@ -211,7 +266,9 @@ case "${STAGE}" in
       fi
       echo "structural_refit_performed=no"
       echo "candidate_sites=1451"
-      echo "distance_cap_m=3500"
+      echo "distance_cap_m=${DISTANCE_CAP}"
+      echo "population_weighting=${POPULATION_WEIGHTING}"
+      echo "target_mode=${TARGET_MODE}"
       echo "generated_utc=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
     } > "${OUTPUT_PATH}/provenance.txt"
     ;;

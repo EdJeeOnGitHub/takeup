@@ -2,6 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 source("R/policy/bootstrap.R")
+source("R/policy/population.R")
 
 input_path <- policy_option_value(args, "--input-path")
 if (is.null(input_path)) stop("--input-path is required.", call. = FALSE)
@@ -15,26 +16,17 @@ scenario_results <- do.call(rbind, lapply(policy_scenarios$scenario, function(sc
   if (!file.exists(path)) stop("Missing scenario status: ", path, call. = FALSE)
   read.csv(path, stringsAsFactors = FALSE)
 }))
-expected_draws <- parameter_status$draws[1]
+draw_map <- read.csv(file.path(input_path, "policy-edge-demand-draw-map.csv"))
+expected_draws <- nrow(draw_map)
+if (anyDuplicated(scenario_results[c("scenario", "draw")]) ||
+    !setequal(unique(scenario_results$scenario), policy_scenarios$scenario) ||
+    !setequal(scenario_results$draw, draw_map$draw) ||
+    any(!scenario_results$status %in% c("complete", "target_infeasible", "equilibrium_undefined"))) stop("Invalid scenario draw accounting.")
 if (any(table(scenario_results$scenario) != expected_draws)) {
   stop("One or more policy scenarios are incomplete.", call. = FALSE)
 }
 
-experimental_demand <- readRDS(file.path(input_path, "policy-experimental-demand.rds"))
-experimental <- aggregate(
-  cbind(mean_demand = experimental_demand$demand, mean_distance = experimental_demand$distance),
-  by = list(draw = experimental_demand$draw, replicate = experimental_demand$replicate),
-  FUN = mean
-)
-experimental$scenario_id <- 0L
-experimental$scenario <- "experimental"
-experimental$scenario_label <- "Experimental allocation"
-experimental$status <- "observed_allocation"
-experimental$solver_status <- NA_integer_
-experimental$elapsed_seconds <- NA_real_
-experimental$n_pot <- 144L
-experimental$achieved_welfare <- experimental$mean_demand * 144
-experimental$target_welfare <- unique(scenario_results$target_welfare)[1]
+experimental <- policy_experimental_summary(input_path, scenario_results)
 for (column in setdiff(names(scenario_results), names(experimental))) experimental[[column]] <- NA
 all_results <- rbind(experimental[, names(scenario_results), drop = FALSE], scenario_results)
 all_results$model_id <- parameter_status$model_id[1]
