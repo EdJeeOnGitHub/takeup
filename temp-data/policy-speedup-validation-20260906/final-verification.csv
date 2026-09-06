@@ -1,0 +1,9 @@
+model,variant,cases,all_pass
+benchmark,default,10,True
+benchmark,parallel,10,True
+cluster-shock,default,10,True
+cluster-shock,parallel,10,True
+full-information,default,10,True
+full-information,parallel,10,True
+tight-multinomial,default,10,True
+tight-multinomial,parallel,10,True

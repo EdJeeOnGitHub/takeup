@@ -12,7 +12,7 @@ for model in "${models[@]}"; do
   prepare=$(sbatch --parsable --export="ALL,STAGE=prepare,MODEL_ID=${model}" "${script}")
   predict=$(sbatch --parsable --dependency="afterok:${prepare}" \
     --export="ALL,STAGE=predict,MODEL_ID=${model}" "${script}")
-  optimize=$(sbatch --parsable --mem=4G --dependency="afterok:${predict}" --array=1-5 \
+  optimize=$(sbatch --parsable --mem="${OPTIMIZE_MEMORY:-28G}" --dependency="afterok:${predict}" --array=1-5 \
     --export="ALL,STAGE=optimize,MODEL_ID=${model}" "${script}")
   summarize=$(sbatch --parsable --mem=4G --dependency="afterok:${optimize}" \
     --export="ALL,STAGE=summarize,MODEL_ID=${model}" "${script}")

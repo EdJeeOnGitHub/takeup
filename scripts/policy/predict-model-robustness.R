@@ -66,7 +66,19 @@ draw_predictions <- parallel::mclapply(seq_len(nrow(parameters)), function(index
     } else {
       predict_policy_draw(parameter, sort(unique(edges$distance)))
     }
-    if (household_family) prediction else if (is.null(cluster_shock)) prediction else prediction$demand
+    diagnostics <- if (is.data.frame(prediction)) {
+      unique(prediction[, intersect(c("scenario_id", "fixedpoint_fallbacks", "fixedpoint_undefined"), names(prediction)), drop = FALSE])
+    } else data.frame()
+    demand <- if (household_family) as.numeric(prediction) else if (!is.null(cluster_shock)) prediction$demand else {
+      unlist(lapply(policy_scenarios$scenario_id, function(id) {
+        rows <- prediction[prediction$scenario_id == id, ]
+        if (anyDuplicated(rows$distance)) stop("Duplicate prediction distances.")
+        index <- match(edges$distance, rows$distance)
+        if (anyNA(index)) stop("Prediction distances do not cover edges.")
+        rows$demand[index]
+      }), use.names = FALSE)
+    }
+    list(demand = demand, diagnostics = diagnostics)
   }, error = function(error) structure(
     list(index = index, message = conditionMessage(error)),
     class = "policy_prediction_error"
@@ -81,32 +93,16 @@ if (any(prediction_errors)) {
   }, character(1))
   stop("Policy prediction failed: ", paste(details, collapse = "; "), call. = FALSE)
 }
-if (household_family) {
-  edge_demand <- do.call(rbind, draw_predictions)
-  expected_columns <- nrow(edges) * nrow(policy_scenarios)
-  finite_edge_demand <- edge_demand[is.finite(edge_demand)]
-  if (ncol(edge_demand) != expected_columns ||
-      any(finite_edge_demand < 0 | finite_edge_demand > 1)) {
-    stop("Invalid household-aggregated edge-demand matrix.", call. = FALSE)
-  }
-  curves <- NULL
-} else if (is.null(cluster_shock)) {
-  curves <- do.call(rbind, draw_predictions)
-  finite_curve_demand <- curves$demand[is.finite(curves$demand)]
-  if (any(finite_curve_demand < 0 | finite_curve_demand > 1)) {
-    stop("Invalid finite predicted demand.", call. = FALSE)
-  }
-  edge_demand <- NULL
-} else {
-  edge_demand <- do.call(rbind, draw_predictions)
-  expected_columns <- nrow(edges) * nrow(policy_scenarios)
-  finite_edge_demand <- edge_demand[is.finite(edge_demand)]
-  if (ncol(edge_demand) != expected_columns ||
-      any(finite_edge_demand < 0 | finite_edge_demand > 1)) {
-    stop("Invalid compact edge-demand matrix.", call. = FALSE)
-  }
-  curves <- NULL
-}
+edge_demand <- do.call(rbind, lapply(draw_predictions, `[[`, "demand"))
+finite_values <- edge_demand[is.finite(edge_demand)]
+if (ncol(edge_demand) != nrow(edges) * nrow(policy_scenarios) ||
+    any(finite_values < 0 | finite_values > 1)) stop("Invalid compact demand matrix.")
+curves <- NULL
+prediction_diagnostics <- lapply(seq_along(draw_predictions), function(i) {
+  d <- draw_predictions[[i]]$diagnostics
+  if (nrow(d)) d$draw <- parameters$draw[i]
+  d
+})
 
 experimental_distances <- distance_object$village_df$dist.to.pot
 experimental <- do.call(rbind, parallel::mclapply(seq_len(nrow(parameters)), function(index) {
@@ -173,6 +169,12 @@ if (is.null(edge_demand)) {
   )
 }
 saveRDS(experimental, file.path(output_path, "policy-experimental-demand.rds"), compress = FALSE)
+saveRDS(prediction_diagnostics, file.path(output_path, "policy-prediction-diagnostics.rds"))
+cache_files <- file.path(output_path, c("policy-feasible-edges.rds", "policy-edge-demand-matrix.rds", "policy-edge-demand-draw-map.csv"))
+saveRDS(list(version = 1L, format = "matrix", distance_cap = distance_cap,
+             source_hashes = tools::md5sum(c(parameter_rds, distance_data, household_workspace)),
+             hashes = setNames(unname(tools::md5sum(cache_files)), basename(cache_files))),
+        file.path(output_path, "policy-cache-manifest.rds"))
 write.csv(data.frame(
   model_id = parameters$model_id[1], draws = nrow(parameters),
   scenarios = nrow(policy_scenarios), feasible_edges = nrow(edges),

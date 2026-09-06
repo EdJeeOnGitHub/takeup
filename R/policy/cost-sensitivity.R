@@ -31,7 +31,7 @@ policy_cost_lp_terms <- function(coefficients, variables, tolerance = 1e-12) {
 
 policy_cost_write_lp <- function(
     path, edges, objective_x, objective_y, welfare_x, target,
-    pooled_welfare_change = NULL, pooled_objective_change = NULL) {
+    pooled_welfare_change = NULL, pooled_objective_change = NULL, prepared = NULL) {
   village_ids <- sort(unique(edges$village_i))
   pot_ids <- sort(unique(edges$pot_j))
   x_names <- paste0("x_", seq_len(nrow(edges)))
@@ -62,18 +62,23 @@ policy_cost_write_lp <- function(
   write_lp_line(paste(" obj:", objective))
   writeLines("Subject To", connection)
 
-  for (village in village_ids) {
-    index <- which(edges$village_i == village)
-    write_lp_line(paste0(
-      " assign_", village, ": ",
-      policy_cost_lp_terms(rep(1, length(index)), x_names[index]), " = 1"
-    ))
-  }
-  for (edge in seq_len(nrow(edges))) {
-    write_lp_line(paste0(
-      " open_", edge, ": + 1 ", x_names[edge], " - 1 y_",
-      edges$pot_j[edge], " <= 0"
-    ))
+  if (!is.null(prepared)) {
+    if (pooling || !identical(edges, prepared$edges)) stop("Prepared LP geometry/formulation mismatch.")
+    writeLines(prepared$constraints, connection)
+  } else {
+    for (village in village_ids) {
+      index <- which(edges$village_i == village)
+      write_lp_line(paste0(
+        " assign_", village, ": ",
+        policy_cost_lp_terms(rep(1, length(index)), x_names[index]), " = 1"
+      ))
+    }
+    for (edge in seq_len(nrow(edges))) {
+      write_lp_line(paste0(
+        " open_", edge, ": + 1 ", x_names[edge], " - 1 y_",
+        edges$pot_j[edge], " <= 0"
+      ))
+    }
   }
 
   welfare_terms <- policy_cost_lp_terms(welfare_x, x_names)
@@ -179,6 +184,8 @@ policy_cost_solve <- function(
     } else "/opt/gurobi1000/linux64/bin/gurobi_cl",
     gurobi_library = file.path(dirname(dirname(gurobi)), "lib"),
     time_limit = 300, work_path = tempdir(), solver = "auto",
+    prepared = NULL, solver_threads = NULL, solver_seed = NULL,
+    log_file = NULL,
     glpsol = if (nzchar(Sys.which("glpsol"))) {
       Sys.which("glpsol")
     } else "/usr/bin/glpsol") {
@@ -208,11 +215,20 @@ policy_cost_solve <- function(
   solution_path <- file.path(work_path, paste0("policy-", identifier, ".sol"))
   log_path <- file.path(work_path, paste0("policy-", identifier, ".log"))
   problem_path <- file.path(work_path, paste0("policy-", identifier, ".glp"))
+  write_started <- proc.time()[[3L]]
   names_map <- policy_cost_write_lp(
     lp_path, edges, objective_x, objective_y, welfare_x, target,
-    pooled_welfare_change, pooled_objective_change
+    pooled_welfare_change, pooled_objective_change, prepared = prepared
   )
-  on.exit(unlink(c(lp_path, solution_path, log_path, problem_path)), add = TRUE)
+  write_seconds <- proc.time()[[3L]] - write_started
+  on.exit({
+    if (!is.null(log_file) && file.exists(log_path)) {
+      dir.create(dirname(log_file), recursive = TRUE, showWarnings = FALSE)
+      file.copy(log_path, log_file, overwrite = TRUE)
+    }
+    unlink(c(lp_path, solution_path, log_path, problem_path))
+  }, add = TRUE)
+  solve_started <- proc.time()[[3L]]
   if (solver == "auto") solver <- if (file.exists(glpsol)) "glpk" else "gurobi"
   if (!solver %in% c("glpk", "gurobi")) stop("Unknown MILP solver: ", solver)
   if (solver == "glpk") {
@@ -229,12 +245,16 @@ policy_cost_solve <- function(
       gurobi,
       args = c(
         paste0("ResultFile=", solution_path), paste0("LogFile=", log_path),
-        "OutputFlag=0", paste0("TimeLimit=", time_limit), lp_path
+        "OutputFlag=1", paste0("TimeLimit=", time_limit),
+        if (!is.null(solver_threads)) paste0("Threads=", solver_threads),
+        if (!is.null(solver_seed)) paste0("Seed=", solver_seed), lp_path
       ),
       stdout = TRUE, stderr = TRUE,
       env = paste0("LD_LIBRARY_PATH=", gurobi_library)
     )
   }
+  solve_seconds <- proc.time()[[3L]] - solve_started
+  diagnostics <- policy_cost_solver_diagnostics(solver, log_path, solution_path)
   status <- attr(output, "status") %||% 0L
   if (status != 0L) {
     stop(solver, " failed (", status, "): ", paste(output, collapse = "\n"), call. = FALSE)
@@ -297,7 +317,50 @@ policy_cost_solve <- function(
     target_slack_takers = sum(allocation$expected_takers) - target,
     stringsAsFactors = FALSE
   )
-  list(summary = result, allocation = allocation, solver_output = output)
+  list(summary = result, allocation = allocation, solver_output = output,
+       diagnostics = diagnostics,
+       timing = c(model_write_seconds = write_seconds, solver_seconds = solve_seconds))
 }
 
 `%||%` <- function(left, right) if (is.null(left)) right else left
+
+# Cache only invariant non-pooling constraint text, preserving legacy LP order.
+policy_cost_prepare <- function(edges) {
+  path <- tempfile(fileext = ".lp")
+  on.exit(unlink(path))
+  policy_cost_write_lp(path, edges, rep(0, nrow(edges)),
+                       rep(1, length(unique(edges$pot_j))), rep(1, nrow(edges)), 0)
+  lines <- readLines(path)
+  first <- match("Subject To", lines) + 1L
+  last <- grep("^target:", lines)[1L] - 1L
+  list(edges = edges, constraints = lines[seq.int(first, last)],
+       village_edges = split(seq_len(nrow(edges)), edges$village_i))
+}
+
+policy_cost_solver_diagnostics <- function(solver, log_path, solution_path) {
+  lines <- if (file.exists(log_path)) readLines(log_path, warn = FALSE) else character()
+  result <- list(termination = "unknown", optimal = FALSE,
+                 objective = NA_real_, bound = NA_real_, gap = NA_real_)
+  if (solver == "gurobi") {
+    result$optimal <- any(grepl("^Optimal solution found", lines))
+    termination <- grep("Optimal solution found|Time limit reached|Infeasible model|Interrupted", lines, value = TRUE)
+    if (length(termination)) result$termination <- tail(termination, 1L)
+    values <- grep("^Best objective .*best bound .*gap ", lines, value = TRUE)
+    if (length(values)) {
+      fields <- strsplit(gsub(",", "", tail(values, 1L)), " +")[[1L]]
+      result$objective <- suppressWarnings(as.numeric(fields[3L]))
+      result$bound <- suppressWarnings(as.numeric(fields[6L]))
+      result$gap <- suppressWarnings(as.numeric(sub("%", "", fields[8L]))) / 100
+    }
+  } else if (file.exists(solution_path)) {
+    values <- grep("^s mip ", readLines(solution_path, warn = FALSE), value = TRUE)
+    if (length(values) == 1L) {
+      fields <- strsplit(values, " +")[[1L]]
+      result$optimal <- fields[5L] == "o"
+      result$termination <- fields[5L]
+      result$objective <- as.numeric(fields[6L])
+      if (result$optimal) { result$bound <- result$objective; result$gap <- 0 }
+    }
+  }
+  result
+}

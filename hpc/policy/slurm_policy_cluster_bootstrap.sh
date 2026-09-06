@@ -17,6 +17,15 @@ NUM_REPLICATES=${NUM_REPLICATES:-999}
 WEIGHT_METHOD=${WEIGHT_METHOD:-exponential}
 DISTANCE_DEFINITION=${DISTANCE_DEFINITION:-assigned}
 NUM_CORES=${NUM_CORES:-12}
+optimizer_cpu_budget=${SLURM_CPUS_PER_TASK:-${NUM_CORES}}
+OPTIMIZE_CORES=${OPTIMIZE_CORES:-$(( optimizer_cpu_budget < 8 ? optimizer_cpu_budget : 8 ))}
+DRAW_BATCH_SIZE=${DRAW_BATCH_SIZE:-25}
+SOLVER_THREADS=${SOLVER_THREADS:-1}
+SOLVER_SEED=${SOLVER_SEED:-0}
+POLICY_SOLVER=${POLICY_SOLVER:-gurobi}
+POLICY_SCRATCH=${POLICY_SCRATCH:-${SLURM_TMPDIR:-${TMPDIR:-/tmp}}}
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+
 MODEL=STRUCTURAL_LINEAR_U_SHOCKS_PHAT_MU_REP
 OUTPUT_PATH=${OUTPUT_PATH:-optim/data/${MODEL}/agg-full-many-pots-exponential-cluster-weights}
 ANALYSIS_ROOT=${ANALYSIS_ROOT:-/project/akaring/takeup-data/data/stan_analysis_data}
@@ -70,6 +79,9 @@ case "${STAGE}" in
     : "${SLURM_ARRAY_TASK_ID:?Optimize requires scenario array 1-5}"
     Rscript --no-save --no-restore scripts/policy/optimize-cluster-bootstrap.R \
       "--input-path=${OUTPUT_PATH}" "--target-csv=${TARGET_CSV}" \
+      "--num-cores=${OPTIMIZE_CORES}" "--draw-batch-size=${DRAW_BATCH_SIZE}" \
+      "--solver=${POLICY_SOLVER}" "--solver-threads=${SOLVER_THREADS}" \
+      "--solver-seed=${SOLVER_SEED}" "--scratch-path=${POLICY_SCRATCH}" \
       "--scenario-id=${SLURM_ARRAY_TASK_ID}" \
       "--num-replicates=${NUM_REPLICATES}"
     ;;

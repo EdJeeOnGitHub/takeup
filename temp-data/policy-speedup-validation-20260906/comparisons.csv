@@ -1,0 +1,13 @@
+"model","comparison","pass"
+"benchmark","reference-vs-serial-auto",TRUE
+"benchmark","serial-auto-vs-serial",FALSE
+"benchmark","serial-vs-parallel",TRUE
+"cluster-shock","reference-vs-serial-auto",TRUE
+"cluster-shock","serial-auto-vs-serial",TRUE
+"cluster-shock","serial-vs-parallel",TRUE
+"full-information","reference-vs-serial-auto",TRUE
+"full-information","serial-auto-vs-serial",TRUE
+"full-information","serial-vs-parallel",TRUE
+"tight-multinomial","reference-vs-serial-auto",TRUE
+"tight-multinomial","serial-auto-vs-serial",TRUE
+"tight-multinomial","serial-vs-parallel",TRUE
