@@ -176,8 +176,8 @@ if (!core_observation_model %in% 0:2) {
   stop("--core-observation-model must be 0, 1, or 2.", call. = FALSE)
 }
 if (!core_recognition_structure %in% 0:2 ||
-    !core_report_structure %in% 0:2) {
-  stop("Observation structures must be 0, 1, or 2.", call. = FALSE)
+    !core_report_structure %in% 0:4) {
+  stop("Recognition structure must be 0:2; report structure must be 0:4.", call. = FALSE)
 }
 if (core_observation_model == 0L &&
     (core_recognition_structure != 0L || core_report_structure != 0L)) {

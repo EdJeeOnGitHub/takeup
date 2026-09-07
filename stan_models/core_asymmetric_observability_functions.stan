@@ -220,3 +220,21 @@ vector core_two_stage_report_row_derivative(
   }
   return result;
 }
+
+// Overload retaining the exact legacy constant-accuracy derivative above.
+vector core_two_stage_report_row_derivative(
+    real definite_prob, real definite_slope,
+    real accuracy_prob, real accuracy_slope, data int truth) {
+  vector[3] result = core_two_stage_report_row_derivative(
+    definite_prob, definite_slope, accuracy_prob, truth
+  );
+  real accuracy_deriv = definite_prob * accuracy_prob * (1 - accuracy_prob) * accuracy_slope;
+  if (truth == 2) {
+    result[1] += accuracy_deriv;
+    result[2] -= accuracy_deriv;
+  } else {
+    result[1] -= accuracy_deriv;
+    result[2] += accuracy_deriv;
+  }
+  return result;
+}

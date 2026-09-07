@@ -1,0 +1,17 @@
+"sample","stage","truth","restriction","F","df1","df2","p"
+"all_communities","definite","nonparticipant","all_slopes_zero",0.703648994382692,4,143,0.590685871086853
+"all_communities","definite","nonparticipant","equal_slopes_across_arms",0.474936789121805,3,143,0.700223000328382
+"all_communities","definite","participant","all_slopes_zero",3.65217100990407,4,143,0.00727641746350162
+"all_communities","definite","participant","equal_slopes_across_arms",4.72983443946571,3,143,0.00354352204253037
+"all_communities","accuracy","nonparticipant","all_slopes_zero",5.33776373509115,4,141,0.000494878652015413
+"all_communities","accuracy","nonparticipant","equal_slopes_across_arms",1.61941415032298,3,141,0.187576903958167
+"all_communities","accuracy","participant","all_slopes_zero",0.773343120924349,4,143,0.544251001719428
+"all_communities","accuracy","participant","equal_slopes_across_arms",0.61673443113554,3,143,0.605248098914151
+"exclude_dispersed","definite","nonparticipant","all_slopes_zero",1.03076380356702,4,138,0.393708220216144
+"exclude_dispersed","definite","nonparticipant","equal_slopes_across_arms",0.387963669440776,3,138,0.761844746903154
+"exclude_dispersed","definite","participant","all_slopes_zero",3.5291859512681,4,138,0.00893038713602299
+"exclude_dispersed","definite","participant","equal_slopes_across_arms",4.39696775211788,3,138,0.00547550485854592
+"exclude_dispersed","accuracy","nonparticipant","all_slopes_zero",4.70089149091974,4,136,0.00138720561972895
+"exclude_dispersed","accuracy","nonparticipant","equal_slopes_across_arms",1.28918278922626,3,136,0.280701077663653
+"exclude_dispersed","accuracy","participant","all_slopes_zero",0.712618375961628,4,138,0.584644133412821
+"exclude_dispersed","accuracy","participant","equal_slopes_across_arms",0.293406686260666,3,138,0.830108563141257

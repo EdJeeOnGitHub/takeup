@@ -48,8 +48,10 @@ data {
   int<lower=0, upper=2> core_observation_model;
   // Recognition: 0 = full; 1 = truth-specific intercepts; 2 = condition out.
   int<lower=0, upper=2> core_recognition_structure;
-  // Reports: 0 = full multinomial; 1 = no arm-distance slopes; 2 = two-stage.
-  int<lower=0, upper=2> core_report_structure;
+  // Reports: 0 = full multinomial; 1 = no arm-distance slopes;
+  // 2 = constant-accuracy two-stage; 3 = common accuracy slopes by truth;
+  // 4 = partially pooled accuracy slopes across arms, separately by truth.
+  int<lower=0, upper=4> core_report_structure;
   // Full-multinomial arm-distance slopes: 0 = independent; 1 = hierarchical.
   // 0 = independent arm slopes; 1 = exchangeable arm slopes;
   // 2 = Any-Signal/No-Signal slope plus shrunk within-group deviations.
@@ -210,18 +212,27 @@ parameters {
     core_report_within_dist_raw;
   vector<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 1 : 0]
     core_report_within_dist_sd;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0]
     core_definite_intercept;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0]
     core_definite_dist_slope;
-  matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
+  matrix[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0, num_treatments - 1]
     core_definite_arm_intercept_raw;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 1 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 1 : 0]
     core_definite_public_signal_dist_slope;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0]
     core_accuracy_intercept;
-  matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
+  matrix[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0, num_treatments - 1]
     core_accuracy_arm_intercept_raw;
+
+  // Modes 3/4: truth-specific accuracy slopes; mode 4 partially pools arms.
+  vector[core_observation_model > 0 && core_report_structure >= 3 ? 2 : 0]
+    core_accuracy_dist_slope;
+  matrix[core_observation_model > 0 && core_report_structure == 4 ? 2 : 0, num_treatments - 1]
+    core_accuracy_arm_dist_raw;
+  vector<lower=0>[core_observation_model > 0 && core_report_structure == 4 ? 2 : 0]
+    core_accuracy_arm_dist_sd;
+
   vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
     core_finite_mixture_weight;
   vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
@@ -349,6 +360,9 @@ model {
     core_definite_dist_slope ~ normal(0, 0.5);
     to_vector(core_definite_arm_intercept_raw) ~ normal(0, 0.5);
     core_definite_public_signal_dist_slope ~ normal(0, 0.25);
+    core_accuracy_dist_slope ~ normal(0, 0.5);
+    to_vector(core_accuracy_arm_dist_raw) ~ std_normal();
+    core_accuracy_arm_dist_sd ~ normal(0, 0.25);
     core_accuracy_intercept ~ normal(0, 1.5);
     to_vector(core_accuracy_arm_intercept_raw) ~ normal(0, 0.5);
 
@@ -372,7 +386,7 @@ model {
           }
           recognition_prob = inv_logit(recognition_eta);
         }
-        if (core_report_structure == 2) {
+        if (core_report_structure >= 2) {
           real definite_eta = core_definite_intercept[truth] + dot_product(
             core_definite_arm_intercept_raw[truth],
             core_signal_lambda_contrast_basis[treatment]
@@ -385,6 +399,15 @@ model {
             core_accuracy_arm_intercept_raw[truth],
             core_signal_lambda_contrast_basis[treatment]
           );
+          if (core_report_structure >= 3) {
+            real accuracy_slope = core_accuracy_dist_slope[truth];
+            if (core_report_structure == 4) {
+              accuracy_slope += core_accuracy_arm_dist_sd[truth] * dot_product(
+                core_accuracy_arm_dist_raw[truth], core_signal_lambda_contrast_basis[treatment]
+              );
+            }
+            accuracy_eta += accuracy_slope * cluster_standard_dist[cluster];
+          }
           conditional_report = core_two_stage_report_row(
             inv_logit(definite_eta), inv_logit(accuracy_eta), truth
           );

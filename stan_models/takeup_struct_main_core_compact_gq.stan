@@ -58,9 +58,12 @@ functions {
       vector definite_public_signal_dist_slope,
       vector accuracy_intercept,
       matrix accuracy_arm_intercept,
+      vector accuracy_dist_slope,
+      matrix accuracy_arm_dist_raw,
+      vector accuracy_arm_dist_sd,
       data matrix contrast_basis) {
     vector[6] result;
-    if (report_structure == 2) {
+    if (report_structure >= 2) {
       real definite_slope = definite_dist_slope[truth] +
         definite_public_signal_dist_slope[1] * is_public_signal;
       real definite_prob = inv_logit(
@@ -68,15 +71,25 @@ functions {
         dot_product(definite_arm_intercept[truth], contrast_basis[treatment]) +
         definite_slope * distance
       );
-      real accuracy_prob = inv_logit(
+      real accuracy_slope = 0;
+      real accuracy_prob;
+      if (report_structure >= 3) {
+        accuracy_slope = accuracy_dist_slope[truth];
+        if (report_structure == 4) {
+          accuracy_slope += accuracy_arm_dist_sd[truth] * dot_product(
+            accuracy_arm_dist_raw[truth], contrast_basis[treatment]
+          );
+        }
+      }
+      accuracy_prob = inv_logit(
         accuracy_intercept[truth] +
-        dot_product(accuracy_arm_intercept[truth], contrast_basis[treatment])
+        dot_product(accuracy_arm_intercept[truth], contrast_basis[treatment]) + accuracy_slope * distance
       );
       result[1:3] = core_two_stage_report_row(
         definite_prob, accuracy_prob, truth
       );
       result[4:6] = core_two_stage_report_row_derivative(
-        definite_prob, definite_slope, accuracy_prob, truth
+        definite_prob, definite_slope, accuracy_prob, accuracy_slope, truth
       );
     } else {
       vector[3] slope = rep_vector(0, 3);
@@ -585,7 +598,7 @@ data {
   array[num_wtp_obs] int<lower=1, upper=num_clusters> wtp_cluster_id;
   int<lower=0, upper=2> core_observation_model;
   int<lower=0, upper=2> core_recognition_structure;
-  int<lower=0, upper=2> core_report_structure;
+  int<lower=0, upper=4> core_report_structure;
   int<lower=0, upper=2> core_report_arm_dist_hierarchical;
   real<lower=0> core_report_arm_dist_prior_scale;
   int<lower=0> core_num_peer_response_rows;
@@ -682,18 +695,27 @@ parameters {
     core_report_within_dist_raw;
   vector<lower=0>[core_observation_model > 0 && core_report_structure == 0 && core_report_arm_dist_hierarchical == 2 ? 1 : 0]
     core_report_within_dist_sd;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0]
     core_definite_intercept;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0]
     core_definite_dist_slope;
-  matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
+  matrix[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0, num_treatments - 1]
     core_definite_arm_intercept_raw;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 1 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 1 : 0]
     core_definite_public_signal_dist_slope;
-  vector[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0]
+  vector[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0]
     core_accuracy_intercept;
-  matrix[core_observation_model > 0 && core_report_structure == 2 ? 2 : 0, num_treatments - 1]
+  matrix[core_observation_model > 0 && core_report_structure >= 2 ? 2 : 0, num_treatments - 1]
     core_accuracy_arm_intercept_raw;
+
+  // Modes 3/4: truth-specific accuracy slopes; mode 4 partially pools arms.
+  vector[core_observation_model > 0 && core_report_structure >= 3 ? 2 : 0]
+    core_accuracy_dist_slope;
+  matrix[core_observation_model > 0 && core_report_structure == 4 ? 2 : 0, num_treatments - 1]
+    core_accuracy_arm_dist_raw;
+  vector<lower=0>[core_observation_model > 0 && core_report_structure == 4 ? 2 : 0]
+    core_accuracy_arm_dist_sd;
+
   vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
     core_finite_mixture_weight;
   vector<lower=0, upper=1>[core_type_distribution == 2 ? 1 : 0]
@@ -909,6 +931,7 @@ generated quantities {
             core_definite_arm_intercept_raw,
             core_definite_public_signal_dist_slope, core_accuracy_intercept,
             core_accuracy_arm_intercept_raw,
+            core_accuracy_dist_slope, core_accuracy_arm_dist_raw, core_accuracy_arm_dist_sd,
             core_signal_lambda_contrast_basis
           );
           observed_recognition[cluster_index, truth] = recognition[1];
@@ -1164,6 +1187,7 @@ generated quantities {
                 core_definite_arm_intercept_raw,
                 core_definite_public_signal_dist_slope,
                 core_accuracy_intercept, core_accuracy_arm_intercept_raw,
+            core_accuracy_dist_slope, core_accuracy_arm_dist_raw, core_accuracy_arm_dist_sd,
                 core_signal_lambda_contrast_basis
               );
               if (truth == 1) {
@@ -1345,6 +1369,7 @@ generated quantities {
               core_definite_dist_slope, core_definite_arm_intercept_raw,
               core_definite_public_signal_dist_slope,
               core_accuracy_intercept, core_accuracy_arm_intercept_raw,
+            core_accuracy_dist_slope, core_accuracy_arm_dist_raw, core_accuracy_arm_dist_sd,
               core_signal_lambda_contrast_basis
             );
             if (truth == 1) {

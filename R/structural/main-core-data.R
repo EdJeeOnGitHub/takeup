@@ -336,8 +336,8 @@ prepare_main_core_data <- function(
   sample_data$core_observation_model <- observation_model
   recognition_structure <- as.integer(recognition_structure)
   report_structure <- as.integer(report_structure)
-  if (!recognition_structure %in% 0:2 || !report_structure %in% 0:2) {
-    stop("recognition_structure and report_structure must be 0, 1, or 2.",
+  if (!recognition_structure %in% 0:2 || !report_structure %in% 0:4) {
+    stop("recognition_structure must be 0:2; report_structure must be 0:4.",
          call. = FALSE)
   }
   if (observation_model == 0L &&
