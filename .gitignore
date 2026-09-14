@@ -69,3 +69,8 @@ stan_models/u_sd_prior_tune.hpp
 takeup.Rproj
 
 /.quarto/
+
+# Inputs and dependency code are supplied by the research launcher.
+/data/
+/multilvlr/
+/.gitmodules

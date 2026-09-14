@@ -1,0 +1,36 @@
+schema_version=1
+project_id="takeup"
+
+[environment]
+locks=["renv.lock", "launcher/environment.json"]
+
+[environment.build]
+containerfile="launcher/Containerfile"
+context=["launcher", "renv.lock"]
+base_image="localhost/r-binary-dev@sha256:5b41bb4b34c4ad59212859c042e3b5db997644d0b50f8acff264e4548dc1495c"
+platform="linux/amd64"
+network="host"
+
+[development_dependencies.multilvlr]
+repository="multilvlr"
+commit="2f86494c1dbb0178352115fe201fd2d57bd851dd"
+
+[experiments.environment-check]
+generate=["python3", "launcher/run.py", "generate", "environment-check"]
+cpus=1
+memory="2G"
+time_limit="00:10:00"
+
+[experiments.models]
+generate=["python3", "launcher/run.py", "generate", "models"]
+cpus=1
+memory="2G"
+time_limit="00:10:00"
+
+[inputs.data]
+mount="/inputs/data"
+
+[outputs.results]
+path="/outputs"
+kind="results"
+required=true

@@ -1,0 +1,11 @@
+FROM localhost/r-binary-dev@sha256:5b41bb4b34c4ad59212859c042e3b5db997644d0b50f8acff264e4548dc1495c
+USER root
+ENV R_PROFILE_USER=/dev/null R_ENVIRON_USER=/dev/null RENV_CONFIG_AUTOLOADER_ENABLED=FALSE RENV_CONFIG_CACHE_ENABLED=FALSE R_LIBS_USER=/opt/research-library R_LIBS_SITE=/opt/research-library:/usr/local/lib/R/site-library:/usr/lib/R/site-library
+WORKDIR /opt/research-build
+COPY renv.lock ./renv.lock
+RUN mkdir -p /opt/research-library && Rscript --vanilla -e 'renv::restore(lockfile="renv.lock", library="/opt/research-library", prompt=FALSE)'
+RUN mkdir -p /opt/cmdstan && Rscript --vanilla -e 'cmdstanr::install_cmdstan(version="2.36.0", dir="/opt/cmdstan", cores=2, quiet=TRUE)'
+ENV CMDSTAN=/opt/cmdstan/cmdstan-2.36.0
+WORKDIR /workspace/project
+ENTRYPOINT []
+CMD ["bash"]
