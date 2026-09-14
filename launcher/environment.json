@@ -1,0 +1,5 @@
+{
+  "base_image": "localhost/r-binary-dev@sha256:5b41bb4b34c4ad59212859c042e3b5db997644d0b50f8acff264e4548dc1495c",
+  "R": "4.5.3",
+  "cmdstan": "2.36.0"
+}
