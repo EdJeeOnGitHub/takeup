@@ -2,6 +2,15 @@
 
 Backend: `quest-general` (account `p53238`). These presets are configured, not executed.
 
+## Repository-owned workflows
+
+Quest access is already registered independently of this branch. This draft is
+optional scaffolding: its named presets are examples, not a selected main analysis.
+The repository decides its entry point, environment, input contract and resource
+requests before adopting or replacing these presets. There is no default analysis
+and nothing runs automatically. Merging this branch is not required for Quest
+registration.
+
 ## Available experiments
 
 `environment-check` loads the required packages without fitting a model.
