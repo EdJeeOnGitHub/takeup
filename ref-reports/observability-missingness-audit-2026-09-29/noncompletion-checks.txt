@@ -1,0 +1,22 @@
+Survey records: 103 unique noncompleters: 98 
+# A tibble: 3 × 2
+  category                                          n
+  <chr>                                         <int>
+1 Incomplete status fields                         29
+2 Recorded non-consent                             23
+3 Unable to interview (no recorded non-consent)    46
+Overlap of non-consent and unable flags:
+# A tibble: 4 × 3
+  recorded_nonconsent recorded_unable     n
+  <lgl>               <lgl>           <int>
+1 FALSE               FALSE              29
+2 FALSE               TRUE               46
+3 TRUE                FALSE              20
+4 TRUE                TRUE                3
+Incomplete status combinations:
+# A tibble: 3 × 3
+  interview consent     n
+      <dbl>   <dbl> <int>
+1         1      NA    18
+2        NA       1    10
+3        NA      NA     1

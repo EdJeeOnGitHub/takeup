@@ -1,0 +1,17 @@
+{
+  "R/reduced-form/context.R": {
+    "sha256": "3aade6cd8fd1e8cf17c19631156c648c655d6d1ae3a316ccd3cd764e302c7681"
+  },
+  "R/reduced-form/functions.R": {
+    "sha256": "203c6092f639c82135b55f8857db12af7406e5ddd768c268ffa11f3002ee1298"
+  },
+  "scripts/checks/test-distance-spec.R": {
+    "sha256": "2f540e9f4d688c337e70ef8e5564512ea2ed2f047edea6b3a70737a03108b54a"
+  },
+  "data/cluster_expected_dist.csv": {
+    "sha256": "3047d17fee9652b90547049000f28162771482ea357b86bbd89ea0f0ff4a2008"
+  },
+  "temp-data/analysis-cluster-covariate-data.csv": {
+    "sha256": "9e5974481d74a1ff555ca4cede8f8ea8c5a0db39f13833fe101a4fabfe9ece97"
+  }
+}

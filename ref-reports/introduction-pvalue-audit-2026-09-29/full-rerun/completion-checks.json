@@ -1,0 +1,8 @@
+{
+  "affected_included_tables": 13,
+  "all_affected_table_baselines_reproduced": true,
+  "paired_bootstrap_outputs": 26,
+  "sample_size_cells_unchanged": 104,
+  "corrected_and_historical_sections_complete": true,
+  "manuscript_numerical_files_unchanged": true
+}

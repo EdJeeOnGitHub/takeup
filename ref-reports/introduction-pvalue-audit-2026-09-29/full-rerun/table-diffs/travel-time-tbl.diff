@@ -1,0 +1,11 @@
+--- manuscript/rf-tables/main-specs/travel-time-tbl.tex
++++ corrected/rf-tables/main-specs/travel-time-tbl.tex
+@@ -10,7 +10,7 @@
+ Fraction walked to treatment & 0.897 & 0.937 & 0.824\\
+ \addlinespace[0.3em]
+ \hline
+-\multicolumn{4}{l}{\textit{Travel time (minutes)}}\\
++\multicolumn{4}{l}{\textit{\textbf{Travel time (minutes)}}}\\
+ \hline
+ \hspace{1em}Mean & 23 & 19 & 32\\
+ \hspace{1em}Median & 20 & 15 & 30\\

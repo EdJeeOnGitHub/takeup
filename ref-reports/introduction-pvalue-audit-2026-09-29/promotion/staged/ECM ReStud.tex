@@ -1,0 +1,321 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{floatrow}
+\floatsetup[table]{capposition=top}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{bbm}
+\usepackage{rotating}
+\usepackage{pdflscape}
+\usepackage[margin=1in]{geometry}   \usepackage{adjustbox}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{color, colortbl}
+\usepackage[authoryear,sectionbib]{natbib}
+\usepackage{pdfpages}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{url}
+\usepackage{comment}
+\usepackage{subfiles}
+\usepackage{changepage}
+\usepackage{natbib}
+\bibliographystyle{unsrtnat}
+\setcitestyle{aysep={}}
+
+\usepackage{lscape}
+\usepackage{dsfont}
+\usepackage{titling}
+\usepackage{lipsum}
+\usepackage{placeins}
+\usepackage{chngcntr}
+\usepackage[colorinlistoftodos]{todonotes}
+
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,calc,fit,backgrounds}
+\usepackage{xcolor}
+\colorlet{analysisgreen}{green!15}
+\colorlet{monblue}{blue!10}
+\colorlet{issueorange}{orange!20}
+
+\usepackage{pdflscape}   % landscape pages
+\usepackage{adjustbox} % for max width/height scaling
+%\usepackage{lscape}
+\usepackage{csquotes}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=blue,      
+    urlcolor=blue,
+    citecolor=blue,    
+}
+\usepackage[noabbrev, capitalise, nameinlink ]{cleveref}
+
+\usepackage{graphicx}
+\usepackage{placeins}
+
+\newcommand\figref{Figure~\ref}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathmorphing}
+\usepackage{pgfplots}
+\definecolor{mygr}{HTML}{e0e0e0}
+\usetikzlibrary{decorations}
+\usetikzlibrary{positioning}
+\usetikzlibrary{arrows.meta}
+\usepackage{pgfkeys}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{lscape}
+\usepackage{rotating}
+\usepackage{epstopdf}
+\usepackage{amssymb}
+
+\setlength{\parskip}{0em}
+\setlength{\parindent}{1em}
+\usepackage{setspace}
+\usepackage[flushleft]{threeparttable}
+% \usepackage{newtxmath}
+\usepackage[multiple]{footmisc}
+
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{mathtools}
+
+\usepackage[en-IE]{datetime2}
+\DTMlangsetup[en-IE]{showdayofmonth=false}
+
+
+\DeclareCaptionFont{blue}{\color{red}}
+
+\newcommand{\startonlineappendix}{%
+  \section*{Online Appendix}
+  \setcounter{subsection}{0}
+
+  % Make appendix subsections A, B, C, ...
+  \renewcommand{\thesubsection}{\Alph{subsection}}
+
+  % Number figures/tables within appendix subsections
+  \counterwithin{figure}{subsection}
+  \counterwithin{table}{subsection}
+
+  % Print figure/table numbers as A1, A2, B1, ...
+  \renewcommand{\thefigure}{\Alph{subsection}\arabic{figure}}
+  \renewcommand{\thetable}{\Alph{subsection}\arabic{table}}
+
+  % Reset when entering appendix
+  \setcounter{figure}{0}
+  \setcounter{table}{0}
+}
+
+\newcommand{\foo}{\color{gray}\makebox[0pt]{\textbullet}\hskip-0.5pt\vrule width 1pt\hspace{\labelsep}}
+\newcommand{\prob}[1]{\operatorname{P}\left(#1\right)}
+\newtheorem{prediction}{Prediction}
+
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{matrix,calc}
+
+\makeatletter
+\newcommand{\thickhline}{%
+    \noalign {\ifnum 0=`}\fi \hrule height 1pt
+    \futurelet \reserved@a \@xhline
+}
+\newcolumntype{"}{@{\hskip\tabcolsep\vrule width 1pt\hskip\tabcolsep}}
+\makeatother
+
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric}
+
+\usepackage{booktabs,longtable,threeparttablex}
+
+\usetikzlibrary{arrows,decorations.pathmorphing,backgrounds,positioning,fit,petri,calc,shapes.geometric}
+
+\tikzset{
+  >=stealth',
+  county/.style={
+    ellipse,
+    draw=black, very thick,
+    fill=white,
+    text width=8.5em,
+    minimum height=2em,
+    text centered},
+  punkt/.style={
+    rectangle,
+    rounded corners,
+    draw=black, very thick,
+    fill=white,
+    text width=8.5em,
+    minimum height=2em,
+    text centered},
+  expgroup/.style 2 args={
+    rectangle,
+    rounded corners, 
+    draw=black!50, dashed,
+    fill=black!10,
+    fit=(#1) (#2)},
+  pil/.style={
+    <-,
+    thick,
+    shorten <=2pt,
+    shorten >=2pt},
+  greypil/.style={
+    <-,
+    draw=black, dotted,
+    shorten <=2pt,
+    shorten >=2pt},
+  triangle/.style={
+    regular polygon,
+    draw=black, very thick,
+    fill=white,
+    regular polygon sides=3
+  },
+  popcircle/.style={
+    circle,
+    fill=white,
+    draw=black, very thick
+  }
+}
+
+
+
+\setlist[itemize]{noitemsep, topsep=0pt}
+%\setlist[itemize]{topsep=0.1\baselineskip, itemsep=0.025\baselineskip}
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\def\sym#1{\ifmmode^{#1}\else\(^{#1}\)\fi}
+
+
+\author{Edward Jee\thanks{Jee: University of Chicago (edjee$@$uchicago.edu); Karing: University of Chicago (akaring$@$uchicago.edu); Naguib: AstraZeneca (karimn2.0$@$gmail.com)}
+  \and
+  Anne Karing 
+    \and
+  Karim Naguib}
+
+
+\title{\Large{The Social Multiplier of Access Costs: \\ Experimental Evidence from Community Deworming in Kenya}\thanks{We thank Ned Augenblick, Stefano DellaVigna, Rachel Glennerster, Edward Miguel, and seminar participants at Berkeley, Bocconi, Chicago, Georgetown, Harvard, MIT, NYU, Pompeu Fabra, Stanford and the NBER Summer Institute for their valuable comments and discussions. Arthur Baker provided outstanding research assistance in Kenya. The field experiment would not have been possible without the invaluable support and collaboration of the Ministry of Health of Kenya, Evidence Action, and REMIT. Funding was provided by the Children's Investment Fund Foundation. The experiment and data collection were approved by the UC Berkeley IRB and the Kenya Medical Research Institute.} } 
+
+\begin{document}
+  \maketitle
+
+  %Goal: make clear that this is not merely about introducing bracelets
+  %
+
+  \begin{abstract}
+  
+  Policies often raise take-up by lowering access costs. When an action is socially visible, a cost change shifts who participates and what participation signals. We study this feedback in a Kenyan deworming campaign in which treatment is free but costly to reach. The experiment cross-randomizes distance to treatment sites with observability of participation, using bracelets and ink marks as public signals. Distance lowers take-up and knowledge of peers' participation. Public signals raise observability and attenuate the distance gradient. A structural social image model decomposes the distance effect into a direct travel cost component and an endogenous image return component. The model separates two forces: distance can reduce visibility, but conditional on being observed, participation at longer distances signals stronger motivation. The estimated multiplier is 0.8–0.9 when signals sustain observability and 1.2–1.6 otherwise. In a site allocation exercise, the social multiplier accounts for most of the 25\% reduction in required treatment sites. \\
+
+\noindent Keywords: social image, social multiplier, signaling, observability, travel distance\\
+\noindent JEL codes: C93, D82, I12, I18, O12
+
+
+\end{abstract}
+
+
+
+
+
+
+\clearpage
+\onehalfspacing
+
+
+
+
+\section{Introduction}
+\label{intro}
+
+
+Governments frequently steer individual behavior by changing the costs of goods and services. Yet behavior is also shaped by concerns about social image. When actions are observable, a change in cost can affect behavior through two channels: directly, by altering private incentives, and indirectly, by altering social image payoffs. As the cost change shifts expected take-up, it also changes beliefs about the types of individuals who take the action—for example, about their underlying motivation. This feedback from equilibrium behavior to beliefs can attenuate or amplify the direct effect of the cost change, generating a social multiplier in the sense of \citet{Benabou_laws_2011}. 
+
+Whether such forces operate in real world settings, and with what magnitude, is an open empirical question with potential policy relevance. Consider a public health campaign that reduces access costs by bringing services closer to people. By shortening travel distances, the campaign increases take-up among individuals who would otherwise be deterred by the cost of reaching those services. At the same time, lowering access costs may alter what attendance signals. If observers view marginal attendees as less intrinsically motivated, attendance may come to signal less dedication, reducing its social image payoff. At the limit, when services are placed very nearby—for example, when a blood drive is held at one’s workplace—participation may become so common that abstention becomes the more salient signal and carries sharper stigma. In both cases, changes in distance shift participation and, in turn, the inferences observers draw from take-up.
+
+Motivated by these examples, this paper asks three questions: When participation is socially visible, do changes in distance generate social image multipliers in equilibrium? How large are these multipliers in practice? And what do they imply for where service delivery sites should be located?
+
+To answer these questions, we collaborate with the Government of Kenya on a community deworming program targeting 200{,}000 adults. Treatment is free and offered at centrally located sites. The setting is one in which participation carries clear social image content: in baseline vignettes, 95 percent of adults report that they would praise someone who participates, and 70 percent report that they would look down on someone who does not. Fewer than 2 percent believe that deworming is only for the sick.
+
+We use the program's geographic scope to implement a community level factorial design that cross-randomizes distance to the treatment site with the observability of participation. Distance provides a salient, common knowledge source of cost variation and, when participation is observable, can affect both who participates and what participation signals about motivation. We first use a randomized spatial selection procedure to select 144 communities at different distances from treatment, creating an average one-kilometer difference in travel distance between Close and Far communities. We classify communities as Close or Far using a prespecified 1.25 km cutoff applied to the realized distance from each community centroid to its treatment site.\footnote{Treatment sites are hosted at well known community locations, such as churches or mosques. The spatial selection procedure accommodates logistical constraints and limited Community Health Volunteer staffing, which restrict the number of treatment sites that can be opened.} Second, we vary the observability of participation by introducing two public signals: upon deworming, attendees receive either a colorful bracelet worn on the wrist or an indelible ink mark on the thumb. The bracelet is highly visible and novel in this setting, whereas the ink mark is familiar from voting. We also include a no-item Control arm and a wall calendar incentive arm. The calendar provides a tangible comparison item that can be retained or displayed at home but is less portable and less publicly tied to the recipient outside the home.
+
+The public signal treatments are central to identification. Distance shifts travel costs, but, in the absence of public signals, it may also affect how easily participation is observed: in nearby communities, residents are more likely to encounter peers at treatment sites or see them traveling to treatment. Distance variation alone therefore cannot isolate travel cost effects from social image effects. By varying public signals while holding distance fixed, the treatments generate variation in observability that helps disentangle these channels. Public signals could also increase take-up by reminding people about the campaign or by providing information about peers' take-up. To probe these alternative channels, we supplemented the main design with auxiliary SMS treatments among phone owners. Among the 3{,}022 enrolled recipients, 387 received campaign reminders only, while 2{,}635 received reminders that also reported cumulative local take-up as of the time of the message.
+
+We first document how distance and the public signal treatments affect observability. In the no-item Control arm, deworming is highly observable in Close communities: respondents report knowing 74 percent of peers' deworming status. Observability declines with distance: reported knowledge is 15 percentage points lower in Far than in Close Control communities (\(p=0.020\)), consistent with learning through direct encounters at treatment sites or seeing others en route to treatment. The wall calendar, which provides an item without a salient public signal, changes reported observability little relative to Control: the estimated effect is 3 percentage points in Close communities and 7 percentage points in Far communities, yielding a Far--Close difference of 4 percentage points (\(p=0.665\)). By contrast, the public signals largely offset the distance-related decline. In Far communities, relative to Control, bracelets raise knowledge of peers' status by 26 percentage points (\(p<0.001\)) and ink raises it by 17 percentage points (\(p=0.005\)), while in Close communities, the same signals raise observability by only 5--7 percentage points (\(p=0.185\)--\(0.324\)). The pooled public-signal effect also differs between Far and Close communities (\(p=0.008\)).
+
+We then examine take-up, measured for 9{,}805 study adults using direct monitoring at treatment sites. Three reduced-form findings emerge. First, in the no-item Control arm, estimated take-up is 16.5 percentage points lower in Far than in Close communities (\(p<0.001\)). The wall calendar leaves this distance gradient essentially unchanged: its Far--Close effect relative to Control is \(0.4\) percentage points (\(p=0.940\)). Survey beliefs track the Control pattern: respondents predict a 13 percentage point decline in deworming participation as distance increases (\(p=0.003\)). Second, bracelets increase take-up by 7.8 percentage points relative to Control (\(p=0.007\)). The wall calendar has an estimated average effect of 2.6 percentage points relative to Control (\(p=0.359\)), making the bracelet effect approximately 5 percentage points larger than the calendar effect (\(p=0.034\)). Ink has no detectable average effect on take-up (\(p=0.36\)).\footnote{In the estimated structural model, the ink mark has negative private value on average, consistent with disutility from being marked. Endline responses point to concerns about dirtiness, stickiness, and slow fading, so any signaling benefit may be offset by private disutility.} The auxiliary SMS comparisons provide no evidence that reminders or information about peers' take-up are stand-alone drivers of these patterns. Third, consistent with the observability results, the pooled effect of a public signal (bracelet or ink), relative to the two arms without public signals (Control and wall calendar), is 6.8 percentage points larger in Far than in Close communities (\(p=0.088\)).
+
+Two alternative explanations could generate stronger public signal effects in Far communities without any role for social image. First, if more individuals are near the participation margin in Far communities, then any additive incentive should have a larger effect there. The calendar arm provides a placebo test: its take-up effect is similar in Close and Far communities (\(p=0.940\)), while the Close--Far interaction appears only for the public signals. Second, the bracelet could have higher private value relative to the calendar for marginal adults in Far communities and therefore compensate for travel costs more effectively. We assess this using complementary endline preference measures. Respondents in all study arms chose between the bracelet and the calendar as a gift after completing the survey. In Control communities, we additionally elicited respondents' willingness to accept compensation to give up their preferred item for the other, yielding a measure of the monetary value gap between the bracelet and calendar. This relative valuation exercise indicates that, on average, the calendar is privately valued at least as highly as the bracelet. Among adults who did not deworm---our closest proxy for marginal participants---gift choices provide no evidence of a distance driven increase in the bracelet's private value relative to the calendar. Finally, we formalize a benchmark model in which incentives operate only through private utility and show that it cannot jointly rationalize the stronger Far effects of the public signals and the nearly flat distance pattern for the calendar.
+
+These reduced form patterns are consistent with a social image mechanism in which distance and public signals interact through observability and inference. Taken alone, however, they do not quantify the social multiplier. Distance changes travel costs directly, but it also changes the equilibrium social image return to participation by shifting the composition of participants and, absent public signals, how observable participation is. Quantifying the multiplier therefore requires recovering a counterfactual distance gradient: how strongly would take-up respond to distance if social image returns did not adjust with distance? We develop and estimate a structural model, building on \citet{Benabou_laws_2011}, in which individuals trade off private benefits net of travel costs against a social image payoff shaped by observability and belief updating. We define the social multiplier as the ratio, in absolute value, of the total distance effect on take-up to the direct travel cost effect that would obtain holding social image returns fixed. The multiplier is below one (mitigation) when the image return rises with distance and offsets part of the travel cost effect, and above one (amplification) when the image return falls with distance and reinforces it.
+
+Identification combines three ingredients. First, the calendar arm, together with endline relative valuation and gift choice measures, disciplines the relative private value of the bracelet versus the calendar, allowing us to bound how much of the take-up difference between the bracelet and calendar arms could be attributed to private rewards. Second, the cross-randomization of distance and public signals, together with survey reports of knowledge of peers' deworming status, disciplines how observable participation is in each arm and how observability changes with distance. Third, the distance-by-observability gradients in take-up, combined with the first two ingredients, discipline the model's estimate of the social image return to being observed as having dewormed and the implied social multiplier.
+
+The structural model matches the reduced form evidence and decomposes the distance gradient into a direct travel cost effect and an endogenous social image component. With public signals that keep participation highly observable as distance rises, the estimated multiplier lies between 0.8 and 0.9, implying mitigation. When observability instead declines with distance, the multiplier lies between 1.2 and 1.6, implying amplification. Decomposing the multiplier shows that belief updating about participants' motivation is quantitatively important even holding observability fixed. Under the Ink signal, mitigation is driven primarily by the fact that participation at greater distances signals stronger motivation. Under the Bracelet signal, it reflects both stronger inference and sustained observability as distance increases. In the Control and Calendar arms, greater distance also makes participation a stronger signal of motivation, but the decline in observability more than offsets this force, producing amplification.
+
+Mitigation under public signals persists across a range of alternative structural specifications, while amplification without public signals is more sensitive to assumptions about information and observability.
+
+The estimated multipliers matter for spatial policy design. In the final part of the paper, we embed the estimated model in a site allocation problem using geographic data on the 144 study communities and 1{,}451 feasible treatment sites. The siting problem is relevant beyond this campaign because many preventive health programs rely on temporary or outreach sites whose locations must be chosen by implementing agencies. We compare the model implied number of sites needed to reach a fixed deworming coverage target with the number chosen by a benchmark planner who calibrates the social image component of demand at short distances and holds it fixed as distance changes. When observability declines with distance, accounting for the multiplier increases the required number of sites from 91 to 102. When public signals sustain high observability, accounting for the multiplier reduces the required number of sites from 84 to 77. Thus, the same coverage target requires 102 sites when observability declines with distance, compared with 77 sites when public signals sustain observability, a reduction of 25 sites, or approximately 25 percent. By comparison, if social image returns were treated as distance invariant, the reduction would be only 7 sites. The additional 18 saved sites reflect the social multiplier: the way distance changes the reputational value of being seen to participate.
+
+Although these magnitudes are context specific, they illustrate a broader point: policies that change access costs or observability can affect not only take-up levels but also the equilibrium feedback that determines whether cost changes are amplified or attenuated. 
+
+Our paper makes three contributions. First, to the best of our knowledge, we provide the first field-experimental estimate of a social multiplier generated by social-image concerns, and quantify its magnitude in our context. Existing field experiments show that social-image incentives can affect behavior at a given margin, but typically do not trace how a policy-induced change in costs shifts participation and feeds back into the social-image payoff itself \citep{bursztyn_social_2017,bursztyn_status_2018,chandrasekhar_social_2018,dellavigna_voting_2017,karing,breza19}. By cross-randomizing travel distance with public signals of participation, we study this equilibrium feedback for a policy-relevant cost margin. Our study is most closely related to \citet{karing}, who shows that attaching public signals to a more effortful childhood vaccination increases timely completion. Our key distinction is that we hold the preventive action fixed and vary distance, allowing us to trace how incremental cost changes shift both participation and what participation implies about motivation---the feedback captured by the social multiplier.
+
+This contribution rests on three features of our design and data: (i) we combine experimentally induced variation in travel distance with randomized public signals for the same preventive action, generating exogenous variation in private costs and observability; (ii) we collect survey based measures of observability, beliefs, and relative private valuations of the incentives to discipline the roles of observability and private rewards; and (iii) we use the experimental variation and auxiliary measures to estimate a structural social image model that recovers the multiplier. Related observational work studies how social norms shape responses to taxes, transfers, and regulation \citep{jia2019individual,besley2023norms,bobonis2025norms}, but typically cannot disentangle material incentives, observability, and beliefs without strong assumptions. Our design helps separate these forces in a field setting.
+
+Second, we contribute to work on contextual factors that shape social image incentives and public good provision \citep{kessler_announcements_2017,perez-truglia_partisan_2017,karing}. We complement \citet{ariely2009}, who show that image concerns interact with monetary incentives, by studying a non-monetary cost---distance. Distance changes access costs and the composition of participants without itself introducing a monetary reward, so changes in image payoffs arise from inference about who participates rather than from financial motives. More broadly, governments often choose where to locate services rather than whether to pay people for participation. Our setting therefore highlights a policy relevant margin through which social image incentives can vary.
+
+Third, we connect micro-level estimates of social image incentives to a concrete problem of spatial policy design, contributing to a growing literature that combines field experiments with structural modeling to inform counterfactual policy choices \citep{ToddWolpin,KaboskiTownsend,DufloHannaRyan,LagakosMobarakWaugh}. We embed the estimated social image model in a site allocation problem, combining it with geocoded data on 144 communities and 1{,}451 feasible sites to choose the minimum number and placement of treatment sites needed to reach a coverage target. This exercise shows how a planner who treats the social image component of demand as invariant to distance can misjudge both how many sites are needed and where they should be located. More broadly, the framework illustrates how micro estimates of social image incentives can inform facility location decisions, and shows that different drivers of low take-up at longer distances---high travel costs versus low observability---have different implications for where and how many sites to open.
+
+The remainder of the paper proceeds as follows. Section~\ref{setting} describes the empirical setting. Section~\ref{design} details the experimental design, and Section~\ref{reduced-form-results} reports reduced form results. Section~\ref{model} develops the theoretical framework and derives predictions, and Section~\ref{structural} estimates the model. Section~\ref{allocation} uses the estimates to solve a planner's siting problem, and Section~\ref{conclusion} concludes.
+
+\section{The Setting}
+\label{setting}
+\subfile{setting}
+\section{Experimental Design}
+\label{design}
+\subfile{experimental-design}
+\section{Theoretical Framework}
+\label{model}
+\subfile{theory}
+\section{Structural Estimates}
+\label{structural}
+\subfile{structural-model-rewrite}
+% structural-model.tex is retained for internal reference and revision.
+
+
+\section{Spatial Allocation with a Social Multiplier}
+\label{allocation}
+\subfile{optimal-policy-rewrite}
+% optimal-policy.tex is retained for internal reference and revision.
+\section{Conclusion}
+\label{conclusion}
+\subfile{conclusion}
+\bibliography{references}
+
+% \newpage 
+\clearpage
+\appendix
+\subfile{online-appendix}
+\end{document}

@@ -1,0 +1,113 @@
+model,arm,group,quantity,paper,reconstructed,match
+takeup,bracelet,combined,estimate,0.075,0.075,True
+takeup,bracelet,combined,std_error,0.029,0.029,True
+takeup,bracelet,close,estimate,0.042,0.042,True
+takeup,bracelet,close,std_error,0.037,0.037,True
+takeup,bracelet,far,estimate,0.117,0.117,True
+takeup,bracelet,far,std_error,0.047,0.047,True
+takeup,bracelet,far - close,estimate,0.075,0.075,True
+takeup,bracelet,far - close,std_error,0.061,0.061,True
+takeup,calendar,combined,estimate,0.027,0.027,True
+takeup,calendar,combined,std_error,0.028,0.028,True
+takeup,calendar,close,estimate,0.028,0.028,True
+takeup,calendar,close,std_error,0.038,0.038,True
+takeup,calendar,far,estimate,0.025,0.025,True
+takeup,calendar,far,std_error,0.041,0.041,True
+takeup,calendar,far - close,estimate,-0.003,-0.003,True
+takeup,calendar,far - close,std_error,0.056,0.056,True
+takeup,ink,combined,estimate,-0.03,-0.03,True
+takeup,ink,combined,std_error,0.032,0.032,True
+takeup,ink,close,estimate,-0.055,-0.055,True
+takeup,ink,close,std_error,0.037,0.037,True
+takeup,ink,far,estimate,0.002,0.002,True
+takeup,ink,far,std_error,0.052,0.052,True
+takeup,ink,far - close,estimate,0.057,0.057,True
+takeup,ink,far - close,std_error,0.063,0.063,True
+takeup,control,combined,estimate,0.338,0.338,True
+takeup,control,combined,std_error,0.023,0.023,True
+takeup,control,close,estimate,0.41,0.41,True
+takeup,control,close,std_error,0.027,0.027,True
+takeup,control,far,estimate,0.248,0.248,True
+takeup,control,far,std_error,0.038,0.038,True
+takeup,control,far - close,estimate,-0.162,-0.162,True
+takeup,control,far - close,std_error,0.046,0.046,True
+takeup,signal,combined,pval,0.632,0.632,True
+takeup,signal,close,pval,0.384,0.384,True
+takeup,signal,far,pval,0.13,0.13,True
+takeup,signal,far - close,pval,0.083,0.083,True
+takeup,bracelet - calendar,combined,pval,0.048,0.048,True
+takeup,bracelet - calendar,close,pval,0.708,0.708,True
+takeup,bracelet - calendar,far,pval,0.004,0.004,True
+takeup,bracelet - calendar,far - close,pval,0.101,0.101,True
+observability,bracelet,combined,estimate,0.144,0.144,True
+observability,bracelet,combined,std_error,0.038,0.038,True
+observability,bracelet,close,estimate,0.064,0.064,True
+observability,bracelet,close,std_error,0.05,0.05,True
+observability,bracelet,far,estimate,0.248,0.248,True
+observability,bracelet,far,std_error,0.056,0.056,True
+observability,bracelet,far - close,estimate,0.184,0.184,True
+observability,bracelet,far - close,std_error,0.073,0.073,True
+observability,calendar,combined,estimate,0.043,0.043,True
+observability,calendar,combined,std_error,0.042,0.042,True
+observability,calendar,close,estimate,0.027,0.027,True
+observability,calendar,close,std_error,0.059,0.059,True
+observability,calendar,far,estimate,0.063,0.063,True
+observability,calendar,far,std_error,0.063,0.063,True
+observability,calendar,far - close,estimate,0.036,0.036,True
+observability,calendar,far - close,std_error,0.088,0.088,True
+observability,ink,combined,estimate,0.103,0.103,True
+observability,ink,combined,std_error,0.04,0.04,True
+observability,ink,close,estimate,0.052,0.052,True
+observability,ink,close,std_error,0.054,0.054,True
+observability,ink,far,estimate,0.169,0.169,True
+observability,ink,far,std_error,0.058,0.058,True
+observability,ink,far - close,estimate,0.117,0.117,True
+observability,ink,far - close,std_error,0.079,0.079,True
+observability,control,combined,estimate,0.681,0.681,True
+observability,control,combined,std_error,0.033,0.033,True
+observability,control,close,estimate,0.745,0.745,True
+observability,control,close,std_error,0.043,0.043,True
+observability,control,far,estimate,0.599,0.599,True
+observability,control,far,std_error,0.049,0.049,True
+observability,control,far - close,estimate,-0.146,-0.146,True
+observability,control,far - close,std_error,0.064,0.064,True
+observability,signal,combined,pval,<0.001,$<$0.001,True
+observability,signal,close,pval,0.213,0.213,True
+observability,signal,far,pval,<0.001,$<$0.001,True
+observability,signal,far - close,pval,0.009,0.009,True
+observability,bracelet - calendar,combined,pval,0.001,0.001,True
+observability,bracelet - calendar,close,pval,0.414,0.414,True
+observability,bracelet - calendar,far,pval,<0.001,$<$0.001,True
+observability,bracelet - calendar,far - close,pval,0.029,0.029,True
+predicted,bracelet,combined,estimate,0.106,0.106,True
+predicted,bracelet,combined,std_error,0.023,0.023,True
+predicted,bracelet,close,estimate,0.067,0.067,True
+predicted,bracelet,close,std_error,0.025,0.025,True
+predicted,bracelet,far,estimate,0.154,0.154,True
+predicted,bracelet,far,std_error,0.043,0.043,True
+predicted,bracelet,far - close,estimate,0.088,0.088,True
+predicted,bracelet,far - close,std_error,0.05,0.05,True
+predicted,calendar,combined,estimate,0.059,0.059,True
+predicted,calendar,combined,std_error,0.024,0.024,True
+predicted,calendar,close,estimate,0.029,0.029,True
+predicted,calendar,close,std_error,0.028,0.028,True
+predicted,calendar,far,estimate,0.097,0.097,True
+predicted,calendar,far,std_error,0.04,0.04,True
+predicted,calendar,far - close,estimate,0.069,0.069,True
+predicted,calendar,far - close,std_error,0.049,0.049,True
+predicted,ink,combined,estimate,0.028,0.028,True
+predicted,ink,combined,std_error,0.024,0.024,True
+predicted,ink,close,estimate,0.013,0.013,True
+predicted,ink,close,std_error,0.025,0.025,True
+predicted,ink,far,estimate,0.047,0.047,True
+predicted,ink,far,std_error,0.044,0.044,True
+predicted,ink,far - close,estimate,0.034,0.034,True
+predicted,ink,far - close,std_error,0.05,0.05,True
+predicted,control,combined,estimate,0.559,0.559,True
+predicted,control,combined,std_error,0.02,0.02,True
+predicted,control,close,estimate,0.614,0.614,True
+predicted,control,close,std_error,0.019,0.019,True
+predicted,control,far,estimate,0.49,0.49,True
+predicted,control,far,std_error,0.039,0.039,True
+predicted,control,far - close,estimate,-0.124,-0.124,True
+predicted,control,far - close,std_error,0.043,0.043,True

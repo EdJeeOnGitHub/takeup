@@ -1,0 +1,58 @@
+{
+  "ECM ReStud.tex": [
+    [
+      "(\\(p=0.056\\))",
+      "(\\(p=0.023\\))"
+    ],
+    [
+      "yielding a Far--Close difference of 4 percentage points (\\(p=\\))",
+      "yielding a Far--Close difference of 4 percentage points (\\(p=0.679\\))"
+    ],
+    [
+      "(\\(p=0.007\\))",
+      "(\\(p=0.004\\))"
+    ],
+    [
+      "(\\(p=0.357\\)--\\(0.644\\))",
+      "(\\(p=0.196\\)--\\(0.341\\))"
+    ],
+    [
+      "\\(-0.3\\) percentage points (\\(p=\\))",
+      "\\(-0.2\\) percentage points (\\(p=0.978\\))"
+    ],
+    [
+      "bracelets increase take-up by 7.5 percentage points",
+      "bracelets increase take-up by 7.6 percentage points"
+    ],
+    [
+      "average effect of 2.7 percentage points relative to Control (\\(p=\\))",
+      "average effect of 2.7 percentage points relative to Control (\\(p=0.334\\))"
+    ],
+    [
+      "(\\(p=0.048\\))",
+      "(\\(p=0.046\\))"
+    ],
+    [
+      "(\\(p=0.959\\))",
+      "(\\(p=0.978\\))"
+    ]
+  ],
+  "experimental-design.tex": [
+    [
+      "16.2 percentage point Control",
+      "16.3 percentage point Control"
+    ],
+    [
+      "decline of 16.2 percentage points",
+      "decline of 16.3 percentage points"
+    ],
+    [
+      "Bracelets raise reported knowledge by 14.4 percentage points overall",
+      "Bracelets raise reported knowledge by 14.5 percentage points overall"
+    ],
+    [
+      "Bracelets increase take-up by 7.5 percentage points relative to Control (\\(p<0.05\\)) and by 4.8 percentage points relative to Calendar (\\(p=0.048\\))",
+      "Bracelets increase take-up by 7.6 percentage points relative to Control (\\(p<0.05\\)) and by 4.9 percentage points relative to Calendar (\\(p=0.046\\))"
+    ]
+  ]
+}

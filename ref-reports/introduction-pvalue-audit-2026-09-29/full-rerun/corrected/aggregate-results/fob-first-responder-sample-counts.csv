@@ -1,0 +1,17 @@
+assigned_treatment,assigned_dist_group,is_backup,is_first_responder,n
+control,close,FALSE,TRUE,114
+control,close,TRUE,FALSE,6
+control,far,FALSE,TRUE,86
+control,far,TRUE,FALSE,6
+ink,close,FALSE,TRUE,174
+ink,close,TRUE,FALSE,10
+ink,far,FALSE,TRUE,106
+ink,far,TRUE,FALSE,9
+calendar,close,FALSE,TRUE,145
+calendar,close,TRUE,FALSE,9
+calendar,far,FALSE,TRUE,134
+calendar,far,TRUE,FALSE,6
+bracelet,close,FALSE,TRUE,177
+bracelet,close,TRUE,FALSE,6
+bracelet,far,FALSE,TRUE,146
+bracelet,far,TRUE,FALSE,7

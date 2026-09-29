@@ -1,0 +1,18 @@
+--- rf-tables/main-specs/rf_discrete_fob_no_covs_no_mu_d_spec_tbl.tex
++++ rf-tables/main-specs/rf_discrete_fob_no_covs_no_mu_d_spec_tbl.tex
+@@ -12,12 +12,12 @@
+ \midrule
+ Bracelet & \makecell[c]{0.143***\\{(0.038)}} & \makecell[c]{0.063\\{(0.048)}} & \makecell[c]{0.246***\\{(0.057)}} & \makecell[c]{0.183**\\{(0.073)}}\\
+ Calendar & \makecell[c]{0.04\\{(0.043)}} & \makecell[c]{0.02\\{(0.058)}} & \makecell[c]{0.066\\{(0.063)}} & \makecell[c]{0.046\\{(0.087)}}\\
+-Ink & \makecell[c]{0.1**\\{(0.04)}} & \makecell[c]{0.045\\{(0.053)}} & \makecell[c]{0.169**\\{(0.059)}} & \makecell[c]{0.124\\{(0.078)}}\\
++Ink & \makecell[c]{0.1**\\{(0.04)}} & \makecell[c]{0.045\\{(0.053)}} & \makecell[c]{0.169***\\{(0.059)}} & \makecell[c]{0.124\\{(0.078)}}\\
+ \midrule
+ Control & \makecell[c]{0.683\\{(0.032)}} & \makecell[c]{0.749\\{(0.041)}} & \makecell[c]{0.598\\{(0.05)}} & \makecell[c]{-0.15**\\{(0.063)}}\\
+ Observations & 1,141 & 1,141 & 1,141 & 1,141\\
+-$H0$: Any Signal = No Signal, $p$-value & <0.001 & 0.221 & <0.001 & 0.01\\
+-$H0$: Bracelet = Calendar, $p$-value & 0.001 & 0.352 & <0.001 & 0.043\\
++$H0$: Any Signal = No Signal, $p$-value & $<$0.001 & 0.221 & $<$0.001 & 0.01\\
++$H0$: Bracelet = Calendar, $p$-value & 0.001 & 0.352 & $<$0.001 & 0.043\\
+ \bottomrule
+ \end{tabular}}
+ 

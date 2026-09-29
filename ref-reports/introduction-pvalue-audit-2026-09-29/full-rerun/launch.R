@@ -1,0 +1,5 @@
+.libPaths(c(.libPaths(), '/home/ed/R/x86_64-pc-linux-gnu-library/4.5'))
+Sys.setenv(TAKEUP_THREADS=1,OPENBLAS_NUM_THREADS=1,TZ='UTC')
+options(dplyr.summarise.inform=FALSE)
+fixest::setFixest_nthreads(1)
+source(Sys.getenv('TAKEUP_AUDIT_SCRIPT', 'scripts/reduced-form/bootstrap.R'))

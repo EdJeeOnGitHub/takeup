@@ -1,0 +1,107 @@
+[
+  {
+    "source": "experimental-design.tex",
+    "line": 242,
+    "table": "rf-tables/main-specs/rf_discrete_fob_spec_tbl.tex"
+  },
+  {
+    "source": "experimental-design.tex",
+    "line": 281,
+    "table": "rf-tables/main-specs/rf_discrete_dist_covs_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 245,
+    "table": "rf-tables/main-specs/paper_main_analysis_sample_attrition_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 265,
+    "table": "rf-tables/main-specs/paper_simulated_table_A_attrition_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 309,
+    "table": "rf-tables/main-specs/fob_lee_bounds_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 342,
+    "table": "rf-tables/main-specs/incentive-check-tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 355,
+    "table": "rf-tables/praise-stigma-by-externality-knowledge.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 371,
+    "table": "rf-tables/main-specs/travel-time-tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 413,
+    "table": "rf-tables/main-specs/rf_cts_fob_spec_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 427,
+    "table": "rf-tables/main-specs/rf_discrete_fob_no_covs_no_mu_d_spec_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 458,
+    "table": "rf-tables/main-specs/rf_discrete_belief_decomposition_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 473,
+    "table": "rf-tables/main-specs/rf_discrete_sob_spec_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 487,
+    "table": "rf-tables/main-specs/predicted_endline_deworm_takeup_spec_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 502,
+    "table": "rf-tables/main-specs/rf_dist_cts_spec_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 517,
+    "table": "rf-tables/main-specs/rf_discrete_dist_no_covs_no_mu_d_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 551,
+    "table": "rf-tables/het-tes.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 566,
+    "table": "rf-tables/main-specs/incentive-control-sms-te.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 579,
+    "table": "rf-tables/main-specs/rf_externality_knowledge_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 609,
+    "table": "rf-tables/main-specs/preference_for_bracelet_abs_diff_spec_tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 1010,
+    "table": "rf-tables/main-specs/bracelet-distance-display-tbl.tex"
+  },
+  {
+    "source": "online-appendix.tex",
+    "line": 1029,
+    "table": "rf-tables/main-specs/incentive-drawback-tbl.tex"
+  }
+]

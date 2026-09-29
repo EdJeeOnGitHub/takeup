@@ -1,0 +1,5 @@
+R version 4.6.1 (2026-06-24) 
+dplyr 1.2.1 
+fixest 0.13.2 
+kableExtra 1.4.0 
+readr 2.2.0 

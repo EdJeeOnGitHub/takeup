@@ -1,0 +1,7 @@
+table,model,arm,group,baseline,before_estimate,after_estimate,before_p,after_p,threshold_changes
+rf_externality_knowledge_tbl.tex,externality-knowledge-tidy-tes.csv,signal,combined,100-draw reconstruction,0.05008069298641987,0.0478080310513197,0.04512188087426256,0.061352704898643154,5%: loses
+predicted_endline_deworm_takeup_spec_tbl.tex,predicted-endline-deworm-takeup-tidy-tes.csv,bracelet,close,100-draw reconstruction,0.06660503384990646,0.06507748202533026,0.008058074822499286,0.013192722704306199,1%: loses
+rf_discrete_fob_spec_tbl.tex,reducedform-discrete-fob-tidy-tes.csv,bracelet,far - close,100-draw reconstruction,0.18372034219414446,0.19012993577618842,0.011905137492947937,0.008844544096908564,1%: gains
+rf_discrete_belief_decomposition_tbl.tex,reducedform-discrete-pct-yesno-tidy-tes.csv,calendar,far,100-draw reconstruction,-0.07802586188363825,-0.08075801381054071,0.1077399746116561,0.09813701134444555,10%: gains
+rf_discrete_belief_decomposition_tbl.tex,reducedform-discrete-pct-yesnodk-tidy-tes.csv,ink,far - close,100-draw reconstruction,0.12426795003946428,0.11767921610863263,0.04546277122197195,0.057955869038350705,5%: loses
+rf_dist_cts_spec_tbl.tex,reducedform-dist-cts-tidy-tes.csv,ink,far - close,100-draw reconstruction,0.07599946242447497,0.08124264276566376,0.06682663289829474,0.04696660212987841,5%: gains

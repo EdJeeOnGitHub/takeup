@@ -1,0 +1,27 @@
+Clean endline respondents: 3678 
+               module_record
+SMS             FALSE TRUE
+  reminder.only    11  152
+  sms.control     252 2407
+  social.info     116  740
+            module_record
+module_type  FALSE TRUE <NA>
+  individual     0 1647    0
+  paired         0 1652    0
+  <NA>         379    0    0
+No-SMS module types:
+
+table.A table.B    <NA> 
+   1204    1203     252 
+No-SMS A with record: 1204 with positive recognition: 1141 
+All knowledge summary records:
+
+table.A table.B 
+   1784    1812 
+Records matched to clean endline:
+         
+          FALSE TRUE
+  table.A   137 1647
+  table.B   160 1652
+Completed raw submissions linked to final no-SMS IDs: 2751 
+Of these, raw submissions without knowledge records: 254 unique individuals: 252 

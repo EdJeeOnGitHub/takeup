@@ -893,14 +893,15 @@ prep_tbl = function(tes, stat = "ci", stars = FALSE) {
 
 
     tbl =  tes %>%
-        select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, pval, oneside_pval, show_pval_only, n_obs_line)  %>%
+        mutate(p_for_stars = 2 * pnorm(-abs(estimate) / std_error)) %>%
+        select(assigned_treatment, assigned_dist_group, estimate, conf.low, conf.high, val, pval, p_for_stars, oneside_pval, show_pval_only, n_obs_line)  %>%
         mutate(
           show_stars = 
             ((assigned_treatment %in% c("bracelet", "calendar", "ink")) | assigned_dist_group == "far - close") & stars == TRUE,
           stars = case_when(
-            pval < 0.001 ~ "***",
-            pval < 0.05 ~ "**",
-            pval < 0.1 ~ "*",
+            p_for_stars < 0.01 ~ "***",
+            p_for_stars < 0.05 ~ "**",
+            p_for_stars < 0.1 ~ "*",
             TRUE ~ ""
           )
         ) %>%

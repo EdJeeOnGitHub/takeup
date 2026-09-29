@@ -1,0 +1,388 @@
+\documentclass[ECM\space ReStud.tex]{subfiles}
+
+\begin{document}
+
+We implement a community-cluster factorial design, stratified by county. An implemented cluster consists of one point of treatment (PoT) and one targeted community drawn from the PoT's catchment. At the cluster level, we cross-randomize two dimensions: the targeted community's distance to its assigned PoT and the item or signal provided upon deworming. The distance assignment generates variation in travel distance, a salient component of access costs. The item/signal assignment includes two public signals, which increase the observability of participation, and two comparison arms, which help separate signaling effects from generic gift effects. Within clusters, we also implement an auxiliary SMS intervention: we randomly sample phone-owning adults for recruitment into reminder and social information messages, and enrolled adults receive texts either reminding them about the campaign or reminding them and reporting current local take-up. The cluster-level cross-randomization tests whether distance effects differ when participation is more observable, while the individual-level SMS intervention probes reminder and social information channels among enrolled recipients. Figure~\ref{fig:design-schematic} summarizes the design and randomization hierarchy.
+
+\begin{figure}[H]
+\centering
+    \resizebox{0.86\textwidth}{!}{%}
+\input{figures/tikz/distance-algorithm}
+}
+\caption{Experimental Design and Assignment Sequence}
+\label{fig:design-schematic}
+\label{fig:design-schematic-algorithm}
+\floatfoot{\textit{Notes:} The distance randomization algorithm generates community-to-PoT distance, which is classified as Close or Far using the prespecified 1.25 km cutoff. Item/signal arms are subsequently randomized within county $\times$ distance strata. Triangles denote cluster-level units. Dashed arrows below the clusters denote the auxiliary individual-level SMS assignments.}
+\end{figure}
+% The previous schematic is retained in experimental-design-old.tex.
+
+
+
+\subsection{Distance Randomization}\label{sec:distance-treatment}
+
+% Main takeaway
+We use a prespecified spatial randomization procedure to select study communities at different distances from their treatment sites, generating variation in the cost of accessing treatment. We classify communities as Close or Far by applying the prespecified 1.25 km cutoff to realized community-centroid-to-PoT distance. The design generates a substantial difference in access costs: Far communities are on average 1.02~km farther from treatment, and median walking time increases from approximately 15 to 30 minutes
+(Table~\ref{tab:dist-travel-treatment}).\footnote{Ninety percent of adults
+report walking to the PoT, while most others travel by bicycle.} We use this variation in distance as an experimentally induced change in the private cost of obtaining treatment.
+
+% Overview of the algorithm BEFORE we see actual locations
+The spatial design, described fully in Appendix~\ref{sec:site-selection}, generates exogenous variation in several stages. Starting from 1,451 school-based candidate PoTs, the procedure randomly selects candidate locations subject to  catchment and separation restrictions chosen to prevent spillovers. Because community boundaries and centroids are not geocoded before fieldwork, schools serve as geographic anchors for targeting field listing toward either the inner band (0--1.25~km) or the outer band (1.25--2.5~km) of each catchment. An eligible inner- or outer-band anchor is then selected at random, and enumerators list nearby communities, from which an eligible target community is randomly selected.\footnote{Anchor-selection probabilities are calibrated to yield approximately equal numbers of inner- and outer-band anchor targets. Because the anchor location only proxies for the location of the subsequently selected community, the community's realized Close/Far classification need not coincide with the targeted anchor band.}
+
+% Algorithm once we see distances.
+We measure each community’s distance to treatment from the centroid of censused households to the finalized PoT. We classify communities within 1.25 km as Close and those farther away as Far, using the cutoff specified in the design. We use the resulting Close/Far measure in our reduced-form analysis and continuous centroid-to-PoT distance when modeling the private cost of access directly. In the implemented sample, this classification yields 80 Close and 64 Far communities.\footnote{This imbalance is not statistically unusual relative to an equal-allocation benchmark; the two-sided exact binomial p-value is 0.211.} Figure~\ref{fig:distance} shows the resulting distribution of community-centroid-to-PoT distances.
+
+%THIS
+
+% % Discussion of randomization
+% Because the design randomizes spatial reference points rather than directly assigning each community a realized distance, local geography could cause some communities to face systematically shorter or longer feasible distances under the assignment mechanism. This concern is closely related to \citet{thorntonDemandImpactLearning2008}, who controls for simulated expected distance when estimating the effect of distance to randomly located HIV-results centers. Following the general framework of \citet{borusyak2023nonrandom}, we re-run the full selection algorithm 500 times to characterize each community’s exposure to potential distances under counterfactual re-draws.
+
+
+% OR THIS
+Because PoTs are selected using a geographically constrained procedure, the induced selection mechanism could in principle depend on local geography, such as school density. Following \citet{thorntonDemandImpactLearning2008} and \citet{borusyak2023nonrandom}, we re-run the full selection algorithm 500 times to assess whether Close and Far communities in the realized experiment had similar potential distance distributions under counterfactual re-draws. These simulations condition on the realized surveyed communities and reproduce the PoT selection, targeted-community pairing, Close/Far classification, and feasibility restrictions used in the experiment. For each simulated draw, each realized community is assigned the distance it would have had under the simulated feasible PoT-community pairing. The resulting potential distance distributions are statistically indistinguishable across the realized Close and Far groups (Figure~\ref{fig:bh-dens-plot}). We further verify that realized centroid-to-PoT distance is uncorrelated with baseline covariates (Figure~\ref{fig:ri-baseline}). Together, these checks support treating variation in realized centroid-to-PoT distance as induced by the spatial randomization procedure rather than by systematic differences across communities.
+
+% Previous distance-design text is retained in experimental-design-old.tex.
+
+\subsection{Item and Public Signal Treatments}
+
+We cross-randomize, at the cluster level, the item or signal provided upon deworming: two publicly visible signals (a bracelet and indelible ink), an active comparison item with limited scope for public display (a wall calendar), and a no-item control.\footnote{We piloted the items to choose acceptable colors and a comparison item that was small, useful, and easy to implement. The color green was selected for both bracelets and ink because it avoided association with political parties and was favored during piloting.}
+CHVs distributed the assigned item or signal only to adults who dewormed at the PoT, so receipt of the item could credibly indicate participation.  Within each county $\times$ distance stratum, clusters were randomly assigned to one of four item/signal arms:
+
+\begin{itemize}
+\item \textbf{Bracelet (39 clusters; Close 21, Far 18).}
+  Adults received a green silicone bracelet reading ``Treat worms---improve the health of your community'' (Figure~\ref{fig:bracelet}).
+
+\item \textbf{Ink (36 clusters; Close 21, Far 15).}
+  Adults received a green indelible ink mark on the thumb, similar to ink used during voting.\footnote{Our implementing partner was interested in ink because of its near zero unit cost, while bracelets cost approximately US\$0.20 each.}
+
+\item \textbf{Calendar (35 clusters; Close 19, Far 16).}
+  Adults received a simple wall calendar containing no deworming message (Figure~\ref{fig:calendar}).\footnote{Wall calendars are popular decorative items in Kenya and cost approximately US\$0.50 each.}
+
+\item \textbf{Control (34 clusters; Close 19, Far 15).}
+  No item was given upon deworming.
+\end{itemize}
+
+The Bracelet and Ink arms are designed to increase observability: how easily peers can learn about others' participation. The Calendar arm provides an active comparison item that delivers a tangible private reward and a personal reminder of participation, but is less portable and less publicly tied to the recipient outside the home. Comparing Bracelet to Calendar therefore helps distinguish the incremental effect of public observability from generic gift effects. At endline, we also measure the relative private value of the bracelet and calendar. Respondents in Control clusters chose between the two items as a gift after completing the survey. We then elicited their willingness to accept compensation to give up their preferred item for the other, yielding a measure of the monetary value gap between the bracelet and calendar.
+
+
+\begin{comment}
+    Address general feedback comment Disentangling observability from general messaging content
+
+    The Bracelet and Ink arms are designed to increase observability: how easily peers can learn about others' participation. They are public signals tied to participation rather than pure manipulations of physical visibility. The bracelet includes printed deworming text, while the ink arm uses a visible, text-free thumb mark similar to marks used in voting. The Calendar arm provides an active comparison item that delivers a tangible private reward and a personal reminder of participation, but is less portable and less publicly tied to the recipient outside the home. Comparing Bracelet to Calendar therefore helps distinguish the incremental effect of a portable public signal from generic gift effects. At endline, we also measure the relative private value of the bracelet and calendar. Respondents in Control clusters chose between the two items as a gift after completing the survey. We then elicited their willingness to accept compensation to give up their preferred item for the other, yielding a measure of the monetary value gap between the bracelet and calendar.
+\end{comment}
+
+\subsubsection{Reminder and Social Information Treatments}
+
+Because public signals could also affect behavior by reminding people about the campaign or by conveying information about peers' take-up, we implemented auxiliary SMS treatments among phone owners. Phone ownership is common in our study area: 75\% of adults own a phone (Table~\ref{tab:stacked-sample-balance-table}). Using the household census, we randomly selected phone-owning adults for SMS recruitment. In Control clusters, separate adults were selected for Reminder Only and Social Information. In clusters assigned to Bracelet, Ink, or Calendar, adults were selected for Social Information only. Reminder Only was included in Control clusters to benchmark the effect of a campaign reminder in the absence of an item or signal treatment.
+
+Specifically, we targeted up to 17 phone-owning adults per Control cluster for recruitment to Reminder Only and up to 17 for recruitment to Social Information, and up to 29 phone-owning adults per Bracelet, Ink, or Calendar cluster for recruitment to Social Information. Actual enrollment was lower because only one adult per household could enroll, backup phone owners could not always be identified or reached, and only adults who were reached and consented received SMS messages. Among the 3{,}040 adults reached for recruitment, 18 declined, yielding 3{,}022 enrolled SMS recipients: 387 Reminder Only recipients and 2{,}635 Social Information recipients. Appendix~\ref{app:sample-construction} reports the full SMS sampling and enrollment flow.\footnote{Appendix Table~\ref{tab:sms-balance} reports balance for the initial SMS assignment and enrolled SMS samples. The initial assignment sample is balanced on available census covariates. Enrolled SMS recipients differ from phone owners in the no-message comparison group in age and gender. We therefore control for age and gender in all SMS specifications. These variables are also included in our main specifications as LASSO-selected controls. Appendix Table~\ref{tab:sms-enrollment} shows that SMS enrollment rates do not vary systematically with distance or item/signal assignment.}
+
+The Reminder Only message informed recipients that free deworming was available at the local PoT. The Social Information message provided the same reminder and additionally reported cumulative local take-up as of the time of the message.\footnote{Reminder Only: ``Free deworming now at [Central Location]. Reply 111 to stop texts. All texts are free.'' Social Information: ``Free deworming now at [Central Location]. [No/few/almost half/half/more than half/almost all/all] of your village came, that is X in 10 adults. Reply 111 to stop texts. All texts are free.''} Enrolled adults received the first message on the evening before the campaign and follow-up messages on campaign days 2, 4, 6, 8, and 10. Messages were free and recipients could unsubscribe at any time.
+
+To construct the no-SMS comparison group used in the SMS analysis, we randomly sampled phone owners from households not selected for an SMS treatment. Members of this comparison group received neither text messages nor a recruitment visit. Because receipt of an SMS treatment required successful in-person contact and consent, the SMS analysis compares enrolled recipients with sampled no-SMS phone owners. It therefore conditions on realized enrollment and cannot separate the effect of the messages from any effect of the recruitment visit. We interpret these comparisons as auxiliary mechanism checks, not as intent-to-treat estimates of assignment to SMS recruitment.
+
+
+\subsection{Community Outreach and Item Disclosure}\label{sec:info-campaign}
+
+One week before the deworming campaign, Community Health Volunteers (CHVs) visited each of the 144 selected study communities to announce the program. These visits served two purposes: to ensure high awareness of campaign dates and locations, and to publicly disclose the item or signal that would be provided upon deworming in that area.
+
+CHVs are trusted local health workers who live in the communities they serve and support a range of public health activities, including Kenya's school-based deworming program. During community visits, CHVs followed a standardized script that announced the campaign dates and PoT location, described the assigned item or signal, and explained that regular deworming---even in the absence of symptoms---benefits both children and adults and can reduce worm transmission within the community (Figure~\ref{fig:sensitization} reproduces the script). CHVs also distributed flyers and posted posters displaying the campaign dates, location, and assigned item or signal (Figures~\ref{fig:flyers}). These materials served as visual reminders and helped coordinate expectations about what the bracelet, ink mark, or calendar signified.
+
+\subsection{Experiment Timeline and Data}
+
+Figure~\ref{fig:timeline} summarizes the timeline of the experiment and main data collection activities.\footnote{Implementation took place in two waves in 2016: October 3--14 in Busia and Siaya counties, and October 24--November 4 in Kakamega County. Endline surveys for each wave were conducted 2 to 14 days after the corresponding campaign.}
+
+\begin{figure}[htbp]
+\centering
+\input{figures/tikz/timeline}
+\caption{Experiment Timeline and Data Collection}
+\label{fig:timeline}
+\end{figure}
+
+Our analysis combines administrative take-up data collected at treatment sites with surveys collected before and after the campaign. The samples are not mutually exclusive: some individuals appear in multiple rosters or data sources, including the baseline survey, take-up monitoring sample, and endline survey. Appendix~\ref{app:sample-construction} and Figure~\ref{fig:sample-consort} provide additional details on sample construction, survey completion, and the relationship across samples.
+
+Because the SMS treatments are themselves interventions, our main analyses of the distance and item/signal treatments exclude adults enrolled in the SMS treatments. We analyze SMS recipients separately to test reminder and social information channels.
+
+\begin{enumerate}
+\item \emph{Household census.}
+We conducted a census of all adults aged 18 or older in the 144 selected study communities. Enumerators visited each household to record geographic coordinates and collect data on basic demographics and phone ownership. The census covered 39{,}301 adults. We use these data to sample adults for the SMS treatments, draw subsamples for the baseline survey and take-up monitoring, check balance of individual and community characteristics across distance and item/signal conditions, and construct control variables for the main estimation.
+
+\item \emph{Baseline survey.}
+We surveyed a random sample of adults before the campaign to measure prior deworming experience, knowledge about treatment, and social norms surrounding treatment. Of 2{,}160 adults targeted for baseline interviews, 2{,}062 were reached and 1{,}995 completed the survey. These data are used to describe the setting and conduct additional balance checks.
+
+\item \emph{Administrative take-up data.}
+We directly monitored deworming take-up at PoTs rather than relying on individual self-reports for our primary outcome.\footnote{This is important because experimenter demand or social desirability effects in survey responses cannot mechanically generate the main reduced form take-up results.} Enumerators used tablets pre-loaded with the monitoring roster to confirm sampled adults' identities at the PoT and record whether they received deworming treatment. The administrative take-up data cover 12{,}827 unique adults. Our main take-up analysis sample excludes the 3{,}022 adults enrolled in SMS treatments, leaving 9{,}805 adults. These data are used to estimate the main treatment effects on deworming take-up and to assess the accuracy of adults' beliefs about peers' deworming take-up.
+
+\item \emph{Endline survey.}
+We surveyed adults 2 to 14 days after the campaign to measure program understanding, beliefs about peers' deworming status, observability of participation, and preferences over the bracelet and calendar. Of 4{,}220 adults selected for the endline survey, including backups, 3{,}830 were reached and 3{,}729 completed the survey. The main no-SMS endline analysis sample contains 2{,}659 respondents.
+
+\item[] \emph{Observability module.}
+A randomly assigned subset of endline respondents completed an observability module measuring adults' knowledge of peers' deworming status. The module was completed by 1{,}784 respondents, of whom 1{,}141 are in the no-SMS endline observability sample. We use these data to measure how easily participation is observed across distance and item/signal arms.
+
+\item[] \emph{Endline preference measures.}
+At the end of the endline survey, respondents in all study arms chose between the bracelet and the calendar as a gift. In no-item Control clusters, we additionally elicited respondents' willingness to accept compensation to give up their preferred item for the other, yielding a measure of the monetary value gap between the bracelet and calendar. This relative valuation exercise was completed by 467 respondents in Control clusters. We use these preference measures to assess whether differences between the bracelet and calendar arms can be explained by private value rather than observability.
+\end{enumerate}
+
+\subsection{Analysis Samples and Randomization Checks}
+\label{sec:sample-balance}
+
+\paragraph{Analysis samples and balance.}
+Our primary outcome is administratively measured deworming take-up. The take-up analysis sample comprises 9{,}805 adults who were not assigned to an SMS treatment and whose take-up was directly monitored at the PoT. For observability and belief outcomes, the main sample is the no-SMS endline observability sample, consisting of 1{,}141 endline respondents who completed the observability module. Appendix~\ref{app:sample-construction} and Figure~\ref{fig:sample-consort} describe the construction of these samples. Appendix~\ref{app:baseline-sample} further describes the separate baseline survey sample and reports balance in demographic characteristics, deworming knowledge and prior experience, and social image measures.
+
+
+The two main analysis samples are broadly balanced across item/signal arms within the Close and Far distance conditions. Table~\ref{tab:stacked-sample-balance-table} reports sample means, no-item Control means, pairwise differences across item/signal arms, and associated \(p\)-values for the take-up and observability samples. Joint tests report \(F\)-test \(p\)-values for equality across item/signal arms within each distance condition and pooled across distance conditions.
+
+% Table~\ref{tab:stacked-sample-balance-table} reports balance for the two main analysis samples. For each sample, the table reports sample means, no-item Control means, pairwise differences across item/signal arms, and associated \(p\)-values, separately for the Close and Far distance conditions. Joint tests report \(F\)-test \(p\)-values for equality across item/signal arms within each distance condition and pooled across distance conditions.
+
+Out of 80 pairwise comparisons in Table~\ref{tab:stacked-sample-balance-table}, 8 differ at the 10 percent level and 5 at the 5 percent level, close to the 8 and 4 differences expected by chance. The most relevant implementation difference is in realized distance: within the Far condition, Ink communities are on average about 344 meters farther from the PoT than Far-Control communities (\(p=0.02\)). We address this by including continuous community-centroid-to-PoT distance as a control in reduced-form robustness specifications. The structural model conditions directly on continuous distance. The remaining significant differences occur in individual covariates in particular subsamples and are consistent with chance given the number of comparisons. Our main specifications include the LASSO-selected controls, including gender.
+
+Because our identification strategy exploits variation both within distance conditions across item/signal arms and within item/signal arms across distance, Table~\ref{tab:stacked-sample-dist-balance-table} reports balance across distance within each item/signal arm. Excluding the Distance to PoT row, which reports the difference in realized distance between Close and Far communities, only one of 32 additional Far--Close comparisons differs at the 10 percent level and none at the 5 percent level, again consistent with chance.
+
+
+%Could this become a footnote or go into the Appendix?
+\paragraph{Data collection checks.}
+Two data collection issues affect the construction of the monitored take-up and observability samples. First, in the administrative take-up data, 989 individuals assigned to be monitored were omitted from the PoT monitoring lists because of a SurveyCTO list generation error.\footnote{The omission occurred during preparation of the monitoring list and was unrelated to observed outcomes, see Table~\ref{tab:takeup-attrit}.} Second, among endline respondents assigned to the observability module, 126 did not receive the module because of a programming error.
+
+Omission from the monitored take-up sample is balanced across
+arms: the individual arm differences relative to the no-item Control
+mean of 9.1 percent are at most 0.7 percentage points and individually
+insignificant (Table~\ref{tab:takeup-attrit}). The joint test is
+significant at the 10 percent level in the item/signal arm specification
+(\(p = 0.081\)) but not with distance interactions (\(p = 0.195\)). Overall, the magnitudes involved are small: the largest difference corresponds to roughly 20 of
+the  2{,}919 individuals assigned to that arm, and is an
+order of magnitude smaller than the 16.2 percentage point Control
+distance gap in take-up. Finally, omission rates do not differ meaningfully between the bracelet and its active comparison item, the calendar: we fail to reject equality either overall (\(p=0.511\)) or across distance cells (\(p=0.754\)).
+
+% The SurveyCTO monitoring list omission does not appear to have generated differential attrition from the administrative take-up sample. Table~\ref{tab:takeup-attrit} examines omission from the monitored take-up sample. Across the Bracelet, Calendar, and Ink arms, the estimated differences relative to Control are small and statistically indistinguishable from zero.\footnote{The \(p\)-value from a joint hypothesis test for differential attrition comparing treatments only is 0.081, comparing across treat-distance cells it is insignificant at 0.195. The difference in the pooled treatment arm is driven by small differences since treatment arms point in different directions - the actual difference in number of individuals in the survey is around 5 individuals.}  %These patterns provide no evidence that the monitoring-list omission drives the distance-by-public-signal results.
+% These results provide no evidence that item/signal assignment induced differential omission from the monitored take-up sample.
+
+%Table~\ref{tab:takeup-attrit} tests whether item/signal assignment predicts omission from the monitored take-up sample. The dependent variable is an indicator equal to one if an individual assigned to monitoring was omitted from the PoT monitoring list. Across the Bracelet, Calendar, and Ink arms, the estimated coefficients are small and statistically indistinguishable from zero, both in the pooled specification and when the sample is split by distance.
+Recruitment to the endline observability module is similarly balanced across
+arms: joint tests do not reject equal missingness across item/signal arms (\(p = 0.431\)), nor when interacted with Close/Far assignment (\(p = 0.220\)). The only significant difference is 8.8 percentage points lower missingness for Bracelet respondents in Close communities (Table~\ref{tab:endline-obs-attrit}). To account for this imbalance, Table~\ref{tab:rf-fob-lee} reports Lee
+bounds for the observability outcomes. The Bracelet effect on
+observability is bounded below by 12.2 percentage points, and the
+qualitative pattern of the main results is unchanged. Again, we find no significant difference in omission between the bracelet and calendar arm, either overall (\(p=0.316\)) or across distance cells (\(0.111\)).
+
+  % Completion of the endline observability module is not fully balanced across arms, but the imbalance is
+  % partly mechanical and the main observability conclusions are robust to Lee bounds. Bracelet arm
+  % respondents are less likely to be missing the module, with a pooled gap of 6.1 percentage points and a
+  % Close distance gap of 8.8 percentage points (Table~\ref{tab:endline-obs-attrit}). The source of this
+  % issue is mechanical: the SurveyCTO knowledge list was pre-loaded only for primary endline respondents,
+  % so backup respondents surveyed when primary respondents could not be located had this section silently
+  % skipped. Backup rates were highest in Control communities, about 19 percent, compared with about 13
+  % percent in Bracelet communities. Controlling for backup status absorbs roughly half of the
+  % Bracelet--Close gap (Table~\ref{tab:endline-obs-attrit-backup}). Importantly, own deworming status does
+  % not predict completion of the observability module. To account for the remaining imbalance,
+  % Table~\ref{tab:rf-fob-lee} reports Lee bounds for the observability outcomes. The bounds preserve the
+  % qualitative pattern of the main results: in Control, observability remains 14.3--14.6 percentage points
+  % lower in Far than Close communities, while the Far effects of the bracelet and ink remain bounded below
+  % by 23 and 15.5 percentage points, respectively.
+
+
+% Table~\ref{tab:endline-obs-attrit} examines whether item/signal assignment predicts completion of the endline observability module. The module issue is not fully balanced: Bracelet arm respondents are less likely to be missing the module, with a pooled gap of 6.1 percentage points and a Close distance gap of 8.8 percentage points. The source of this issue is mechanical: the SurveyCTO knowledge list was pre-loaded only for primary endline respondents, so backup respondents surveyed when primary respondents could not be located had this section silently skipped. Backup rates were highest in Control communities, about 19 percent, compared with about 13 percent in Bracelet communities. Table~\ref{tab:endline-obs-attrit-backup} shows that controlling for backup status absorbs roughly half of the Bracelet--Close gap. Importantly, own deworming status does not predict completion of the observability module. To account for the remaining imbalance, Table~\ref{tab:rf-fob-lee} reports Lee bounds for the observability outcomes. The bounds preserve the qualitative pattern of the main results: in Control, observability remains 14.3--14.6 percentage points lower in Far than Close communities, while the Far effects of the bracelet and ink remain bounded below by 23 and 15.5 percentage points, respectively.
+
+\subsection{Implementation Fidelity and Interpretation of Items/Signals}
+\label{sec:implementation-fidelity}
+
+Endline survey responses indicate that the campaign outreach was implemented as intended. Table~\ref{tab:implement-bal} shows that CHV visits, community announcements, information about deworming practices, and communication of treatment locations are balanced across item/signal arms within both Close and Far communities. The sample mean for receiving a CHV visit is 81.8 percent, and the joint tests across arms are not statistically significant within either distance condition. Other implementation measures are similarly balanced, with all joint-test \(p\)-values exceeding 0.28. These checks reduce concerns that differential outreach drives the take-up or observability effects.
+
+We next verify that the assigned items and signals were received and understood. Table~\ref{tab:incentive-check} shows that implementation at the PoT was accurate: 96.7 percent of Bracelet recipients, 94.8 percent of Calendar recipients, and 95.0 percent of Ink recipients report receiving the assigned item or signal. Respondents also understood the items as linked to deworming participation. Among endline respondents in the no-SMS sample who report seeing the assigned item or mark and provide a non-missing meaning response, 94.6 percent in the Bracelet arm, 89.3 percent in the Calendar arm, and 96.6 percent in the Ink arm mention deworming, treatment, medicine, tablets, drugs, or worms. Explicitly stigmatizing interpretations are essentially absent: none of the 1{,}669 open-ended meaning responses describe the item as indicating dirtiness, infection, or poor hygiene (Appendix~\ref{app:bad_incentive}).
+
+Table~\ref{tab:incentive-check} documents that the public visibility and persistence of the items differ in ways consistent with the design. The bracelet is the most visible item in the community: 94.5 percent of respondents in the Bracelet arm report seeing it, compared with 72.6 percent in the Calendar arm and 65.7 percent in the Ink arm. Because indelible ink fades within a few days on skin and roughly two weeks on nails, only 14.2 percent of Ink recipients displayed a visible mark at endline. By contrast, 80.5 percent of Bracelet recipients still possessed the bracelet, and 46.0 percent were wearing it on their wrist at endline. Calendar retention and household display were also high: 95.5 percent of Calendar recipients still possessed the calendar, and 86.4 percent had it displayed. Appendix Table~\ref{tab:bracelet-distance-display} further shows that bracelet visibility is high in both Close and Far communities. Respondents in Far communities are somewhat more likely to still have the bracelet, but they are not more likely to be wearing it at endline. These patterns support the intended interpretation of the arms: the bracelet is a persistent public signal of individual participation, ink is a short-lived public signal, and the calendar is an active comparison item that can be retained or displayed at home but is less likely to identify the recipient in public.
+
+Finally, Appendix~\ref{app:bad_incentive} examines whether the items generated negative perceptions or stigma. Complaints are uncommon overall: about 3.3 percent of Ink recipients report any drawback, and the Bracelet complaint rate is statistically indistinguishable from Ink. For ink, the small number of complaints primarily concern the mark being dirty, sticky, or slow to fade. Calendar recipients are more likely to report a drawback, but the open-ended responses indicate that these concerns primarily reflect design or informational preferences rather than stigma. In particular, the most common calendar complaint is that the calendar should have more clearly displayed the organization name or deworming campaign message. This pattern is inconsistent with respondents wanting to hide deworming participation and instead suggests that some recipients preferred a clearer link to the campaign.
+
+
+\subsection{Pre-analysis Plan}\label{sec:prereg}
+
+This study was preregistered through the AEA RCT Registry as AEARCTR-0001643. The pre-analysis plan (PAP) specifies adult deworming take-up as the primary outcome, secondary belief and knowledge outcomes, and the main reduced form comparisons. The preregistered design includes the cluster level item/signal arms, the Close/Far distance assignment, and auxiliary individual level SMS comparisons among phone owners. We report the preregistered reduced form comparisons, with additional analyses labeled as robustness checks, auxiliary tests, or post-PAP additions.
+
+The paper includes three post-PAP additions. First, we develop and estimate a structural model, building on \citet{Benabou_laws_2011}, to quantify the social image multiplier. Second, we use the estimated model in a site allocation exercise. Third, we use an endline relative valuation elicitation in Control communities to benchmark the private value of the bracelet relative to the calendar. These additions are used to interpret, not replace, the preregistered reduced form evidence. Appendix~\ref{sec:pap} discusses deviations from the PAP and maps preregistered items to the analyses reported in the paper (Table~\ref{tab:pap_mapping}).
+
+ \section{Reduced Form Estimates} \label{reduced-form-results}
+
+\subsection{Empirical Strategy}
+
+We estimate the effects of distance and item/signal assignments on the observability of deworming and individual take-up. Let \(\mathcal{Z}=\{\text{Bracelet},\text{Calendar},\text{Ink}\}\). For individual \(i\) in targeted community \(c\), we estimate saturated OLS specifications of the form
+\[
+Y_{ic}
+=
+\alpha_{s(c)}
++\delta Far_c
++\sum_{z\in\mathcal{Z}}\beta_z Z_{zc}
++\sum_{z\in\mathcal{Z}}\gamma_z \left(Z_{zc}\times Far_c\right)
++X_{ic}'\theta
++\varepsilon_{ic}.
+\]
+where \(Y_{ic}\) is either (i) \(\text{Observability}_{ic}\), the share of recognized peers whose deworming status respondent \(i\) reports knowing, or (ii) an indicator equal to one if individual \(i\) dewormed. The variable \(Far_c\) equals one if the realized distance from community \(c\)'s centroid to its finalized PoT exceeds 1.25 km, and \(Z_{zc}\) denotes assignment to item/signal arm \(z\).
+
+The no-item Control arm in Close communities is the omitted group. Thus, \(\delta\) is the Far--Close difference in the Control arm. The coefficient \(\beta_z\) is the effect of arm \(z\) relative to Control in Close communities, \(\beta_z+\gamma_z\) is the corresponding effect in Far communities, and \(\gamma_z\) is the Far--Close difference in the treatment effect. Tables~\ref{tab:beliefs-visibility} and~\ref{tab:overall_effects} report estimates for the combined sample, Close communities, Far communities, and the Far--Close difference.
+
+The vector \(X_{ic}\) includes the LASSO-selected individual controls---sex and age---and, as a design control, expected community-centroid-to-PoT distance under the constrained assignment procedure described in Section~\ref{sec:distance-treatment}. County fixed effects \(\alpha_{s(c)}\) reflect the stratified design. Standard errors are bootstrapped and clustered at the community level. Appendix Tables~\ref{tab:rf-fob-no-covs-no-mud} and~\ref{tab:rf-takeup-no-covs-no-mud} replicate the two main reduced form tables omitting the individual controls and expected distance design control. The point estimates are very similar in magnitude.
+
+\subsubsection{Effects of Distance and Public Signals on Observability}
+
+We first examine how distance and public signals affect whether deworming status is known within the community. At endline, respondents were shown a random subset of ten adults from the same community and asked, conditional on recognizing each adult, whether that adult came for deworming. We code ``Yes'' and ``No'' responses as reported knowledge of status and ``Don't know'' responses as unknown status. The observability outcome is the respondent level share of recognized peers whose deworming status the respondent reports knowing.
+
+In the no-item Control arm, observability is high but declines with distance. Control respondents report knowing the status of 68.1 percent of recognized peers (Table~\ref{tab:beliefs-visibility}). This share is 74.5 percent in Close communities and 59.9 percent in Far communities, a Far--Close difference of $-14.6$ percentage points. This pattern is consistent with learning through direct encounters at treatment sites, seeing peers travel to treatment, or local communication around the campaign. Complementary endline responses on why others would know respondents' own deworming status point to the same channels: respondents commonly cite direct observation, communication, social proximity, and incentive cues, while ``Don't know'' responses are more common in lower observability settings (Figure~\ref{fig:sob-reasons}).
+
+Public signals substantially increase observability, especially in Far communities. Bracelets raise reported knowledge by 14.4 percentage points overall, with effects of 6.4 percentage points in Close communities and 24.8 percentage points in Far communities. Ink raises reported knowledge by 10.3 percentage points overall, with effects of 5.2 percentage points in Close communities and 16.9 percentage points in Far communities. The Calendar arm has a smaller and statistically insignificant effect of 4.3 percentage points. Pooling Bracelet and Ink as Any Signal and Control and Calendar as No Signal, public signals significantly reduce the Far--Close observability gap relative to the no-signal arms (\(p=0.009\)). The bracelet also differs from the calendar overall (\(p=0.001\)), in Far communities (\(p<0.001\)), and in the Far--Close difference (\(p=0.029\)). The same pattern is robust to using continuous community-centroid-to-PoT distance instead of the binary Close/Far indicator (Table~\ref{tab:rf-fob-tes-cts-dist}).% and to omitting the selected controls and expected-distance control from the discrete-distance specification (Table~\ref{tab:rf-fob-no-covs-no-mud}).
+
+This heterogeneity has two possible components. Public signals may raise observability more where baseline observability is low, and greater distance may change what participation signals about motivation. The reduced form documents the interaction between distance and public signals, but it does not by itself separate changes in observability from changes in inference. The structural model decomposes these channels.
+
+We interpret this measure as reported knowledge of peers' deworming status. Appendix Table~\ref{tab:rf-fob-decomp} assesses its accuracy using administrative take-up records for the named peers. Public signals mainly reduce ``Don't know'' responses in Far communities, moving additional dyads into definite Yes/No classifications. These additional classifications are noisier in some cells, consistent with lower-information dyads being newly classified. Nevertheless, the pooled public signal effect on unconditional correct classification is positive in Far communities. Appendix~\ref{app:demand_checks} further uses the paired name elicitation format to test for experimenter demand and social desirability concerns, and provides no evidence that the main individual name format mechanically reduces ``Don't know'' responses or inflates false positives. Together, these checks support interpreting Table~\ref{tab:beliefs-visibility} as evidence of changes in reported knowledge of peers' deworming status rather than as an artifact of the elicitation format.
+
+
+\begin{table}[ht!]
+\scriptsize
+\caption{Effects of Item/Signal Arms and Distance on the Observability of Deworming}
+\label{tab:beliefs-visibility}
+\centering
+\begin{threeparttable}
+\resizebox{\textwidth}{!}{%
+\input{rf-tables/main-specs/rf_discrete_fob_spec_tbl}
+}
+\floatfoot{
+\textit{Notes:} Each column reports OLS estimates of the respondent level observability measure: the fraction of recognized community members whose deworming status the respondent reports knowing. ``Control'' is the mean in the no-item Control arm. Rows for Bracelet, Ink, and Calendar give treatment effects relative to Control. Column (4) reports the difference in those effects between Far and Close communities. We pool Bracelet and Ink as ``Any Signal'' and Control and Calendar as ``No Signal'' to test \(H_0\): Any Signal \(=\) No Signal. The second test, \(H_0\): Bracelet \(=\) Calendar, compares the bracelet with the active comparison item. All regressions include county fixed effects, LASSO selected controls for sex and age, and expected community-centroid-to-PoT distance as a design control. Bootstrapped standard errors, clustered at the community level, are reported in parentheses. Table~\ref{tab:rf-sob-ates} presents analogous results for respondents' beliefs about how observable their own deworming decisions are to other community members. \(\sym{*}p<0.10\), \(\sym{**}p<0.05\), \(\sym{***}p<0.01\).
+}
+\end{threeparttable}
+\end{table}
+
+
+\subsubsection{Effects of Distance and Public Signals on Deworming Take-up}
+
+Table~\ref{tab:overall_effects} reports treatment effects on deworming take-up. In the no-item Control arm, 33.8 percent of adults dewormed. Distance has a large effect: 41.0 percent of adults in Close Control communities dewormed, compared with 24.8 percent in Far Control communities, a decline of 16.2 percentage points (\(p<0.001\)). Respondents' beliefs track this pattern: in the Control arm, they expect about 12 percentage points lower community take-up in Far than in Close communities (Table~\ref{tab:pred-te}).
+
+Bracelets increase take-up by 7.5 percentage points relative to Control (\(p<0.05\)) and by 4.8 percentage points relative to Calendar (\(p=0.048\)). Calendar has a small and statistically insignificant effect of 2.7 percentage points, while Ink has no detectable average effect. The implementation checks in Section~\ref{sec:implementation-fidelity} help interpret this pattern: respondents overwhelmingly link ink to deworming, but the mark is short lived and some respondents report disliking its dirtiness or slow fading, so any signaling benefit may be offset by private disutility.
+
+The distance interaction differs between public signals and the active comparison item. Calendar effects are essentially identical in Close and Far communities. By contrast, Bracelet and Ink effects are quantitatively larger in Far communities, though the arm specific interactions are imprecisely estimated. Because the hypothesis concerns public observability, we test whether the Far--Close take-up gap is smaller in the public signal arms than in the no-signal arms. Pooling Bracelet and Ink as Any Signal and comparing them with Control and Calendar as No Signal, public signals reduce the Far--Close take-up gap by 6.8 percentage points (\(p=0.083\)). The same pattern appears in continuous distance specifications, where the pooled public signal by distance interaction is significant at the 5 percent level (Table~\ref{tab:rf-ates-cts-dist}). For the Bracelet arm specifically, Appendix Table~\ref{tab:bracelet-distance-display} shows that recipients in Far communities are not more likely to be wearing the bracelet at endline, suggesting that the larger Far effect is not driven by differential active display.
+
+The Calendar arm is informative for interpretation. A pure ``mass near the
+  margin'' explanation would predict that any additive private item should have a
+  larger effect in Far communities if more adults are close to the participation
+  cutoff there. The Calendar effect does not vary with distance, while the distance
+  interaction appears only for public signals. This pattern points to a mechanism
+  tied to observability and social image rather than to a generic density at the
+  margin effect.
+
+
+% The Calendar arm is informative for interpretation. A pure ``mass near the margin'' explanation would predict that any additive private item should have a larger effect in Far communities if more adults are close to the participation cutoff there. The Calendar effect does not vary with distance, while the distance interaction appears only for public signals. This pattern also helps address the baseline imbalances in deworming knowledge and past deworming reported in Appendix Table~\ref{tab:baseline-bal}: Calendar communities display a similar Far--Close pattern in past deworming to the public-signal arms, but Calendar take-up is flat across distance. Moreover, although the baseline and take-up samples cannot be linked at the individual level, cluster-level baseline covariate shares can be merged to the full take-up sample. Controlling for the three unbalanced baseline shares -- knows medicine treats worms, dewormed in the past year, and knows bi-yearly treatment is recommended -- leaves the treatment-by-distance pattern intact: for monitored take-up, the Bracelet and Ink Far--Close interactions are 12.1 and 10.7 percentage points, while the Calendar interaction is 2.9 percentage points (Appendix Table~\ref{tab:prior-deworming-robustness}). This points to a mechanism tied to observability and social image rather than to a generic density at the margin effect or differential prior deworming propensity.
+
+Figure~\ref{fig:np-rf} plots community level take-up against community centroid to PoT distance, fitting flexible penalized splines separately by item/signal arm. Take-up declines with distance in all arms, but the Control curve falls steeply and the Bracelet curve remains comparatively high at longer distances. Ink is noisier and remains low, consistent with its muted average take-up effect. These descriptive patterns mirror the regression evidence that the distance gradient is attenuated when participation is made publicly visible, and motivate the structural decomposition.
+
+Taken together, the reduced form results show that greater distance lowers take-up and reduces observability, while public signals increase observability and attenuate the distance gradient in take-up. Before turning to the model, we ask whether the interaction between distance and public signals can be accounted for by non image mechanisms.
+
+\begin{table}[ht!]
+	\scriptsize
+	\caption{Effects of Item/Signal Arms and Distance on Deworming Take-up}
+    \label{tab:overall_effects}
+	\centering
+    \begin{threeparttable}
+    \resizebox{\textwidth}{!}{%
+    \input{rf-tables/main-specs/rf_discrete_dist_covs_tbl}
+    %  uncomment line below for conventional order
+      % \input{rf-tables/rf_main_spec_tbl}
+	}
+    \floatfoot{
+\textit{Notes:} Each column reports OLS estimates of the individual take-up indicator, equal to one if the adult dewormed during the campaign. The estimating equation saturates the binary distance indicator, Far versus Close, with dummy variables for the item/signal arms. The no-item Control arm is the omitted group. Rows for Bracelet, Ink, and Calendar report treatment effects relative to Control. The Control row reports the Control mean in columns (1)--(3) and the Control Far--Close difference in column (4). Columns (1)--(4) report estimates for the combined sample, Close communities, Far communities, and the Far--Close difference, respectively. We pool Bracelet and Ink as ``Any Signal'' and Control and Calendar as ``No Signal'' to test \(H_0\): Any Signal \(=\) No Signal. The second test, \(H_0\): Bracelet \(=\) Calendar, compares the bracelet to the active comparison item. All regressions include county fixed effects, LASSO selected controls for sex and age, and expected community-centroid-to-PoT distance as a design control. Bootstrapped standard errors, clustered at the community level, are reported in parentheses. \(\sym{*}p<0.10\), \(\sym{**}p<0.05\), \(\sym{***}p<0.01\).}
+\end{threeparttable}
+\end{table}
+
+\subsection{Alternative Mechanisms}
+
+\subsubsection{Information and Belief Based Alternatives}\label{sec:sms-alternatives}
+
+The bracelet and ink could raise take-up without changing social image incentives if they increase the salience of the campaign over the 12-day treatment window or convey information about peers' participation. We assess these channels using the auxiliary SMS intervention among phone owners and endline belief measures.
+
+\begin{comment}
+    The bracelet and ink could affect take-up without changing social image incentives if they increase the salience of the campaign, convey information about peers' participation, or change perceptions through message content or item associations. We assess these channels using the auxiliary SMS intervention, endline belief measures, implementation checks, and the contrast between the two public signals.
+\end{comment}
+
+\paragraph{Reminders and social learning.}
+
+Because adults could seek treatment on any of 12 consecutive campaign days, the bracelet and ink could increase take-up by reminding people about the campaign or by facilitating learning about local participation.
+
+We first benchmark the effect of reminders in no-item Control communities, where both Reminder Only and Social Information SMS treatments were implemented. Relative to phone owners in the no-SMS comparison group, Reminder Only raises take-up by 16.7 percentage points (\(p<0.01\)) and Social Information raises take-up by 13.1 percentage points (\(p<0.01\)) (Table~\ref{tab:sms-reminder-te}). The two estimates are statistically indistinguishable, suggesting that the Social Information SMS primarily operated as a reminder in Control communities.
+
+Even though reminders are effective, the evidence provides little support for the view that public signals operate primarily through reminder or social learning channels. If the bracelet and ink worked mainly by reminding people or conveying peer take-up, one might expect their incremental effects to be attenuated among Social Information recipients, who already received both a reminder and information about current local take-up. Figure~\ref{fig:te-by-sms} shows no such attenuation. The bracelet effect relative to the Control arm is 9.3 percentage points among no-SMS phone owners and 14.7 percentage points among Social Information recipients. In Far communities, the corresponding estimates are 12.2 and 18 percentage points. Ink remains close to zero in both SMS conditions. The signal \(\times\) SMS interaction terms are statistically indistinguishable from zero. The conclusion is unchanged when comparing the bracelet to the calendar and when estimating effects separately in Close and Far communities.
+
+\begin{comment}
+    \paragraph{Message content and item associations.}
+A related concern is that the public signal arms may affect behavior through message content or item associations rather than through observability. The bracelet includes the printed message ``Treat worms---improve the health of your community,'' whereas the ink mark is a text-free mark on the thumb and is familiar from voting contexts. We therefore do not interpret the Bracelet arm alone as isolating message-free visibility. Two patterns are informative. First, the observability response is not specific to the bracelet's printed message: both Bracelet and Ink substantially increase reported knowledge of peers' deworming status in Far communities, where baseline observability is lower. Second, endline meaning checks show that respondents overwhelmingly understood the ink mark as linked to deworming; among those who saw the ink mark and provided a meaning, 96.6 percent mentioned deworming, treatment, medicine, tablets, drugs, or worms. The muted average take-up effect of Ink is therefore more consistent with offsetting private disutility of the mark---for example, concerns about dirtiness, stickiness, or slow fading---than with the mark failing to signal deworming participation. We interpret the evidence as reflecting public signaling of participation, while recognizing that the bracelet bundles visibility with printed campaign text and the ink arm bundles visibility with a familiar mark that some respondents dislike.
+\end{comment}
+
+\paragraph{Externality motives.} A related channel is that public signals may shift beliefs about community coverage and hence opportunities to free ride on reduced transmission. Under standard free riding logic, higher expected coverage lowers the private return to deworming. This mechanism does not fit the main pattern. Public signals increase take-up, especially in Far communities, while respondents in the signal arms report higher expected community take-up relative to Control (Table~\ref{tab:pred-te}). Knowledge that worm infections can spread to others also changes little and does not increase differentially in Far communities, where the signals raise observability most (Table~\ref{tab:endline-deworm-knowledge}). These patterns are difficult to reconcile with externality motives as the primary driver of the distance by signal interaction. %check if these sentences are needed, at end
+
+
+% \paragraph{Prior deworming experience} The baseline survey also shows some arm differences in deworming knowledge and prior deworming experience (Appendix Table~\ref{tab:baseline-bal}). Because baseline survey records cannot be linked at the individual level to administrative take-up records, we address these differences by constructing community-level baseline shares for the imbalanced measures and merging them into the take-up and endline observability analyses. The results are stable. For administrative take-up, controlling for these baseline-survey community shares increases the Bracelet and Ink Far--Close interactions from 7.5 and 5.7 percentage points in the main specification to 12.1 and 10.7 percentage points, while the Calendar interaction remains small at 2.9 percentage points (Appendix Table~\ref{tab:prior-deworming-robustness}). For reported knowledge of peers' deworming status, the corresponding Far--Close interactions are nearly unchanged: 17.5 percentage points for Bracelet,11.5 percentage points for Ink, and 2.4 percentage points for Calendar (Appendix Table~\ref{tab:fob-baseline-imbalance-robustness}). These checks suggest that the take-up and observability patterns are not driven by pre-existing differences in deworming knowledge or prior deworming experience across communities.
+
+
+\subsubsection{Private Incentive Explanations}\label{subsec:consumption}
+
+A remaining alternative is that the distance-by-public-signal interaction reflects private incentives rather than social image. One version of this concern is that Far communities contain more adults near the participation margin, so any additive private item would have a larger effect there. The Calendar arm provides the relevant private-item benchmark: its effect on take-up is essentially identical in Close and Far communities, whereas the distance interaction is concentrated in the public signal arms. A more specific concern is that adults induced to deworm in Far communities may privately value the bracelet more than those induced in Close communities. The stronger Far effect of the bracelet could then reflect distance varying private value rather than social image. We assess this possibility using endline preferences between the bracelet and calendar.
+
+At endline, respondents in all study arms chose between the bracelet and the calendar as a gift after completing the survey. In no-item Control communities, we additionally conducted a relative valuation exercise: respondents first chose between the two items and then stated the compensation required to give up their preferred item for the other. Seventy-three percent of respondents prefer the calendar, and the implied mean value gap is US\$0.47 in favor of the calendar (Table~\ref{tab:wtp-summ-table}). Thus, on average, private valuation does not favor the bracelet.
+
+Average valuations do not, however, directly address the relevant concern, which pertains to adults near the participation margin at different distances. Although marginal participants are not observed, gift choices among non-dewormers provide a suggestive diagnostic. In no-item Control communities, where neither item was distributed during the campaign, bracelet choice among non-dewormers is similar across distances: 22.1 percent choose the bracelet in Close communities and 23.5 percent in Far communities (Table~\ref{tab:pref-cal-gift}). This comparison provides no evidence that adults at greater distances have a meaningfully higher underlying private valuation for the bracelet relative to the calendar.
+
+Private valuations could nevertheless depend on the local prevalence of an item. We therefore also examine gift choices among non-dewormers in Bracelet and Calendar communities. These comparisons are informative about how gift choices vary across local item and signaling environments, but they require caution because non-dewormer status is post-treatment. Adults with the highest private valuation for the bracelet in Far Bracelet communities may have been induced to deworm and therefore be absent from this subsample. Moreover, once an item is locally understood as a signal of deworming, a non-participant may avoid choosing it because doing so could falsely signal participation. Gift choices in these communities therefore combine private consumption value, treatment induced selection, and the local signaling environment.
+
+%Table~\ref{tab:pref-cal-gift} shows that gift choices differ across local item environments in a pattern consistent with avoidance of the locally prevalent item. Relative to non-dewormers in Control communities, those in Bracelet communities are 9.7 percentage points less likely to choose the bracelet (\(p<0.05\)), while those in Calendar communities are 17.3 percentage points more likely to choose the bracelet (\(p<0.01\)). These differences do not increase with distance. The Bracelet--Control difference is \(-10.5\) percentage points in Close communities and \(-8.9\) percentage points in Far communities, while the Calendar--Control difference declines from 22.3 to 12.7 percentage points. Thus, although gift choices differ across local item environments, we find no evidence of a distance-varying shift that would increase the bracelet's relative private value farther from the treatment site.
+
+Table~\ref{tab:pref-cal-gift} shows that gift choices differ across local item environments in a pattern consistent with avoidance of the locally prevalent item. Relative to non-dewormers in Control communities, those in Bracelet communities are 9.7 percentage points less likely to choose the bracelet (\(p<0.05\)), while those in Calendar communities are 17.3 percentage points more likely to choose the bracelet (\(p<0.01\)). These differences do not become stronger with distance. The Bracelet--Control difference is \(-10.5\) percentage points in Close communities and \(-8.9\) percentage points in Far communities, while the Calendar--Control difference declines from 22.3 to 12.7 percentage points. Comparing these patterns directly, the difference between the magnitudes of the Calendar and Bracelet coefficients declines from 11.8 percentage points in Close communities to 3.8 percentage points in Far communities, an imprecisely estimated Far--Close change of \(-8.0\) percentage points (standard error 11.2). Thus, although gift choices differ across local item environments, the estimates provide little evidence that prevalence-related preferences shift differentially with distance in a way that could explain the stronger Far effect of the bracelet on take-up.
+
+Finally, Appendix~\ref{sec:mrs} formalizes the private substitution argument. If the distance-by-public-signal interaction were driven by distance-varying substitution between travel costs and private item values, the bracelet--calendar value gap would have to shift toward the bracelet at greater distances, given that the Calendar arm's take-up effect is flat across distance. We find no such pattern. Taken together, the Calendar benchmark, preferences in no-item Control communities, the treated arm gift choice comparisons, and the relative valuation exercise provide little support for a private-value-only explanation of the stronger Far effects of the public signals.
+
+\begin{comment}
+
+    Address general feedback Local prevalence and private value restriction. Note, I have concerns that this is undoing the clarity of the argument around no evidence of scarcity premium etc. RECHECK Refine check when it gave a different rational for why we treat in model as constant when private value might change depending on how many people have the item - in terms of how we think of experimental treatment.
+
+     You can argue that overall prevalence is driven by the randomized arms anyway, or run a robustness check (or write a qualitative defense) showing that this local saturation effect is too small to overturn the massive take-up differences you attribute to the social multiplier.
+
+    \subsubsection{Private Incentive Explanations}\label{subsec:consumption}
+
+A remaining class of alternatives is that the distance by public signal interaction reflects private incentives rather than social image. The take-up results already address one version of this concern: if Far communities simply had more adults near the participation margin, then any additive private item should have had a larger effect in Far communities. The calendar arm provides the relevant placebo. Its take-up effect is essentially identical in Close and Far communities, while the distance interaction appears only for public signals.
+
+The more specific concern is that the marginal adults induced to deworm in Far communities may privately value the bracelet more than marginal adults in Close communities. If so, the stronger Far effect of the bracelet could reflect distance-varying private value rather than social image. We examine this possibility using endline preference measures over the bracelet and calendar.
+
+At endline, respondents in all study arms chose between the bracelet and the calendar as a gift after completing the survey. In no-item Control communities, we additionally conducted a relative valuation exercise: respondents first chose between the two items and then stated the compensation required to give up their preferred item for the other. Seventy-three percent of respondents prefer the calendar, and the implied mean value gap is US\$0.47 in favor of the calendar (Table~\ref{tab:wtp-summ-table}). Thus, on average, private valuation does not favor the bracelet.
+
+The relevant concern, however, is valuation among adults close to participating at different distances. We therefore examine gift choices among adults who did not deworm, our closest proxy for marginal participants. In no-item Control communities, where neither item is locally prevalent, bracelet choice among non-dewormers does not rise with distance: 22.1 percent choose the bracelet in Close communities and 23.5 percent in Far communities (Table~\ref{tab:pref-cal-gift}). This provides no evidence that adults at farther distances have higher private valuation for the bracelet relative to the calendar.
+
+We also examine gift choices among non-dewormers in Bracelet and Calendar communities. These comparisons are informative about how local item prevalence and local signaling environments affect item choice, but they should be interpreted with caution because non-dewormer status is itself post-treatment. Adults with the highest private value for the bracelet in Far Bracelet communities may have been induced to deworm and therefore would not appear in this subsample. In addition, once an item is locally understood as a signal of deworming, a non-participant may dislike choosing that item because doing so would falsely signal participation. These choices therefore reflect both private consumption value and the local signaling environment, rather than private material value alone.
+
+Table~\ref{tab:pref-cal-gift} shows that local item prevalence affects gift choices in ways consistent with this interpretation. When the calendar is locally common, non-dewormers are more likely to choose the bracelet than in Control communities (+17.3 pp, \(p<0.01\)). When the bracelet is locally common, non-dewormers are less likely to choose the bracelet than in Control communities (-9.7 pp, \(p<0.05\)). The latter pattern is consistent with non-participants avoiding an item that locally signals a behavior they did not undertake. For this reason, our cleanest evidence on distance-varying private valuation comes from no-item Control communities, where neither item was earned through the campaign. In those communities, bracelet choice among non-dewormers does not rise with distance.
+
+Finally, Appendix~\ref{sec:mrs} formalizes the private substitution logic. If the distance by public signal interaction were driven by distance-varying substitution between travel costs and private item values, then the bracelet--calendar value gap would have to tilt toward the bracelet at farther distances, given that the calendar arm's take-up effect is flat across distance. Empirically, we find no such pattern in the no-item Control communities, and the relative valuation exercise shows that the calendar is privately valued at least as highly as the bracelet on average. Taken together, the calendar placebo, the Control-community preference evidence, and the relative valuation exercise provide little support for a private-value-only account of the stronger Far effects of the public signals.
+
+REFINE
+Your point about people not wanting to "lie" is a brilliant insight. In fact, this is an incredibly powerful defense—much better than the mechanical "supply and demand" explanation I previously suggested!
+Let’s break down exactly why your "lying" hypothesis perfectly solves the reviewer's concern, and then I will clarify what my previous (and now secondary) suggestion meant.
+Why your "lying" (Stolen Valor) hypothesis is the best defense
+The reviewer's concern is about the structural model's assumption that the private, material value of the bracelet is constant across all villages. The reviewer looks at Table B24 and says: "Wait, in Bracelet communities, non-dewormers don't want the bracelet. This must be a standard supply-and-demand saturation effect—bracelets are everywhere, so their private value drops. Your model assumes private value is constant, so your model is wrong."
+Your hypothesis completely flips this critique on its head.
+You are pointing out that in a Bracelet community, the bracelet has been publicly established as the "I Dewormed" signal. For a non-dewormer to take the bracelet, they would have to actively "lie" to their neighbors and falsely claim a health behavior they didn't do.
+Therefore, the drop in demand you see in B24 isn't because the private, material value of the silicone band dropped (saturation). The demand dropped because there is a massive social image penalty for wearing a signal you didn't earn.
+This completely defends your structural assumption! You can argue that the private value of the item remains constant, just as the model assumes. The difference in take-up among non-dewormers is entirely driven by the signaling/social environment, perfectly validating your paper's core thesis.
+How to write this in the paper:
+You can just add a sentence or two around the discussion of Table B24 to preempt the reviewer:
+"While non-dewormers are less likely to choose the assigned item in treated communities, this likely reflects the signaling environment rather than a shift in the item's intrinsic private value (i.e., local saturation). In a Bracelet community, the item is publicly known as a signal of deworming; a non-participant taking the item would be falsely signaling a behavior they did not undertake. This 'stolen valor' penalty deters non-dewormers from choosing the item, whereas our structural model correctly restricts the underlying private material value of the item to be constant."
+
+What I meant by my previous suggestion (just for clarity)
+Before you brought up the signaling/lying point, I was treating the reviewer's "saturation/scarcity" idea at face value.
+If we assume the reviewer is right and people just get bored of bracelets when there are lots of bracelets in the village, I was suggesting:
+
+Qualitative defense (The logic works in your favor): If saturation makes bracelets less valuable in Far Bracelet communities, take-up in those communities should logically drop. But your main result is that take-up in Far Bracelet communities stays high. If the private value of the bracelet is actually dropping, the residual high take-up must be driven by an even larger social image effect. So if anything, ignoring saturation makes your social multiplier estimates conservative!
+Robustness check: Simulating or bounding what happens to the estimates if you manually allow the private value parameter ($\beta$) to decline as the share of treated people in the village goes up.
+
+However, since your "lying/signaling" explanation completely aligns with the economic story of your paper and directly justifies your structural model's setup, I highly recommend using your explanation instead. It turns a methodological critique into further proof that social signaling is working exactly as you hypothesized.
+\end{comment}
+
+\subsection{Summary}
+
+The reduced form evidence delivers two central findings. First, the distance assignment generates variation in both take-up and observability: moving a community from Close to Far lowers deworming by about 16 percentage points and makes participation less observable. Second, public signals increase observability, and the Far--Close decline in take-up is smaller in the public signal arms than in the Control and Calendar arms. The bracelet raises take-up on average, while ink raises observability but has no detectable average take-up effect. We find little support for reminder or social learning channels, externality based motives, or distance varying private valuation as primary explanations for the distance by public signal pattern.
+
+The reduced form alone does not separate the two components of social image returns: distance can change both how likely participation is to be observed and what being observed implies about motivation. These results motivate a framework adapted from \citet{Benabou_laws_2011} in which deworming yields private benefits and a social image return that decomposes into (i) the probability that participation is observed and (ii) the reputational value of being observed. Distance and public signals can affect both components. In the structural model that follows, we use the observability data to quantify the respective roles of observability and belief updating.
+
+
+
+\end{document}

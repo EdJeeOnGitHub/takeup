@@ -2297,7 +2297,7 @@ summ_gift_df = full_analysis_data %>%
     # 1,808
     group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
     mutate(arm.size = n()) %>% 
-    group_by(gift_choice, add = TRUE) %>%
+    group_by(gift_choice, .add = TRUE) %>%
     ungroup() %>%
     select(KEY.individ, cluster.id, gift_choice, 
       assigned.treatment, dist.pot.group, county, gender,
@@ -2341,7 +2341,7 @@ pref_gift_fit_not_dewormed = analysis_data %>%
       !is.na(sms.treatment)) %>% 
     group_by(assigned.treatment, dist.pot.group, dewormed) %>% 
     mutate(arm.size = n()) %>% 
-    group_by(gift_choice, add = TRUE) %>%
+    group_by(gift_choice, .add = TRUE) %>%
     filter(
       dewormed == FALSE
     )  %>%

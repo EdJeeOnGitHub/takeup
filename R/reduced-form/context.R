@@ -684,8 +684,10 @@ cov_analysis_data = read_csv("temp-data/analysis-cluster-covariate-data.csv") %>
   ) %>%
   left_join(
       cluster_expected_dist_df %>%
-        mutate(cluster.id = as.numeric(cluster.id)),
-      by = c("cluster_id" = "cluster.id")
+        filter(!is.na(cluster.id)) %>%
+        mutate(cluster.id = takeup_clean_cluster_id(cluster.id)),
+      by = c("cluster.id.x" = "cluster.id"),
+      relationship = "many-to-one"
   ) %>%
   left_join(
       cell_expected_dist_df,
@@ -801,6 +803,24 @@ takeup_validate_analysis_context <- function(context) {
       paste(names(actual_rows), actual_rows, sep = "=", collapse = ", "),
       call. = FALSE
     )
+  }
+  # Community ranks are bootstrap indices, not keys into expected distances.
+  # Validate this also when loading a cached context created by older code.
+  expected <- context$data$cluster_expected_dist_df
+  expected <- expected[!is.na(expected$cluster.id), ]
+  expected_ids <- as.integer(as.character(expected$cluster.id))
+  for (name in c("cov_analysis_data", "endline_data")) {
+    frame <- context$data[[name]]
+    ids <- as.integer(as.character(
+      if (name == "cov_analysis_data") frame$cluster.id.x else frame$cluster.id
+    ))
+    correct_mu <- expected$clust_expected_dist[match(ids, expected_ids)] /
+      context$config$distance_sd
+    if (anyNA(correct_mu) || anyNA(frame$mu_d) ||
+        !isTRUE(all.equal(frame$mu_d, correct_mu, check.attributes = FALSE))) {
+      stop("Expected-distance controls do not match original community IDs in ",
+           name, "; rebuild the analysis context.", call. = FALSE)
+    }
   }
   invisible(context)
 }

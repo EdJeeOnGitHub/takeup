@@ -23,10 +23,11 @@ data <- read_csv("temp-data/analysis-cluster-covariate-data.csv",
                  show_col_types = FALSE)
 cluster_expected <- read_csv("data/cluster_expected_dist.csv",
                              show_col_types = FALSE) |>
-  transmute(cluster_id = as.integer(cluster.id), clust_expected_dist = dist)
+  transmute(cluster.id.x = as.integer(cluster.id), clust_expected_dist = dist)
 data <- data |>
-  left_join(cluster_expected, by = "cluster_id") |>
+  left_join(cluster_expected, by = "cluster.id.x", relationship = "many-to-one") |>
   mutate(mu_d = clust_expected_dist / sd(cluster.dist.to.pot))
+stopifnot(!anyNA(data$mu_d))
 assigned <- takeup_apply_distance_spec(data, crosswalk, "assigned") |>
   mutate(
     assigned_treatment = factor(assigned.treatment),

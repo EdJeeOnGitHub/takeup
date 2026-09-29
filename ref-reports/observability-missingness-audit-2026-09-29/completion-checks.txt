@@ -1,0 +1,31 @@
+Verified exact saved person/submission-key pairs: 3678 
+Eligible contact records: 3817 unique people: 3776 
+Records without affirmative interview and consent: 117 
+Completed records: 3700 repeat completed records: 22 
+Unique contacted people without an eligible completion: 98 
+# A tibble: 12 × 4
+   stage                        sms           records unique_people
+   <chr>                        <chr>           <int>         <int>
+ 1 eligible_contact_records     all              3817          3776
+ 2 eligible_contact_records     reminder.only     172           168
+ 3 eligible_contact_records     sms.control      2774          2745
+ 4 eligible_contact_records     social.info       871           863
+ 5 completed_records            all              3700          3678
+ 6 completed_records            reminder.only     167           163
+ 7 completed_records            sms.control      2672          2659
+ 8 completed_records            social.info       861           856
+ 9 unique_completed_respondents all              3678          3678
+10 unique_completed_respondents reminder.only     163           163
+11 unique_completed_respondents sms.control      2659          2659
+12 unique_completed_respondents social.info       856           856
+# A tibble: 8 × 3
+  interview consent records
+      <dbl>   <dbl>   <int>
+1         0       0       2
+2         0       1       6
+3         0      NA      50
+4         1       0      21
+5         1       1    3700
+6         1      NA      27
+7        NA       1      10
+8        NA      NA       1

@@ -1,0 +1,20 @@
+{
+  "build/work/realized/temp-data/tidy-rf-tes/discrete-dist-covs-tidy-tes.csv": {
+    "sha256": "b9e994ae64061e2b4e4c8e93682bc09de31314ed4925f7a6ee75ba61409d5e1a"
+  },
+  "build/work/realized/temp-data/tidy-rf-tes/reducedform-discrete-fob-tidy-tes.csv": {
+    "sha256": "4fa38e125c0af49b2b7620e8b367f061aa430b7693edaf2368a3e1c28c6dad29"
+  },
+  "/home/ed/projects/overleaf/overleaf-takeup/rf-tables/main-specs/rf_discrete_dist_covs_tbl.tex": {
+    "sha256": "57b6c6ba1d430c91640ded10f34a91369cb0693dcd72f4b7ee8292c97f78403e"
+  },
+  "build/realized/presentations/rf-tables/main-specs/rf_discrete_dist_covs_tbl.tex": {
+    "sha256": "e3019e5e99f90e5a9b80aa348fffcdb656c10e25bf64ffc3b86c8af80720920a"
+  },
+  "/home/ed/projects/overleaf/overleaf-takeup/rf-tables/main-specs/rf_discrete_fob_spec_tbl.tex": {
+    "sha256": "130bb6b65cf33ae10140f9fce4eab59384fc56a1330fa555765e79cfe99be539"
+  },
+  "build/realized/presentations/rf-tables/main-specs/rf_discrete_fob_spec_tbl.tex": {
+    "sha256": "4d6ace54e0384266b189e622140308eeb45832dbd3350f24b8557f748ce1164a"
+  }
+}

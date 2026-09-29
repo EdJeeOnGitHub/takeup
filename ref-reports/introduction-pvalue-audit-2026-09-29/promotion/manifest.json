@@ -1,0 +1,74 @@
+{
+  "rf-tables/main-specs/rf_discrete_fob_spec_tbl.tex": {
+    "before_sha256": "130bb6b65cf33ae10140f9fce4eab59384fc56a1330fa555765e79cfe99be539",
+    "after_sha256": "9fc8f7fb32a186e1e95a0a8c9595a41e723a51882afdfb57b42c50e3df5f90cc"
+  },
+  "rf-tables/main-specs/rf_discrete_dist_covs_tbl.tex": {
+    "before_sha256": "57b6c6ba1d430c91640ded10f34a91369cb0693dcd72f4b7ee8292c97f78403e",
+    "after_sha256": "1d1a2650c1c4642f9997f99e447d9bc1cb16f28bc5e3689dba19598f4717d19f"
+  },
+  "rf-tables/main-specs/paper_main_analysis_sample_attrition_tbl.tex": {
+    "before_sha256": "308085500171c4b732fccf69f39ccc1f95d8fbb0e9b7b1d1d393abaf2758fda8",
+    "after_sha256": "74e8151852888c8b3dabadd3af20d7844531636934443807fd33cf786e584c53"
+  },
+  "rf-tables/main-specs/paper_simulated_table_A_attrition_tbl.tex": {
+    "before_sha256": "4ae73958a282aa4302ce72db1ff994f98dcb89ef0f89a6e7872598de8d2637f3",
+    "after_sha256": "c48270605ba9ea2a889996e290d743f3db1a5b3d91f09c84b088179b79ef5fab"
+  },
+  "rf-tables/main-specs/fob_lee_bounds_tbl.tex": {
+    "before_sha256": "054cd76f47e3ee0d6fe27ae8a9570cf7e51555cd8323f05034539f5cfee7eedc",
+    "after_sha256": "9583a6eeb62f915343588be4941f5add1cb0453e16437a79316d29296172acb9"
+  },
+  "rf-tables/main-specs/rf_cts_fob_spec_tbl.tex": {
+    "before_sha256": "d5195a48002c06ba1c192a4e8be1330fa347cfa764153dd576261bafe68f335e",
+    "after_sha256": "a7cda82c9d8fd630337e6835a11f4589b2bfca40b35da742cbb8610b5fee3901"
+  },
+  "rf-tables/main-specs/rf_discrete_belief_decomposition_tbl.tex": {
+    "before_sha256": "a697a49196f1f6b39ac525da2ee573d969ca12931e873ef37855137ee30413d8",
+    "after_sha256": "7e05f361619cfb50c49f1f671cdf93d656b8ebad10a5b8211ecdd0294d651c62"
+  },
+  "rf-tables/main-specs/rf_discrete_sob_spec_tbl.tex": {
+    "before_sha256": "8f22b079762c26765b15c3284f84eefeb5e68a74747b40b87bd113e2a11718fc",
+    "after_sha256": "1b0156ffffb6d62b8e92bbf74671e53af6292efd9de08de2daf1c248a7d401dc"
+  },
+  "rf-tables/main-specs/predicted_endline_deworm_takeup_spec_tbl.tex": {
+    "before_sha256": "e2f6305e606ace17ceaa579ede60dd03417dd3df936b59959dc851d0a9763357",
+    "after_sha256": "a3fb33c8ab939f50307c7133c391e22f42fdd2e96a92fc0fb63d77ba90ca8162"
+  },
+  "rf-tables/main-specs/rf_dist_cts_spec_tbl.tex": {
+    "before_sha256": "14722c49ecf5c7f1cfd0987c986f75d5061962b75f80011fcf6c91195ccfffb4",
+    "after_sha256": "26b235481e5f51ecc05eb981d96575828abb5a2caa8c2aab51db434f7b9015a5"
+  },
+  "rf-tables/main-specs/rf_externality_knowledge_tbl.tex": {
+    "before_sha256": "77821de8f389ed46561eacae34876a3dece654dea193063a0c079c6c1190e20d",
+    "after_sha256": "5c7bf162d810e88d40504c552882f9c77ee15d3b03e1d5563d1006c28afc9d9c"
+  },
+  "rf-tables/main-specs/preference_for_bracelet_abs_diff_spec_tbl.tex": {
+    "before_sha256": "377260488533a9585d14020290e8ecaf71fbbe135db8e4587abc5406c201a32a",
+    "after_sha256": "c1b853205d1d71874005df5a1c797b87fb529b8d18fb2364d08b94b5b01ccff7"
+  },
+  "tables/fob-baseline-imbalance-robustness.tex": {
+    "before_sha256": "2a61b21132385f38eaad3f7460b0d8feffbc7b907f4292b02896f46a10c2a3a7",
+    "after_sha256": "f96843112ef1082c3a55ba754337a94366cbef1b4c33ff738d79e9ca6958e6c3"
+  },
+  "ECM ReStud.tex": {
+    "before_sha256": "f0e9caa443cdd12c5882bb4532cf773ea16d562fa7a0c49721532e387d759f75",
+    "after_sha256": "43521c5e882ec5be2417c9d7f68a065aadc1eb32ee8a8f9a12a067c2ab50aa06"
+  },
+  "experimental-design.tex": {
+    "before_sha256": "ee7b0a74512d7d1a6d6702518446ab2cabedb75afa8ff6bb8c0944f289e06664",
+    "after_sha256": "47bd954f0169b23bad7f25268f9641c4e9594fb5051c0a99c2daf1d1a35e7a0a"
+  },
+  "online-appendix.tex": {
+    "before_sha256": "ff2a49143b3ff065215ceed74434ec07909930dbb6d3d61470d1c9b7361bf467",
+    "after_sha256": "93a31349e0bdf2fccd4b585e9e6386c517dfc427a71ebb3ec5a36bc23ece0d5f"
+  },
+  "rf-tables/main-specs/rf_discrete_fob_no_covs_no_mu_d_spec_tbl.tex": {
+    "before_sha256": "73d2e8825e562129d7d412bc89c9760b6e36e6eef18c266913761865e80df208",
+    "after_sha256": "0938bee3621f2795a3f1a4d3912bfeb43b8b343c41d968c07a3f55c3c092224e"
+  },
+  "rf-tables/main-specs/rf_discrete_dist_no_covs_no_mu_d_tbl.tex": {
+    "before_sha256": "30bbdf4ad8dc5c448d92247905c0e8d5eb1402ab1bb67c702be21818541fb3d8",
+    "after_sha256": "cd6be14539af4a3f40aaaec2969de2da6d6af46513bf9472b2f9d9dfe8fd35ff"
+  }
+}

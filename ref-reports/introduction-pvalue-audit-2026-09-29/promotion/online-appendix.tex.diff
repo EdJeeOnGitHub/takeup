@@ -1,0 +1,13 @@
+--- online-appendix.tex
++++ online-appendix.tex
+@@ -765,8 +765,8 @@
+   take-up data, we construct community-level baseline
+   shares for these three measures and include them as controls in the main reduced-form specifications. The results are reported in Tables~\ref{tab:fob-baseline-imbalance-robustness} and \ref{tab:prior-deworming-robustness}. The key patterns
+   are stable: for reported knowledge of peers' deworming status, the Bracelet and
+-  Ink Far--Close interactions are 17.5 and 11.5 percentage points, while the
+-  Calendar interaction is 2.4 percentage points; for administrative take-up, the
++  Ink Far--Close interactions are 18.2 and 11.3 percentage points, while the
++  Calendar interaction is 2.8 percentage points; for administrative take-up, the
+   corresponding interactions are 12.1, 10.7, and 2.9 percentage points. Thus, the
+   central observability and take-up patterns are not explained by these baseline
+   survey imbalances.

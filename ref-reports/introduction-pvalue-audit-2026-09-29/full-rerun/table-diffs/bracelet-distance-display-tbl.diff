@@ -1,0 +1,16 @@
+--- manuscript/rf-tables/main-specs/bracelet-distance-display-tbl.tex
++++ corrected/rf-tables/main-specs/bracelet-distance-display-tbl.tex
+@@ -1,6 +1,7 @@
++
+ \centering
+ \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+-\begin{tabular}[t]{lccc}
++\begin{tabular}{lccc}
+ \toprule
+  & Close & Far & Far--Close\\
+ \midrule
+@@ -9,3 +10,4 @@
+ Wearing bracelet & \makecell[c]{0.482\\(0.058)} & \makecell[c]{0.429\\(0.055)} & \makecell[c]{-0.053\\(0.08)}\\
+ \bottomrule
+ \end{tabular}}
++
